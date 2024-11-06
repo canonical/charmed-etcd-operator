@@ -19,11 +19,3 @@ bases:
     run-on:
     - name: ubuntu
       channel: "22.04"
-
-source: https://github.com/canonical/charmed-etcd-operator
-issues: https://github.com/canonical/charmed-etcd-operator/issues
-website:
-  - https://github.com/canonical/charmed-etcd-operator
-  - https://matrix.to/#/%23charmhub-data-platform%3Aubuntu.com
-maintainers:
-  - Canonical Data Platform <data-platform@lists.launchpad.net>
