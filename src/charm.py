@@ -24,4 +24,4 @@ class EtcdOperatorCharm(ops.CharmBase):
 
 
 if __name__ == "__main__":  # pragma: nocover
-    ops.main(CharmedEtcdOperatorCharm)  # type: ignore
+    ops.main(EtcdOperatorCharm)  # type: ignore
