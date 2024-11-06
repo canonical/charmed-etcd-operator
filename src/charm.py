@@ -11,7 +11,7 @@ import ops
 logger = logging.getLogger(__name__)
 
 
-class CharmedEtcdOperatorCharm(ops.CharmBase):
+class EtcdOperatorCharm(ops.CharmBase):
     """Charm the application."""
 
     def __init__(self, framework: ops.Framework):
