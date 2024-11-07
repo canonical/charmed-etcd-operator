@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-# Copyright 2024 Ubuntu
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import logging
 from pathlib import Path
 
@@ -12,23 +11,21 @@ from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before any relations/configurations take place.
+    Assert on the status before any relations/configurations take place.
     """
     # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
+    etcd_charm = await ops_test.build_charm(".")
 
     # Deploy the charm and wait for active/idle status
-    await asyncio.gather(
-        ops_test.model.deploy(charm, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=1000
-        ),
-    )
+    await ops_test.model.deploy(etcd_charm, num_units=1)
+
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)

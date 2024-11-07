@@ -1,14 +1,10 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 # This file configures Charmcraft.
 # See https://juju.is/docs/sdk/charmcraft-config for guidance.
 
-name: charmed-etcd-operator
 type: charm
-title: Charmed etcd VM operator
-summary: Operator for etcd databases in VM environments.
-description: |
-  Etcd is a distributed, reliable key-value store for the most critical data of
-  distributed systems, such as Kubernetes. This charmed operator deploys and operates
-  etcd on virtual machines.
 
 # temporary based on 22.04 as data-platform-workflows is not ready yet for 24.04
 # see: https://github.com/canonical/data-platform-workflows/issues/246
@@ -19,3 +15,23 @@ bases:
     run-on:
     - name: ubuntu
       channel: "22.04"
+
+parts:
+  charm:
+    build-snaps:
+      - rustup
+    build-packages:
+      - libffi-dev
+      - libssl-dev
+      - pkg-config
+    override-build: |
+      rustup default stable
+
+      # Convert subset of poetry.lock to requirements.txt
+      curl -sSL https://install.python-poetry.org | python3 -
+      /root/.local/bin/poetry export --only main,charm-libs --output requirements.txt
+
+      craftctl default
+    charm-strict-dependencies: true
+    charm-requirements: [requirements.txt]
+    charm-entrypoint: src/charm.py

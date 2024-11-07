@@ -1,0 +1,54 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: Release to Charmhub
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  ci-tests:
+    name: Tests
+    uses: ./.github/workflows/ci.yaml
+    secrets: inherit
+    permissions:
+      contents: write  # Needed for Allure Report beta
+
+  release-libraries:
+    name: Release libraries
+    needs:
+      - ci-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          # Workaround for https://github.com/canonical/charmcraft/issues/1389#issuecomment-1880921728
+          touch requirements.txt
+      - name: Release charm libraries
+        uses: canonical/charming-actions/release-libraries@2.6.3
+        with:
+          credentials: ${{ secrets.CHARMHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build charm
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v23.0.4
+
+#  release:
+#    name: Release charm
+#    needs:
+#      - ci-tests
+#      - build
+#    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v23.0.4
+#    with:
+#      channel: 3.5/edge
+#      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+#    secrets:
+#      charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
+#    permissions:
+#      contents: write  # Needed to create GitHub release
