@@ -6,8 +6,9 @@ import unittest
 
 import ops
 import ops.testing
-from charm import EtcdOperatorCharm
 from scenario import Context, State
+
+from charm import EtcdOperatorCharm
 
 
 class TestCharm(unittest.TestCase):
