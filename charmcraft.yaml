@@ -1,14 +1,10 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 # This file configures Charmcraft.
 # See https://juju.is/docs/sdk/charmcraft-config for guidance.
 
-name: charmed-etcd-operator
 type: charm
-title: Charmed etcd VM operator
-summary: Operator for etcd databases in VM environments.
-description: |
-  Etcd is a distributed, reliable key-value store for the most critical data of
-  distributed systems, such as Kubernetes. This charmed operator deploys and operates
-  etcd on virtual machines.
 
 # temporary based on 22.04 as data-platform-workflows is not ready yet for 24.04
 # see: https://github.com/canonical/data-platform-workflows/issues/246
