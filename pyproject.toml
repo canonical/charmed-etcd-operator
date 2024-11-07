@@ -6,7 +6,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
-ops = "^2.8.0"
+ops = "^2.17.0"
 
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
@@ -43,6 +43,7 @@ parameterized = "*"
 ops-scenario = "*"
 
 [tool.poetry.group.integration.dependencies]
+ops = "^2.17.0"
 pytest = "*"
 pytest-github-secrets = {git = "https://github.com/canonical/data-platform-workflows", tag = "v22.0.0", subdirectory = "python/pytest_plugins/github_secrets"}
 pytest-asyncio = "*"
