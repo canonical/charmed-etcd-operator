@@ -1,6 +1,10 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+# This file is still required due to data-platform-workflows not supporting unified
+# charmcraft.yaml syntax. Details see:
+# https://github.com/canonical/data-platform-workflows/issues/169
+
 name: charmed-etcd-operator
 title: Charmed etcd VM operator
 summary: Operator for etcd databases in VM environments.
