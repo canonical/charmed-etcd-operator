@@ -1,15 +1,12 @@
-# Copyright 2024 Ubuntu
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
-#
-# Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import unittest
 
 import ops
 import ops.testing
-from scenario import Context, State
-
 from charm import EtcdOperatorCharm
+from scenario import Context, State
 
 
 class TestCharm(unittest.TestCase):
