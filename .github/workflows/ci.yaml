@@ -80,7 +80,6 @@ jobs:
     with:
       juju-agent-version: ${{ matrix.juju.agent }}
       juju-snap-channel: ${{ matrix.juju.snap_channel }}
-      _beta_allure_report: ${{ matrix.juju.allure_report }}
       artifact-prefix: packed-charm-cache-true
       cloud: lxd
     permissions:
