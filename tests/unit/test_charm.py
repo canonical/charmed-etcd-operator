@@ -3,11 +3,11 @@
 # See LICENSE file for licensing details.
 
 import unittest
+from unittest.mock import patch
 
 import ops
 import ops.testing
 from scenario import Context, State
-from unittest.mock import patch
 
 from charm import EtcdOperatorCharm
 
