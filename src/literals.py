@@ -8,12 +8,18 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
-from ops.model import BlockedStatus, StatusBase
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 SNAP_NAME = "etcd"
 SNAP_REVISION = 233
 
+PEER_RELATION = "etcd-cluster"
+SERVER_PORT = 2379
+PEER_PORT = 2380
+
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+SUBSTRATES = Literal["vm", "k8s"]
+SUBSTRATE = "vm"
 
 
 @dataclass
@@ -27,4 +33,6 @@ class StatusLevel:
 class Status(Enum):
     """Collection of possible statuses for the charm."""
 
+    ACTIVE = StatusLevel(ActiveStatus(), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
+    NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")

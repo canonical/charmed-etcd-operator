@@ -34,6 +34,7 @@ class EtcdWorkload(WorkloadBase):
         try:
             self.etcd.ensure(snap.SnapState.Present, revision=SNAP_REVISION)
             self.etcd.hold()
+            return True
         except snap.SnapError as e:
             logger.error(str(e))
             return False
