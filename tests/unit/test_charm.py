@@ -10,11 +10,13 @@ from scenario import Context, State
 
 from charm import EtcdOperatorCharm
 
+
 def test_start():
     ctx = Context(EtcdOperatorCharm, meta={"name": "my-charm"})
     state_in = State()
     state_out = ctx.run(ctx.on.start(), state_in)
     assert state_out.unit_status == ops.ActiveStatus()
+
 
 def test_install_failure_blocked_status():
     ctx = Context(EtcdOperatorCharm, meta={"name": "my-charm"})

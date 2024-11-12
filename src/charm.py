@@ -7,6 +7,7 @@
 import logging
 
 import ops
+from ops import StatusBase
 from ops.charm import (
     LeaderElectedEvent,
     RelationChangedEvent,
@@ -14,7 +15,6 @@ from ops.charm import (
     RelationDepartedEvent,
     RelationJoinedEvent,
 )
-from ops import StatusBase
 
 from core.cluster import ClusterState
 from literals import PEER_RELATION, SUBSTRATE, DebugLevel, Status
