@@ -61,6 +61,8 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
+        self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
+
         self.charm.set_status(Status.ACTIVE)
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
@@ -73,7 +75,7 @@ class EtcdEvents(Object):
 
     def _on_cluster_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
-        self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
+        pass
 
     def _on_cluster_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by a unit leaves the cluster relation."""

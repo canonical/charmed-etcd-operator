@@ -27,7 +27,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
         # --- MANAGERS ---
-        self.cluster_manager = ClusterManager
+        self.cluster_manager = ClusterManager()
 
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
