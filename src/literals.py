@@ -12,6 +12,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 SNAP_NAME = "etcd"
 SNAP_REVISION = 233
+SNAP_SERVICE = "etcd.etcd"
 
 PEER_RELATION = "etcd-cluster"
 SERVER_PORT = 2379
@@ -35,4 +36,5 @@ class Status(Enum):
 
     ACTIVE = StatusLevel(ActiveStatus(), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
+    SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")

@@ -14,3 +14,8 @@ class WorkloadBase(ABC):
     def start(self) -> None:
         """Start the workload service."""
         pass
+
+    @abstractmethod
+    def alive(self) -> bool:
+        """Check if the workload is running."""
+        pass

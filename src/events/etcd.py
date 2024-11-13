@@ -50,6 +50,7 @@ class EtcdEvents(Object):
         )
         """
         self.framework.observe(self.charm.on.leader_elected, self._on_leader_elected)
+        self.framework.observe(self.charm.on.update_status, self._on_update_status)
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -63,7 +64,12 @@ class EtcdEvents(Object):
         """Handle start event."""
         self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
 
-        self.charm.set_status(Status.ACTIVE)
+        self.charm.workload.start()
+
+        if self.charm.workload.alive():
+            self.charm.set_status(Status.ACTIVE)
+        else:
+            self.charm.set_status(Status.SERVICE_NOT_RUNNING)
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
@@ -90,3 +96,8 @@ class EtcdEvents(Object):
         if not self.charm.state.peer_relation:
             self.charm.set_status(Status.NO_PEER_RELATION)
             return
+
+    def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
+        """Handle update_status event."""
+        if not self.charm.workload.alive():
+            self.charm.set_status(Status.SERVICE_NOT_RUNNING)

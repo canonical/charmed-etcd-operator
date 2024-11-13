@@ -10,7 +10,7 @@ from charms.operator_libs_linux.v2 import snap
 from typing_extensions import override
 
 from core.workload import WorkloadBase
-from literals import SNAP_NAME, SNAP_REVISION
+from literals import SNAP_NAME, SNAP_REVISION, SNAP_SERVICE
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,10 @@ class EtcdWorkload(WorkloadBase):
 
     @override
     def start(self) -> None:
-        pass
+        try:
+            self.etcd.start(services=[SNAP_SERVICE])
+        except snap.SnapError as e:
+            logger.exception(str(e))
 
     def install(self) -> bool:
         """Install the etcd snap from the snap store.
@@ -37,4 +40,11 @@ class EtcdWorkload(WorkloadBase):
             return True
         except snap.SnapError as e:
             logger.error(str(e))
+            return False
+
+    @override
+    def alive(self) -> bool:
+        try:
+            return bool(self.etcd.services[SNAP_SERVICE]["active"])
+        except KeyError:
             return False
