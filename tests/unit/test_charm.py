@@ -6,14 +6,15 @@ from unittest.mock import patch
 
 import ops
 import ops.testing
-from scenario import Context, State
+from scenario import Context, State, Relation
 
 from charm import EtcdOperatorCharm
 
 
 def test_start():
     ctx = Context(EtcdOperatorCharm, meta={"name": "my-charm"})
-    state_in = State()
+    relation = Relation(id=1, endpoint="etcd-cluster", remote_units_data={1: {}})
+    state_in = State(relations=[relation])
     state_out = ctx.run(ctx.on.start(), state_in)
     assert state_out.unit_status == ops.ActiveStatus()
 
