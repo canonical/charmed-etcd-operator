@@ -35,7 +35,6 @@ class EtcdEvents(Object):
         self.framework.observe(self.charm.on.install, self._on_install)
         self.framework.observe(self.charm.on.start, self._on_start)
         self.framework.observe(self.charm.on.config_changed, self._on_config_changed)
-        """
         self.framework.observe(
             self.charm.on[PEER_RELATION].relation_created, self._on_cluster_relation_created
         )
@@ -48,7 +47,6 @@ class EtcdEvents(Object):
         self.framework.observe(
             self.charm.on[PEER_RELATION].relation_departed, self._on_cluster_relation_departed
         )
-        """
         self.framework.observe(self.charm.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.charm.on.update_status, self._on_update_status)
 
