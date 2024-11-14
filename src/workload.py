@@ -5,6 +5,7 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
+import os
 
 from charms.operator_libs_linux.v2 import snap
 from typing_extensions import override
@@ -48,3 +49,10 @@ class EtcdWorkload(WorkloadBase):
             return bool(self.etcd.services[SNAP_SERVICE]["active"])
         except KeyError:
             return False
+
+    @override
+    def write(self, content: str, path: str) -> None:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        with open(path, "w") as f:
+            f.write(content)

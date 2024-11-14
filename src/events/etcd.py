@@ -19,6 +19,7 @@ from ops.charm import (
 
 from literals import PEER_RELATION, Status
 from managers.cluster import ClusterManager
+from managers.config import ConfigManager
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -35,6 +36,9 @@ class EtcdEvents(Object):
 
         # --- MANAGERS ---
         self.cluster_manager = ClusterManager()
+        self.config_manager = ConfigManager(
+            state=self.charm.state, workload=self.charm.workload, config=self.charm.config
+        )
 
         # --- Core etcd charm events ---
 
@@ -66,7 +70,7 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
-        self.charm.state.unit_server.update(self.cluster_manager.get_host_mapping())
+        self.config_manager.set_config_properties()
 
         self.charm.workload.start()
 
@@ -81,7 +85,7 @@ class EtcdEvents(Object):
 
     def _on_cluster_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
-        pass
+        self.charm.state.unit_server.update(self.cluster_manager.get_host_mapping())
 
     def _on_cluster_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""

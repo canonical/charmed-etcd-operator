@@ -12,7 +12,10 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 SNAP_NAME = "etcd"
 SNAP_REVISION = 233
-SNAP_SERVICE = "etcd.etcd"
+SNAP_SERVICE = "etcd"
+# this path will be updated when we switch to charmed-etcd snap
+# it's the current config path for the legacy-etcd snap
+CONFIG_PATH = "/var/snap/etcd/common/etcd.conf.yml"
 
 PEER_RELATION = "etcd-cluster"
 SERVER_PORT = 2379

@@ -72,6 +72,11 @@ class EtcdServer(RelationState):
         return int(self.unit.name.split("/")[1])
 
     @property
+    def unit_name(self) -> str:
+        """The id of the unit from the unit name."""
+        return self.unit.name
+
+    @property
     def hostname(self) -> str:
         """The hostname for the unit."""
         return self.relation_data.get("hostname", "")

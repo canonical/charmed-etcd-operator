@@ -19,3 +19,8 @@ class WorkloadBase(ABC):
     def alive(self) -> bool:
         """Check if the workload is running."""
         pass
+
+    @abstractmethod
+    def write(self, content: str, path: str) -> None:
+        """Write content to a file."""
+        pass
