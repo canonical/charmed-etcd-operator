@@ -18,6 +18,7 @@ from ops.charm import (
 )
 
 from literals import PEER_RELATION, Status
+from managers.cluster import ClusterManager
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -31,6 +32,11 @@ class EtcdEvents(Object):
     def __init__(self, charm: "EtcdOperatorCharm"):
         super().__init__(charm, key="etcd_events")
         self.charm = charm
+
+        # --- MANAGERS ---
+        self.cluster_manager = ClusterManager()
+
+        # --- Core etcd charm events ---
 
         self.framework.observe(self.charm.on.install, self._on_install)
         self.framework.observe(self.charm.on.start, self._on_start)
@@ -60,7 +66,7 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
-        self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
+        self.charm.state.unit_server.update(self.cluster_manager.get_host_mapping())
 
         self.charm.workload.start()
 
