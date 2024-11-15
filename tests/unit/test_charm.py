@@ -23,6 +23,19 @@ def test_start():
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State()
 
+    # without peer relation the charm should not start
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.write"),
+        patch("workload.EtcdWorkload.start"),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == ops.MaintenanceStatus("no peer relation available")
+
+    # with peer relation, it should go to active status
+    relation = testing.PeerRelation(id=1, endpoint="etcd-cluster")
+    state_in = testing.State(relations={relation})
+
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write"),
@@ -31,6 +44,7 @@ def test_start():
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
 
+    # if the etcd daemon can't start, the charm should display blocked status
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write"),

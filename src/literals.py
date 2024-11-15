@@ -18,7 +18,7 @@ SNAP_SERVICE = "etcd"
 CONFIG_PATH = "/var/snap/etcd/common/etcd.conf.yml"
 
 PEER_RELATION = "etcd-cluster"
-SERVER_PORT = 2379
+CLIENT_PORT = 2379
 PEER_PORT = 2380
 
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]

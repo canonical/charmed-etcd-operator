@@ -7,10 +7,10 @@
 import logging
 from collections.abc import MutableMapping
 
-from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerUnitData
+from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
 
-from literals import PEER_PORT, SERVER_PORT, SUBSTRATES
+from literals import CLIENT_PORT, PEER_PORT, SUBSTRATES
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +77,11 @@ class EtcdServer(RelationState):
         return self.unit.name
 
     @property
+    def member_name(self) -> str:
+        """The Human-readable name for this etcd cluster member."""
+        return f"etcd{self.unit_id}"
+
+    @property
     def hostname(self) -> str:
         """The hostname for the unit."""
         return self.relation_data.get("hostname", "")
@@ -88,10 +93,29 @@ class EtcdServer(RelationState):
 
     @property
     def peer_url(self) -> str:
-        """The peer connection endpoint for the Etcd server."""
-        return f"http://{self.ip}:{SERVER_PORT}"
+        """The peer connection endpoint for the etcd server."""
+        return f"http://{self.ip}:{PEER_PORT}"
 
     @property
     def client_url(self) -> str:
-        """The client connection endpoint for the Etcd server."""
-        return f"http://{self.ip}:{PEER_PORT}"
+        """The client connection endpoint for the etcd server."""
+        return f"http://{self.ip}:{CLIENT_PORT}"
+
+
+class EtcdCluster(RelationState):
+    """State/Relation data collection for the etcd application."""
+
+    def __init__(
+        self,
+        relation: Relation | None,
+        data_interface: DataPeerData,
+        component: Application,
+        substrate: SUBSTRATES,
+    ):
+        super().__init__(relation, data_interface, component, substrate)
+        self.app = component
+
+    @property
+    def initial_cluster_state(self) -> str:
+        """The initial cluster state ('new' or 'existing') of the etcd cluster."""
+        return self.relation_data.get("initial_cluster_state", "")

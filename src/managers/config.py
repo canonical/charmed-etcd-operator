@@ -14,19 +14,8 @@ from literals import CONFIG_PATH
 
 logger = logging.getLogger(__name__)
 
-DYNAMIC_PROPERTIES = """
-data-dir: -> get from snap
-wal-dir: -> get from snap
-listen-peer-urls: http://localhost:2380
-listen-client-urls: http://localhost:2379
-initial-advertise-peer-urls: http://localhost:2380
-advertise-client-urls: http://localhost:2379
-initial-cluster:
-initial-cluster-token: 'etcd-cluster'
-initial-cluster-state: 'new'
-"""
-
 DEFAULT_PROPERTIES = """
+initial-cluster-token: 'etcd-cluster'
 snapshot-count: 10000
 heartbeat-interval: 100
 election-timeout: 1000
@@ -46,6 +35,8 @@ auto-compaction-mode: periodic
 auto-compaction-retention: "1"
 """
 
+# these config properties are not used at the moment
+# they are only listed here for completeness
 TLS_PROPERTIES = """
 client-transport-security:
   cert-file:
@@ -93,8 +84,13 @@ class ConfigManager:
             List of properties to be written to the config file.
         """
         properties = [
-            f"log-level={self.config.get('log-level')}",
-            f"name={self.state.unit_server.unit_name}",
+            f"name: {self.state.unit_server.member_name}",
+            f"initial-advertise-peer-urls: {self.state.unit_server.peer_url}",
+            f"initial-cluster-state: {self.state.cluster.initial_cluster_state}",
+            f"listen-peer-urls: {self.state.unit_server.peer_url}",
+            f"listen-client-urls: {self.state.unit_server.client_url}",
+            f"advertise-client-urls: {self.state.unit_server.client_url}",
+            f"initial-cluster: {self._get_cluster_endpoints()}",
         ] + DEFAULT_PROPERTIES.split("\n")
 
         return properties
@@ -105,3 +101,16 @@ class ConfigManager:
             content="\n".join(self.config_properties),
             path=self.config_path,
         )
+
+    def _get_cluster_endpoints(self) -> str:
+        """Concatenate peer-urls of all cluster members.
+
+        Returns:
+            Str of member name and peer url for all cluster members in required syntax, e.g.:
+            etcd1=http://10.54.237.109:2380,etcd2=http://10.54.237.57:2380
+        """
+        cluster_endpoints = ",".join(
+            f"{server.member_name}={server.peer_url}" for server in self.state.servers
+        )
+
+        return cluster_endpoints

@@ -2,7 +2,7 @@
 # Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
-"""Etcd related event handlers."""
+"""Etcd related and core event handlers."""
 
 import logging
 from typing import TYPE_CHECKING
@@ -70,6 +70,16 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
+        # Make sure all planned units have joined the peer relation before starting the cluster
+        if (
+            not self.charm.state.peer_relation
+            or len(self.charm.state.peer_relation.units) + 1 < self.charm.app.planned_units()
+        ):
+            logger.info("Deferring start because not all units joined peer-relation.")
+            self.charm.set_status(Status.NO_PEER_RELATION)
+            event.defer()
+            return
+
         self.config_manager.set_config_properties()
 
         self.charm.workload.start()
@@ -86,6 +96,7 @@ class EtcdEvents(Object):
     def _on_cluster_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
         self.charm.state.unit_server.update(self.cluster_manager.get_host_mapping())
+        self.charm.state.cluster.update({"initial-cluster-state": "new"})
 
     def _on_cluster_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
