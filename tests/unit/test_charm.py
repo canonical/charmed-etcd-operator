@@ -26,7 +26,7 @@ def test_start():
     # without peer relation the charm should not start
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
-        patch("workload.EtcdWorkload.write"),
+        patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
@@ -38,7 +38,7 @@ def test_start():
 
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
-        patch("workload.EtcdWorkload.write"),
+        patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
@@ -47,7 +47,7 @@ def test_start():
     # if the etcd daemon can't start, the charm should display blocked status
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
-        patch("workload.EtcdWorkload.write"),
+        patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)

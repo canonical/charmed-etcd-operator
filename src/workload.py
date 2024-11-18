@@ -5,7 +5,7 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
-import os
+import pathlib
 
 from charms.operator_libs_linux.v2 import snap
 from typing_extensions import override
@@ -51,8 +51,9 @@ class EtcdWorkload(WorkloadBase):
             return False
 
     @override
-    def write(self, content: str, path: str) -> None:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+    def write_file(self, content: str, file: str) -> None:
+        path = "/".join(file.split("/")[:-1])
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w") as f:
+        with open(file, "w") as f:
             f.write(content)

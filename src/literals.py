@@ -15,7 +15,7 @@ SNAP_REVISION = 233
 SNAP_SERVICE = "etcd"
 # this path will be updated when we switch to charmed-etcd snap
 # it's the current config path for the legacy-etcd snap
-CONFIG_PATH = "/var/snap/etcd/common/etcd.conf.yml"
+CONFIG_FILE = "/var/snap/etcd/common/etcd.conf.yml"
 
 PEER_RELATION = "etcd-cluster"
 CLIENT_PORT = 2379

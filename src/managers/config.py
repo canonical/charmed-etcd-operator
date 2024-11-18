@@ -10,7 +10,7 @@ from ops.model import ConfigData
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import CONFIG_PATH
+from literals import CONFIG_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class ConfigManager:
         self.state = state
         self.workload = workload
         self.config = config
-        self.config_path = CONFIG_PATH
+        self.config_file = CONFIG_FILE
 
     @property
     def config_properties(self) -> list[str]:
@@ -97,9 +97,9 @@ class ConfigManager:
 
     def set_config_properties(self) -> None:
         """Write the config properties to the config file."""
-        self.workload.write(
+        self.workload.write_file(
             content="\n".join(self.config_properties),
-            path=self.config_path,
+            file=self.config_file,
         )
 
     def _get_cluster_endpoints(self) -> str:

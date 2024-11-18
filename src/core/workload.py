@@ -21,6 +21,6 @@ class WorkloadBase(ABC):
         pass
 
     @abstractmethod
-    def write(self, content: str, path: str) -> None:
+    def write_file(self, content: str, file: str) -> None:
         """Write content to a file."""
         pass
