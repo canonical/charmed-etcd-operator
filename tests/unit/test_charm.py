@@ -8,6 +8,7 @@ import ops
 from ops import testing
 
 from charm import EtcdOperatorCharm
+from literals import PEER_RELATION
 
 
 def test_install_failure_blocked_status():
@@ -33,7 +34,7 @@ def test_start():
         assert state_out.unit_status == ops.MaintenanceStatus("no peer relation available")
 
     # with peer relation, it should go to active status
-    relation = testing.PeerRelation(id=1, endpoint="etcd-cluster")
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation})
 
     with (
@@ -67,7 +68,7 @@ def test_peer_relation_changed():
     test_data = {"hostname": "my_hostname", "ip": "my_ip"}
 
     ctx = testing.Context(EtcdOperatorCharm)
-    relation = testing.PeerRelation(id=1, endpoint="etcd-cluster")
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation})
     with patch("managers.cluster.ClusterManager.get_host_mapping", return_value=test_data):
         state_out = ctx.run(ctx.on.relation_created(relation=relation), state_in)
