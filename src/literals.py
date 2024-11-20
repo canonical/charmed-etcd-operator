@@ -17,7 +17,7 @@ SNAP_SERVICE = "etcd"
 # it's the current config path for the legacy-etcd snap
 CONFIG_FILE = "/var/snap/etcd/common/etcd.conf.yml"
 
-PEER_RELATION = "etcd-cluster"
+PEER_RELATION = "etcd-peers"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
 

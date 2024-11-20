@@ -13,5 +13,5 @@ description: |
   etcd on virtual machines.
 
 peers:
-  etcd-cluster:
-    interface: etcd_cluster
+  etcd-peers:
+    interface: etcd_peers
