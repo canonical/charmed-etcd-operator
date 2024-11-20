@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 
 from charms.operator_libs_linux.v2 import snap
+from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
 from core.workload import WorkloadBase
@@ -20,7 +21,9 @@ class EtcdWorkload(WorkloadBase):
     """Implementation of WorkloadBase for running on VMs."""
 
     def __init__(self):
-        self.etcd = snap.SnapCache()[SNAP_NAME]
+        for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
+            with attempt:
+                self.etcd = snap.SnapCache()[SNAP_NAME]
 
     @override
     def start(self) -> None:
@@ -29,6 +32,7 @@ class EtcdWorkload(WorkloadBase):
         except snap.SnapError as e:
             logger.exception(str(e))
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True)
     def install(self) -> bool:
         """Install the etcd snap from the snap store.
 
