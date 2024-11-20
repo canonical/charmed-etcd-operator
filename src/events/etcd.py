@@ -62,10 +62,8 @@ class EtcdEvents(Object):
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
-        install = self.charm.workload.install()
-        if not install:
+        if not self.charm.workload.install():
             self.charm.set_status(Status.SERVICE_NOT_INSTALLED)
-            event.defer()
             return
 
     def _on_start(self, event: ops.StartEvent) -> None:
