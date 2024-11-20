@@ -50,7 +50,7 @@ class RelationState:
         self.relation_data.update(update_content)
 
         for field in delete_fields:
-            del self.relation_data[field]
+            self.relation_data.pop(field, None)
 
 
 class EtcdServer(RelationState):
