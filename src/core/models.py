@@ -79,7 +79,7 @@ class EtcdServer(RelationState):
     @property
     def member_name(self) -> str:
         """The Human-readable name for this etcd cluster member."""
-        return f"etcd{self.unit_id}"
+        return f"{self.unit.app.name}{self.unit_id}"
 
     @property
     def hostname(self) -> str:
