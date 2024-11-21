@@ -7,6 +7,7 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.10"
 ops = "^2.17.0"
+tenacity = "*"
 
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
@@ -41,6 +42,7 @@ pytest-mock = "*"
 coverage = {extras = ["toml"], version = "*"}
 parameterized = "*"
 ops-scenario = "*"
+ops = "^2.17.0"
 
 [tool.poetry.group.integration.dependencies]
 ops = "^2.17.0"
@@ -53,6 +55,10 @@ pytest-operator-groups = {git = "https://github.com/canonical/data-platform-work
 juju = "3.5.2"
 allure-pytest = "*"
 allure-pytest-collection-report = {git = "https://github.com/canonical/data-platform-workflows", tag = "v22.0.0", subdirectory = "python/pytest_plugins/allure_pytest_collection_report"}
+# pin websockets to <14.0 because of breaking changes in this version
+# see also: https://github.com/juju/python-libjuju/issues/1184
+websockets = "<14.0"
+tenacity = "*"
 
 [tool.coverage.run]
 branch = true
