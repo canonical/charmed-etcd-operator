@@ -40,7 +40,7 @@ class ConfigManager:
         Returns:
             List of properties to be written to the config file.
         """
-        with open(f"{WORKING_DIR}/../../config/etcd.conf.yml") as config:
+        with open(f"{WORKING_DIR}/config/etcd.conf.yml") as config:
             config_properties = yaml.safe_load(config)
 
         config_properties["name"] = self.state.unit_server.member_name
