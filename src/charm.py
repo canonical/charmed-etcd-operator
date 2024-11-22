@@ -26,7 +26,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
         # --- EVENT HANDLERS ---
-        self.etcd_events = EtcdEvents(self)
+        self.etcd_events = EtcdEvents(self, self.state)
 
     def set_status(self, key: Status) -> None:
         """Set charm status."""

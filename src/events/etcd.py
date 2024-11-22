@@ -17,6 +17,7 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 
+from core.cluster import ClusterState
 from literals import PEER_RELATION, Status
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
@@ -30,12 +31,13 @@ logger = logging.getLogger(__name__)
 class EtcdEvents(Object):
     """Handle all base and etcd related events."""
 
-    def __init__(self, charm: "EtcdOperatorCharm"):
+    def __init__(self, charm: "EtcdOperatorCharm", state: ClusterState):
         super().__init__(charm, key="etcd_events")
         self.charm = charm
+        self.state = state
 
         # --- MANAGERS ---
-        self.cluster_manager = ClusterManager()
+        self.cluster_manager = ClusterManager(self.state)
         self.config_manager = ConfigManager(
             state=self.charm.state, workload=self.charm.workload, config=self.charm.config
         )

@@ -29,6 +29,7 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
+        patch("managers.cluster.ClusterManager.get_leader"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.MaintenanceStatus("no peer relation available")
@@ -41,6 +42,7 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
+        patch("managers.cluster.ClusterManager.get_leader"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
@@ -50,6 +52,7 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
+        patch("managers.cluster.ClusterManager.get_leader"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
@@ -70,6 +73,9 @@ def test_peer_relation_changed():
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation})
-    with patch("managers.cluster.ClusterManager.get_host_mapping", return_value=test_data):
+    with (
+        patch("managers.cluster.ClusterManager.get_host_mapping", return_value=test_data),
+        patch("managers.cluster.ClusterManager.get_leader"),
+    ):
         state_out = ctx.run(ctx.on.relation_created(relation=relation), state_in)
         assert state_out.get_relation(1).local_unit_data.get("hostname") == test_data["hostname"]
