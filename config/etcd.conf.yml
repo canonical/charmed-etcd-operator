@@ -1,0 +1,24 @@
+initial-cluster-token: 'etcd-cluster'
+snapshot-count: 10000
+heartbeat-interval: 100
+election-timeout: 1000
+quota-backend-bytes: 0
+max-snapshots: 5
+max-wals: 5
+strict-reconfig-check: false
+enable-pprof: true
+proxy: 'off'
+proxy-failure-wait: 5000
+proxy-refresh-interval: 30000
+proxy-dial-timeout: 1000
+proxy-write-timeout: 5000
+proxy-read-timeout: 0
+force-new-cluster: false
+auto-compaction-mode: periodic
+auto-compaction-retention: "1"
+cipher-suites: [
+  TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+  TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+]
+tls-min-version: 'TLS1.2'
+tls-max-version: 'TLS1.3'
