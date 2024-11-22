@@ -5,6 +5,7 @@
 """Manager for handling configuration building + writing."""
 
 import logging
+from pathlib import Path
 
 import yaml
 from ops.model import ConfigData
@@ -14,6 +15,8 @@ from core.workload import WorkloadBase
 from literals import CONFIG_FILE
 
 logger = logging.getLogger(__name__)
+
+WORKING_DIR = Path(__file__).absolute().parent
 
 
 class ConfigManager:
@@ -37,7 +40,7 @@ class ConfigManager:
         Returns:
             List of properties to be written to the config file.
         """
-        with open("config/etcd.conf.yml") as config:
+        with open(f"{WORKING_DIR}/../../config/etcd.conf.yml") as config:
             config_properties = yaml.safe_load(config)
 
         config_properties["name"] = self.state.unit_server.member_name
