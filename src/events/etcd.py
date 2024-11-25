@@ -17,10 +17,7 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 
-from core.cluster import ClusterState
 from literals import PEER_RELATION, Status
-from managers.cluster import ClusterManager
-from managers.config import ConfigManager
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -31,16 +28,9 @@ logger = logging.getLogger(__name__)
 class EtcdEvents(Object):
     """Handle all base and etcd related events."""
 
-    def __init__(self, charm: "EtcdOperatorCharm", state: ClusterState):
+    def __init__(self, charm: "EtcdOperatorCharm"):
         super().__init__(charm, key="etcd_events")
         self.charm = charm
-        self.state = state
-
-        # --- MANAGERS ---
-        self.cluster_manager = ClusterManager(self.state)
-        self.config_manager = ConfigManager(
-            state=self.charm.state, workload=self.charm.workload, config=self.charm.config
-        )
 
         # --- Core etcd charm events ---
 
@@ -80,7 +70,7 @@ class EtcdEvents(Object):
             event.defer()
             return
 
-        self.config_manager.set_config_properties()
+        self.charm.config_manager.set_config_properties()
 
         self.charm.workload.start()
 
@@ -95,8 +85,9 @@ class EtcdEvents(Object):
 
     def _on_cluster_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
-        self.charm.state.unit_server.update(self.cluster_manager.get_host_mapping())
-        self.charm.state.cluster.update({"initial-cluster-state": "new"})
+        self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
+        if self.charm.unit.is_leader():
+            self.charm.state.cluster.update({"initial-cluster-state": "new"})
 
     def _on_cluster_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""

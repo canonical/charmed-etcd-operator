@@ -26,7 +26,6 @@ class ClusterManager:
     def __init__(self, state: ClusterState):
         self.state = state
         self.cluster_endpoints = [server.client_url for server in self.state.servers]
-        self.leader = self.get_leader()
 
     def get_host_mapping(self) -> dict[str, str]:
         """Collect hostname mapping for current unit.
