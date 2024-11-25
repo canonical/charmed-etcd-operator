@@ -99,7 +99,11 @@ class EtcdEvents(Object):
 
     def _on_cluster_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
-        pass
+        # Todo: remove this test at some point, this is just for showcasing that it works :)
+        # We will need to perform any HA-related action against the raft leader
+        # e.g. add members, trigger leader election, log compaction, etc.
+        if raft_leader := self.charm.cluster_manager.get_leader():
+            logger.info(f"Raft leader: {raft_leader}")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""

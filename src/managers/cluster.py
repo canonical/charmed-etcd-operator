@@ -54,8 +54,8 @@ class ClusterManager:
                     leader = endpoint
                     logger.info(f"Raft leader found: {leader}")
                     break
-            except KeyError as e:
-                logger.error(f"No raft leader found in cluster: {e}")
+            except KeyError:
+                logger.warning("No raft leader found in cluster.")
 
         return leader
 
@@ -70,15 +70,52 @@ class EtcdClient:
         self.client_url = client_url
 
     def get_endpoint_status(self) -> dict:
-        """Run the `etcdctl endpoint status` command and return the result as dict."""
-        try:
-            result = subprocess.check_output(
-                ["etcdctl", "endpoint", "status", f"--endpoints={self.client_url}", "-w=json"]
-            ).decode("UTF-8")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Error: {e}")
-            return {}
-
-        endpoint_status = json.loads(result)[0]
+        """Run the `endpoint status` command and return the result as dict."""
+        endpoint_status = {}
+        if result := self._run_etcdctl(
+            command="endpoint",
+            subcommand="status",
+            endpoints=self.client_url,
+            output_format="json",
+        ):
+            endpoint_status = json.loads(result)[0]
 
         return endpoint_status
+
+    def _run_etcdctl(
+        self,
+        command: str,
+        subcommand: str | None,
+        endpoints: str,
+        output_format: str | None,
+    ) -> str:
+        """Execute `etcdctl` command via subprocess.
+
+        Args:
+            command: command to execute with etcdctl, e.g. `elect`, `member` or `endpoint`
+            subcommand: subcommand to add to the previous command, e.g. `add` or `status`
+            endpoints: str-formatted list of endpoints to run the command against
+            output_format: set the output format (fields, json, protobuf, simple, table)
+            ...
+
+        Returns:
+            The output of the subprocess-command as a string.
+        """
+        try:
+            result = subprocess.run(
+                args=[
+                    "etcdctl",
+                    command,
+                    subcommand,
+                    f"--endpoints={endpoints}",
+                    f"-w={output_format}",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+        except subprocess.CalledProcessError as e:
+            logger.warning(e)
+            return ""
+
+        return result
