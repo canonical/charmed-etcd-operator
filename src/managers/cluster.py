@@ -52,9 +52,10 @@ class ClusterManager:
                 leader_id = endpoint_status["Status"]["leader"]
                 if member_id == leader_id:
                     leader = endpoint
-                    logger.info(f"Raft leader found: {leader}")
                     break
             except KeyError:
+                # for now, we don't raise an error if there is no leader
+                # this may change when we have actual relevant tasks performed against the leader
                 logger.warning("No raft leader found in cluster.")
 
         return leader

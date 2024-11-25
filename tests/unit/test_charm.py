@@ -99,5 +99,5 @@ def test_get_leader():
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_unit_data={"ip": test_ip})
     state_in = testing.State(relations={relation})
     with patch("managers.cluster.EtcdClient.get_endpoint_status", return_value=test_data):
-        with ctx(ctx.on.relation_joined(relation=relation), state_in) as manager:
-            assert manager.charm.cluster_manager.get_leader() == f"http://{test_ip}:{CLIENT_PORT}"
+        with ctx(ctx.on.relation_joined(relation=relation), state_in) as context:
+            assert context.charm.cluster_manager.get_leader() == f"http://{test_ip}:{CLIENT_PORT}"
