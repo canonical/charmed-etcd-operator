@@ -8,7 +8,7 @@ import ops
 from ops import testing
 
 from charm import EtcdOperatorCharm
-from literals import PEER_RELATION
+from literals import CLIENT_PORT, PEER_RELATION
 
 
 def test_install_failure_blocked_status():
@@ -67,7 +67,7 @@ def test_update_status():
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
 
 
-def test_peer_relation_changed():
+def test_peer_relation_created():
     test_data = {"hostname": "my_hostname", "ip": "my_ip"}
 
     ctx = testing.Context(EtcdOperatorCharm)
@@ -79,3 +79,25 @@ def test_peer_relation_changed():
     ):
         state_out = ctx.run(ctx.on.relation_created(relation=relation), state_in)
         assert state_out.get_relation(1).local_unit_data.get("hostname") == test_data["hostname"]
+
+
+def test_get_leader():
+    test_ip = "10.54.237.119"
+    test_data = {
+        "Endpoint": f"http://{test_ip}:{CLIENT_PORT}",
+        "Status": {
+            "header": {
+                "cluster_id": 9102535641521235766,
+                "member_id": 11187096354790748301,
+            },
+            "version": "3.4.22",
+            "leader": 11187096354790748301,
+        },
+    }
+
+    ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_unit_data={"ip": test_ip})
+    state_in = testing.State(relations={relation})
+    with patch("managers.cluster.EtcdClient.get_endpoint_status", return_value=test_data):
+        with ctx(ctx.on.relation_joined(relation=relation), state_in) as manager:
+            assert manager.charm.cluster_manager.get_leader() == f"http://{test_ip}:{CLIENT_PORT}"
