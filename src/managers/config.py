@@ -12,7 +12,6 @@ from ops.model import ConfigData
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import CONFIG_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ class ConfigManager:
         self.state = state
         self.workload = workload
         self.config = config
-        self.config_file = CONFIG_FILE
+        self.config_file = workload.paths.config_file
 
     @property
     def config_properties(self) -> str:
