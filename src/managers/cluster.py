@@ -38,10 +38,8 @@ class ClusterManager:
 
         return {"hostname": hostname, "ip": ip}
 
-    def get_leader(self) -> str:
+    def get_leader(self) -> str | None:
         """Query the etcd cluster for the raft leader and return the client_url as string."""
-        leader = ""
-
         # loop through list of hosts and compare their member id with the leader
         # if they match, return this host's endpoint
         for endpoint in self.cluster_endpoints:
@@ -52,13 +50,13 @@ class ClusterManager:
                 leader_id = endpoint_status["Status"]["leader"]
                 if member_id == leader_id:
                     leader = endpoint
-                    break
+                    return leader
             except KeyError:
                 # for now, we don't raise an error if there is no leader
                 # this may change when we have actual relevant tasks performed against the leader
                 logger.warning("No raft leader found in cluster.")
 
-        return leader
+        return None
 
 
 class EtcdClient:
@@ -88,8 +86,8 @@ class EtcdClient:
         command: str,
         subcommand: str | None,
         endpoints: str,
-        output_format: str | None,
-    ) -> str:
+        output_format: str | None = "simple",
+    ) -> str | None:
         """Execute `etcdctl` command via subprocess.
 
         The list of arguments will be extended once authentication/encryption is implemented.
@@ -105,8 +103,8 @@ class EtcdClient:
 
         Returns:
             The output of the subprocess-command as a string. In case of error, this will
-            return an empty string. It will not raise an error in order to leave error handling
-            up to the caller. Depending on what command is executed, the ways of handling errors
+            return `None`. It will not raise an error in order to leave error handling up
+            to the caller. Depending on what command is executed, the ways of handling errors
             might differ.
         """
         try:
@@ -124,6 +122,6 @@ class EtcdClient:
             ).stdout
         except subprocess.CalledProcessError as e:
             logger.warning(e)
-            return ""
+            return None
 
         return result
