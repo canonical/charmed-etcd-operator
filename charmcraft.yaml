@@ -24,6 +24,8 @@ parts:
       - libffi-dev
       - libssl-dev
       - pkg-config
+      - rustc
+      - cargo
     override-build: |
       rustup default stable
 
