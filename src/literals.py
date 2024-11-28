@@ -13,13 +13,14 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 SNAP_NAME = "etcd"
 SNAP_REVISION = 233
 SNAP_SERVICE = "etcd"
-# this path will be updated when we switch to charmed-etcd snap
-# it's the current config path for the legacy-etcd snap
 CONFIG_FILE = "/var/snap/etcd/common/etcd.conf.yml"
 
 PEER_RELATION = "etcd-peers"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
+
+INTERNAL_USER = "root"
+SECRETS_APP = ["root-password"]
 
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 SUBSTRATES = Literal["vm", "k8s"]

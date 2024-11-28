@@ -17,7 +17,7 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 
-from literals import PEER_RELATION, Status
+from literals import INTERNAL_USER, PEER_RELATION, Status
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -57,6 +57,14 @@ class EtcdEvents(Object):
         if not self.charm.workload.install():
             self.charm.set_status(Status.SERVICE_NOT_INSTALLED)
             return
+
+        if (
+            self.charm.unit.is_leader()
+            and not self.charm.state.cluster.internal_user_credentials
+        ):
+            self.charm.state.cluster.update(
+                {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
+            )
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""

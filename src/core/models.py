@@ -10,7 +10,7 @@ from collections.abc import MutableMapping
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
 
-from literals import CLIENT_PORT, PEER_PORT, SUBSTRATES
+from literals import CLIENT_PORT, INTERNAL_USER, PEER_PORT, SUBSTRATES
 
 logger = logging.getLogger(__name__)
 
@@ -119,3 +119,11 @@ class EtcdCluster(RelationState):
     def initial_cluster_state(self) -> str:
         """The initial cluster state ('new' or 'existing') of the etcd cluster."""
         return self.relation_data.get("initial_cluster_state", "")
+
+    @property
+    def internal_user_credentials(self) -> dict[str, str] | None:
+        """Retrieve the credentials for the internal admin user."""
+        if password := self.relation_data.get(f"{INTERNAL_USER}-password"):
+            return {INTERNAL_USER: password}
+
+        return None

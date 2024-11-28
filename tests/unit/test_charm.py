@@ -8,7 +8,7 @@ import ops
 from ops import testing
 
 from charm import EtcdOperatorCharm
-from literals import CLIENT_PORT, PEER_RELATION
+from literals import CLIENT_PORT, INTERNAL_USER, PEER_RELATION
 
 
 def test_install_failure_blocked_status():
@@ -18,6 +18,17 @@ def test_install_failure_blocked_status():
     with patch("workload.EtcdWorkload.install", return_value=False):
         state_out = ctx.run(ctx.on.install(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("unable to install etcd snap")
+
+
+def test_internal_user_creation():
+    ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    state_in = testing.State(relations={relation}, leader=True)
+    with patch("workload.EtcdWorkload.install", return_value=True):
+        state_out = ctx.run(ctx.on.install(), state_in)
+        secret_out = state_out.get_secret(label="etcd-peers.charmed-etcd-operator.app")
+        assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")
 
 
 def test_start():
