@@ -38,7 +38,10 @@ class EtcdClient:
             password=self.password,
             output_format="json",
         ):
-            endpoint_status = json.loads(result)[0]
+            try:
+                endpoint_status = json.loads(result)[0]
+            except json.JSONDecodeError:
+                pass
 
         return endpoint_status
 
@@ -120,11 +123,11 @@ class EtcdClient:
                 args=[
                     "etcdctl",
                     command,
-                    subcommand,
-                    new_user,
+                    subcommand if subcommand else "",
+                    new_user if new_user else "",
                     f"--endpoints={endpoints}",
-                    f"--user={username}",
-                    f"--password={password}",
+                    f"--user={username}" if username else "",
+                    f"--password={password}" if password else "",
                     "--no-password" if no_password else "",
                     f"-w={output_format}",
                 ],
@@ -132,8 +135,8 @@ class EtcdClient:
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-        except subprocess.CalledProcessError as e:
-            logger.warning(e)
+        except subprocess.CalledProcessError:
+            logger.warning(f"etcdctl {command} command failed.")
             return None
 
         return result

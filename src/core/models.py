@@ -121,9 +121,9 @@ class EtcdCluster(RelationState):
         return self.relation_data.get("initial_cluster_state", "")
 
     @property
-    def internal_user_credentials(self) -> dict[str, str] | None:
+    def internal_user_credentials(self) -> dict[str, str]:
         """Retrieve the credentials for the internal admin user."""
         if password := self.relation_data.get(f"{INTERNAL_USER}-password"):
             return {INTERNAL_USER: password}
 
-        return None
+        return {}

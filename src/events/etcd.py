@@ -63,11 +63,6 @@ class EtcdEvents(Object):
             self.charm.set_status(Status.SERVICE_NOT_INSTALLED)
             return
 
-        if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
-            self.charm.state.cluster.update(
-                {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
-            )
-
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
         # Make sure all planned units have joined the peer relation before starting the cluster
@@ -135,6 +130,11 @@ class EtcdEvents(Object):
         if not self.charm.state.peer_relation:
             self.charm.set_status(Status.NO_PEER_RELATION)
             return
+
+        if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
+            self.charm.state.cluster.update(
+                {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
+            )
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""

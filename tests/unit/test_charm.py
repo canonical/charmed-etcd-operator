@@ -30,10 +30,9 @@ def test_internal_user_creation():
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
 
     state_in = testing.State(relations={relation}, leader=True)
-    with patch("workload.EtcdWorkload.install", return_value=True):
-        state_out = ctx.run(ctx.on.install(), state_in)
-        secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
-        assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")
+    state_out = ctx.run(ctx.on.leader_elected(), state_in)
+    secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")
 
 
 def test_start():

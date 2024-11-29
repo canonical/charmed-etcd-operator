@@ -25,7 +25,7 @@ class ClusterManager:
     def __init__(self, state: ClusterState):
         self.state = state
         self.admin_user = INTERNAL_USER
-        self.admin_password = self.state.cluster.internal_user_credentials
+        self.admin_password = self.state.cluster.internal_user_credentials.get(INTERNAL_USER, "")
         self.cluster_endpoints = [server.client_url for server in self.state.servers]
 
     def get_host_mapping(self) -> dict[str, str]:
@@ -65,7 +65,9 @@ class ClusterManager:
         """Enable the etcd admin user and authentication."""
         try:
             endpoint = self.get_leader()
-            client = EtcdClient(client_url=endpoint)
+            client = EtcdClient(
+                username=self.admin_user, password=self.admin_password, client_url=endpoint
+            )
             client.add_admin_user()
             client.enable_auth()
         except (RaftLeaderNotFoundError, EtcdAuthNotEnabledError, EtcdUserNotCreatedError):
