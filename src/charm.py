@@ -12,6 +12,8 @@ from ops import StatusBase
 from core.cluster import ClusterState
 from events.etcd import EtcdEvents
 from literals import SUBSTRATE, DebugLevel, Status
+from managers.cluster import ClusterManager
+from managers.config import ConfigManager
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,12 @@ class EtcdOperatorCharm(ops.CharmBase):
         super().__init__(*args)
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
+
+        # --- MANAGERS ---
+        self.cluster_manager = ClusterManager(self.state)
+        self.config_manager = ConfigManager(
+            state=self.state, workload=self.workload, config=self.config
+        )
 
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
