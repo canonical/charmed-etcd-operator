@@ -18,8 +18,6 @@ from ops.charm import (
 )
 
 from literals import PEER_RELATION, Status
-from managers.cluster import ClusterManager
-from managers.config import ConfigManager
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -33,12 +31,6 @@ class EtcdEvents(Object):
     def __init__(self, charm: "EtcdOperatorCharm"):
         super().__init__(charm, key="etcd_events")
         self.charm = charm
-
-        # --- MANAGERS ---
-        self.cluster_manager = ClusterManager()
-        self.config_manager = ConfigManager(
-            state=self.charm.state, workload=self.charm.workload, config=self.charm.config
-        )
 
         # --- Core etcd charm events ---
 
@@ -78,7 +70,7 @@ class EtcdEvents(Object):
             event.defer()
             return
 
-        self.config_manager.set_config_properties()
+        self.charm.config_manager.set_config_properties()
 
         self.charm.workload.start()
 
@@ -93,8 +85,9 @@ class EtcdEvents(Object):
 
     def _on_cluster_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
-        self.charm.state.unit_server.update(self.cluster_manager.get_host_mapping())
-        self.charm.state.cluster.update({"initial-cluster-state": "new"})
+        self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
+        if self.charm.unit.is_leader():
+            self.charm.state.cluster.update({"initial-cluster-state": "new"})
 
     def _on_cluster_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
@@ -106,7 +99,11 @@ class EtcdEvents(Object):
 
     def _on_cluster_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
-        pass
+        # Todo: remove this test at some point, this is just for showcasing that it works :)
+        # We will need to perform any HA-related action against the raft leader
+        # e.g. add members, trigger leader election, log compaction, etc.
+        if raft_leader := self.charm.cluster_manager.get_leader():
+            logger.info(f"Raft leader: {raft_leader}")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""
