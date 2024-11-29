@@ -7,6 +7,7 @@
 import json
 import logging
 import subprocess
+from typing import Optional
 
 from common.exceptions import EtcdAuthNotEnabledError, EtcdUserNotCreatedError
 
@@ -80,16 +81,16 @@ class EtcdClient:
     def _run_etcdctl(
         self,
         command: str,
-        subcommand: str | None,
         endpoints: str,
+        subcommand: Optional[str] = None,
         # We need to be able to run `etcdctl` with empty user/pw
         # otherwise it will error if auth is not yet enabled
         # this is relevant for `user add` and `auth enable` commands
-        username: str | None,
-        password: str | None,
-        new_user: str | None,
-        no_password: bool = False,
-        output_format: str | None = "simple",
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        new_user: Optional[str] = None,
+        no_password: Optional[bool] = False,
+        output_format: Optional[str] = "simple",
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
 
@@ -120,7 +121,7 @@ class EtcdClient:
                     "etcdctl",
                     command,
                     subcommand,
-                    new_user if new_user else "",
+                    new_user,
                     f"--endpoints={endpoints}",
                     f"--user={username}",
                     f"--password={password}",
