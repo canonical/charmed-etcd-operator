@@ -2,13 +2,18 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from pathlib import Path
 from unittest.mock import patch
 
+import yaml
 import ops
 from ops import testing
 
 from charm import EtcdOperatorCharm
 from literals import CLIENT_PORT, INTERNAL_USER, PEER_RELATION
+
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+APP_NAME = METADATA["name"]
 
 
 def test_install_failure_blocked_status():
@@ -27,7 +32,7 @@ def test_internal_user_creation():
     state_in = testing.State(relations={relation}, leader=True)
     with patch("workload.EtcdWorkload.install", return_value=True):
         state_out = ctx.run(ctx.on.install(), state_in)
-        secret_out = state_out.get_secret(label="etcd-peers.charmed-etcd-operator.app")
+        secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")
 
 
