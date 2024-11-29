@@ -71,7 +71,7 @@ class EtcdClient:
                 check=True,
                 capture_output=True,
                 text=True,
-            ).stdout
+            ).stdout.strip()
         except subprocess.CalledProcessError as e:
             logger.warning(e)
             return None
