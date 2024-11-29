@@ -5,8 +5,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
-import yaml
 import ops
+import yaml
 from ops import testing
 
 from charm import EtcdOperatorCharm

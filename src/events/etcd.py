@@ -17,6 +17,11 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 
+from common.exceptions import (
+    EtcdAuthNotEnabledError,
+    EtcdUserNotCreatedError,
+    RaftLeaderNotFoundError,
+)
 from literals import INTERNAL_USER, PEER_RELATION, Status
 
 if TYPE_CHECKING:
@@ -58,10 +63,7 @@ class EtcdEvents(Object):
             self.charm.set_status(Status.SERVICE_NOT_INSTALLED)
             return
 
-        if (
-            self.charm.unit.is_leader()
-            and not self.charm.state.cluster.internal_user_credentials
-        ):
+        if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             self.charm.state.cluster.update(
                 {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
             )
@@ -81,6 +83,18 @@ class EtcdEvents(Object):
         self.charm.config_manager.set_config_properties()
 
         self.charm.workload.start()
+
+        if self.charm.unit.is_leader():
+            try:
+                self.charm.cluster_manager.enable_authentication()
+            except (
+                RaftLeaderNotFoundError,
+                EtcdAuthNotEnabledError,
+                EtcdUserNotCreatedError,
+            ) as e:
+                logger.error(e)
+                self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
+                return
 
         if self.charm.workload.alive():
             self.charm.set_status(Status.ACTIVE)
@@ -110,8 +124,11 @@ class EtcdEvents(Object):
         # Todo: remove this test at some point, this is just for showcasing that it works :)
         # We will need to perform any HA-related action against the raft leader
         # e.g. add members, trigger leader election, log compaction, etc.
-        if raft_leader := self.charm.cluster_manager.get_leader():
+        try:
+            raft_leader = self.charm.cluster_manager.get_leader()
             logger.info(f"Raft leader: {raft_leader}")
+        except RaftLeaderNotFoundError as e:
+            logger.warning(e)
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""

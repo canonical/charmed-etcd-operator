@@ -8,6 +8,8 @@ import json
 import logging
 import subprocess
 
+from common.exceptions import EtcdAuthNotEnabledError, EtcdUserNotCreatedError
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,9 +18,13 @@ class EtcdClient:
 
     def __init__(
         self,
+        username,
+        password,
         client_url: str,
     ):
         self.client_url = client_url
+        self.user = username
+        self.password = password
 
     def get_endpoint_status(self) -> dict:
         """Run the `endpoint status` command and return the result as dict."""
@@ -27,17 +33,62 @@ class EtcdClient:
             command="endpoint",
             subcommand="status",
             endpoints=self.client_url,
+            username=self.user,
+            password=self.password,
             output_format="json",
         ):
             endpoint_status = json.loads(result)[0]
 
         return endpoint_status
 
+    def add_admin_user(self):
+        """Add the internal admin with password. Raise if not successful."""
+        if result := self._run_etcdctl(
+            command="user",
+            subcommand="add",
+            endpoints=self.client_url,
+            new_user=f"{self.user}:{self.password}",
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdUserNotCreatedError(f"Failed to add user {self.user}.")
+
+    def add_client_user(self):
+        """Add non-admin user with `CommonName` based authentication`."""
+        if result := self._run_etcdctl(
+            command="user",
+            subcommand="add",
+            endpoints=self.client_url,
+            new_user=self.user,
+            no_password=True,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdUserNotCreatedError(f"Failed to add user {self.user}.")
+
+    def enable_auth(self):
+        """Enable authentication in etcd."""
+        if result := self._run_etcdctl(
+            command="auth",
+            subcommand="enable",
+            endpoints=self.client_url,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdAuthNotEnabledError("Failed to enable authentication in etcd.")
+
     def _run_etcdctl(
         self,
         command: str,
         subcommand: str | None,
         endpoints: str,
+        # We need to be able to run `etcdctl` with empty user/pw
+        # otherwise it will error if auth is not yet enabled
+        # this is relevant for `user add` and `auth enable` commands
+        username: str | None,
+        password: str | None,
+        new_user: str | None,
+        no_password: bool = False,
         output_format: str | None = "simple",
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
@@ -50,6 +101,10 @@ class EtcdClient:
             command: command to execute with etcdctl, e.g. `elect`, `member` or `endpoint`
             subcommand: subcommand to add to the previous command, e.g. `add` or `status`
             endpoints: str-formatted list of endpoints to run the command against
+            username: user for authentication
+            password: password for authentication
+            new_user: username (and password, in case of admin user) to be added to etcd
+            no_password: add a new user with the --no-password option for CN based authentication
             output_format: set the output format (fields, json, protobuf, simple, table)
             ...
 
@@ -65,7 +120,11 @@ class EtcdClient:
                     "etcdctl",
                     command,
                     subcommand,
+                    new_user if new_user else "",
                     f"--endpoints={endpoints}",
+                    f"--user={username}",
+                    f"--password={password}",
+                    "--no-password" if no_password else "",
                     f"-w={output_format}",
                 ],
                 check=True,
