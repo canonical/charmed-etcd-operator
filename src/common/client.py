@@ -8,6 +8,8 @@ import json
 import logging
 import subprocess
 
+from literals import SNAP_NAME
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +64,7 @@ class EtcdClient:
         try:
             result = subprocess.run(
                 args=[
-                    "etcdctl",
+                    f"{SNAP_NAME}.etcdctl",
                     command,
                     subcommand,
                     f"--endpoints={endpoints}",
