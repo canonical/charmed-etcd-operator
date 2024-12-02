@@ -64,11 +64,12 @@ class ClusterManager:
     def enable_authentication(self):
         """Enable the etcd admin user and authentication."""
         try:
-            endpoint = self.get_leader()
             client = EtcdClient(
-                username=self.admin_user, password=self.admin_password, client_url=endpoint
+                username=self.admin_user,
+                password=self.admin_password,
+                client_url=self.state.unit_server.client_url,
             )
-            client.add_admin_user()
+            client.add_user(username=self.admin_user)
             client.enable_auth()
-        except (RaftLeaderNotFoundError, EtcdAuthNotEnabledError, EtcdUserNotCreatedError):
+        except (EtcdAuthNotEnabledError, EtcdUserNotCreatedError):
             raise

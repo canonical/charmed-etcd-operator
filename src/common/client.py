@@ -10,6 +10,7 @@ import subprocess
 from typing import Optional
 
 from common.exceptions import EtcdAuthNotEnabledError, EtcdUserNotCreatedError
+from literals import INTERNAL_USER
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,6 @@ class EtcdClient:
             command="endpoint",
             subcommand="status",
             endpoints=self.client_url,
-            username=self.user,
-            password=self.password,
             output_format="json",
         ):
             try:
@@ -45,26 +44,15 @@ class EtcdClient:
 
         return endpoint_status
 
-    def add_admin_user(self):
-        """Add the internal admin with password. Raise if not successful."""
+    def add_user(self, username: str):
+        """Add a user to etcd."""
         if result := self._run_etcdctl(
             command="user",
             subcommand="add",
             endpoints=self.client_url,
-            new_user=f"{self.user}:{self.password}",
-        ):
-            logger.debug(result)
-        else:
-            raise EtcdUserNotCreatedError(f"Failed to add user {self.user}.")
-
-    def add_client_user(self):
-        """Add non-admin user with `CommonName` based authentication`."""
-        if result := self._run_etcdctl(
-            command="user",
-            subcommand="add",
-            endpoints=self.client_url,
-            new_user=self.user,
-            no_password=True,
+            new_user=username,
+            # only admin user is added with password, all others require `CommonName` based auth
+            new_user_password=self.password if username == INTERNAL_USER else "",
         ):
             logger.debug(result)
         else:
@@ -86,13 +74,13 @@ class EtcdClient:
         command: str,
         endpoints: str,
         subcommand: Optional[str] = None,
-        # We need to be able to run `etcdctl` with empty user/pw
+        # We need to be able to run `etcdctl` without user/pw
         # otherwise it will error if auth is not yet enabled
         # this is relevant for `user add` and `auth enable` commands
         username: Optional[str] = None,
         password: Optional[str] = None,
         new_user: Optional[str] = None,
-        no_password: Optional[bool] = False,
+        new_user_password: Optional[str] = None,
         output_format: Optional[str] = "simple",
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
@@ -107,8 +95,8 @@ class EtcdClient:
             endpoints: str-formatted list of endpoints to run the command against
             username: user for authentication
             password: password for authentication
-            new_user: username (and password, in case of admin user) to be added to etcd
-            no_password: add a new user with the --no-password option for CN based authentication
+            new_user: username to be added to etcd
+            new_user_password: password to be set for the new user
             output_format: set the output format (fields, json, protobuf, simple, table)
             ...
 
@@ -119,24 +107,32 @@ class EtcdClient:
             might differ.
         """
         try:
+            args = ["etcdctl", command]
+            if subcommand:
+                args.append(subcommand)
+            if new_user:
+                args.append(new_user)
+            if new_user_password == "":
+                args.append("--no-password=True")
+            elif new_user_password:
+                args.append(f"--new-user-password={new_user_password}")
+            if endpoints:
+                args.append(f"--endpoints={endpoints}")
+            if username:
+                args.append(f"--user={username}")
+            if password:
+                args.append(f"--password={password}")
+            if output_format:
+                args.append(f"-w={output_format}")
+
             result = subprocess.run(
-                args=[
-                    "etcdctl",
-                    command,
-                    subcommand if subcommand else "",
-                    new_user if new_user else "",
-                    f"--endpoints={endpoints}",
-                    f"--user={username}" if username else "",
-                    f"--password={password}" if password else "",
-                    "--no-password" if no_password else "",
-                    f"-w={output_format}",
-                ],
+                args=args,
                 check=True,
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-        except subprocess.CalledProcessError:
-            logger.warning(f"etcdctl {command} command failed.")
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"etcdctl {command} command failed: {e}")
             return None
 
         return result

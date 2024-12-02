@@ -82,11 +82,7 @@ class EtcdEvents(Object):
         if self.charm.unit.is_leader():
             try:
                 self.charm.cluster_manager.enable_authentication()
-            except (
-                RaftLeaderNotFoundError,
-                EtcdAuthNotEnabledError,
-                EtcdUserNotCreatedError,
-            ) as e:
+            except (EtcdAuthNotEnabledError, EtcdUserNotCreatedError) as e:
                 logger.error(e)
                 self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
                 return
