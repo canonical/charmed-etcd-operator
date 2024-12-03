@@ -132,7 +132,10 @@ class EtcdClient:
                 text=True,
             ).stdout.strip()
         except subprocess.CalledProcessError as e:
-            logger.warning(f"etcdctl {command} command failed: {e}")
+            logger.error(f"etcdctl {command} command failed: {e.returncode}, {e.stderr}")
+            return None
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"Timed out running etcdctl: {e.stderr}")
             return None
 
         return result
