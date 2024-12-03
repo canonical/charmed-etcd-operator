@@ -19,7 +19,7 @@ from ops.charm import (
 
 from common.exceptions import (
     EtcdAuthNotEnabledError,
-    EtcdUserNotCreatedError,
+    EtcdUserManagementError,
     RaftLeaderNotFoundError,
 )
 from literals import INTERNAL_USER, PEER_RELATION, Status
@@ -82,7 +82,7 @@ class EtcdEvents(Object):
         if self.charm.unit.is_leader():
             try:
                 self.charm.cluster_manager.enable_authentication()
-            except (EtcdAuthNotEnabledError, EtcdUserNotCreatedError) as e:
+            except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
                 logger.error(e)
                 self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
                 return

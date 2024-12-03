@@ -11,8 +11,8 @@ class RaftLeaderNotFoundError(Exception):
     pass
 
 
-class EtcdUserNotCreatedError(Exception):
-    """Custom Exception if user could not be added to etcd cluster."""
+class EtcdUserManagementError(Exception):
+    """Custom Exception if user could not be added or updated in etcd cluster."""
 
     pass
 

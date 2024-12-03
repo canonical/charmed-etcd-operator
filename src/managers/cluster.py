@@ -10,7 +10,7 @@ import socket
 from common.client import EtcdClient
 from common.exceptions import (
     EtcdAuthNotEnabledError,
-    EtcdUserNotCreatedError,
+    EtcdUserManagementError,
     RaftLeaderNotFoundError,
 )
 from core.cluster import ClusterState
@@ -61,7 +61,7 @@ class ClusterManager:
 
         return None
 
-    def enable_authentication(self):
+    def enable_authentication(self) -> None:
         """Enable the etcd admin user and authentication."""
         try:
             client = EtcdClient(
@@ -71,5 +71,17 @@ class ClusterManager:
             )
             client.add_user(username=self.admin_user)
             client.enable_auth()
-        except (EtcdAuthNotEnabledError, EtcdUserNotCreatedError):
+        except (EtcdAuthNotEnabledError, EtcdUserManagementError):
+            raise
+
+    def update_credentials(self, username: str, password: str) -> None:
+        """Update a user's password."""
+        try:
+            client = EtcdClient(
+                username=self.admin_user,
+                password=self.admin_password,
+                client_url=self.state.unit_server.client_url,
+            )
+            client.update_password(username=username, new_password=password)
+        except EtcdUserManagementError:
             raise
