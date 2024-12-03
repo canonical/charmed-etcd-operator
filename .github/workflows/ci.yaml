@@ -66,9 +66,9 @@ jobs:
       matrix:
         juju:
           # This runs on all runs
-          - agent: 3.6 # renovate: juju-agent-pin-minor
+          - agent: 3.6.0 # renovate: juju-agent-pin-minor
             allure_report: false
-    name: Integration test charm
+    name: Integration test charm | ${{ matrix.juju.agent }}
     needs:
       - lint
       - unit-test
