@@ -7,12 +7,15 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
+from literals import INTERNAL_USER
+
 from .helpers import (
     APP_NAME,
     get_cluster_endpoints,
     get_cluster_members,
     get_juju_leader_unit_name,
     get_key,
+    get_user_password,
     put_key,
 )
 
@@ -45,7 +48,22 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     assert len(cluster_members) == NUM_UNITS
 
     # make sure data can be written to the cluster
+    password = await get_user_password(ops_test, user=INTERNAL_USER, unit=leader_unit)
     test_key = "test_key"
     test_value = "42"
-    assert put_key(model, leader_unit, endpoints, key=test_key, value=test_value) == "OK"
-    assert get_key(model, leader_unit, endpoints, key=test_key) == test_value
+    assert (
+        put_key(
+            model,
+            leader_unit,
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=test_key,
+            value=test_value,
+        )
+        == "OK"
+    )
+    assert (
+        get_key(model, leader_unit, endpoints, user=INTERNAL_USER, password=password, key=test_key)
+        == test_value
+    )

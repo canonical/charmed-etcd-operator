@@ -18,17 +18,32 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
-def put_key(model: str, unit: str, endpoints: str, key: str, value: str) -> str:
+def put_key(
+    model: str,
+    unit: str,
+    endpoints: str,
+    user: str,
+    password: str,
+    key: str,
+    value: str,
+) -> str:
     """Write data to etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
+    etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints} --user={user} --password={password}"
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[0]
 
 
-def get_key(model: str, unit: str, endpoints: str, key: str) -> str:
+def get_key(
+    model: str,
+    unit: str,
+    endpoints: str,
+    user: str,
+    password: str,
+    key: str,
+) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
+    etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints} --user={user} --password={password}"
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[1]
@@ -59,3 +74,16 @@ async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME)
     for unit in ops_test.model.applications[app_name].units:
         if await unit.is_leader_from_status():
             return unit.name
+
+
+async def get_user_password(ops_test: OpsTest, user: str, unit: str) -> str:
+    """Use the action to retrieve the password for a user.
+
+    Return:
+        String with the password stored on the peer relation databag.
+    """
+    action = await ops_test.model.units.get(unit).run_action(
+        action_name="get-password", params={"username": user}
+    )
+    credentials = await action.wait()
+    return credentials.results["password"]
