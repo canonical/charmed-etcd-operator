@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT
+from literals import CLIENT_PORT, SNAP_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ APP_NAME = METADATA["name"]
 
 def put_key(model: str, unit: str, endpoints: str, key: str, value: str) -> str:
     """Write data to etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"etcdctl put {key} {value} --endpoints={endpoints}"
+    etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[0]
@@ -28,7 +28,7 @@ def put_key(model: str, unit: str, endpoints: str, key: str, value: str) -> str:
 
 def get_key(model: str, unit: str, endpoints: str, key: str) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"etcdctl get {key} --endpoints={endpoints}"
+    etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[1]
@@ -36,7 +36,7 @@ def get_key(model: str, unit: str, endpoints: str, key: str) -> str:
 
 def get_cluster_members(model: str, unit: str, endpoints: str) -> list[dict]:
     """Query all cluster members from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
+    etcd_command = f"{SNAP_NAME}.etcdctl member list --endpoints={endpoints} -w=json"
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     result = subprocess.getoutput(juju_command).split("\n")[0]

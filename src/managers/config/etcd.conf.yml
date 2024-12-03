@@ -1,3 +1,4 @@
+data-dir: "/var/snap/charmed-etcd/common/var/lib/etcd"
 initial-cluster-token: 'etcd-cluster'
 snapshot-count: 10000
 heartbeat-interval: 100

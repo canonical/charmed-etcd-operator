@@ -39,16 +39,16 @@ jobs:
     name: Build charm
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v23.0.4
 
-#  release:
-#    name: Release charm
-#    needs:
-#      - ci-tests
-#      - build
-#    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v23.0.4
-#    with:
-#      channel: 3.5/edge
-#      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-#    secrets:
-#      charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
-#    permissions:
-#      contents: write  # Needed to create GitHub release
+  release:
+    name: Release charm
+    needs:
+      - ci-tests
+      - build
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v23.0.4
+    with:
+      channel: 3.5/edge
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+    secrets:
+      charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
+    permissions:
+      contents: write  # Needed to create GitHub release

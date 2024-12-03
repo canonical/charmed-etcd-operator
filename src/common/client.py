@@ -10,7 +10,7 @@ import subprocess
 from typing import Optional
 
 from common.exceptions import EtcdAuthNotEnabledError, EtcdUserNotCreatedError
-from literals import INTERNAL_USER
+from literals import INTERNAL_USER, SNAP_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ class EtcdClient:
     def _run_etcdctl(
         self,
         command: str,
+        subcommand: str | None,
         endpoints: str,
         subcommand: Optional[str] = None,
         # We need to be able to run `etcdctl` without user/pw
@@ -107,7 +108,7 @@ class EtcdClient:
             might differ.
         """
         try:
-            args = ["etcdctl", command]
+            args = [f"{SNAP_NAME}.etcdctl", command]
             if subcommand:
                 args.append(subcommand)
             if new_user:
