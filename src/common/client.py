@@ -72,7 +72,6 @@ class EtcdClient:
     def _run_etcdctl(
         self,
         command: str,
-        subcommand: str | None,
         endpoints: str,
         subcommand: Optional[str] = None,
         # We need to be able to run `etcdctl` without user/pw
@@ -133,7 +132,9 @@ class EtcdClient:
                 text=True,
             ).stdout.strip()
         except subprocess.CalledProcessError as e:
-            logger.error(f"etcdctl {command} command failed: {e.returncode}, {e.stderr}")
+            logger.error(
+                f"etcdctl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"
+            )
             return None
         except subprocess.TimeoutExpired as e:
             logger.error(f"Timed out running etcdctl: {e.stderr}")
