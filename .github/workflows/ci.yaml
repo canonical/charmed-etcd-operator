@@ -66,12 +66,9 @@ jobs:
       matrix:
         juju:
           # This runs on all runs
-          - agent: 3.5.4 # renovate: juju-agent-pin-minor
-            allure_report: true
-          # This runs only on scheduled runs, DPW 21 specifics (scheduled + 3.6/X)
-          - snap_channel: 3.6/beta
+          - agent: 3.6 # renovate: juju-agent-pin-minor
             allure_report: false
-    name: Integration test charm | ${{ matrix.juju.agent || matrix.juju.snap_channel }}
+    name: Integration test charm
     needs:
       - lint
       - unit-test
@@ -79,7 +76,6 @@ jobs:
     uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v23.0.4
     with:
       juju-agent-version: ${{ matrix.juju.agent }}
-      juju-snap-channel: ${{ matrix.juju.snap_channel }}
       artifact-prefix: packed-charm-cache-true
       cloud: lxd
     permissions:
