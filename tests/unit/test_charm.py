@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 from pathlib import Path
+from subprocess import CalledProcessError, CompletedProcess
 from unittest.mock import patch
 
 import ops
@@ -44,7 +45,6 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
-        patch("managers.cluster.ClusterManager.get_leader"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.MaintenanceStatus("no peer relation available")
@@ -57,7 +57,28 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
-        patch("managers.cluster.ClusterManager.get_leader"),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+
+    # if authentication cannot be enabled, the charm should be blocked
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.start"),
+        patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == ops.BlockedStatus(
+            "failed to enable authentication in etcd"
+        )
+
+    # if authentication was enabled, the charm should be active
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.start"),
+        patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
@@ -67,7 +88,7 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
-        patch("managers.cluster.ClusterManager.get_leader"),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
