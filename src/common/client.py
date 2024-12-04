@@ -20,8 +20,8 @@ class EtcdClient:
 
     def __init__(
         self,
-        username,
-        password,
+        username: str,
+        password: str,
         client_url: str,
     ):
         self.client_url = client_url

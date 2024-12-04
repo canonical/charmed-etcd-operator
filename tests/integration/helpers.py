@@ -6,6 +6,7 @@ import json
 import logging
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 import yaml
 from pytest_operator.plugin import OpsTest
@@ -22,13 +23,17 @@ def put_key(
     model: str,
     unit: str,
     endpoints: str,
-    user: str,
-    password: str,
     key: str,
     value: str,
+    user: Optional[str] = None,
+    password: Optional[str] = None,
 ) -> str:
     """Write data to etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints} --user={user} --password={password}"
+    etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[0]
@@ -38,12 +43,17 @@ def get_key(
     model: str,
     unit: str,
     endpoints: str,
-    user: str,
-    password: str,
     key: str,
+    user: Optional[str] = None,
+    password: Optional[str] = None,
 ) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints} --user={user} --password={password}"
+    etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[1]
