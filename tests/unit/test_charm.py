@@ -82,6 +82,7 @@ def test_start():
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
+        assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
 
     # if the etcd daemon can't start, the charm should display blocked status
     with (

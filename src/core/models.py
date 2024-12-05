@@ -127,3 +127,8 @@ class EtcdCluster(RelationState):
             return {INTERNAL_USER: password}
 
         return {}
+
+    @property
+    def auth_enabled(self) -> bool:
+        """Flag to check if authentication is already enabled in the Cluster."""
+        return self.relation_data.get("authentication", "") == "enabled"

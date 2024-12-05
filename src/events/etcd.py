@@ -79,9 +79,10 @@ class EtcdEvents(Object):
 
         self.charm.workload.start()
 
-        if self.charm.unit.is_leader():
+        if self.charm.unit.is_leader() and not self.charm.state.cluster.auth_enabled:
             try:
                 self.charm.cluster_manager.enable_authentication()
+                self.charm.state.cluster.update({"authentication": "enabled"})
             except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
                 logger.error(e)
                 self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
