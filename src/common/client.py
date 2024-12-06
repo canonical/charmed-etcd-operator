@@ -95,7 +95,7 @@ class EtcdClient:
         auth_password: str | None = None,
         user: str | None = None,
         user_password: str | None = None,
-        output_format: str | None = "simple",
+        output_format: str = "simple",
         use_input: str | None = None,
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
