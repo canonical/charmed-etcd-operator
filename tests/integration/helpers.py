@@ -18,17 +18,41 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
-def put_key(model: str, unit: str, endpoints: str, key: str, value: str) -> str:
+def put_key(
+    model: str,
+    unit: str,
+    endpoints: str,
+    key: str,
+    value: str,
+    user: str | None = None,
+    password: str | None = None,
+) -> str:
     """Write data to etcd using `etcdctl` via `juju ssh`."""
     etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[0]
 
 
-def get_key(model: str, unit: str, endpoints: str, key: str) -> str:
+def get_key(
+    model: str,
+    unit: str,
+    endpoints: str,
+    key: str,
+    user: str | None = None,
+    password: str | None = None,
+) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
     etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[1]

@@ -7,6 +7,8 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
+from literals import INTERNAL_USER
+
 from .helpers import (
     APP_NAME,
     get_cluster_endpoints,
@@ -45,7 +47,42 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     assert len(cluster_members) == NUM_UNITS
 
     # make sure data can be written to the cluster
+    password = await get_user_password(ops_test, user=INTERNAL_USER, unit=leader_unit)
     test_key = "test_key"
     test_value = "42"
-    assert put_key(model, leader_unit, endpoints, key=test_key, value=test_value) == "OK"
-    assert get_key(model, leader_unit, endpoints, key=test_key) == test_value
+    assert (
+        put_key(
+            model,
+            leader_unit,
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=test_key,
+            value=test_value,
+        )
+        == "OK"
+    )
+    assert (
+        get_key(model, leader_unit, endpoints, user=INTERNAL_USER, password=password, key=test_key)
+        == test_value
+    )
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_authentication(ops_test: OpsTest) -> None:
+    """Assert authentication is enabled by default.
+
+    Test reading and writing data without providing credentials.
+    Test updating the password of the internal admin user and make sure it can be used.
+    """
+    model = ops_test.model_full_name
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    test_key = "test_key"
+    test_value = "42"
+
+    # check that reading/writing data without credentials fails
+    assert get_key(model, leader_unit, endpoints, key=test_key) != test_value
+    assert put_key(model, leader_unit, endpoints, key=test_key, value=test_value) != "OK"

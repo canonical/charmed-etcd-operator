@@ -4,6 +4,8 @@
 
 """Base objects for workload operations across different substrates."""
 
+import secrets
+import string
 from abc import ABC, abstractmethod
 
 
@@ -24,3 +26,12 @@ class WorkloadBase(ABC):
     def write_file(self, content: str, file: str) -> None:
         """Write content to a file."""
         pass
+
+    @staticmethod
+    def generate_password() -> str:
+        """Create randomized string for use as app passwords.
+
+        Returns:
+            String of 32 randomized letter+digit characters
+        """
+        return "".join([secrets.choice(string.ascii_letters + string.digits) for _ in range(32)])

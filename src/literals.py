@@ -21,6 +21,9 @@ PEER_RELATION = "etcd-peers"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
 
+INTERNAL_USER = "root"
+SECRETS_APP = ["root-password"]
+
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 SUBSTRATES = Literal["vm", "k8s"]
 SUBSTRATE = "vm"
@@ -38,6 +41,9 @@ class Status(Enum):
     """Collection of possible statuses for the charm."""
 
     ACTIVE = StatusLevel(ActiveStatus(), "DEBUG")
+    AUTHENTICATION_NOT_ENABLED = StatusLevel(
+        BlockedStatus("failed to enable authentication in etcd"), "ERROR"
+    )
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")

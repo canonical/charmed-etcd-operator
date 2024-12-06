@@ -17,7 +17,12 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 
-from literals import PEER_RELATION, Status
+from common.exceptions import (
+    EtcdAuthNotEnabledError,
+    EtcdUserManagementError,
+    RaftLeaderNotFoundError,
+)
+from literals import INTERNAL_USER, PEER_RELATION, Status
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -74,6 +79,15 @@ class EtcdEvents(Object):
 
         self.charm.workload.start()
 
+        if self.charm.unit.is_leader() and not self.charm.state.cluster.auth_enabled:
+            try:
+                self.charm.cluster_manager.enable_authentication()
+                self.charm.state.cluster.update({"authentication": "enabled"})
+            except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
+                logger.error(e)
+                self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
+                return
+
         if self.charm.workload.alive():
             self.charm.set_status(Status.ACTIVE)
         else:
@@ -102,14 +116,22 @@ class EtcdEvents(Object):
         # Todo: remove this test at some point, this is just for showcasing that it works :)
         # We will need to perform any HA-related action against the raft leader
         # e.g. add members, trigger leader election, log compaction, etc.
-        if raft_leader := self.charm.cluster_manager.get_leader():
+        try:
+            raft_leader = self.charm.cluster_manager.get_leader()
             logger.info(f"Raft leader: {raft_leader}")
+        except RaftLeaderNotFoundError as e:
+            logger.warning(e)
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""
         if not self.charm.state.peer_relation:
             self.charm.set_status(Status.NO_PEER_RELATION)
             return
+
+        if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
+            self.charm.state.cluster.update(
+                {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
+            )
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""

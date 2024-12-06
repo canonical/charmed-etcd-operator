@@ -15,7 +15,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from ops import Object, Relation, Unit
 
 from core.models import EtcdCluster, EtcdServer
-from literals import PEER_RELATION, SUBSTRATES
+from literals import PEER_RELATION, SECRETS_APP, SUBSTRATES
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -29,7 +29,9 @@ class ClusterState(Object):
     def __init__(self, charm: "EtcdOperatorCharm", substrate: SUBSTRATES):
         super().__init__(parent=charm, key="charm_state")
         self.substrate: SUBSTRATES = substrate
-        self.peer_app_interface = DataPeerData(self.model, relation_name=PEER_RELATION)
+        self.peer_app_interface = DataPeerData(
+            self.model, relation_name=PEER_RELATION, additional_secret_fields=SECRETS_APP
+        )
         self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_RELATION)
 
     @property
