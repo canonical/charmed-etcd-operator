@@ -87,16 +87,16 @@ class EtcdClient:
         self,
         command: str,
         endpoints: str,
-        subcommand: str = None,
+        subcommand: str | None = None,
         # We need to be able to run `etcdctl` without user/pw
         # otherwise it will error if auth is not yet enabled
         # this is relevant for `user add` and `auth enable` commands
-        auth_username: str = None,
-        auth_password: str = None,
-        user: str = None,
-        user_password: str = None,
-        output_format: str = "simple",
-        use_input: str = None,
+        auth_username: str | None = None,
+        auth_password: str | None = None,
+        user: str | None = None,
+        user_password: str | None = None,
+        output_format: str | None = "simple",
+        use_input: str | None = None,
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
 

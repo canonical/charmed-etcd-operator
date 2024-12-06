@@ -6,7 +6,6 @@ import json
 import logging
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from pytest_operator.plugin import OpsTest
@@ -25,8 +24,8 @@ def put_key(
     endpoints: str,
     key: str,
     value: str,
-    user: Optional[str] = None,
-    password: Optional[str] = None,
+    user: str | None = None,
+    password: str | None = None,
 ) -> str:
     """Write data to etcd using `etcdctl` via `juju ssh`."""
     etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
@@ -44,8 +43,8 @@ def get_key(
     unit: str,
     endpoints: str,
     key: str,
-    user: Optional[str] = None,
-    password: Optional[str] = None,
+    user: str | None = None,
+    password: str | None = None,
 ) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
     etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
