@@ -10,7 +10,6 @@ import ops
 from ops import StatusBase
 
 from core.cluster import ClusterState
-from events.actions import ActionEvents
 from events.etcd import EtcdEvents
 from literals import SUBSTRATE, DebugLevel, Status
 from managers.cluster import ClusterManager
@@ -36,7 +35,6 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
-        self.action_events = ActionEvents(self)
 
     def set_status(self, key: Status) -> None:
         """Set charm status."""

@@ -83,16 +83,3 @@ async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME)
     for unit in ops_test.model.applications[app_name].units:
         if await unit.is_leader_from_status():
             return unit.name
-
-
-async def get_user_password(ops_test: OpsTest, user: str, unit: str) -> str:
-    """Use the action to retrieve the password for a user.
-
-    Return:
-        String with the password stored on the peer relation databag.
-    """
-    action = await ops_test.model.units.get(unit).run_action(
-        action_name="get-password", params={"username": user}
-    )
-    credentials = await action.wait()
-    return credentials.results["password"]
