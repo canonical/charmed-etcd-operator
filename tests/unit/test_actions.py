@@ -31,6 +31,13 @@ def test_get_password():
     assert ctx.action_results.get("password")
     assert ctx.action_results.get("ca-chain")
 
+    with raises(ActionFailed) as error:
+        ctx.run(
+            ctx.on.action("get-password", params={"username": "my_user"}),
+            state_in,
+        )
+    assert error.value.message == f"Action only allowed for user {INTERNAL_USER}."
+
 
 def test_set_password():
     ctx = testing.Context(EtcdOperatorCharm)

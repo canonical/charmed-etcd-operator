@@ -7,7 +7,6 @@
 import json
 import logging
 import subprocess
-from typing import Optional
 
 from common.exceptions import EtcdAuthNotEnabledError, EtcdUserManagementError
 from literals import INTERNAL_USER, SNAP_NAME
@@ -88,16 +87,16 @@ class EtcdClient:
         self,
         command: str,
         endpoints: str,
-        subcommand: Optional[str] = None,
+        subcommand: str = None,
         # We need to be able to run `etcdctl` without user/pw
         # otherwise it will error if auth is not yet enabled
         # this is relevant for `user add` and `auth enable` commands
-        auth_username: Optional[str] = None,
-        auth_password: Optional[str] = None,
-        user: Optional[str] = None,
-        user_password: Optional[str] = None,
-        output_format: Optional[str] = "simple",
-        use_input: Optional[str] = None,
+        auth_username: str = None,
+        auth_password: str = None,
+        user: str = None,
+        user_password: str = None,
+        output_format: str = "simple",
+        use_input: str = None,
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
 

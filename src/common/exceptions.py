@@ -8,16 +8,10 @@
 class RaftLeaderNotFoundError(Exception):
     """Custom Exception if there is no current Raft leader."""
 
-    pass
-
 
 class EtcdUserManagementError(Exception):
     """Custom Exception if user could not be added or updated in etcd cluster."""
 
-    pass
-
 
 class EtcdAuthNotEnabledError(Exception):
     """Custom Exception if authentication could not be enabled in the etcd cluster."""
-
-    pass

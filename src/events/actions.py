@@ -40,6 +40,7 @@ class ActionEvents(Object):
             event.fail("User credentials not created yet.")
             return
 
+        # todo: add the TLS CA chain here once TLS is implemented
         event.set_results(
             {
                 "username": username,

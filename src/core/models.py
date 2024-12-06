@@ -5,7 +5,6 @@
 """Collection of state objects for the Etcd relations, apps and units."""
 
 import logging
-from collections.abc import MutableMapping
 
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
@@ -30,11 +29,6 @@ class RelationState:
         self.component = component
         self.substrate = substrate
         self.relation_data = self.data_interface.as_dict(self.relation.id) if self.relation else {}
-
-    @property
-    def data(self) -> MutableMapping:
-        """Data representing the state."""
-        return self.relation_data
 
     def update(self, items: dict[str, str]) -> None:
         """Write to relation data."""
