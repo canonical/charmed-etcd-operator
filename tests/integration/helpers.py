@@ -6,11 +6,12 @@ import json
 import logging
 import subprocess
 from pathlib import Path
+from typing import Dict
 
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT, SNAP_NAME
+from literals import CLIENT_PORT, PEER_RELATION, SNAP_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -83,3 +84,19 @@ async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME)
     for unit in ops_test.model.applications[app_name].units:
         if await unit.is_leader_from_status():
             return unit.name
+
+
+async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str]:
+    secrets_raw = await ops_test.juju("list-secrets")
+    secret_ids = [
+        secret_line.split()[0] for secret_line in secrets_raw[1].split("\n")[1:] if secret_line
+    ]
+
+    for secret_id in secret_ids:
+        secret_data_raw = await ops_test.juju(
+            "show-secret", "--format", "json", "--reveal", secret_id
+        )
+        secret_data = json.loads(secret_data_raw[1])
+
+        if label == secret_data[secret_id].get("label"):
+            return secret_data[secret_id]["content"]["Data"]

@@ -83,7 +83,7 @@ class EtcdClient:
         else:
             raise EtcdAuthNotEnabledError("Failed to enable authentication in etcd.")
 
-    def _run_etcdctl(
+    def _run_etcdctl(  # noqa: C901
         self,
         command: str,
         endpoints: str,

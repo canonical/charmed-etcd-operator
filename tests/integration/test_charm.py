@@ -15,6 +15,7 @@ from .helpers import (
     get_cluster_members,
     get_juju_leader_unit_name,
     get_key,
+    get_secret_by_label,
     put_key,
 )
 
@@ -47,7 +48,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     assert len(cluster_members) == NUM_UNITS
 
     # make sure data can be written to the cluster
-    password = await get_user_password(ops_test, user=INTERNAL_USER, unit=leader_unit)
+    password = await get_secret_by_label(ops_test, label=f"{APP_NAME}:app:") # get_user_password(ops_test, user=INTERNAL_USER, unit=leader_unit)
     test_key = "test_key"
     test_value = "42"
     assert (
