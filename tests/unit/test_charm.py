@@ -138,3 +138,24 @@ def test_get_leader():
     with patch("managers.cluster.EtcdClient.get_endpoint_status", return_value=test_data):
         with ctx(ctx.on.relation_joined(relation=relation), state_in) as context:
             assert context.charm.cluster_manager.get_leader() == f"http://{test_ip}:{CLIENT_PORT}"
+
+
+def test_config_changed():
+    secret_key = "admin-password"
+    secret_value = "123"
+    secret_content = {secret_key: secret_value}
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        secrets=[secret],
+        config={secret_key: secret.id},
+        relations={relation},
+        leader=True
+    )
+
+    with patch("subprocess.run"):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
+        assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value

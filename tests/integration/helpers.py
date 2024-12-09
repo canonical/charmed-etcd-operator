@@ -11,7 +11,7 @@ from typing import Dict
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT, PEER_RELATION, SNAP_NAME
+from literals import CLIENT_PORT, SNAP_NAME
 
 logger = logging.getLogger(__name__)
 
