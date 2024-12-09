@@ -1,0 +1,11 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+options:
+  admin-password:
+    type: secret
+    description: |
+      Configure the admin user's password. The password will be auto-generated
+      if this option is not set. It is for internal use only and SHOULD NOT
+      be used by applications. This needs to be a Juju Secret URI pointing
+      to a secret that contains the following key: `admin-password`.
