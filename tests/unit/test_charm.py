@@ -149,10 +149,7 @@ def test_config_changed():
 
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
-        secrets=[secret],
-        config={secret_key: secret.id},
-        relations={relation},
-        leader=True
+        secrets=[secret], config={secret_key: secret.id}, relations={relation}, leader=True
     )
 
     with patch("subprocess.run"):
