@@ -16,8 +16,15 @@ from ops.charm import (
     RelationDepartedEvent,
     RelationJoinedEvent,
 )
+from ops.model import ModelError, SecretNotFoundError
 
-from literals import PEER_RELATION, Status
+from common.exceptions import (
+    EtcdAuthNotEnabledError,
+    EtcdUserManagementError,
+    RaftLeaderNotFoundError,
+)
+from common.secrets import get_secret_from_id
+from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -51,6 +58,7 @@ class EtcdEvents(Object):
         )
         self.framework.observe(self.charm.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.charm.on.update_status, self._on_update_status)
+        self.framework.observe(self.charm.on.secret_changed, self._on_secret_changed)
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -74,6 +82,15 @@ class EtcdEvents(Object):
 
         self.charm.workload.start()
 
+        if self.charm.unit.is_leader() and not self.charm.state.cluster.auth_enabled:
+            try:
+                self.charm.cluster_manager.enable_authentication()
+                self.charm.state.cluster.update({"authentication": "enabled"})
+            except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
+                logger.error(e)
+                self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
+                return
+
         if self.charm.workload.alive():
             self.charm.set_status(Status.ACTIVE)
         else:
@@ -81,7 +98,11 @@ class EtcdEvents(Object):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
-        pass
+        if not self.charm.unit.is_leader():
+            return
+
+        if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
+            self.update_admin_password(admin_secret_id)
 
     def _on_cluster_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
@@ -102,8 +123,11 @@ class EtcdEvents(Object):
         # Todo: remove this test at some point, this is just for showcasing that it works :)
         # We will need to perform any HA-related action against the raft leader
         # e.g. add members, trigger leader election, log compaction, etc.
-        if raft_leader := self.charm.cluster_manager.get_leader():
+        try:
+            raft_leader = self.charm.cluster_manager.get_leader()
             logger.info(f"Raft leader: {raft_leader}")
+        except RaftLeaderNotFoundError as e:
+            logger.warning(e)
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""
@@ -111,7 +135,44 @@ class EtcdEvents(Object):
             self.charm.set_status(Status.NO_PEER_RELATION)
             return
 
+        if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
+            self.charm.state.cluster.update(
+                {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
+            )
+
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
         if not self.charm.workload.alive():
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+
+    def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
+        """Handle the secret_changed event."""
+        if not self.charm.unit.is_leader():
+            return
+
+        if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
+            if admin_secret_id == event.secret.id:
+                self.update_admin_password(admin_secret_id)
+
+    def update_admin_password(self, admin_secret_id: str) -> None:
+        """Compare current admin password and update in etcd if required."""
+        try:
+            if new_password := get_secret_from_id(self.charm.model, admin_secret_id).get(
+                INTERNAL_USER
+            ):
+                # only update admin credentials if the password has changed
+                if new_password != self.charm.state.cluster.internal_user_credentials.get(
+                    INTERNAL_USER
+                ):
+                    logger.debug(f"{INTERNAL_USER_PASSWORD_CONFIG} have changed.")
+                    try:
+                        self.charm.cluster_manager.update_credentials(
+                            username=INTERNAL_USER, password=new_password
+                        )
+                        self.charm.state.cluster.update(
+                            {f"{INTERNAL_USER}-password": new_password}
+                        )
+                    except EtcdUserManagementError as e:
+                        logger.error(e)
+        except (ModelError, SecretNotFoundError) as e:
+            logger.error(e)

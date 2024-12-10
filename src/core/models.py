@@ -5,12 +5,11 @@
 """Collection of state objects for the Etcd relations, apps and units."""
 
 import logging
-from collections.abc import MutableMapping
 
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
 
-from literals import CLIENT_PORT, PEER_PORT, SUBSTRATES
+from literals import CLIENT_PORT, INTERNAL_USER, PEER_PORT, SUBSTRATES
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +29,6 @@ class RelationState:
         self.component = component
         self.substrate = substrate
         self.relation_data = self.data_interface.as_dict(self.relation.id) if self.relation else {}
-
-    @property
-    def data(self) -> MutableMapping:
-        """Data representing the state."""
-        return self.relation_data
 
     def update(self, items: dict[str, str]) -> None:
         """Write to relation data."""
@@ -119,3 +113,16 @@ class EtcdCluster(RelationState):
     def initial_cluster_state(self) -> str:
         """The initial cluster state ('new' or 'existing') of the etcd cluster."""
         return self.relation_data.get("initial_cluster_state", "")
+
+    @property
+    def internal_user_credentials(self) -> dict[str, str]:
+        """Retrieve the credentials for the internal admin user."""
+        if password := self.relation_data.get(f"{INTERNAL_USER}-password"):
+            return {INTERNAL_USER: password}
+
+        return {}
+
+    @property
+    def auth_enabled(self) -> bool:
+        """Flag to check if authentication is already enabled in the Cluster."""
+        return self.relation_data.get("authentication", "") == "enabled"

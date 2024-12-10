@@ -2,13 +2,19 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from pathlib import Path
+from subprocess import CalledProcessError, CompletedProcess
 from unittest.mock import patch
 
 import ops
+import yaml
 from ops import testing
 
 from charm import EtcdOperatorCharm
-from literals import CLIENT_PORT, PEER_RELATION
+from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
+
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+APP_NAME = METADATA["name"]
 
 
 def test_install_failure_blocked_status():
@@ -20,6 +26,16 @@ def test_install_failure_blocked_status():
         assert state_out.unit_status == ops.BlockedStatus("unable to install etcd snap")
 
 
+def test_internal_user_creation():
+    ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    state_in = testing.State(relations={relation}, leader=True)
+    state_out = ctx.run(ctx.on.leader_elected(), state_in)
+    secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")
+
+
 def test_start():
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State()
@@ -29,7 +45,6 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
-        patch("managers.cluster.ClusterManager.get_leader"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.MaintenanceStatus("no peer relation available")
@@ -42,17 +57,39 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
-        patch("managers.cluster.ClusterManager.get_leader"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
+
+    # if authentication cannot be enabled, the charm should be blocked
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.start"),
+        patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == ops.BlockedStatus(
+            "failed to enable authentication in etcd"
+        )
+
+    # if authentication was enabled, the charm should be active
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.start"),
+        patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+        assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
 
     # if the etcd daemon can't start, the charm should display blocked status
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
-        patch("managers.cluster.ClusterManager.get_leader"),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
@@ -101,3 +138,24 @@ def test_get_leader():
     with patch("managers.cluster.EtcdClient.get_endpoint_status", return_value=test_data):
         with ctx(ctx.on.relation_joined(relation=relation), state_in) as context:
             assert context.charm.cluster_manager.get_leader() == f"http://{test_ip}:{CLIENT_PORT}"
+
+
+def test_config_changed():
+    secret_key = "root"
+    secret_value = "123"
+    secret_content = {secret_key: secret_value}
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        secrets=[secret],
+        config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
+        relations={relation},
+        leader=True,
+    )
+
+    with patch("subprocess.run"):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
+        assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
