@@ -159,3 +159,45 @@ def test_config_changed():
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+
+def test_secret_changed():
+    secret_key = "root"
+    secret_value = "123"
+    secret_content = {secret_key: secret_value}
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    # test the happy path
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        secrets=[secret],
+        config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
+        relations={relation},
+        leader=True,
+    )
+    with patch("subprocess.run"):
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
+        secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
+        assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+    # unhappy path: if the password update fails in etcd, charm status has to be blocked
+    with patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="failed")):
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
+
+        assert state_out.unit_status == ops.BlockedStatus("failed to update password")
+
+    # no update should happen if the user-name is invalid, charm status has to be blocked
+    secret_key = "invalid-user-name"
+    secret_content = {secret_key: secret_value}
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    state_in = testing.State(
+        secrets=[secret],
+        config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
+        relations={relation},
+        leader=True,
+    )
+    with patch("subprocess.run") as run:
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
+        run.assert_not_called()
+        assert state_out.unit_status == ops.BlockedStatus("failed to update password")
