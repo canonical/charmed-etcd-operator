@@ -3,17 +3,17 @@
 In this step, we will set up a development environment with the required components for deploying Charmed etcd.
 
 ## Summary
-* [Set up LXD](#heading--set-up-lxd)
-* [Set up Juju](#heading--set-up-juju)
+* [Set up LXD](#set-up-lxd)
+* [Set up Juju](#set-up-juju)
 
 ---
 
-<a href="#heading--set-up-lxd"><h2 id="heading--set-up-lxd"> Set up LXD </h2></a>
+## Set up LXD
 
-The simplest way to get started with Charmed etcd is to set up a local LXD cloud.
+The simplest way to get started with charmed etcd is to set up a local LXD cloud.
 [LXD](https://documentation.ubuntu.com/lxd/en/latest/) is a system container and
 virtual machine manager that comes pre-installed on Ubuntu. Juju interfaces with
-LXD to control the containers on which Charmed OpenSearch runs.
+LXD to control the containers on which charmed etcd runs.
 
 Verify if your Ubuntu system already has LXD installed with the command `which lxd`.
 If there is no output, then install LXD with
@@ -40,10 +40,10 @@ in the tutorial, none should exist, so you'll only see this as output:
 +------+-------+------+------+------+-----------+
 ```
 
-<a href="#heading--set-up-juju"><h2 id="heading--set-up-juju"> Set up Juju </h2></a>
+## Set up Juju
 
 [Juju](https://juju.is/docs/juju) is an Operator Lifecycle Manager (OLM) for clouds,
-bare metal, LXD or Kubernetes. We will be using it to deploy and manage Charmed etcd. 
+bare metal, LXD or Kubernetes. We will be using it to deploy and manage charmed etcd. 
 
 As with LXD, Juju is installed using a snap package:
 
@@ -77,7 +77,7 @@ localhost  1        localhost  lxd   1            built-in  LXD Container Hyperv
 
 Notice that Juju already has a built-in knowledge of LXD and how it works,
 so there is no need for additional setup. A controller will be used to deploy
-and control Charmed etcd. 
+and control charmed etcd. 
 
 Run the following command to bootstrap a Juju controller named `dev-controller` on LXD:
 

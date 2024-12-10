@@ -1,13 +1,13 @@
 # Deploy etcd
 
-To deploy Charmed etcd, all you need to do is run the following command:
+To deploy charmed etcd, all you need to do is run the following command:
 
 ```shell
 juju deploy charmed-etcd -n 3 --channel 3.5/edge
 ```
 
 >**Note:** The `-n` flag is optional and specifies the number of units to
-> deploy. In this case, we are deploying three units of Charmed etcd. We
+> deploy. In this case, we are deploying three units of charmed etcd. We
 > recommend deploying at least three units for high availability.
 
 The command will fetch the charm from [Charmhub](https://charmhub.io/charmed-etcd?channel=3.5/edge)
@@ -20,10 +20,7 @@ You can track the progress by running:
 juju status --watch 1s
 ```
 
->This command is useful for checking the status of your Juju model, including
-> the applications and machines it hosts. Helpful information it displays
-> includes IP addresses, ports, state, etc. The output of this command updates
-> once every other second. 
+> See also: [`juju status` command](https://juju.is/docs/juju/juju-status) 
 
 When the application is ready, `juju status` will show something similar to the sample output below: 
 
@@ -47,7 +44,10 @@ Machine  State    Address        Inst id         Base          AZ  Message
 
 To exit the `juju status` screen, enter `Ctrl + C`.
 
+## Access etcd
+
 You can access etcd with a command line client like `etcdctl` or via REST API.
+
 In this tutorial, we will use `curl` with the REST API. Get the IP of an etcd node
 from the output of juju status (any of the nodes should work fine), and run the
 following command to connect to the etcd cluster:
