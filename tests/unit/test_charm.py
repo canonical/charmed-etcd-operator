@@ -11,7 +11,7 @@ import yaml
 from ops import testing
 
 from charm import EtcdOperatorCharm
-from literals import CLIENT_PORT, INTERNAL_USER, PEER_RELATION
+from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -141,7 +141,7 @@ def test_get_leader():
 
 
 def test_config_changed():
-    secret_key = "admin-password"
+    secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
     secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
@@ -149,7 +149,10 @@ def test_config_changed():
 
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
-        secrets=[secret], config={secret_key: secret.id}, relations={relation}, leader=True
+        secrets=[secret],
+        config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
+        relations={relation},
+        leader=True,
     )
 
     with patch("subprocess.run"):

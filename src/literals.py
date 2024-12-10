@@ -22,7 +22,7 @@ CLIENT_PORT = 2379
 PEER_PORT = 2380
 
 INTERNAL_USER = "root"
-INTERNAL_USER_PASSWORD_CONFIG = "admin-password"
+INTERNAL_USER_PASSWORD_CONFIG = "system-users"
 SECRETS_APP = ["root-password"]
 
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]

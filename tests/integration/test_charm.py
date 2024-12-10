@@ -7,7 +7,7 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION
+from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
 from .helpers import (
     APP_NAME,
@@ -103,12 +103,14 @@ async def test_update_admin_password(ops_test: OpsTest) -> None:
     new_password = "some-password"
 
     secret_id = await ops_test.model.add_secret(
-        name=secret_name, data_args=[f"admin-password={new_password}"]
+        name=secret_name, data_args=[f"{INTERNAL_USER}={new_password}"]
     )
     await ops_test.model.grant_secret(secret_name=secret_name, application=APP_NAME)
 
     # update the application config to include the secret
-    await ops_test.model.applications[APP_NAME].set_config({"admin-password": secret_id})
+    await ops_test.model.applications[APP_NAME].set_config(
+        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
+    )
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # perform read operation with the updated password
@@ -120,7 +122,7 @@ async def test_update_admin_password(ops_test: OpsTest) -> None:
     )
 
     # update the config again and remove the option `admin-password`
-    await ops_test.model.applications[APP_NAME].reset_config(["admin-password"])
+    await ops_test.model.applications[APP_NAME].reset_config([INTERNAL_USER_PASSWORD_CONFIG])
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # make sure we can still read data with the previously set password

@@ -158,13 +158,13 @@ class EtcdEvents(Object):
         """Compare current admin password and update in etcd if required."""
         try:
             if new_password := get_secret_from_id(self.charm.model, admin_secret_id).get(
-                INTERNAL_USER_PASSWORD_CONFIG
+                INTERNAL_USER
             ):
                 # only update admin credentials if the password has changed
                 if new_password != self.charm.state.cluster.internal_user_credentials.get(
                     INTERNAL_USER
                 ):
-                    logger.debug(f"{INTERNAL_USER_PASSWORD_CONFIG} has changed.")
+                    logger.debug(f"{INTERNAL_USER_PASSWORD_CONFIG} have changed.")
                     try:
                         self.charm.cluster_manager.update_credentials(
                             username=INTERNAL_USER, password=new_password
