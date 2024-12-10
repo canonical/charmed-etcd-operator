@@ -5,7 +5,6 @@ In this step, we will set up a development environment with the required compone
 ## Summary
 * [Set up LXD](#heading--set-up-lxd)
 * [Set up Juju](#heading--set-up-juju)
-* [Set kernel parameters](#heading--kernel-parameters)
 
 ---
 
