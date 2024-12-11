@@ -1,26 +1,11 @@
-<!--
-Avoid using this README file for information that is maintained or published elsewhere, e.g.:
-
-* metadata.yaml > published on Charmhub
-* documentation > published on (or linked to from) Charmhub
-* detailed contribution guide > documentation or CONTRIBUTING.md
-
-Use links instead.
--->
-
-# charmed-etcd-operator
-
-Charmhub package name: operator-template
-More information: https://charmhub.io/charmed-etcd-operator
-
-Describe your charm in one or two sentences.
+## Description
+The Charmed etcd Operator deploys and operates the [etcd](https://etcd.io) 
+software on VMs and machine clusters. The Operator in this repository is a 
+Python project installing and managing etcd installed from the [etcd Snap](https://snapcraft.io/charmed-etcd),
+providing lifecycle management and handling events (install, start, etc).
 
 ## Other resources
-
-<!-- If your charm is documented somewhere else other than Charmhub, provide a link separately. -->
-
-- [Read more](https://example.com)
-
-- [Contributing](CONTRIBUTING.md) <!-- or link to other contribution documentation -->
-
-- See the [Juju SDK documentation](https://juju.is/docs/sdk) for more information about developing and improving charms.
+Further documentation can be found in these documents:
+- setup: docs/set-up.md
+- deployment: docs/deploy-etcd.md
+- manage passwords: docs/manage-passwords.md
