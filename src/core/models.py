@@ -95,6 +95,11 @@ class EtcdServer(RelationState):
         """The client connection endpoint for the etcd server."""
         return f"http://{self.ip}:{CLIENT_PORT}"
 
+    @property
+    def started(self) -> bool:
+        """Flag to check if the unit has started the etcd service."""
+        return self.relation_data.get("state", None) == "started"
+
 
 class EtcdCluster(RelationState):
     """State/Relation data collection for the etcd application."""
@@ -126,3 +131,28 @@ class EtcdCluster(RelationState):
     def auth_enabled(self) -> bool:
         """Flag to check if authentication is already enabled in the Cluster."""
         return self.relation_data.get("authentication", "") == "enabled"
+
+    @property
+    def cluster_members(self) -> str:
+        """Get the list of current members added to the etcd cluster.
+
+        This string is the output of the `etcdctl member add` command issued by the juju leader
+        when a new unit joins and is added as cluster member. This string needs to be provided
+        as an argument `--initial-cluster` when starting the workload on the newly added unit.
+
+        This data is added to the peer cluster relation app databag when the first unit initializes
+        the cluster on startup after deployment.
+        """
+        return self.relation_data.get("initial_cluster", "")
+
+    @property
+    def learning_member(self) -> str:
+        """Get the current learning member.
+
+        New cluster members are added to the etcd cluster as so-called learning members. That means
+        they are not participating in raft leader election because they do not yet have up-to-data
+        data. When added as cluster members with the `add member` command, the juju leader will
+        put the unit's `member_name` here. After promoting to full voting member, the juju leader
+        will unset the `member name` here.
+        """
+        return self.relation_data.get("learning_member", "")
