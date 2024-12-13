@@ -15,3 +15,7 @@ class EtcdUserManagementError(Exception):
 
 class EtcdAuthNotEnabledError(Exception):
     """Custom Exception if authentication could not be enabled in the etcd cluster."""
+
+
+class EtcdClusterManagementError(Exception):
+    """Custom Exception if cluster management operation fails."""

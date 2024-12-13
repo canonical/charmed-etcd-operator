@@ -20,8 +20,8 @@ from ops.model import ModelError, SecretNotFoundError
 
 from common.exceptions import (
     EtcdAuthNotEnabledError,
+    EtcdClusterManagementError,
     EtcdUserManagementError,
-    RaftLeaderNotFoundError,
 )
 from common.secrets import get_secret_from_id
 from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status
@@ -68,28 +68,38 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
-        # Make sure all planned units have joined the peer relation before starting the cluster
-        if (
-            not self.charm.state.peer_relation
-            or len(self.charm.state.peer_relation.units) + 1 < self.charm.app.planned_units()
-        ):
-            logger.info("Deferring start because not all units joined peer-relation.")
-            self.charm.set_status(Status.NO_PEER_RELATION)
-            event.defer()
-            return
-
         self.charm.config_manager.set_config_properties()
 
-        self.charm.workload.start()
+        if self.charm.unit.is_leader():
+            self.charm.workload.start()
+            self.charm.state.unit_server.update({"state": "started"})
 
-        if self.charm.unit.is_leader() and not self.charm.state.cluster.auth_enabled:
-            try:
-                self.charm.cluster_manager.enable_authentication()
-                self.charm.state.cluster.update({"authentication": "enabled"})
-            except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
-                logger.error(e)
-                self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
-                return
+            if self.charm.state.cluster.initial_cluster_state == "new":
+                # mark the cluster as initialized
+                self.charm.state.cluster.update({"initial_cluster_state": "existing"})
+                self.charm.state.cluster.update(
+                    {"initial_cluster": self.charm.state.unit_server.member_endpoint}
+                )
+
+            if not self.charm.state.cluster.auth_enabled:
+                try:
+                    self.charm.cluster_manager.enable_authentication()
+                    self.charm.state.cluster.update({"authentication": "enabled"})
+                except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
+                    logger.error(e)
+                    self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
+                    return
+        elif self.charm.unit_server.member_endpoint in self.charm.state.cluster.cluster_members:
+            # this unit has been added to the etcd cluster
+            self.charm.workload.start()
+            # this triggers a relation_changed event which the leader will use to promote
+            # a learner-member to fully-voting member
+            self.charm.state.unit_server.update({"state": "started"})
+        else:
+            # this is a non-leader unit that has not been added to the cluster
+            # wait for leader to process `relation_joined` event and add the member to the cluster
+            event.defer()
+            return
 
         if self.charm.workload.alive():
             self.charm.set_status(Status.ACTIVE)
@@ -120,14 +130,24 @@ class EtcdEvents(Object):
 
     def _on_cluster_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
-        # Todo: remove this test at some point, this is just for showcasing that it works :)
-        # We will need to perform any HA-related action against the raft leader
-        # e.g. add members, trigger leader election, log compaction, etc.
-        try:
-            raft_leader = self.charm.cluster_manager.get_leader()
-            logger.info(f"Raft leader: {raft_leader}")
-        except RaftLeaderNotFoundError as e:
-            logger.warning(e)
+        if self.charm.unit.is_leader():
+            # get the member information for the newly joined unit from the set of EtcdServers
+            for server in self.charm.state.servers:
+                if server.unit_name == event.unit.name:
+                    member_name = server.member_name
+                    peer_url = server.peer_url
+                    break
+
+            try:
+                initial_cluster_config = self.charm.cluster_manager.add_member_as_learner(
+                    member_name=member_name, peer_url=peer_url
+                )
+                self.charm.state.cluster.update({"initial_cluster": initial_cluster_config})
+                self.charm.state.cluster.update({"learning_member": member_name})
+            except EtcdClusterManagementError as e:
+                logger.error(e)
+                event.defer()
+                return
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""
