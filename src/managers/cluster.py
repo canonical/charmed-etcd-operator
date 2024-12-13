@@ -10,6 +10,7 @@ import socket
 from common.client import EtcdClient
 from common.exceptions import (
     EtcdAuthNotEnabledError,
+    EtcdClusterManagementError,
     EtcdUserManagementError,
     RaftLeaderNotFoundError,
 )
@@ -84,4 +85,19 @@ class ClusterManager:
             )
             client.update_password(username=username, new_password=password)
         except EtcdUserManagementError:
+            raise
+
+    def add_unit_as_learner(self, member_name: str, peer_url: str) -> str:
+        """Add a new member to the etcd cluster, using the learner-flag.
+
+        Returns: the string for `initial_cluster` configuration to be used for starting the member.
+        """
+        try:
+            client = EtcdClient(
+                username=self.admin_user,
+                password=self.admin_password,
+                client_url=self.state.unit_server.client_url,
+            )
+            client.add_learner()
+        except EtcdClusterManagementError:
             raise

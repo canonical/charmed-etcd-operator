@@ -96,6 +96,11 @@ class EtcdServer(RelationState):
         return f"http://{self.ip}:{CLIENT_PORT}"
 
     @property
+    def member_endpoint(self) -> str:
+        """Concatenate member_name and peer_url."""
+        return f"{self.member_name}={self.peer_url}"
+
+    @property
     def started(self) -> bool:
         """Flag to check if the unit has started the etcd service."""
         return self.relation_data.get("state", None) == "started"
