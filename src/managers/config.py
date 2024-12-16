@@ -48,16 +48,19 @@ class ConfigManager:
 
         config_properties["name"] = self.state.unit_server.member_name
         config_properties["initial-advertise-peer-urls"] = self.state.unit_server.peer_url
-        config_properties["initial-cluster-state"] = self.state.cluster.initial_cluster_state
+        if self.state.cluster.cluster_state:
+            config_properties["initial-cluster-state"] = self.state.cluster.cluster_state
+        else:
+            config_properties["initial-cluster-state"] = "new"
         config_properties["listen-peer-urls"] = self.state.unit_server.peer_url
         config_properties["listen-client-urls"] = self.state.unit_server.client_url
         config_properties["advertise-client-urls"] = self.state.unit_server.client_url
-        if self.state.cluster.initial_cluster_state == "new":
+        if self.state.cluster.cluster_state:
+            config_properties["initial-cluster"] = self.state.cluster.cluster_members
+        else:
             # on very first cluster initialization, only the leader should be cluster member
             # all other units will be added to the cluster subsequently
             config_properties["initial-cluster"] = self.state.unit_server.member_endpoint
-        else:
-            config_properties["initial-cluster"] = self.state.cluster.cluster_members
 
         return yaml.safe_dump(config_properties)
 

@@ -44,7 +44,8 @@ class RelationState:
         self.relation_data.update(update_content)
 
         for field in delete_fields:
-            self.relation_data.pop(field, None)
+            # use del instead of pop here because of error with dataplatform-libs
+            del self.relation_data[field]
 
 
 class EtcdServer(RelationState):
@@ -120,9 +121,9 @@ class EtcdCluster(RelationState):
         self.app = component
 
     @property
-    def initial_cluster_state(self) -> str:
-        """The initial cluster state ('new' or 'existing') of the etcd cluster."""
-        return self.relation_data.get("initial_cluster_state", "")
+    def cluster_state(self) -> str:
+        """The cluster state ('new' or 'existing') of the etcd cluster."""
+        return self.relation_data.get("cluster_state", "")
 
     @property
     def internal_user_credentials(self) -> dict[str, str]:
@@ -148,7 +149,7 @@ class EtcdCluster(RelationState):
         This data is added to the peer cluster relation app databag when the first unit initializes
         the cluster on startup after deployment.
         """
-        return self.relation_data.get("initial_cluster", "")
+        return self.relation_data.get("cluster_configuration", "")
 
     @property
     def learning_member(self) -> str:
@@ -157,7 +158,7 @@ class EtcdCluster(RelationState):
         New cluster members are added to the etcd cluster as so-called learning members. That means
         they are not participating in raft leader election because they do not yet have up-to-data
         data. When added as cluster members with the `add member` command, the juju leader will
-        put the unit's `member_name` here. After promoting to full voting member, the juju leader
-        will unset the `member name` here.
+        put the unit's `member_id` here. After promoting to full voting member, the juju leader
+        will unset the `member_id` here.
         """
         return self.relation_data.get("learning_member", "")
