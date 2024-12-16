@@ -87,17 +87,48 @@ class ClusterManager:
         except EtcdUserManagementError:
             raise
 
-    def add_unit_as_learner(self, member_name: str, peer_url: str) -> str:
-        """Add a new member to the etcd cluster, using the learner-flag.
+    def add_member(self, unit_name: str) -> None:
+        """Add a new member to the etcd cluster."""
+        # retrieve the member information for the newly joined unit from the set of EtcdServers
+        member_name = ""
+        ip = ""
+        peer_url = ""
 
-        Returns: the string for `initial_cluster` configuration to be used for starting the member.
-        """
+        for server in self.state.servers:
+            if server.unit_name == unit_name:
+                member_name = server.member_name
+                ip = server.ip
+                peer_url = server.peer_url
+                break
+
+        if member_name and ip and peer_url:
+            # we need to make sure all required information are available before adding the member
+            try:
+                client = EtcdClient(
+                    username=self.admin_user,
+                    password=self.admin_password,
+                    client_url=self.state.unit_server.client_url,
+                )
+                cluster_config, member_id = client.add_member_as_learner(member_name, peer_url)
+                self.state.cluster.update({"cluster_configuration": cluster_config})
+                self.state.cluster.update({"learning_member": member_id})
+            except EtcdClusterManagementError:
+                raise
+        else:
+            raise KeyError(f"Peer relation data for unit {unit_name} not found.")
+
+    def promote_learning_member(self) -> None:
+        """Promote a learning member to full-voting member."""
+        member_id = self.state.cluster.learning_member
+
         try:
             client = EtcdClient(
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=self.state.unit_server.client_url,
             )
-            client.add_learner()
+            client.promote_member(member_id=member_id)
         except EtcdClusterManagementError:
             raise
+
+        self.state.cluster.update({"learning_member": ""})

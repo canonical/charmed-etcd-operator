@@ -74,11 +74,11 @@ class EtcdEvents(Object):
             self.charm.workload.start()
             self.charm.state.unit_server.update({"state": "started"})
 
-            if self.charm.state.cluster.initial_cluster_state == "new":
+            if not self.charm.state.cluster.cluster_state:
                 # mark the cluster as initialized
-                self.charm.state.cluster.update({"initial_cluster_state": "existing"})
+                self.charm.state.cluster.update({"cluster_state": "existing"})
                 self.charm.state.cluster.update(
-                    {"initial_cluster": self.charm.state.unit_server.member_endpoint}
+                    {"cluster_configuration": self.charm.state.unit_server.member_endpoint}
                 )
 
             if not self.charm.state.cluster.auth_enabled:
@@ -89,7 +89,10 @@ class EtcdEvents(Object):
                     logger.error(e)
                     self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
                     return
-        elif self.charm.unit_server.member_endpoint in self.charm.state.cluster.cluster_members:
+        elif (
+            self.charm.state.unit_server.member_endpoint
+            in self.charm.state.cluster.cluster_members
+        ):
             # this unit has been added to the etcd cluster
             self.charm.workload.start()
             # this triggers a relation_changed event which the leader will use to promote
@@ -117,12 +120,16 @@ class EtcdEvents(Object):
     def _on_cluster_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
         self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
-        if self.charm.unit.is_leader():
-            self.charm.state.cluster.update({"initial-cluster-state": "new"})
 
     def _on_cluster_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
-        pass
+        if self.charm.unit.is_leader() and self.charm.state.cluster.learning_member:
+            try:
+                self.charm.cluster_manager.promote_learning_member()
+            except EtcdClusterManagementError as e:
+                logger.warning(e)
+                event.defer()
+                return
 
     def _on_cluster_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by a unit leaves the cluster relation."""
@@ -131,21 +138,10 @@ class EtcdEvents(Object):
     def _on_cluster_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
         if self.charm.unit.is_leader():
-            # get the member information for the newly joined unit from the set of EtcdServers
-            for server in self.charm.state.servers:
-                if server.unit_name == event.unit.name:
-                    member_name = server.member_name
-                    peer_url = server.peer_url
-                    break
-
             try:
-                initial_cluster_config = self.charm.cluster_manager.add_member_as_learner(
-                    member_name=member_name, peer_url=peer_url
-                )
-                self.charm.state.cluster.update({"initial_cluster": initial_cluster_config})
-                self.charm.state.cluster.update({"learning_member": member_name})
-            except EtcdClusterManagementError as e:
-                logger.error(e)
+                self.charm.cluster_manager.add_member(event.unit.name)
+            except (EtcdClusterManagementError, KeyError) as e:
+                logger.warning(e)
                 event.defer()
                 return
 
