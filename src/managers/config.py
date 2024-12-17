@@ -11,6 +11,7 @@ import yaml
 from ops.model import ConfigData
 
 from core.cluster import ClusterState
+from core.models import TLSState
 from core.workload import WorkloadBase
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,39 @@ class ConfigManager:
         config_properties["listen-client-urls"] = self.state.unit_server.client_url
         config_properties["advertise-client-urls"] = self.state.unit_server.client_url
         config_properties["initial-cluster"] = self._get_cluster_endpoints()
+
+        if self.state.unit_server.tls_state in [TLSState.TO_TLS, TLSState.TLS]:
+            # replace http with https in listen-client-urls, listen-peer-urls, and advertise-client-urls
+            config_properties["listen-peer-urls"] = self.state.unit_server.peer_url.replace(
+                "http://", "https://"
+            )
+            config_properties["listen-client-urls"] = self.state.unit_server.client_url.replace(
+                "http://", "https://"
+            )
+            config_properties["advertise-client-urls"] = self.state.unit_server.client_url.replace(
+                "http://", "https://"
+            )
+            config_properties["initial-cluster"] = config_properties["initial-cluster"].replace(
+                "http://", "https://"
+            )
+            config_properties["initial-advertise-peer-urls"] = config_properties[
+                "initial-advertise-peer-urls"
+            ].replace("http://", "https://")
+
+            # set the client-transport-security and peer-transport-security
+            config_properties["client-transport-security"] = {
+                "cert-file": self.workload.paths.tls.client_cert,
+                "key-file": self.workload.paths.tls.client_key,
+                "client-cert-auth": True,
+                "trusted-ca-file": self.workload.paths.tls.client_ca,
+            }
+
+            config_properties["peer-transport-security"] = {
+                "cert-file": self.workload.paths.tls.peer_cert,
+                "key-file": self.workload.paths.tls.peer_key,
+                "client-cert-auth": True,
+                "trusted-ca-file": self.workload.paths.tls.peer_ca,
+            }
 
         return yaml.safe_dump(config_properties)
 

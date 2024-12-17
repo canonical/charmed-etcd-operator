@@ -7,11 +7,23 @@
 import json
 import logging
 import subprocess
+from dataclasses import dataclass
+
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from common.exceptions import EtcdAuthNotEnabledError, EtcdUserManagementError
-from literals import INTERNAL_USER, SNAP_NAME
+from literals import INTERNAL_USER, SNAP_NAME, TLS_ROOT_DIR
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class MemberListResult:
+    """NamedTuple to store member list results."""
+
+    id: str
+    peer_urls: list[str]
+    client_urls: list[str]
 
 
 class EtcdClient:
@@ -22,10 +34,12 @@ class EtcdClient:
         username: str,
         password: str,
         client_url: str,
+        tls_path: str | None = None,
     ):
         self.client_url = client_url
         self.user = username
         self.password = password
+        self.tls_path = tls_path
 
     def get_endpoint_status(self) -> dict:
         """Run the `endpoint status` command and return the result as dict."""
@@ -97,6 +111,9 @@ class EtcdClient:
         user_password: str | None = None,
         output_format: str = "simple",
         use_input: str | None = None,
+        member_id: str | None = None,
+        peer_urls: str | None = None,
+        cluster_arg: bool = False,
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
 
@@ -115,6 +132,9 @@ class EtcdClient:
             output_format: set the output format (fields, json, protobuf, simple, table)
             use_input: supply text input to be passed to the `etcdctl` command (e.g. for
                         non-interactive password change)
+            member_id: member ID to be used in the command
+            peer_urls: peer URLs to be used in the command
+            cluster_arg: set to `True` if the command requires the `--cluster` argument
 
         Returns:
             The output of the subprocess-command as a string. In case of error, this will
@@ -126,6 +146,8 @@ class EtcdClient:
             args = [f"{SNAP_NAME}.etcdctl", command]
             if subcommand:
                 args.append(subcommand)
+            if member_id:
+                args.append(member_id)
             if user:
                 args.append(user)
             if user_password == "":
@@ -142,14 +164,24 @@ class EtcdClient:
                 args.append(f"-w={output_format}")
             if use_input:
                 args.append("--interactive=False")
+            if peer_urls:
+                args.append(f"--peer-urls={peer_urls}")
+            if "https" in endpoints:
+                args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
+                args.append(f"--key={TLS_ROOT_DIR}/client.key")
+                args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
+            if cluster_arg:
+                args.append("--cluster")
 
+            logger.debug(f"Running etcdctl command: {' '.join(args)}")
             result = subprocess.run(
-                args=args,
+                args,
                 check=True,
-                capture_output=True,
                 text=True,
-                input=use_input if use_input else "",
-            ).stdout.strip()
+                capture_output=True,
+                input=use_input,
+                timeout=10,
+            ).stdout
         except subprocess.CalledProcessError as e:
             logger.error(
                 f"etcdctl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"
@@ -160,3 +192,46 @@ class EtcdClient:
             return None
 
         return result
+
+    def member_list(self) -> dict[str, MemberListResult] | None:
+        """Run the `member list` command in etcd."""
+        member_list_json = self._run_etcdctl(
+            command="member",
+            subcommand="list",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            output_format="json",
+        )
+        if member_list_json:
+            result = json.loads(member_list_json)
+            return {
+                member["name"]: MemberListResult(
+                    id=str(hex(member["ID"]))[2:],
+                    peer_urls=member["peerURLs"],
+                    client_urls=member["clientURLs"],
+                )
+                for member in result["members"]
+            }
+
+    @retry(stop=stop_after_attempt(5), wait=wait_fixed(5), reraise=True)
+    def health_check(self, cluster: bool = False) -> bool:
+        """Run the `endpoint health` command and return True if healthy."""
+        logger.debug("Running etcd health check.")
+
+        result = self._run_etcdctl(
+            command="endpoint",
+            subcommand="health",
+            endpoints=self.client_url,
+            output_format="json",
+            cluster_arg=cluster,
+        )
+
+        if result is None:
+            raise ValueError("etcd health check failed")
+
+        for endpoint in json.loads(result):
+            if not endpoint["health"]:
+                return False
+
+        return True

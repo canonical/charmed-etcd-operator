@@ -18,12 +18,9 @@ from ops.charm import (
 )
 from ops.model import ModelError, SecretNotFoundError
 
-from common.exceptions import (
-    EtcdAuthNotEnabledError,
-    EtcdUserManagementError,
-    RaftLeaderNotFoundError,
-)
+from common.exceptions import EtcdAuthNotEnabledError, EtcdUserManagementError
 from common.secrets import get_secret_from_id
+from core.models import TLSState
 from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status
 
 if TYPE_CHECKING:
@@ -78,23 +75,46 @@ class EtcdEvents(Object):
             event.defer()
             return
 
+        for server in self.charm.state.servers:
+            if not server.peer_url:
+                logger.info(
+                    f"Deferring start because peer-url for {server.member_name} is not set."
+                )
+                self.charm.set_status(Status.PEER_URL_NOT_SET)
+                event.defer()
+                return
+
+            logger.debug(f"TLSState for {server.member_name}: {server.tls_state}")
+            if server.tls_state != TLSState.TLS and server.tls_state != TLSState.NO_TLS:
+                logger.info(f"Deferring start because TLS is not ready for {server.member_name}.")
+                event.defer()
+                return
+
         self.charm.config_manager.set_config_properties()
+
+        logger.debug("Starting the etcd snap service.")
 
         self.charm.workload.start()
 
-        if self.charm.unit.is_leader() and not self.charm.state.cluster.auth_enabled:
-            try:
-                self.charm.cluster_manager.enable_authentication()
-                self.charm.state.cluster.update({"authentication": "enabled"})
-            except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
-                logger.error(e)
-                self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
-                return
+        logger.debug("Checking the health of the etcd cluster.")
 
         if self.charm.workload.alive():
+            if self.charm.unit.is_leader() and not self.charm.state.cluster.auth_enabled:
+                try:
+                    self.charm.cluster_manager.enable_authentication()
+                    self.charm.state.cluster.update({"authentication": "enabled"})
+                except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
+                    logger.error(e)
+                    self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
+                    event.defer()
+                    return
+
             self.charm.set_status(Status.ACTIVE)
+            self.charm.state.cluster.update({"initial-cluster-state": "existing"})
+
         else:
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+            event.defer()
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
@@ -123,11 +143,12 @@ class EtcdEvents(Object):
         # Todo: remove this test at some point, this is just for showcasing that it works :)
         # We will need to perform any HA-related action against the raft leader
         # e.g. add members, trigger leader election, log compaction, etc.
-        try:
-            raft_leader = self.charm.cluster_manager.get_leader()
-            logger.info(f"Raft leader: {raft_leader}")
-        except RaftLeaderNotFoundError as e:
-            logger.warning(e)
+        # try:
+        #     raft_leader = self.charm.cluster_manager.get_leader()
+        #     logger.info(f"Raft leader: {raft_leader}")
+        # except RaftLeaderNotFoundError as e:
+        #     logger.warning(e)
+        pass
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""

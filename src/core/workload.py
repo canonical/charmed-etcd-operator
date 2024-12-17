@@ -7,7 +7,7 @@
 import secrets
 import string
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from literals import CONFIG_FILE, TLS_ROOT_DIR
 
@@ -26,12 +26,12 @@ class TLSPaths:
     @property
     def peer_cert(self) -> str:
         """Path to the peer cert."""
-        return f"{self.root_dir}/peer_cert.pem"
+        return f"{self.root_dir}/peer.pem"
 
     @property
     def peer_key(self) -> str:
         """Path to the peer key."""
-        return f"{self.root_dir}/peer_key.pem"
+        return f"{self.root_dir}/peer.key"
 
     @property
     def client_ca(self) -> str:
@@ -39,14 +39,14 @@ class TLSPaths:
         return f"{self.root_dir}/client_ca.pem"
 
     @property
-    def server_cert(self) -> str:
+    def client_cert(self) -> str:
         """Path to the server cert."""
-        return f"{self.root_dir}/server_cert.pem"
+        return f"{self.root_dir}/client.pem"
 
     @property
-    def server_key(self) -> str:
+    def client_key(self) -> str:
         """Path to the server key."""
-        return f"{self.root_dir}/server_key.pem"
+        return f"{self.root_dir}/client.key"
 
 
 @dataclass
@@ -54,7 +54,7 @@ class EtcdPaths:
     """Paths for etcd."""
 
     config_file: str = CONFIG_FILE
-    tls: TLSPaths = TLSPaths()
+    tls: TLSPaths = field(default_factory=TLSPaths)
 
 
 class WorkloadBase(ABC):
@@ -85,3 +85,8 @@ class WorkloadBase(ABC):
             String of 32 randomized letter+digit characters
         """
         return "".join([secrets.choice(string.ascii_letters + string.digits) for _ in range(32)])
+
+    @abstractmethod
+    def restart(self) -> None:
+        """Restart the workload service."""
+        pass

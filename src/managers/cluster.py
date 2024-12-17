@@ -85,3 +85,55 @@ class ClusterManager:
             client.update_password(username=username, new_password=password)
         except EtcdUserManagementError:
             raise
+
+    def get_member_id(self) -> str:
+        """Get the member ID of the current unit."""
+        logger.debug(f"Getting member ID for unit {self.state.unit_server.member_name}")
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        member_list = client.member_list()
+        if member_list is None:
+            raise ValueError("member list command failed")
+        if self.state.unit_server.member_name not in member_list:
+            raise ValueError("member name not found")
+
+        logger.debug(f"Member ID: {member_list[self.state.unit_server.member_name].id}")
+        return member_list[self.state.unit_server.member_name].id
+
+    def broadcast_peer_url(self, peer_urls: str) -> None:
+        """Broadcast the peer URL to all units in the cluster."""
+        logger.debug(
+            f"Broadcasting peer URL: {peer_urls} for unit {self.state.unit_server.member_name}"
+        )
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        client._run_etcdctl(
+            command="member",
+            subcommand="update",
+            endpoints=self.state.unit_server.client_url,
+            auth_username=self.admin_user,
+            auth_password=self.admin_password,
+            member_id=self.get_member_id(),
+            peer_urls=peer_urls,
+        )
+
+    def health_check(self) -> bool:
+        """Run the `endpoint health` command and return True if healthy."""
+        if not self.admin_password:
+            self.admin_password = self.state.cluster.internal_user_credentials.get(
+                INTERNAL_USER, ""
+            )
+
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        return client.health_check(cluster=True)

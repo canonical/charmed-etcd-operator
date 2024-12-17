@@ -11,9 +11,11 @@ from ops import StatusBase
 
 from core.cluster import ClusterState
 from events.etcd import EtcdEvents
+from events.tls import TLSEvents
 from literals import SUBSTRATE, DebugLevel, Status
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
+from managers.tls import TLSManager
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
@@ -33,8 +35,12 @@ class EtcdOperatorCharm(ops.CharmBase):
             state=self.state, workload=self.workload, config=self.config
         )
 
+        # --- MANAGERS ---
+        self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
+
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
+        self.tls_events = TLSEvents(self)
 
     def set_status(self, key: Status) -> None:
         """Set charm status."""

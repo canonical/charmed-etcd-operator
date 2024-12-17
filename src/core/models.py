@@ -5,6 +5,8 @@
 """Collection of state objects for the Etcd relations, apps and units."""
 
 import logging
+import uuid
+from enum import Enum
 
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
@@ -12,6 +14,16 @@ from ops.model import Application, Relation, Unit
 from literals import CLIENT_PORT, INTERNAL_USER, PEER_PORT, SUBSTRATES
 
 logger = logging.getLogger(__name__)
+
+
+# enum for TLS state
+class TLSState(Enum):
+    """Enum for TLS state."""
+
+    NO_TLS = "no-tls"
+    TO_TLS = "to-tls"
+    TLS = "tls"
+    TO_NO_TLS = "to-no-tls"
 
 
 class RelationState:
@@ -88,12 +100,42 @@ class EtcdServer(RelationState):
     @property
     def peer_url(self) -> str:
         """The peer connection endpoint for the etcd server."""
-        return f"http://{self.ip}:{PEER_PORT}"
+        return f"{self.http}://{self.ip}:{PEER_PORT}"
 
     @property
     def client_url(self) -> str:
         """The client connection endpoint for the etcd server."""
-        return f"http://{self.ip}:{CLIENT_PORT}"
+        return f"{self.http}://{self.ip}:{CLIENT_PORT}"
+
+    @property
+    def tls_state(self) -> TLSState:
+        """The current TLS state of the etcd server."""
+        return TLSState(self.relation_data.get("tls-state", TLSState.NO_TLS.value))
+
+    @property
+    def http(self) -> str:
+        """The HTTP or HTTPS protocol based on the TLS state."""
+        return "https" if self.tls_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+
+    @property
+    def common_name(self) -> str:
+        """The common name for the server certificate."""
+        cn = self.relation_data.get("common-name", "")
+        if not cn:
+            cn = f"{self.unit_name}-{uuid.uuid4()!s}"
+            self.update({"common-name": cn})
+
+        return cn
+
+    @property
+    def peer_cert_ready(self) -> bool:
+        """Check if the peer certificate is ready."""
+        return self.relation_data.get("peer-cert-ready", "") == "True"
+
+    @property
+    def client_cert_ready(self) -> bool:
+        """Check if the client certificate is ready."""
+        return self.relation_data.get("client-cert-ready", "") == "True"
 
 
 class EtcdCluster(RelationState):
@@ -112,7 +154,7 @@ class EtcdCluster(RelationState):
     @property
     def initial_cluster_state(self) -> str:
         """The initial cluster state ('new' or 'existing') of the etcd cluster."""
-        return self.relation_data.get("initial_cluster_state", "")
+        return self.relation_data.get("initial-cluster-state", "")
 
     @property
     def internal_user_credentials(self) -> dict[str, str]:

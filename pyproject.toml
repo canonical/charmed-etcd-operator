@@ -9,6 +9,7 @@ python = "^3.10"
 ops = "^2.17.0"
 tenacity = "*"
 
+
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
 ops = ">=2.0.0"
@@ -16,10 +17,9 @@ ops = ">=2.0.0"
 poetry-core = "*"
 # data_platform_libs/v0/upgrade.py requires pydantic ^1.10
 # grafana_agent/v0/cos_agent.py requires pydantic <2
-pydantic = "^1.10, <2"
-# tls_certificates_interface/v1/tls_certificates.py
-cryptography = ">=42.0.5"
-jsonschema = "*"
+# tls_certificates_interface/v4/tls_certificates.py
+cryptography = "==43.0.1"
+pydantic = "==2.9.1"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
