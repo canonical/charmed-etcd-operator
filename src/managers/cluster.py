@@ -124,7 +124,7 @@ class ClusterManager:
             peer_urls=peer_urls,
         )
 
-    def health_check(self) -> bool:
+    def health_check(self, cluster=True) -> bool:
         """Run the `endpoint health` command and return True if healthy."""
         if not self.admin_password:
             self.admin_password = self.state.cluster.internal_user_credentials.get(
@@ -136,4 +136,4 @@ class ClusterManager:
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
         )
-        return client.health_check(cluster=True)
+        return client.health_check(cluster=cluster)

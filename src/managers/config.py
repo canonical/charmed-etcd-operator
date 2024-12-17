@@ -84,6 +84,23 @@ class ConfigManager:
                 "trusted-ca-file": self.workload.paths.tls.peer_ca,
             }
 
+        if self.state.unit_server.tls_state == TLSState.TO_NO_TLS:
+            config_properties["listen-peer-urls"] = self.state.unit_server.peer_url.replace(
+                "https://", "http://"
+            )
+            config_properties["listen-client-urls"] = self.state.unit_server.client_url.replace(
+                "https://", "http://"
+            )
+            config_properties["advertise-client-urls"] = self.state.unit_server.client_url.replace(
+                "https://", "http://"
+            )
+            config_properties["initial-cluster"] = config_properties["initial-cluster"].replace(
+                "https://", "http://"
+            )
+            config_properties["initial-advertise-peer-urls"] = config_properties[
+                "initial-advertise-peer-urls"
+            ].replace("https://", "http://")
+
         return yaml.safe_dump(config_properties)
 
     def set_config_properties(self) -> None:
