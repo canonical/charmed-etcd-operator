@@ -12,7 +12,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
 )
-from ops import RelationCreatedEvent, RelationJoinedEvent
+from ops import RelationBrokenEvent, RelationCreatedEvent, RelationJoinedEvent
 from ops.framework import Object
 
 from core.models import TLSState
@@ -81,7 +81,14 @@ class TLSEvents(Object):
             self.charm.on[CLIENT_TLS_RELATION_NAME].relation_joined, self._on_relation_joined
         )
 
-    def _on_relation_created(self, _: RelationCreatedEvent):
+        self.framework.observe(
+            self.charm.on[PEER_TLS_RELATION_NAME].relation_broken, self._on_certificates_broken
+        )
+        self.framework.observe(
+            self.charm.on[CLIENT_TLS_RELATION_NAME].relation_broken, self._on_certificates_broken
+        )
+
+    def _on_relation_created(self, event: RelationCreatedEvent):
         """Handle the `relation-created` event."""
         self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS)
 
@@ -142,3 +149,44 @@ class TLSEvents(Object):
             if self.charm.state.peer_tls_relation is None:
                 logger.debug("setting status to peer tls missing")
                 self.charm.set_status(Status.PEER_TLS_MISSING)
+
+    def _on_certificates_broken(self, event: RelationBrokenEvent):
+        """Handle the `certificates-broken` event."""
+        cert_type = (
+            CertType.PEER if event.relation.name == PEER_TLS_RELATION_NAME else CertType.CLIENT
+        )
+
+        self.charm.tls_manager.set_tls_state(state=TLSState.TO_NO_TLS)
+        self.charm.set_status(Status.TLS_NOT_READY)
+        self.charm.tls_manager.set_cert_status(cert_type, is_ready=False)
+
+        if cert_type == CertType.PEER and self.charm.state.client_tls_relation:
+            self.charm.set_status(Status.CLIENT_TLS_NEEDS_TO_BE_REMOVED)
+
+        if cert_type == CertType.CLIENT and self.charm.state.peer_tls_relation:
+            self.charm.set_status(Status.PEER_TLS_NEEDS_TO_BE_REMOVED)
+
+        # write config and restart workload
+        if (
+            not self.charm.state.unit_server.peer_cert_ready
+            and not self.charm.state.unit_server.client_cert_ready
+        ):
+            # broadcast new peer url
+            logger.debug("Broadcasting new peer url")
+            self.charm.cluster_manager.broadcast_peer_url(
+                self.charm.state.unit_server.peer_url.replace("https://", "http://")
+            )
+            # delete certificates from disk
+            self.charm.tls_manager.delete_certificates()
+            logger.debug("Writing config properties")
+            self.charm.config_manager.set_config_properties()
+            logger.debug("Restarting workload")
+            self.charm.workload.restart()
+            logger.debug("Checking the health of the cluster")
+            self.charm.tls_manager.set_tls_state(state=TLSState.NO_TLS)
+            if self.charm.cluster_manager.health_check(cluster=False):
+                logger.debug("Setting status to active")
+                self.charm.set_status(Status.ACTIVE)
+            else:
+                self.charm.set_status(Status.HEALTH_CHECK_FAILED)
+                event.defer()

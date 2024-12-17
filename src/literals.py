@@ -59,3 +59,9 @@ class Status(Enum):
     CLIENT_TLS_MISSING = StatusLevel(BlockedStatus("client tls relation missing"), "DEBUG")
     PEER_TLS_MISSING = StatusLevel(BlockedStatus("peer tls relation missing"), "DEBUG")
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
+    CLIENT_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
+        MaintenanceStatus("client tls needs to be removed"), "DEBUG"
+    )
+    PEER_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
+        MaintenanceStatus("peer tls needs to be removed"), "DEBUG"
+    )

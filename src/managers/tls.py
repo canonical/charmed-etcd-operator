@@ -95,3 +95,24 @@ class TLSManager:
     def certs_ready(self) -> bool:
         """Check if all certificates are ready."""
         return self.state.unit_server.peer_cert_ready and self.state.unit_server.client_cert_ready
+
+    def delete_certificates(self):
+        """Delete the certificate, key and its CA from disk."""
+        for cert_type in CertType:
+            logger.debug(f"Deleting {cert_type} certificate")
+            cert_path = Path(self.workload.paths.tls.peer_cert)
+            key_path = Path(self.workload.paths.tls.peer_key)
+            ca_path = Path(self.workload.paths.tls.peer_ca)
+
+            if cert_type == CertType.CLIENT:
+                cert_path = Path(self.workload.paths.tls.client_cert)
+
+            if cert_path.exists():
+                cert_path.unlink()
+
+            if key_path.exists():
+                key_path.unlink()
+
+            if ca_path.exists():
+                ca_path.unlink()
+            logger.debug(f"Deleted {cert_type} certificate")

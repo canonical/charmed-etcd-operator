@@ -220,6 +220,8 @@ class EtcdClient:
         logger.debug("Running etcd health check.")
 
         result = self._run_etcdctl(
+            auth_password=self.password,
+            auth_username=self.user,
             command="endpoint",
             subcommand="health",
             endpoints=self.client_url,
