@@ -78,7 +78,7 @@ class EtcdEvents(Object):
                 # mark the cluster as initialized
                 self.charm.state.cluster.update({"cluster_state": "existing"})
                 self.charm.state.cluster.update(
-                    {"cluster_configuration": self.charm.state.unit_server.member_endpoint}
+                    {"cluster_members": self.charm.state.unit_server.member_endpoint}
                 )
 
             if not self.charm.state.cluster.auth_enabled:
@@ -125,6 +125,7 @@ class EtcdEvents(Object):
         """Handle all events related to the cluster-peer relation."""
         if self.charm.unit.is_leader() and self.charm.state.cluster.learning_member:
             try:
+                # this will promote any learner, not only the unit that updated its relation data
                 self.charm.cluster_manager.promote_learning_member()
             except EtcdClusterManagementError as e:
                 logger.warning(e)

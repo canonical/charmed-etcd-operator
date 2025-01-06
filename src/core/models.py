@@ -149,7 +149,7 @@ class EtcdCluster(RelationState):
         This data is added to the peer cluster relation app databag when the first unit initializes
         the cluster on startup after deployment.
         """
-        return self.relation_data.get("cluster_configuration", "")
+        return self.relation_data.get("cluster_members", "")
 
     @property
     def learning_member(self) -> str:
