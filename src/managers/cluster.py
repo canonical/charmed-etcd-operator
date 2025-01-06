@@ -101,16 +101,16 @@ class ClusterManager:
                 peer_url = server.peer_url
                 break
 
+        # we need to make sure all required information are available before adding the member
         if member_name and ip and peer_url:
-            # we need to make sure all required information are available before adding the member
             try:
                 client = EtcdClient(
                     username=self.admin_user,
                     password=self.admin_password,
                     client_url=self.state.unit_server.client_url,
                 )
-                cluster_config, member_id = client.add_member_as_learner(member_name, peer_url)
-                self.state.cluster.update({"cluster_configuration": cluster_config})
+                cluster_members, member_id = client.add_member_as_learner(member_name, peer_url)
+                self.state.cluster.update({"cluster_members": cluster_members})
                 self.state.cluster.update({"learning_member": member_id})
             except EtcdClusterManagementError:
                 raise

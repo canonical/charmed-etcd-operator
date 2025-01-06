@@ -47,20 +47,18 @@ class ConfigManager:
             config_properties = yaml.safe_load(config)
 
         config_properties["name"] = self.state.unit_server.member_name
-        config_properties["initial-advertise-peer-urls"] = self.state.unit_server.peer_url
         if self.state.cluster.cluster_state:
             config_properties["initial-cluster-state"] = self.state.cluster.cluster_state
-        else:
-            config_properties["initial-cluster-state"] = "new"
-        config_properties["listen-peer-urls"] = self.state.unit_server.peer_url
-        config_properties["listen-client-urls"] = self.state.unit_server.client_url
-        config_properties["advertise-client-urls"] = self.state.unit_server.client_url
-        if self.state.cluster.cluster_state:
             config_properties["initial-cluster"] = self.state.cluster.cluster_members
         else:
+            config_properties["initial-cluster-state"] = "new"
             # on very first cluster initialization, only the leader should be cluster member
             # all other units will be added to the cluster subsequently
             config_properties["initial-cluster"] = self.state.unit_server.member_endpoint
+        config_properties["initial-advertise-peer-urls"] = self.state.unit_server.peer_url
+        config_properties["listen-peer-urls"] = self.state.unit_server.peer_url
+        config_properties["listen-client-urls"] = self.state.unit_server.client_url
+        config_properties["advertise-client-urls"] = self.state.unit_server.client_url
 
         return yaml.safe_dump(config_properties)
 
