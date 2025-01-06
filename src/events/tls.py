@@ -126,7 +126,7 @@ class TLSEvents(Object):
 
         if self.charm.tls_manager.certs_ready:
             if self.charm.workload.alive():
-                # boardcast change
+                # broadcast change
                 self.charm.cluster_manager.broadcast_peer_url(
                     self.charm.state.unit_server.peer_url.replace("http://", "https://")
                 )
