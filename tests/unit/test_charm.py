@@ -64,6 +64,7 @@ def test_start():
     # if authentication cannot be enabled, the charm should be blocked
     state_in = testing.State(relations={relation}, leader=True)
     with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
