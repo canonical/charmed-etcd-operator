@@ -3,9 +3,16 @@
 # See LICENSE file for licensing details.
 
 import json
+import logging
 import subprocess
 
 from pytest_operator.plugin import OpsTest
+
+from literals import SNAP_NAME
+
+from ..helpers import APP_NAME
+
+logger = logging.getLogger(__name__)
 
 
 async def existing_app(ops_test: OpsTest) -> str | None:
@@ -19,3 +26,40 @@ async def existing_app(ops_test: OpsTest) -> str | None:
     etcd_apps = {name: desc for name, desc in apps.items() if desc["charm-name"] == "charmed-etcd"}
 
     return list(etcd_apps.keys())[0] if etcd_apps else None
+
+
+def start_continuous_writes(ops_test: OpsTest, endpoints: str, user: str, password: str) -> None:
+    subprocess.Popen(
+        [
+            "python3",
+            "tests/integration/ha/continuous_writes.py",
+            ops_test,
+            endpoints,
+            user,
+            password,
+        ]
+    )
+
+
+def stop_continuous_writes() -> None:
+    proc = subprocess.Popen(["pkill", "-9", "-f", "continuous_writes.py"])
+    proc.communicate()
+
+
+def count_writes(ops_test: OpsTest, endpoints: str, user: str, password: str) -> str:
+    model = ops_test.model_full_name
+    unit = ops_test.model.applications[APP_NAME].units[0]
+    key = "cw_key"
+
+    etcd_command = f"""{SNAP_NAME}.etcdctl \
+                            get {key} \
+                            --endpoints={endpoints} \
+                            --user={user} \
+                            --password={password}
+                            """
+    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
+
+    try:
+        return subprocess.getoutput(juju_command).split("\n")[1]
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        logger.warning(e)
