@@ -38,28 +38,28 @@ def test_internal_user_creation():
 
 def test_start():
     ctx = testing.Context(EtcdOperatorCharm)
-    state_in = testing.State()
-
-    # without peer relation the charm should not start
-    with (
-        patch("workload.EtcdWorkload.alive", return_value=True),
-        patch("workload.EtcdWorkload.write_file"),
-        patch("workload.EtcdWorkload.start"),
-    ):
-        state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status == ops.MaintenanceStatus("no peer relation available")
-
-    # with peer relation, it should go to active status
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
-    state_in = testing.State(relations={relation})
+    state_in = testing.State(leader=True)
 
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
+
+    # non-leader units should not start directly
+    state_in = testing.State(leader=False)
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.start"),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status != ops.ActiveStatus()
 
     # if authentication cannot be enabled, the charm should be blocked
     state_in = testing.State(relations={relation}, leader=True)

@@ -112,6 +112,7 @@ class ClusterManager:
                 cluster_members, member_id = client.add_member_as_learner(member_name, peer_url)
                 self.state.cluster.update({"cluster_members": cluster_members})
                 self.state.cluster.update({"learning_member": member_id})
+                logger.info(f"Added unit {unit_name} as new cluster member {member_id}.")
             except EtcdClusterManagementError:
                 raise
         else:
@@ -132,3 +133,4 @@ class ClusterManager:
             raise
 
         self.state.cluster.update({"learning_member": ""})
+        logger.info(f"Successfully promoted learning member {member_id}.")
