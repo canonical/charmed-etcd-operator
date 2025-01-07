@@ -71,15 +71,7 @@ class EtcdEvents(Object):
         self.charm.config_manager.set_config_properties()
 
         if self.charm.unit.is_leader():
-            self.charm.workload.start()
-            self.charm.state.unit_server.update({"state": "started"})
-
-            if not self.charm.state.cluster.cluster_state:
-                # mark the cluster as initialized
-                self.charm.state.cluster.update({"cluster_state": "existing"})
-                self.charm.state.cluster.update(
-                    {"cluster_members": self.charm.state.unit_server.member_endpoint}
-                )
+            self.charm.cluster_manager.start_member()
 
             if not self.charm.state.cluster.auth_enabled:
                 try:
@@ -94,10 +86,7 @@ class EtcdEvents(Object):
             in self.charm.state.cluster.cluster_members
         ):
             # this unit has been added to the etcd cluster
-            self.charm.workload.start()
-            # this triggers a relation_changed event which the leader will use to promote
-            # a learner-member to fully-voting member
-            self.charm.state.unit_server.update({"state": "started"})
+            self.charm.cluster_manager.start_member()
         else:
             # this is a non-leader unit that has not been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
