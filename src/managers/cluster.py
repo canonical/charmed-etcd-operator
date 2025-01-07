@@ -15,6 +15,7 @@ from common.exceptions import (
     RaftLeaderNotFoundError,
 )
 from core.cluster import ClusterState
+from core.workload import WorkloadBase
 from literals import INTERNAL_USER
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,9 @@ logger = logging.getLogger(__name__)
 class ClusterManager:
     """Manage cluster members, quorum and authorization."""
 
-    def __init__(self, state: ClusterState):
+    def __init__(self, state: ClusterState, workload: WorkloadBase):
         self.state = state
+        self.workload = workload
         self.admin_user = INTERNAL_USER
         self.admin_password = self.state.cluster.internal_user_credentials.get(INTERNAL_USER, "")
         self.cluster_endpoints = [server.client_url for server in self.state.servers]
@@ -110,13 +112,29 @@ class ClusterManager:
                     client_url=self.state.unit_server.client_url,
                 )
                 cluster_members, member_id = client.add_member_as_learner(member_name, peer_url)
-                self.state.cluster.update({"cluster_members": cluster_members})
-                self.state.cluster.update({"learning_member": member_id})
+                self.state.cluster.update(
+                    {"cluster_members": cluster_members, "learning_member": member_id}
+                )
                 logger.info(f"Added unit {unit_name} as new cluster member {member_id}.")
             except EtcdClusterManagementError:
                 raise
         else:
             raise KeyError(f"Peer relation data for unit {unit_name} not found.")
+
+    def start_member(self) -> None:
+        """Start a cluster member and update its status."""
+        self.workload.start()
+        # this triggers a relation_changed event which the leader will use to promote
+        # a learner-member to fully-voting member
+        self.state.unit_server.update({"state": "started"})
+        if not self.state.cluster.cluster_state:
+            # mark the cluster as initialized
+            self.state.cluster.update(
+                {
+                    "cluster_state": "existing",
+                    "cluster_members": self.state.unit_server.member_endpoint,
+                }
+            )
 
     def promote_learning_member(self) -> None:
         """Promote a learning member to full-voting member."""
