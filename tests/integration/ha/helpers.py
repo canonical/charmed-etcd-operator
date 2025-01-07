@@ -29,11 +29,17 @@ async def existing_app(ops_test: OpsTest) -> str | None:
 
 
 def start_continuous_writes(ops_test: OpsTest, endpoints: str, user: str, password: str) -> None:
+    model = ops_test.model_full_name
+    # this is the unit where the `etcdctl` command is executed
+    # it does not mean that data is written to this cluster member
+    # before removing the unit used for running `etcdctl`, continuous writes should be stopped
+    unit = ops_test.model.applications[APP_NAME].units[0].name
     subprocess.Popen(
         [
             "python3",
             "tests/integration/ha/continuous_writes.py",
-            ops_test,
+            model,
+            unit,
             endpoints,
             user,
             password,
@@ -48,7 +54,7 @@ def stop_continuous_writes() -> None:
 
 def count_writes(ops_test: OpsTest, endpoints: str, user: str, password: str) -> str:
     model = ops_test.model_full_name
-    unit = ops_test.model.applications[APP_NAME].units[0]
+    unit = ops_test.model.applications[APP_NAME].units[0].name
     key = "cw_key"
 
     etcd_command = f"""{SNAP_NAME}.etcdctl \
