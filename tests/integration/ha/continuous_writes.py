@@ -7,23 +7,16 @@ import subprocess
 import sys
 import time
 
-from pytest_operator.plugin import OpsTest
-
 from literals import SNAP_NAME
-
-from ..helpers import APP_NAME
 
 logger = logging.getLogger(__name__)
 
 
-def continuous_writes(ops_test: OpsTest, endpoints: str, user: str, password: str):
-    model = ops_test.model_full_name
-
+def continuous_writes(model: str, unit: str, endpoints: str, user: str, password: str):
     key = "cw_key"
     count = 0
 
     while True:
-        unit = ops_test.model.applications[APP_NAME].units[0]
         etcd_command = f"""{SNAP_NAME}.etcdctl \
                         put {key} {count} \
                         --endpoints={endpoints} \
@@ -44,12 +37,13 @@ def continuous_writes(ops_test: OpsTest, endpoints: str, user: str, password: st
 
 
 def main():
-    ops_test = sys.argv[1]
-    endpoints = sys.argv[2]
-    user = sys.argv[3]
-    password = sys.argv[4]
+    model = sys.argv[1]
+    unit = sys.argv[2]
+    endpoints = sys.argv[3]
+    user = sys.argv[4]
+    password = sys.argv[5]
 
-    continuous_writes(ops_test, endpoints, user, password)
+    continuous_writes(model, unit, endpoints, user, password)
 
 
 if __name__ == "__main__":

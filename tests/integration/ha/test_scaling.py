@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import time
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -57,10 +58,13 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
-    init_writes = count_writes(
+    start_continuous_writes(
         ops_test, endpoints=init_endpoints, user=INTERNAL_USER, password=password
     )
-    start_continuous_writes(
+
+    # after some time, get the current count
+    time.sleep(30)
+    init_writes = count_writes(
         ops_test, endpoints=init_endpoints, user=INTERNAL_USER, password=password
     )
 
