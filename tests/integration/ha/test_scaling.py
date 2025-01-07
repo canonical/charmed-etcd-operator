@@ -49,23 +49,23 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_scale_up(ops_test: OpsTest) -> None:
-    """Make sure new units are added to the etcd cluster."""
+    """Make sure new units are added to the etcd cluster without downtime."""
     app = (await existing_app(ops_test)) or APP_NAME
     model = ops_test.model_full_name
     init_units_count = len(ops_test.model.applications[app].units)
     init_endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(
-        ops_test, endpoints=init_endpoints, user=INTERNAL_USER, password=password
+        ops_test, app_name=app, endpoints=init_endpoints, user=INTERNAL_USER, password=password
     )
 
     # after some time, get the current count
     time.sleep(30)
     init_writes = count_writes(
-        ops_test, endpoints=init_endpoints, user=INTERNAL_USER, password=password
+        ops_test, app_name=app, endpoints=init_endpoints, user=INTERNAL_USER, password=password
     )
 
     # scale up
@@ -89,6 +89,6 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     # check if data was continuously written to the cluster
     stop_continuous_writes()
     final_writes = count_writes(
-        ops_test, endpoints=endpoints, user=INTERNAL_USER, password=password
+        ops_test, app_name=app, endpoints=endpoints, user=INTERNAL_USER, password=password
     )
     assert final_writes > init_writes
