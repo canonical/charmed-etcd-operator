@@ -46,6 +46,7 @@ def get_key(
     key: str,
     user: str | None = None,
     password: str | None = None,
+    tls_enabled: bool = False,
 ) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
     etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
@@ -54,14 +55,21 @@ def get_key(
     if password:
         etcd_command = f"{etcd_command} --password={password}"
 
+    if tls_enabled:
+        etcd_command = f"{etcd_command} --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem --cert /var/snap/charmed-etcd/common/tls/client.pem --key /var/snap/charmed-etcd/common/tls/client.key"
+
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[1]
 
 
-def get_cluster_members(model: str, unit: str, endpoints: str) -> list[dict]:
+def get_cluster_members(
+    model: str, unit: str, endpoints: str, tls_enabled: bool = False
+) -> list[dict]:
     """Query all cluster members from etcd using `etcdctl` via `juju ssh`."""
     etcd_command = f"{SNAP_NAME}.etcdctl member list --endpoints={endpoints} -w=json"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem --cert /var/snap/charmed-etcd/common/tls/client.pem --key /var/snap/charmed-etcd/common/tls/client.key"
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     result = subprocess.getoutput(juju_command).split("\n")[0]
@@ -69,11 +77,13 @@ def get_cluster_members(model: str, unit: str, endpoints: str) -> list[dict]:
     return json.loads(result)["members"]
 
 
-def get_cluster_endpoints(ops_test: OpsTest, app_name: str = APP_NAME) -> str:
+def get_cluster_endpoints(
+    ops_test: OpsTest, app_name: str = APP_NAME, tls_enabled: bool = False
+) -> str:
     """Resolve the etcd endpoints for a given juju application."""
     return ",".join(
         [
-            f"http://{unit.public_address}:{CLIENT_PORT}"
+            f"{'https' if tls_enabled else 'http'}://{unit.public_address}:{CLIENT_PORT}"
             for unit in ops_test.model.applications[app_name].units
         ]
     )
