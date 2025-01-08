@@ -137,6 +137,11 @@ class EtcdServer(RelationState):
         """Check if the client certificate is ready."""
         return self.relation_data.get("client-cert-ready", "") == "True"
 
+    @property
+    def certs_ready(self) -> bool:
+        """Check if all certificates are ready."""
+        return self.peer_cert_ready and self.client_cert_ready
+
 
 class EtcdCluster(RelationState):
     """State/Relation data collection for the etcd application."""

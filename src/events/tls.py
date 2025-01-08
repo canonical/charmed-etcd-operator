@@ -136,8 +136,12 @@ class TLSEvents(Object):
         # write certificates to disk
         self.charm.tls_manager.write_certificate(cert, private_key)
 
-        if self.charm.tls_manager.certs_ready:
-            self.charm.rolling_restart()
+        if self.charm.state.unit_server.certs_ready:
+            # we do not restart if the cluster has not started yet
+            if self.charm.state.cluster.initial_cluster_state == "existing":
+                self.charm.rolling_restart()
+            else:
+                self.charm.tls_manager.set_tls_state(state=TLSState.TLS)
         else:
             logger.debug("A certificate is missing, waiting for the next certificate event.")
             if self.charm.state.client_tls_relation is None:

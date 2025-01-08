@@ -74,7 +74,7 @@ class EtcdOperatorCharm(ops.CharmBase):
                 logger.error(f"Enabling TLS failed: {e}")
                 self.set_status(Status.TLS_TRANSITION_FAILED)
 
-        if self.state.unit_server.tls_state == TLSState.TO_NO_TLS:
+        elif self.state.unit_server.tls_state == TLSState.TO_NO_TLS:
             try:
                 logger.debug("Disabling TLS through rolling restart")
                 logger.debug("Broadcasting new peer url")
@@ -93,6 +93,11 @@ class EtcdOperatorCharm(ops.CharmBase):
             except Exception as e:
                 logger.error(f"Disabling TLS failed: {e}")
                 self.set_status(Status.TLS_TRANSITION_FAILED)
+
+        else:
+            logger.debug("Restarting workload")
+            if not self.cluster_manager.restart_member():
+                raise Exception("Failed to check health of the member after restart")
 
     def rolling_restart(self) -> None:
         """Initiate a rolling restart."""

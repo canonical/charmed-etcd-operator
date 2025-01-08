@@ -114,11 +114,6 @@ class TLSManager:
         """
         self.state.unit_server.update({f"{cert_type.value}-cert-ready": str(is_ready)})
 
-    @property
-    def certs_ready(self) -> bool:
-        """Check if all certificates are ready."""
-        return self.state.unit_server.peer_cert_ready and self.state.unit_server.client_cert_ready
-
     def delete_certificates(self):
         """Delete the certificate, key and its CA from disk."""
         for cert_type in CertType:
