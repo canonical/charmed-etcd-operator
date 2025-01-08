@@ -34,7 +34,7 @@ class ClusterManager:
         """Collect hostname mapping for current unit.
 
         Returns:
-            Dict of string keys 'hostname', 'ip' and their values
+            dict[str, str]: Dict of string keys 'hostname', 'ip' and their values
         """
         hostname = socket.gethostname()
         ip = socket.gethostbyname(hostname)
@@ -42,7 +42,11 @@ class ClusterManager:
         return {"hostname": hostname, "ip": ip}
 
     def get_leader(self) -> str | None:
-        """Query the etcd cluster for the raft leader and return the client_url as string."""
+        """Query the etcd cluster for the raft leader and return the client_url as string.
+
+        Returns:
+            str | None: The client URL of the raft leader or None if no leader is found.
+        """
         # loop through list of hosts and compare their member id with the leader
         # if they match, return this host's endpoint
         for endpoint in self.cluster_endpoints:
@@ -77,7 +81,12 @@ class ClusterManager:
             raise
 
     def update_credentials(self, username: str, password: str) -> None:
-        """Update a user's password."""
+        """Update a user's password.
+
+        Args:
+            username (str): The username to update.
+            password (str): The new password.
+        """
         try:
             client = EtcdClient(
                 username=self.admin_user,
@@ -89,7 +98,11 @@ class ClusterManager:
             raise
 
     def get_member_id(self) -> str:
-        """Get the member ID of the current unit."""
+        """Get the member ID of the current unit.
+
+        Returns:
+            str: The member ID of the current unit.
+        """
         logger.debug(f"Getting member ID for unit {self.state.unit_server.member_name}")
         client = EtcdClient(
             username=self.admin_user,

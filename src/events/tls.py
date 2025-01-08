@@ -89,11 +89,19 @@ class TLSEvents(Object):
         )
 
     def _on_relation_created(self, event: RelationCreatedEvent):
-        """Handle the `relation-created` event."""
+        """Handle the `relation-created` event.
+
+        Args:
+            event (RelationCreatedEvent): The event object.
+        """
         self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS)
 
     def _on_relation_joined(self, event: RelationJoinedEvent):
-        """Handle the `relation-joined` event."""
+        """Handle the `relation-joined` event.
+
+        Args:
+            event (RelationJoinedEvent): The event object.
+        """
         if event.relation.name == PEER_TLS_RELATION_NAME:
             if not self.charm.state.client_tls_relation:
                 self.charm.set_status(Status.CLIENT_TLS_MISSING)
@@ -104,7 +112,11 @@ class TLSEvents(Object):
                 event.defer()
 
     def _on_certificate_available(self, event: CertificateAvailableEvent):
-        """Handle the `certificates-available` event."""
+        """Handle the `certificates-available` event.
+
+        Args:
+            event (CertificateAvailableEvent): The event object.
+        """
         cert = event.certificate
         cert_type = CertType(cert.organization)
         logger.debug(f"Received certificate for {cert_type}")
@@ -135,7 +147,11 @@ class TLSEvents(Object):
                 self.charm.set_status(Status.PEER_TLS_MISSING)
 
     def _on_certificates_broken(self, event: RelationBrokenEvent):
-        """Handle the `certificates-broken` event."""
+        """Handle the `certificates-broken` event.
+
+        Args:
+            event (RelationBrokenEvent): The event object.
+        """
         cert_type = (
             CertType.PEER if event.relation.name == PEER_TLS_RELATION_NAME else CertType.CLIENT
         )

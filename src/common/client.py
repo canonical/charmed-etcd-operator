@@ -58,7 +58,11 @@ class EtcdClient:
         return endpoint_status
 
     def add_user(self, username: str) -> None:
-        """Add a user to etcd."""
+        """Add a user to etcd.
+
+        Args:
+            username (str): The username to add.
+        """
         if result := self._run_etcdctl(
             command="user",
             subcommand="add",
@@ -72,7 +76,12 @@ class EtcdClient:
             raise EtcdUserManagementError(f"Failed to add user {self.user}.")
 
     def update_password(self, username: str, new_password: str) -> None:
-        """Run the `user passwd` command in etcd."""
+        """Run the `user passwd` command in etcd.
+
+        Args:
+            username (str): The username to update the password for.
+            new_password (str): The new password to set.
+        """
         if result := self._run_etcdctl(
             command="user",
             subcommand="passwd",
@@ -194,7 +203,12 @@ class EtcdClient:
         return result
 
     def member_list(self) -> dict[str, MemberListResult] | None:
-        """Run the `member list` command in etcd."""
+        """Run the `member list` command in etcd.
+
+        Returns:
+            dict[str, MemberListResult]: A dictionary with the member name as key and the
+            MemberListResult as value.
+        """
         member_list_json = self._run_etcdctl(
             command="member",
             subcommand="list",
@@ -217,7 +231,14 @@ class EtcdClient:
 
     @retry(stop=stop_after_attempt(5), wait=wait_fixed(5), reraise=True)
     def health_check(self, cluster: bool = False) -> bool:
-        """Run the `endpoint health` command and return True if healthy."""
+        """Run the `endpoint health` command and return True if healthy.
+
+        Args:
+            cluster (bool): set to `True` to check the health of the entire cluster.
+
+        Returns:
+            bool: True if the cluster or node is healthy.
+        """
         logger.debug("Running etcd health check.")
 
         result = self._run_etcdctl(

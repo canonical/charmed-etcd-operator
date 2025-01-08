@@ -69,12 +69,21 @@ class WorkloadBase(ABC):
 
     @abstractmethod
     def alive(self) -> bool:
-        """Check if the workload is running."""
+        """Check if the workload is running.
+
+        Returns:
+            bool: True if the workload is running, False otherwise.
+        """
         pass
 
     @abstractmethod
     def write_file(self, content: str, file: str) -> None:
-        """Write content to a file."""
+        """Write content to a file.
+
+        Args:
+            content (str): Content to write to the file.
+            file (str): Path to the file.
+        """
         pass
 
     @staticmethod
@@ -82,7 +91,7 @@ class WorkloadBase(ABC):
         """Create randomized string for use as app passwords.
 
         Returns:
-            String of 32 randomized letter+digit characters
+            str: String of 32 randomized letter+digit characters
         """
         return "".join([secrets.choice(string.ascii_letters + string.digits) for _ in range(32)])
 

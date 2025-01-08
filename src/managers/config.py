@@ -114,7 +114,7 @@ class ConfigManager:
         """Concatenate peer-urls of all cluster members.
 
         Returns:
-            Str of member name and peer url for all cluster members in required syntax, e.g.:
+            str: Member name and peer url for all cluster members in required syntax, e.g.:
             etcd1=http://10.54.237.109:2380,etcd2=http://10.54.237.57:2380
         """
         cluster_endpoints = ",".join(
