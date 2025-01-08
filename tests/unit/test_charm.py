@@ -29,8 +29,9 @@ def test_install_failure_blocked_status():
 def test_internal_user_creation():
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    restart_relation = testing.PeerRelation(id=2, endpoint="restart")
 
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, restart_relation}, leader=True)
     state_out = ctx.run(ctx.on.leader_elected(), state_in)
     secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")

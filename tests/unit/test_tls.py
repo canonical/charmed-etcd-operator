@@ -4,10 +4,16 @@
 
 from unittest.mock import patch
 
-from ops import testing
+from ops import WaitingStatus, testing
 
 from charm import EtcdOperatorCharm
-from literals import CLIENT_TLS_RELATION_NAME, PEER_RELATION, PEER_TLS_RELATION_NAME, Status
+from literals import (
+    CLIENT_TLS_RELATION_NAME,
+    PEER_RELATION,
+    PEER_TLS_RELATION_NAME,
+    RESTART_RELATION,
+    Status,
+)
 
 
 def test_enable_tls_on_start():
@@ -43,11 +49,12 @@ def test_certificates_broken():
             "tls-state": "tls",
         },
     )
+    restart_peer_relation = testing.PeerRelation(id=4, endpoint=RESTART_RELATION)
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
     client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
 
     state_in = testing.State(
-        relations=[peer_relation, peer_tls_relation, client_tls_relation],
+        relations=[peer_relation, restart_peer_relation, peer_tls_relation, client_tls_relation],
     )
 
     state_out = ctx.run(ctx.on.relation_broken(relation=peer_tls_relation), state_in)
@@ -69,11 +76,12 @@ def test_certificates_broken():
         patch("managers.tls.TLSManager.delete_certificates"),
         patch("managers.config.ConfigManager.set_config_properties"),
         patch("workload.EtcdWorkload.restart"),
+        # patch("charm.EtcdOperatorCharm.rolling_restart"),
     ):
         state_out = ctx.run(ctx.on.relation_broken(relation=peer_tls_relation), state_in)
         state_out = ctx.run(ctx.on.relation_broken(relation=client_tls_relation), state_out)
-        assert state_out.unit_status == Status.ACTIVE.value.status
-        assert state_out.get_relation(peer_relation.id).local_unit_data["tls-state"] == "no-tls"
+        assert state_out.unit_status == WaitingStatus("Awaiting restart operation")
+        assert state_out.get_relation(peer_relation.id).local_unit_data["tls-state"] == "to-no-tls"
         assert (
             state_out.get_relation(peer_relation.id).local_unit_data["client-cert-ready"]
             == "False"
@@ -81,14 +89,3 @@ def test_certificates_broken():
         assert (
             state_out.get_relation(peer_relation.id).local_unit_data["peer-cert-ready"] == "False"
         )
-
-    with (
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
-        patch("managers.cluster.ClusterManager.health_check", return_value=False),
-        patch("managers.tls.TLSManager.delete_certificates"),
-        patch("managers.config.ConfigManager.set_config_properties"),
-        patch("workload.EtcdWorkload.restart"),
-    ):
-        state_out = ctx.run(ctx.on.relation_broken(relation=peer_tls_relation), state_in)
-        state_out = ctx.run(ctx.on.relation_broken(relation=client_tls_relation), state_out)
-        assert state_out.unit_status == Status.HEALTH_CHECK_FAILED.value.status

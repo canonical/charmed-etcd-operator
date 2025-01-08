@@ -27,6 +27,7 @@ def put_key(
     value: str,
     user: str | None = None,
     password: str | None = None,
+    tls_enabled: bool = False,
 ) -> str:
     """Write data to etcd using `etcdctl` via `juju ssh`."""
     etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
@@ -34,6 +35,9 @@ def put_key(
         etcd_command = f"{etcd_command} --user={user}"
     if password:
         etcd_command = f"{etcd_command} --password={password}"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem --cert /var/snap/charmed-etcd/common/tls/client.pem --key /var/snap/charmed-etcd/common/tls/client.key"
+
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     return subprocess.getoutput(juju_command).split("\n")[0]
