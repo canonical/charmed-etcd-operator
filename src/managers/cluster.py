@@ -14,6 +14,7 @@ from common.exceptions import (
     RaftLeaderNotFoundError,
 )
 from core.cluster import ClusterState
+from core.workload import WorkloadBase
 from literals import INTERNAL_USER
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,9 @@ logger = logging.getLogger(__name__)
 class ClusterManager:
     """Manage cluster members, quorum and authorization."""
 
-    def __init__(self, state: ClusterState):
+    def __init__(self, state: ClusterState, workload: WorkloadBase):
         self.state = state
+        self.workload = workload
         self.admin_user = INTERNAL_USER
         self.admin_password = self.state.cluster.internal_user_credentials.get(INTERNAL_USER, "")
         self.cluster_endpoints = [server.client_url for server in self.state.servers]
@@ -105,7 +107,11 @@ class ClusterManager:
         return member_list[self.state.unit_server.member_name].id
 
     def broadcast_peer_url(self, peer_urls: str) -> None:
-        """Broadcast the peer URL to all units in the cluster."""
+        """Broadcast the peer URL to all units in the cluster.
+
+        Args:
+            peer_urls (str): The peer URLs to broadcast.
+        """
         logger.debug(
             f"Broadcasting peer URL: {peer_urls} for unit {self.state.unit_server.member_name}"
         )
@@ -125,7 +131,14 @@ class ClusterManager:
         )
 
     def health_check(self, cluster=True) -> bool:
-        """Run the `endpoint health` command and return True if healthy."""
+        """Run the `endpoint health` command and return True if healthy.
+
+        Args:
+            cluster (bool): True if the health check should be cluster-wide.
+
+        Returns:
+                bool: True if the cluster or node is healthy.
+        """
         if not self.admin_password:
             self.admin_password = self.state.cluster.internal_user_credentials.get(
                 INTERNAL_USER, ""
@@ -137,3 +150,12 @@ class ClusterManager:
             client_url=self.state.unit_server.client_url,
         )
         return client.health_check(cluster=cluster)
+
+    def restart_member(self) -> bool:
+        """Restart the workload.
+
+        Returns:
+            bool: True if the workload is running after restart.
+        """
+        self.workload.restart()
+        return self.health_check(cluster=False)

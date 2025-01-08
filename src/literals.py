@@ -19,6 +19,7 @@ CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
 
 PEER_RELATION = "etcd-peers"
+RESTART_RELATION = "restart"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
 
@@ -64,4 +65,7 @@ class Status(Enum):
     )
     PEER_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
         MaintenanceStatus("peer tls needs to be removed"), "DEBUG"
+    )
+    TLS_TRANSITION_FAILED = StatusLevel(
+        BlockedStatus("failed to transition to/from tls state"), "ERROR"
     )

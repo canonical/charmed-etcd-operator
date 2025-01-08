@@ -173,7 +173,7 @@ class EtcdClient:
             if cluster_arg:
                 args.append("--cluster")
 
-            logger.debug(f"Running etcdctl command: {' '.join(args)}")
+            # logger.debug(f"Running etcdctl command: {' '.join(args)}")
             result = subprocess.run(
                 args,
                 check=True,
@@ -203,6 +203,7 @@ class EtcdClient:
             auth_password=self.password,
             output_format="json",
         )
+        logger.debug(f"Member list: {member_list_json}")
         if member_list_json:
             result = json.loads(member_list_json)
             return {

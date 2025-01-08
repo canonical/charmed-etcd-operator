@@ -7,12 +7,14 @@
 import logging
 
 import ops
+from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops import StatusBase
 
 from core.cluster import ClusterState
+from core.models import TLSState
 from events.etcd import EtcdEvents
 from events.tls import TLSEvents
-from literals import SUBSTRATE, DebugLevel, Status
+from literals import RESTART_RELATION, SUBSTRATE, DebugLevel, Status
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.tls import TLSManager
@@ -30,17 +32,18 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
         # --- MANAGERS ---
-        self.cluster_manager = ClusterManager(self.state)
+        self.cluster_manager = ClusterManager(self.state, self.workload)
         self.config_manager = ConfigManager(
             state=self.state, workload=self.workload, config=self.config
         )
-
-        # --- MANAGERS ---
         self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
 
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
         self.tls_events = TLSEvents(self)
+
+        # --- LIB EVENT HANDLERS ---
+        self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)
 
     def set_status(self, key: Status) -> None:
         """Set charm status."""
@@ -49,6 +52,52 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         getattr(logger, log_level.lower())(status.message)
         self.unit.status = status
+
+    def _restart(self, event) -> None:
+        """Restart callback for the rolling ips lib."""
+        if self.state.unit_server.tls_state == TLSState.TO_TLS:
+            try:
+                logger.debug("Enabling TLS through rolling restart")
+                logger.debug("Broadcasting new peer url")
+                self.cluster_manager.broadcast_peer_url(
+                    self.state.unit_server.peer_url.replace("http://", "https://")
+                )
+                logger.debug("Writing configuration")
+                self.config_manager.set_config_properties()
+
+                self.tls_manager.set_tls_state(state=TLSState.TLS)
+                logger.debug("Restarting workload")
+                if not self.cluster_manager.restart_member():
+                    raise Exception("Failed to check health of the member after restart")
+
+            except Exception as e:
+                logger.error(f"Enabling TLS failed: {e}")
+                self.set_status(Status.TLS_TRANSITION_FAILED)
+
+        if self.state.unit_server.tls_state == TLSState.TO_NO_TLS:
+            try:
+                logger.debug("Disabling TLS through rolling restart")
+                logger.debug("Broadcasting new peer url")
+                self.cluster_manager.broadcast_peer_url(
+                    self.state.unit_server.peer_url.replace("https://", "http://")
+                )
+                logger.debug("Deleting certificates")
+                self.tls_manager.delete_certificates()
+                logger.debug("Writing config properties")
+                self.config_manager.set_config_properties()
+                self.tls_manager.set_tls_state(state=TLSState.NO_TLS)
+                logger.debug("Restarting workload")
+                if not self.cluster_manager.restart_member():
+                    raise Exception("Failed to check health of the member after restart")
+
+            except Exception as e:
+                logger.error(f"Disabling TLS failed: {e}")
+                self.set_status(Status.TLS_TRANSITION_FAILED)
+
+    def rolling_restart(self) -> None:
+        """Initiate a rolling restart."""
+        logger.info(f"Initiating a rolling restart unit {self.unit.name}")
+        self.on[RESTART_RELATION].acquire_lock.emit()
 
 
 if __name__ == "__main__":  # pragma: nocover

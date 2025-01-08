@@ -125,23 +125,7 @@ class TLSEvents(Object):
         self.charm.tls_manager.write_certificate(cert, private_key)
 
         if self.charm.tls_manager.certs_ready:
-            if self.charm.workload.alive():
-                # broadcast change
-                self.charm.cluster_manager.broadcast_peer_url(
-                    self.charm.state.unit_server.peer_url.replace("http://", "https://")
-                )
-            # write configuration file
-            self.charm.config_manager.set_config_properties()
-            self.charm.tls_manager.set_tls_state(state=TLSState.TLS)
-
-            # restart the workload if it is running
-            if self.charm.workload.alive():
-                self.charm.workload.restart()
-                if self.charm.cluster_manager.health_check():
-                    self.charm.set_status(Status.ACTIVE)
-                else:
-                    self.charm.set_status(Status.HEALTH_CHECK_FAILED)
-            # self.charm.set_status(Status.ACTIVE)
+            self.charm.rolling_restart()
         else:
             logger.debug("A certificate is missing, waiting for the next certificate event.")
             if self.charm.state.client_tls_relation is None:
@@ -171,22 +155,4 @@ class TLSEvents(Object):
             not self.charm.state.unit_server.peer_cert_ready
             and not self.charm.state.unit_server.client_cert_ready
         ):
-            # broadcast new peer url
-            logger.debug("Broadcasting new peer url")
-            self.charm.cluster_manager.broadcast_peer_url(
-                self.charm.state.unit_server.peer_url.replace("https://", "http://")
-            )
-            # delete certificates from disk
-            self.charm.tls_manager.delete_certificates()
-            logger.debug("Writing config properties")
-            self.charm.config_manager.set_config_properties()
-            logger.debug("Restarting workload")
-            self.charm.workload.restart()
-            logger.debug("Checking the health of the cluster")
-            self.charm.tls_manager.set_tls_state(state=TLSState.NO_TLS)
-            if self.charm.cluster_manager.health_check(cluster=False):
-                logger.debug("Setting status to active")
-                self.charm.set_status(Status.ACTIVE)
-            else:
-                self.charm.set_status(Status.HEALTH_CHECK_FAILED)
-                event.defer()
+            self.charm.rolling_restart()
