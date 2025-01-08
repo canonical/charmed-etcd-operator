@@ -10,8 +10,6 @@ from pytest_operator.plugin import OpsTest
 
 from literals import SNAP_NAME
 
-from ..helpers import APP_NAME
-
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +26,9 @@ async def existing_app(ops_test: OpsTest) -> str | None:
     return list(etcd_apps.keys())[0] if etcd_apps else None
 
 
-def start_continuous_writes(ops_test: OpsTest, app_name: str, endpoints: str, user: str, password: str) -> None:
+def start_continuous_writes(
+    ops_test: OpsTest, app_name: str, endpoints: str, user: str, password: str
+) -> None:
     model = ops_test.model_full_name
     # this is the unit where the `etcdctl` command is executed
     # it does not mean that data is written to this cluster member
@@ -52,7 +52,9 @@ def stop_continuous_writes() -> None:
     proc.communicate()
 
 
-def count_writes(ops_test: OpsTest, app_name: str, endpoints: str, user: str, password: str) -> str:
+def count_writes(
+    ops_test: OpsTest, app_name: str, endpoints: str, user: str, password: str
+) -> str:
     model = ops_test.model_full_name
     unit = ops_test.model.applications[app_name].units[0].name
     key = "cw_key"
