@@ -131,12 +131,16 @@ class TLSEvents(Object):
         if not cert or not private_key:
             logger.error("Missing certificate or private key")
             raise Exception("Missing certificate or private key")
-
-        self.charm.set_status(Status.TLS_NOT_READY)
         # write certificates to disk
         self.charm.tls_manager.write_certificate(cert, private_key)
 
+        # Updating certificates no need to do a rolling restart
+        if self.charm.state.unit_server.tls_state == TLSState.TLS:
+            logger.debug(f"Updated certificate for {cert_type}")
+            return
+
         if self.charm.state.unit_server.certs_ready:
+            self.charm.set_status(Status.TLS_NOT_READY)
             # we do not restart if the cluster has not started yet
             if self.charm.state.cluster.initial_cluster_state == "existing":
                 self.charm.rolling_restart()

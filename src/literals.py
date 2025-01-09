@@ -55,7 +55,7 @@ class Status(Enum):
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
     MISSING_TLS_RELATION = StatusLevel(BlockedStatus("missing tls relation"), "DEBUG")
     MISSING_CERTIFICATES = StatusLevel(MaintenanceStatus("missing certificates"), "DEBUG")
-    TLS_NOT_READY = StatusLevel(MaintenanceStatus("tls not ready"), "DEBUG")
+    TLS_NOT_READY = StatusLevel(MaintenanceStatus("enabling/disabling TLS"), "DEBUG")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     CLIENT_TLS_MISSING = StatusLevel(BlockedStatus("client tls relation missing"), "DEBUG")
     PEER_TLS_MISSING = StatusLevel(BlockedStatus("peer tls relation missing"), "DEBUG")
