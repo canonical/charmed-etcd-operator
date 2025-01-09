@@ -3,15 +3,18 @@
 # See LICENSE file for licensing details.
 
 import logging
+from time import sleep
 
 import pytest
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION
+from managers.tls import CertType
 
 from .helpers import (
     APP_NAME,
+    get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
     get_juju_leader_unit_name,
@@ -55,6 +58,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    assert leader_unit
 
     cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS
@@ -64,6 +68,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 
     # make sure data can be written to the cluster
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret
     password = secret.get(f"{INTERNAL_USER}-password")
 
     assert (
@@ -101,7 +106,7 @@ async def test_turning_off_tls(ops_test: OpsTest) -> None:
     model = ops_test.model_full_name
     assert model is not None
 
-    # enable TLS and check if the cluster is still accessible
+    # disable TLS and check if the cluster is still accessible
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
     await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
     await etcd_app.remove_relation("client-certificates", f"{TLS_NAME}:certificates")
@@ -110,6 +115,7 @@ async def test_turning_off_tls(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    assert leader_unit
     cluster_members = get_cluster_members(model, leader_unit, endpoints)
     assert len(cluster_members) == NUM_UNITS
 
@@ -118,6 +124,7 @@ async def test_turning_off_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("http://")
 
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret
     password = secret.get(f"{INTERNAL_USER}-password")
     assert (
         get_key(
@@ -148,6 +155,7 @@ async def test_turning_on_tls(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    assert leader_unit
     cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS
 
@@ -156,7 +164,89 @@ async def test_turning_on_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https")
 
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret
     password = secret.get(f"{INTERNAL_USER}-password")
+    assert (
+        get_key(
+            model,
+            leader_unit,
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=TEST_KEY,
+            tls_enabled=True,
+        )
+        == TEST_VALUE
+    )
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_certificate_expiration(ops_test: OpsTest) -> None:
+    assert ops_test.model
+    model = ops_test.model_full_name
+    assert model is not None
+
+    # turn off tls
+    # disable TLS and check if the cluster is still accessible
+    etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
+    await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
+    await etcd_app.remove_relation("client-certificates", f"{TLS_NAME}:certificates")
+
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    assert leader_unit
+    cluster_members = get_cluster_members(model, leader_unit, endpoints)
+    assert len(cluster_members) == NUM_UNITS
+
+    for cluster_member in cluster_members:
+        assert cluster_member["clientURLs"][0].startswith("http://")
+        assert cluster_member["peerURLs"][0].startswith("http://")
+
+    # change config of TLS operator to have a certificate that is expired in 1m
+    tls_config = {"ca-common-name": "etcd", "certificate-validity": "1m"}
+    tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
+    await tls_app.set_config(tls_config)
+
+    # enable TLS and check if the cluster is still accessible
+    await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
+    await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
+
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
+    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    assert leader_unit
+    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    assert len(cluster_members) == NUM_UNITS
+
+    for cluster_member in cluster_members:
+        assert cluster_member["clientURLs"][0].startswith("https")
+        assert cluster_member["peerURLs"][0].startswith("https")
+
+    # get current certificate
+    current_certificate = get_certificate_from_unit(model, leader_unit, cert_type=CertType.CLIENT)
+    assert current_certificate
+
+    # wait for certificate to expire
+    sleep(90)
+
+    # get new certificate
+    new_certificate = get_certificate_from_unit(model, leader_unit, cert_type=CertType.CLIENT)
+    assert new_certificate
+
+    # check that the certificate has been updated
+    assert current_certificate != new_certificate
+
+    # check that the cluster is still accessible
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret
+
+    password = secret.get(f"{INTERNAL_USER}-password")
+
     assert (
         get_key(
             model,
