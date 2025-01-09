@@ -112,7 +112,7 @@ async def test_turning_off_tls(ops_test: OpsTest) -> None:
     assert model is not None
 
     # disable TLS and check if the cluster is still accessible
-    logger.info("Disbaling TLS by removing the TLS certificates")
+    logger.info("Disabling TLS by removing the TLS certificates")
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
     await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
     await etcd_app.remove_relation("client-certificates", f"{TLS_NAME}:certificates")
