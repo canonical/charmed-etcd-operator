@@ -15,8 +15,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 from ops import RelationBrokenEvent, RelationCreatedEvent, RelationJoinedEvent
 from ops.framework import Object
 
-from core.models import TLSState
-from literals import CLIENT_TLS_RELATION_NAME, PEER_TLS_RELATION_NAME, Status
+from literals import CLIENT_TLS_RELATION_NAME, PEER_TLS_RELATION_NAME, Status, TLSState
 from managers.tls import CertType
 
 if TYPE_CHECKING:

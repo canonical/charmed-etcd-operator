@@ -11,8 +11,8 @@ import yaml
 from ops.model import ConfigData
 
 from core.cluster import ClusterState
-from core.models import TLSState
 from core.workload import WorkloadBase
+from literals import TLSState
 
 logger = logging.getLogger(__name__)
 

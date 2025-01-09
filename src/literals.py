@@ -69,3 +69,13 @@ class Status(Enum):
     TLS_TRANSITION_FAILED = StatusLevel(
         BlockedStatus("failed to transition to/from tls state"), "ERROR"
     )
+
+
+# enum for TLS state
+class TLSState(Enum):
+    """Enum for TLS state."""
+
+    NO_TLS = "no-tls"
+    TO_TLS = "to-tls"
+    TLS = "tls"
+    TO_NO_TLS = "to-no-tls"

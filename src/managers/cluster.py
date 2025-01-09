@@ -133,14 +133,8 @@ class ClusterManager:
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
         )
-        client._run_etcdctl(
-            command="member",
-            subcommand="update",
-            endpoints=self.state.unit_server.client_url,
-            auth_username=self.admin_user,
-            auth_password=self.admin_password,
-            member_id=self.get_member_id(),
-            peer_urls=peer_urls,
+        client.broadcast_peer_url(
+            self.state.unit_server.client_url, self.get_member_id(), peer_urls
         )
 
     def health_check(self, cluster=True) -> bool:

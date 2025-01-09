@@ -11,10 +11,9 @@ from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops import StatusBase
 
 from core.cluster import ClusterState
-from core.models import TLSState
 from events.etcd import EtcdEvents
 from events.tls import TLSEvents
-from literals import RESTART_RELATION, SUBSTRATE, DebugLevel, Status
+from literals import RESTART_RELATION, SUBSTRATE, DebugLevel, Status, TLSState
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.tls import TLSManager

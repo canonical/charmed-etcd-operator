@@ -6,24 +6,13 @@
 
 import logging
 import uuid
-from enum import Enum
 
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
 
-from literals import CLIENT_PORT, INTERNAL_USER, PEER_PORT, SUBSTRATES
+from literals import CLIENT_PORT, INTERNAL_USER, PEER_PORT, SUBSTRATES, TLSState
 
 logger = logging.getLogger(__name__)
-
-
-# enum for TLS state
-class TLSState(Enum):
-    """Enum for TLS state."""
-
-    NO_TLS = "no-tls"
-    TO_TLS = "to-tls"
-    TLS = "tls"
-    TO_NO_TLS = "to-no-tls"
 
 
 class RelationState:

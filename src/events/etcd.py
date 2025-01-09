@@ -20,8 +20,7 @@ from ops.model import ModelError, SecretNotFoundError
 
 from common.exceptions import EtcdAuthNotEnabledError, EtcdUserManagementError
 from common.secrets import get_secret_from_id
-from core.models import TLSState
-from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status
+from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status, TLSState
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm

@@ -14,9 +14,8 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 )
 
 from core.cluster import ClusterState
-from core.models import TLSState
 from core.workload import WorkloadBase
-from literals import SUBSTRATES
+from literals import SUBSTRATES, TLSState
 
 logger = logging.getLogger(__name__)
 

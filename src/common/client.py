@@ -182,7 +182,6 @@ class EtcdClient:
             if cluster_arg:
                 args.append("--cluster")
 
-            # logger.debug(f"Running etcdctl command: {' '.join(args)}")
             result = subprocess.run(
                 args,
                 check=True,
@@ -259,3 +258,21 @@ class EtcdClient:
                 return False
 
         return True
+
+    def broadcast_peer_url(self, endpoints: str, member_id: str, peer_urls: str) -> None:
+        """Broadcast the peer URL to all units in the cluster.
+
+        Args:
+            endpoints (str): The endpoints to run the command against.
+            member_id (str): The member ID to broadcast the peer URL for.
+            peer_urls (str): The peer URLs to broadcast.
+        """
+        self._run_etcdctl(
+            command="member",
+            subcommand="update",
+            endpoints=endpoints,
+            auth_username=self.user,
+            auth_password=self.password,
+            member_id=member_id,
+            peer_urls=peer_urls,
+        )

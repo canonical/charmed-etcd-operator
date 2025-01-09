@@ -28,23 +28,3 @@ def get_secret_from_id(model, secret_id: str) -> dict[str, str] | None:
         raise
 
     return secret_content
-
-
-def get_secret_from_label(model, label: str) -> dict[str, str] | None:
-    """Resolve the given label of a Juju secret and return the content as a dict.
-
-    Args:
-        model (Model): Model object.
-        label (str): The label of the secret.
-
-    Returns:
-        dict: The content of the secret.
-    """
-    try:
-        secret_content = model.get_secret(label=label).get_content(refresh=True)
-    except SecretNotFoundError:
-        raise SecretNotFoundError(f"The secret '{label}' does not exist.")
-    except ModelError:
-        raise
-
-    return secret_content
