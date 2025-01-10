@@ -56,15 +56,11 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
-    start_continuous_writes(
-        ops_test, app_name=app, endpoints=init_endpoints, user=INTERNAL_USER, password=password
-    )
+    start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
     # after some time, get the current count
     time.sleep(10)
-    init_writes = count_writes(
-        ops_test, app_name=app, endpoints=init_endpoints, user=INTERNAL_USER, password=password
-    )
+    init_writes = count_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
     # scale up
     await ops_test.model.applications[app].add_unit(count=2)
@@ -85,7 +81,5 @@ async def test_scale_up(ops_test: OpsTest) -> None:
 
     # check if data was continuously written to the cluster
     stop_continuous_writes()
-    final_writes = count_writes(
-        ops_test, app_name=app, endpoints=endpoints, user=INTERNAL_USER, password=password
-    )
+    final_writes = count_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
     assert final_writes > init_writes

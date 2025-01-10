@@ -8,8 +8,6 @@ import subprocess
 
 from pytest_operator.plugin import OpsTest
 
-from literals import SNAP_NAME
-
 logger = logging.getLogger(__name__)
 
 
@@ -26,20 +24,11 @@ async def existing_app(ops_test: OpsTest) -> str | None:
     return list(etcd_apps.keys())[0] if etcd_apps else None
 
 
-def start_continuous_writes(
-    ops_test: OpsTest, app_name: str, endpoints: str, user: str, password: str
-) -> None:
-    model = ops_test.model_full_name
-    # this is the unit where the `etcdctl` command is executed
-    # it does not mean that data is written to this cluster member
-    # before removing the unit used for running `etcdctl`, continuous writes should be stopped
-    unit = ops_test.model.applications[app_name].units[0].name
+def start_continuous_writes(endpoints: str, user: str, password: str) -> None:
     subprocess.Popen(
         [
             "python3",
             "tests/integration/ha/continuous_writes.py",
-            model,
-            unit,
             endpoints,
             user,
             password,
@@ -52,22 +41,17 @@ def stop_continuous_writes() -> None:
     proc.communicate()
 
 
-def count_writes(
-    ops_test: OpsTest, app_name: str, endpoints: str, user: str, password: str
-) -> str:
-    model = ops_test.model_full_name
-    unit = ops_test.model.applications[app_name].units[0].name
+def count_writes(endpoints: str, user: str, password: str) -> int:
     key = "cw_key"
 
-    etcd_command = f"""{SNAP_NAME}.etcdctl \
-                            get {key} \
-                            --endpoints={endpoints} \
-                            --user={user} \
-                            --password={password}
+    etcd_command = f"""etcdctl \
+                        get {key} \
+                        --endpoints={endpoints} \
+                        --user={user} \
+                        --password={password}
                             """
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     try:
-        return subprocess.getoutput(juju_command).split("\n")[1]
+        return int(subprocess.getoutput(etcd_command).split("\n")[1])
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         logger.warning(e)
