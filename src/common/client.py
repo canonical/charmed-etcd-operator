@@ -189,7 +189,7 @@ class EtcdClient:
                 capture_output=True,
                 input=use_input,
                 timeout=10,
-            ).stdout
+            ).stdout.strip()
         except subprocess.CalledProcessError as e:
             logger.error(
                 f"etcdctl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"

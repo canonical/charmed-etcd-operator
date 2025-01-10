@@ -123,6 +123,8 @@ class TLSManager:
 
             if cert_type == CertType.CLIENT:
                 cert_path = Path(self.workload.paths.tls.client_cert)
+                ca_path = Path(self.workload.paths.tls.client_ca)
+                key_path = Path(self.workload.paths.tls.client_key)
 
             if cert_path.exists():
                 cert_path.unlink()
