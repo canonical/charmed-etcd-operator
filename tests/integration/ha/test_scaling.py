@@ -63,7 +63,7 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     )
 
     # after some time, get the current count
-    time.sleep(30)
+    time.sleep(10)
     init_writes = count_writes(
         ops_test, app_name=app, endpoints=init_endpoints, user=INTERNAL_USER, password=password
     )
