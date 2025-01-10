@@ -52,7 +52,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         getattr(logger, log_level.lower())(status.message)
         self.unit.status = status
 
-    def _restart(self, event) -> None:
+    def _restart(self, _) -> None:
         """Restart callback for the rolling ips lib."""
         if self.state.unit_server.tls_state == TLSState.TO_TLS:
             try:
