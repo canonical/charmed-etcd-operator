@@ -45,11 +45,11 @@ def count_writes(endpoints: str, user: str, password: str) -> int:
     key = "cw_key"
 
     etcd_command = f"""etcdctl \
-                        get {key} \
-                        --endpoints={endpoints} \
-                        --user={user} \
-                        --password={password}
-                            """
+                    get {key} \
+                    --endpoints={endpoints} \
+                    --user={user} \
+                    --password={password}
+                    """
 
     try:
         return int(subprocess.getoutput(etcd_command).split("\n")[1])
