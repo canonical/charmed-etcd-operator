@@ -13,7 +13,6 @@ from .helpers import (
     APP_NAME,
     get_cluster_endpoints,
     get_cluster_members,
-    get_juju_leader_unit_name,
     get_key,
     get_secret_by_label,
     put_key,
@@ -22,6 +21,8 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 NUM_UNITS = 3
+TEST_KEY = "test_key"
+TEST_VALUE = "42"
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -34,7 +35,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """
     # Build and deploy charm from local source folder
     etcd_charm = await ops_test.build_charm(".")
-    model = ops_test.model_full_name
 
     # Deploy the charm and wait for active/idle status
     await ops_test.model.deploy(etcd_charm, num_units=NUM_UNITS)
@@ -42,33 +42,25 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints)
+    cluster_members = get_cluster_members(endpoints)
     assert len(cluster_members) == NUM_UNITS
 
     # make sure data can be written to the cluster
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
-    test_key = "test_key"
-    test_value = "42"
     assert (
         put_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
-            key=test_key,
-            value=test_value,
+            key=TEST_KEY,
+            value=TEST_VALUE,
         )
         == "OK"
     )
-    assert (
-        get_key(model, leader_unit, endpoints, user=INTERNAL_USER, password=password, key=test_key)
-        == test_value
-    )
+    assert get_key(endpoints, user=INTERNAL_USER, password=password, key=TEST_KEY) == TEST_VALUE
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -76,15 +68,11 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_authentication(ops_test: OpsTest) -> None:
     """Assert authentication is enabled by default."""
-    model = ops_test.model_full_name
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    test_key = "test_key"
-    test_value = "42"
 
     # check that reading/writing data without credentials fails
-    assert get_key(model, leader_unit, endpoints, key=test_key) != test_value
-    assert put_key(model, leader_unit, endpoints, key=test_key, value=test_value) != "OK"
+    assert get_key(endpoints, key=TEST_KEY) != TEST_VALUE
+    assert put_key(endpoints, key=TEST_KEY, value=TEST_VALUE) != "OK"
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -92,11 +80,7 @@ async def test_authentication(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_update_admin_password(ops_test: OpsTest) -> None:
     """Assert the admin password is updated when adding a user secret to the config."""
-    model = ops_test.model_full_name
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    test_key = "test_key"
-    test_value = "42"
 
     # create a user secret and grant it to the application
     secret_name = "test_secret"
@@ -115,10 +99,7 @@ async def test_update_admin_password(ops_test: OpsTest) -> None:
 
     # perform read operation with the updated password
     assert (
-        get_key(
-            model, leader_unit, endpoints, user=INTERNAL_USER, password=new_password, key=test_key
-        )
-        == test_value
+        get_key(endpoints, user=INTERNAL_USER, password=new_password, key=TEST_KEY) == TEST_VALUE
     )
 
     # update the config again and remove the option `admin-password`
@@ -127,8 +108,5 @@ async def test_update_admin_password(ops_test: OpsTest) -> None:
 
     # make sure we can still read data with the previously set password
     assert (
-        get_key(
-            model, leader_unit, endpoints, user=INTERNAL_USER, password=new_password, key=test_key
-        )
-        == test_value
+        get_key(endpoints, user=INTERNAL_USER, password=new_password, key=TEST_KEY) == TEST_VALUE
     )

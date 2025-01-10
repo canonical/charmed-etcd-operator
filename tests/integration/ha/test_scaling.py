@@ -14,7 +14,6 @@ from ..helpers import (
     APP_NAME,
     get_cluster_endpoints,
     get_cluster_members,
-    get_juju_leader_unit_name,
     get_secret_by_label,
 )
 from .helpers import (
@@ -51,7 +50,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 async def test_scale_up(ops_test: OpsTest) -> None:
     """Make sure new units are added to the etcd cluster without downtime."""
     app = (await existing_app(ops_test)) or APP_NAME
-    model = ops_test.model_full_name
     init_units_count = len(ops_test.model.applications[app].units)
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
@@ -81,9 +79,8 @@ async def test_scale_up(ops_test: OpsTest) -> None:
 
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, app)
-    leader_unit = await get_juju_leader_unit_name(ops_test, app)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints)
+    cluster_members = get_cluster_members(endpoints)
     assert len(cluster_members) == init_units_count + 2
 
     # check if data was continuously written to the cluster

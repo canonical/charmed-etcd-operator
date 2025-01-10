@@ -11,7 +11,7 @@ from typing import Dict
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT, SNAP_NAME
+from literals import CLIENT_PORT
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,6 @@ APP_NAME = METADATA["name"]
 
 
 def put_key(
-    model: str,
-    unit: str,
     endpoints: str,
     key: str,
     value: str,
@@ -29,42 +27,35 @@ def put_key(
     password: str | None = None,
 ) -> str:
     """Write data to etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
+    etcd_command = f"etcdctl put {key} {value} --endpoints={endpoints}"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
     if password:
         etcd_command = f"{etcd_command} --password={password}"
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
-    return subprocess.getoutput(juju_command).split("\n")[0]
+    return subprocess.getoutput(etcd_command).split("\n")[0]
 
 
 def get_key(
-    model: str,
-    unit: str,
     endpoints: str,
     key: str,
     user: str | None = None,
     password: str | None = None,
 ) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
+    etcd_command = f"etcdctl get {key} --endpoints={endpoints}"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
     if password:
         etcd_command = f"{etcd_command} --password={password}"
 
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
-
-    return subprocess.getoutput(juju_command).split("\n")[1]
+    return subprocess.getoutput(etcd_command).split("\n")[1]
 
 
-def get_cluster_members(model: str, unit: str, endpoints: str) -> list[dict]:
+def get_cluster_members(endpoints: str) -> list[dict]:
     """Query all cluster members from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl member list --endpoints={endpoints} -w=json"
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
-
-    result = subprocess.getoutput(juju_command).split("\n")[0]
+    etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
 
     return json.loads(result)["members"]
 
