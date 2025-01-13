@@ -89,6 +89,19 @@ class EtcdOperatorCharm(ops.CharmBase):
                 logger.error(f"Disabling TLS failed: {e}")
                 self.set_status(Status.TLS_TRANSITION_FAILED)
 
+        elif (
+            self.state.unit_server.tls_state == TLSState.UPDATING_CLIENT_CERTS
+            or self.state.unit_server.tls_state == TLSState.UPDATING_PEER_CERTS
+        ):
+            try:
+                self.tls_manager.set_tls_state(state=TLSState.TLS)
+                if not self.cluster_manager.restart_member():
+                    logger.error("Failed to check health of the member after restart")
+                    self.set_status(Status.TLS_TRANSITION_FAILED)
+            except Exception as e:
+                logger.error(f"Enabling TLS failed: {e}")
+                self.set_status(Status.TLS_TRANSITION_FAILED)
+
         else:
             logger.debug("Restarting workload")
             if not self.cluster_manager.restart_member():

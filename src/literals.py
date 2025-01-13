@@ -61,10 +61,12 @@ class Status(Enum):
     TLS_CLIENT_TLS_MISSING = StatusLevel(BlockedStatus("client tls relation missing"), "DEBUG")
     TLS_PEER_TLS_MISSING = StatusLevel(BlockedStatus("peer tls relation missing"), "DEBUG")
     TLS_CLIENT_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
-        MaintenanceStatus("client tls needs to be removed"), "DEBUG"
+        MaintenanceStatus("client tls needs to be removed or peer tls needs to be integrated"),
+        "DEBUG",
     )
     TLS_PEER_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
-        MaintenanceStatus("peer tls needs to be removed"), "DEBUG"
+        MaintenanceStatus("peer tls needs to be removed or client tls needs to be integrated"),
+        "DEBUG",
     )
     TLS_TRANSITION_FAILED = StatusLevel(
         BlockedStatus("failed to transition to/from tls state"), "ERROR"
@@ -79,3 +81,5 @@ class TLSState(Enum):
     TO_TLS = "to-tls"
     TLS = "tls"
     TO_NO_TLS = "to-no-tls"
+    UPDATING_CLIENT_CERTS = "updating-client-tls"
+    UPDATING_PEER_CERTS = "updating-peer-tls"

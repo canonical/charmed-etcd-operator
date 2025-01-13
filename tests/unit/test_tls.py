@@ -71,14 +71,20 @@ def test_certificates_broken():
 
     state_out = ctx.run(ctx.on.relation_broken(relation=peer_tls_relation), state_in)
     assert state_out.unit_status == Status.TLS_CLIENT_TLS_NEEDS_TO_BE_REMOVED.value.status
-    assert state_out.get_relation(peer_relation.id).local_unit_data["tls-state"] == "to-no-tls"
+    assert (
+        state_out.get_relation(peer_relation.id).local_unit_data["tls-state"]
+        == TLSState.UPDATING_PEER_CERTS.value
+    )
     assert state_out.get_relation(peer_relation.id).local_unit_data["peer-cert-ready"] == "False"
     assert state_out.get_relation(peer_relation.id).local_unit_data["client-cert-ready"] == "True"
 
     peer_relation.local_unit_data["peer-cert-ready"] = "True"
     state_out = ctx.run(ctx.on.relation_broken(relation=client_tls_relation), state_in)
     assert state_out.unit_status == Status.TLS_PEER_TLS_NEEDS_TO_BE_REMOVED.value.status
-    assert state_out.get_relation(peer_relation.id).local_unit_data["tls-state"] == "to-no-tls"
+    assert (
+        state_out.get_relation(peer_relation.id).local_unit_data["tls-state"]
+        == TLSState.UPDATING_CLIENT_CERTS.value
+    )
     assert state_out.get_relation(peer_relation.id).local_unit_data["client-cert-ready"] == "False"
     assert state_out.get_relation(peer_relation.id).local_unit_data["peer-cert-ready"] == "True"
 

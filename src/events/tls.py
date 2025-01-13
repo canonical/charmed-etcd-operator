@@ -83,7 +83,11 @@ class TLSEvents(Object):
         Args:
             event (RelationCreatedEvent): The event object.
         """
-        self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS)
+        if (
+            self.charm.state.unit_server.tls_state != TLSState.UPDATING_CLIENT_CERTS
+            and self.charm.state.unit_server.tls_state != TLSState.UPDATING_PEER_CERTS
+        ):
+            self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS)
         self.charm.set_status(Status.TLS_NOT_READY)
 
     def _on_relation_joined(self, event: RelationJoinedEvent) -> None:
@@ -148,8 +152,10 @@ class TLSEvents(Object):
         cert_type = (
             CertType.PEER if event.relation.name == PEER_TLS_RELATION_NAME else CertType.CLIENT
         )
-
-        self.charm.tls_manager.set_tls_state(state=TLSState.TO_NO_TLS)
+        if cert_type == CertType.PEER:
+            self.charm.tls_manager.set_tls_state(state=TLSState.UPDATING_PEER_CERTS)
+        else:
+            self.charm.tls_manager.set_tls_state(state=TLSState.UPDATING_CLIENT_CERTS)
         self.charm.set_status(Status.TLS_DISABLING)
         self.charm.tls_manager.set_cert_state(cert_type, is_ready=False)
 
@@ -164,4 +170,5 @@ class TLSEvents(Object):
             not self.charm.state.unit_server.peer_cert_ready
             and not self.charm.state.unit_server.client_cert_ready
         ):
+            self.charm.tls_manager.set_tls_state(state=TLSState.TO_NO_TLS)
             self.charm.rolling_restart()
