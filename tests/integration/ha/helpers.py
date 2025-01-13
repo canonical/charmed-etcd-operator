@@ -54,7 +54,7 @@ def stop_continuous_writes() -> None:
 
 def count_writes(
     ops_test: OpsTest, app_name: str, endpoints: str, user: str, password: str
-) -> str:
+) -> int:
     model = ops_test.model_full_name
     unit = ops_test.model.applications[app_name].units[0].name
     key = "cw_key"
@@ -68,6 +68,6 @@ def count_writes(
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
     try:
-        return subprocess.getoutput(juju_command).split("\n")[1]
+        return int(subprocess.getoutput(juju_command).split("\n")[1])
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         logger.warning(e)
