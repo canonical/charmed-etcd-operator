@@ -45,7 +45,10 @@ class RelationState:
 
         for field in delete_fields:
             # use del instead of pop here because of error with dataplatform-libs
-            del self.relation_data[field]
+            try:
+                del self.relation_data[field]
+            except KeyError:
+                pass
 
 
 class EtcdServer(RelationState):
@@ -100,11 +103,6 @@ class EtcdServer(RelationState):
     def member_endpoint(self) -> str:
         """Concatenate member_name and peer_url."""
         return f"{self.member_name}={self.peer_url}"
-
-    @property
-    def started(self) -> bool:
-        """Flag to check if the unit has started the etcd service."""
-        return self.relation_data.get("state", None) == "started"
 
 
 class EtcdCluster(RelationState):

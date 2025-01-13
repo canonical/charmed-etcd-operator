@@ -44,7 +44,7 @@ class EtcdClient:
             try:
                 endpoint_status = json.loads(result)[0]
             except json.JSONDecodeError:
-                pass
+                raise
 
         return endpoint_status
 

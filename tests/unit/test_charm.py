@@ -73,7 +73,9 @@ def test_start():
             "failed to enable authentication in etcd"
         )
 
-    # if authentication was enabled, the charm should be active
+    # if the cluster is new, the leader should immediately start and enable auth
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
+    state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
@@ -84,7 +86,19 @@ def test_start():
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
 
+    # if the cluster already exists, the leader should not start but wait for being added as member
+    relation = testing.PeerRelation(
+        id=1, endpoint=PEER_RELATION, local_app_data={"cluster_state": "existing"}
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with patch("workload.EtcdWorkload.write_file"):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status != ops.ActiveStatus()
+        assert state_out.get_relation(1).local_unit_data.get("state") != "started"
+
     # if the etcd daemon can't start, the charm should display blocked status
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),

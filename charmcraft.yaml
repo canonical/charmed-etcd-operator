@@ -9,12 +9,9 @@ type: charm
 # temporary based on 22.04 as data-platform-workflows is not ready yet for 24.04
 # see: https://github.com/canonical/data-platform-workflows/issues/246
 bases:
-  - build-on:
-      - name: ubuntu
-        channel: "22.04"
-    run-on:
-      - name: ubuntu
-        channel: "22.04"
+  - name: ubuntu
+    channel: "22.04"
+    architectures: [amd64]
 
 parts:
   charm:

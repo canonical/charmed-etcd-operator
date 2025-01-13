@@ -45,16 +45,16 @@ class EtcdEvents(Object):
         self.framework.observe(self.charm.on.start, self._on_start)
         self.framework.observe(self.charm.on.config_changed, self._on_config_changed)
         self.framework.observe(
-            self.charm.on[PEER_RELATION].relation_created, self._on_cluster_relation_created
+            self.charm.on[PEER_RELATION].relation_created, self._on_peer_relation_created
         )
         self.framework.observe(
-            self.charm.on[PEER_RELATION].relation_joined, self._on_cluster_relation_joined
+            self.charm.on[PEER_RELATION].relation_joined, self._on_peer_relation_joined
         )
         self.framework.observe(
-            self.charm.on[PEER_RELATION].relation_changed, self._on_cluster_relation_changed
+            self.charm.on[PEER_RELATION].relation_changed, self._on_peer_relation_changed
         )
         self.framework.observe(
-            self.charm.on[PEER_RELATION].relation_departed, self._on_cluster_relation_departed
+            self.charm.on[PEER_RELATION].relation_departed, self._on_peer_relation_departed
         )
         self.framework.observe(self.charm.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.charm.on.update_status, self._on_update_status)
@@ -70,7 +70,9 @@ class EtcdEvents(Object):
         """Handle start event."""
         self.charm.config_manager.set_config_properties()
 
-        if self.charm.unit.is_leader():
+        if self.charm.unit.is_leader() and not self.charm.state.cluster.cluster_state:
+            # this is the very first cluster start, this unit starts without being added as member
+            # all subsequent units will have to be added as member before starting the workload
             self.charm.cluster_manager.start_member()
 
             if not self.charm.state.cluster.auth_enabled:
@@ -88,7 +90,7 @@ class EtcdEvents(Object):
             # this unit has been added to the etcd cluster
             self.charm.cluster_manager.start_member()
         else:
-            # this is a non-leader unit that has not been added to the cluster
+            # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
             event.defer()
             return
@@ -106,11 +108,11 @@ class EtcdEvents(Object):
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
             self.update_admin_password(admin_secret_id)
 
-    def _on_cluster_relation_created(self, event: RelationCreatedEvent) -> None:
+    def _on_peer_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
         self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
 
-    def _on_cluster_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
         if self.charm.unit.is_leader() and self.charm.state.cluster.learning_member:
             try:
@@ -121,11 +123,11 @@ class EtcdEvents(Object):
                 event.defer()
                 return
 
-    def _on_cluster_relation_departed(self, event: RelationDepartedEvent) -> None:
+    def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by a unit leaves the cluster relation."""
         pass
 
-    def _on_cluster_relation_joined(self, event: RelationJoinedEvent) -> None:
+    def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
         if self.charm.unit.is_leader():
             try:

@@ -6,6 +6,7 @@
 
 import logging
 import socket
+from json import JSONDecodeError
 
 from common.client import EtcdClient
 from common.exceptions import (
@@ -16,7 +17,7 @@ from common.exceptions import (
 )
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER
+from literals import INTERNAL_USER, EtcdClusterState
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +58,10 @@ class ClusterManager:
                 if member_id == leader_id:
                     leader = endpoint
                     return leader
-            except KeyError:
+            except (KeyError, JSONDecodeError) as e:
                 # for now, we don't raise an error if there is no leader
                 # this may change when we have actual relevant tasks performed against the leader
-                raise RaftLeaderNotFoundError("No raft leader found in cluster.")
+                raise RaftLeaderNotFoundError(f"No raft leader found in cluster: {e}")
 
         return None
 
@@ -92,26 +93,21 @@ class ClusterManager:
     def add_member(self, unit_name: str) -> None:
         """Add a new member to the etcd cluster."""
         # retrieve the member information for the newly joined unit from the set of EtcdServers
-        member_name = ""
-        ip = ""
-        peer_url = ""
-
-        for server in self.state.servers:
-            if server.unit_name == unit_name:
-                member_name = server.member_name
-                ip = server.ip
-                peer_url = server.peer_url
-                break
+        server = next(iter([s for s in self.state.servers if s.unit_name == unit_name]), None)
+        if not server:
+            raise KeyError(f"Peer relation data for unit {unit_name} not found.")
 
         # we need to make sure all required information are available before adding the member
-        if member_name and ip and peer_url:
+        if server.member_name and server.ip and server.peer_url:
             try:
                 client = EtcdClient(
                     username=self.admin_user,
                     password=self.admin_password,
                     client_url=self.state.unit_server.client_url,
                 )
-                cluster_members, member_id = client.add_member_as_learner(member_name, peer_url)
+                cluster_members, member_id = client.add_member_as_learner(
+                    server.member_name, server.peer_url
+                )
                 self.state.cluster.update(
                     {"cluster_members": cluster_members, "learning_member": member_id}
                 )
@@ -131,7 +127,7 @@ class ClusterManager:
             # mark the cluster as initialized
             self.state.cluster.update(
                 {
-                    "cluster_state": "existing",
+                    "cluster_state": EtcdClusterState.EXISTING.value,
                     "cluster_members": self.state.unit_server.member_endpoint,
                 }
             )
