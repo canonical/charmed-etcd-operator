@@ -36,7 +36,10 @@ def put_key(
     if password:
         etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
-        etcd_command = f"{etcd_command} --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem --cert /var/snap/charmed-etcd/common/tls/client.pem --key /var/snap/charmed-etcd/common/tls/client.key"
+        etcd_command = f"{etcd_command} \
+            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
+            --cert /var/snap/charmed-etcd/common/tls/client.pem \
+            --key /var/snap/charmed-etcd/common/tls/client.key"
 
     juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 

@@ -36,14 +36,14 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 
     The initial cluster should be formed and accessible.
     """
-    assert ops_test.model is not None
+    assert ops_test.model is not None, "Model is not set"
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
     await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
     # Build and deploy charm from local source folder
     etcd_charm = await ops_test.build_charm(".")
     model = ops_test.model_full_name
-    assert model is not None
+    assert model is not None, "Model is not set"
     # Deploy the charm and wait for active/idle status
     await ops_test.model.deploy(etcd_charm, num_units=NUM_UNITS)
 
@@ -52,7 +52,16 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_tls_enabled(ops_test: OpsTest) -> None:
+    """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
+    assert ops_test.model is not None, "Model is not set"
+    model = ops_test.model_full_name
+    assert model is not None, "Model is not set"
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
@@ -96,10 +105,10 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_turning_off_tls(ops_test: OpsTest) -> None:
-    assert ops_test.model
+async def test_disable_tls(ops_test: OpsTest) -> None:
+    assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
-    assert model is not None
+    assert model is not None, "Model is not set"
 
     # enable TLS and check if the cluster is still accessible
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
@@ -131,14 +140,36 @@ async def test_turning_off_tls(ops_test: OpsTest) -> None:
         == TEST_VALUE
     )
 
+    assert put_key(
+        model,
+        leader_unit,
+        endpoints,
+        user=INTERNAL_USER,
+        password=password,
+        key=f"{TEST_KEY}_2",
+        value=TEST_VALUE,
+    )
+
+    assert (
+        get_key(
+            model,
+            leader_unit,
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=f"{TEST_KEY}_2",
+        )
+        == TEST_VALUE
+    )
+
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_turning_on_tls(ops_test: OpsTest) -> None:
-    assert ops_test.model
+async def test_enable_tls(ops_test: OpsTest) -> None:
+    assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
-    assert model is not None
+    assert model is not None, "Model is not set"
 
     # enable TLS and check if the cluster is still accessible
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
@@ -165,6 +196,30 @@ async def test_turning_on_tls(ops_test: OpsTest) -> None:
             user=INTERNAL_USER,
             password=password,
             key=TEST_KEY,
+            tls_enabled=True,
+        )
+        == TEST_VALUE
+    )
+
+    assert put_key(
+        model,
+        leader_unit,
+        endpoints,
+        user=INTERNAL_USER,
+        password=password,
+        key=f"{TEST_KEY}_3",
+        value=TEST_VALUE,
+        tls_enabled=True,
+    )
+
+    assert (
+        get_key(
+            model,
+            leader_unit,
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=f"{TEST_KEY}_3",
             tls_enabled=True,
         )
         == TEST_VALUE
