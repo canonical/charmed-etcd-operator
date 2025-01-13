@@ -5,7 +5,7 @@
 """Collection of state objects for the Etcd relations, apps and units."""
 
 import logging
-import uuid
+from dataclasses import dataclass
 
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
@@ -89,12 +89,12 @@ class EtcdServer(RelationState):
     @property
     def peer_url(self) -> str:
         """The peer connection endpoint for the etcd server."""
-        return f"{self.http}://{self.ip}:{PEER_PORT}"
+        return f"{self.scheme}://{self.ip}:{PEER_PORT}"
 
     @property
     def client_url(self) -> str:
         """The client connection endpoint for the etcd server."""
-        return f"{self.http}://{self.ip}:{CLIENT_PORT}"
+        return f"{self.scheme}://{self.ip}:{CLIENT_PORT}"
 
     @property
     def tls_state(self) -> TLSState:
@@ -102,19 +102,9 @@ class EtcdServer(RelationState):
         return TLSState(self.relation_data.get("tls-state", TLSState.NO_TLS.value))
 
     @property
-    def http(self) -> str:
+    def scheme(self) -> str:
         """The HTTP or HTTPS protocol based on the TLS state."""
         return "https" if self.tls_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
-
-    @property
-    def common_name(self) -> str:
-        """The common name for the server certificate."""
-        cn = self.relation_data.get("common-name", "")
-        if not cn:
-            cn = f"{self.unit_name}-{uuid.uuid4()!s}"
-            self.update({"common-name": cn})
-
-        return cn
 
     @property
     def peer_cert_ready(self) -> bool:
@@ -162,3 +152,13 @@ class EtcdCluster(RelationState):
     def auth_enabled(self) -> bool:
         """Flag to check if authentication is already enabled in the Cluster."""
         return self.relation_data.get("authentication", "") == "enabled"
+
+
+@dataclass
+class Member:
+    """Class representing the members of an ETCD cluster."""
+
+    id: str
+    name: str
+    peer_urls: list[str]
+    client_urls: list[str]

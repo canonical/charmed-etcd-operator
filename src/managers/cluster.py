@@ -14,6 +14,7 @@ from common.exceptions import (
     RaftLeaderNotFoundError,
 )
 from core.cluster import ClusterState
+from core.models import Member
 from core.workload import WorkloadBase
 from literals import INTERNAL_USER
 
@@ -97,13 +98,14 @@ class ClusterManager:
         except EtcdUserManagementError:
             raise
 
-    def get_member_id(self) -> str:
-        """Get the member ID of the current unit.
+    @property
+    def member(self) -> Member:
+        """Get the member information of the current unit.
 
         Returns:
-            str: The member ID of the current unit.
+            Member: The member object.
         """
-        logger.debug(f"Getting member ID for unit {self.state.unit_server.member_name}")
+        logger.debug(f"Getting member for unit {self.state.unit_server.member_name}")
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
@@ -116,8 +118,8 @@ class ClusterManager:
         if self.state.unit_server.member_name not in member_list:
             raise ValueError("member name not found")
 
-        logger.debug(f"Member ID: {member_list[self.state.unit_server.member_name].id}")
-        return member_list[self.state.unit_server.member_name].id
+        logger.debug(f"Member: {member_list[self.state.unit_server.member_name].id}")
+        return member_list[self.state.unit_server.member_name]
 
     def broadcast_peer_url(self, peer_urls: str) -> None:
         """Broadcast the peer URL to all units in the cluster.
@@ -133,11 +135,9 @@ class ClusterManager:
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
         )
-        client.broadcast_peer_url(
-            self.state.unit_server.client_url, self.get_member_id(), peer_urls
-        )
+        client.broadcast_peer_url(self.state.unit_server.client_url, self.member.id, peer_urls)
 
-    def health_check(self, cluster=True) -> bool:
+    def is_healthy(self, cluster=True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
 
         Args:
@@ -156,7 +156,7 @@ class ClusterManager:
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
         )
-        return client.health_check(cluster=cluster)
+        return client.is_healthy(cluster=cluster)
 
     def restart_member(self) -> bool:
         """Restart the workload.
@@ -164,5 +164,6 @@ class ClusterManager:
         Returns:
             bool: True if the workload is running after restart.
         """
+        logger.debug("Restarting workload")
         self.workload.restart()
-        return self.health_check(cluster=False)
+        return self.is_healthy(cluster=False)

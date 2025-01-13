@@ -62,7 +62,4 @@ class EtcdWorkload(WorkloadBase):
 
     @override
     def restart(self) -> None:
-        try:
-            self.etcd.restart(services=[SNAP_SERVICE])
-        except snap.SnapError as e:
-            logger.exception(str(e))
+        self.etcd.restart(services=[SNAP_SERVICE])

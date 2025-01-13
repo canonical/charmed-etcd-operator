@@ -105,6 +105,7 @@ class ConfigManager:
 
     def set_config_properties(self) -> None:
         """Write the config properties to the config file."""
+        logger.debug("Writing configuration")
         self.workload.write_file(
             content=self.config_properties,
             file=self.config_file,

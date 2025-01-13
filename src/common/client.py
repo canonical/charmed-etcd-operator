@@ -7,23 +7,14 @@
 import json
 import logging
 import subprocess
-from dataclasses import dataclass
 
-from tenacity import retry, stop_after_attempt, wait_fixed
+import tenacity
 
 from common.exceptions import EtcdAuthNotEnabledError, EtcdUserManagementError
+from core.models import Member
 from literals import INTERNAL_USER, SNAP_NAME, TLS_ROOT_DIR
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class MemberListResult:
-    """NamedTuple to store member list results."""
-
-    id: str
-    peer_urls: list[str]
-    client_urls: list[str]
 
 
 class EtcdClient:
@@ -201,14 +192,14 @@ class EtcdClient:
 
         return result
 
-    def member_list(self) -> dict[str, MemberListResult] | None:
+    def member_list(self) -> dict[str, Member] | None:
         """Run the `member list` command in etcd.
 
         Returns:
             dict[str, MemberListResult]: A dictionary with the member name as key and the
             MemberListResult as value.
         """
-        member_list_json = self._run_etcdctl(
+        result = self._run_etcdctl(
             command="member",
             subcommand="list",
             endpoints=self.client_url,
@@ -216,20 +207,22 @@ class EtcdClient:
             auth_password=self.password,
             output_format="json",
         )
-        logger.debug(f"Member list: {member_list_json}")
-        if member_list_json:
-            result = json.loads(member_list_json)
-            return {
-                member["name"]: MemberListResult(
-                    id=str(hex(member["ID"]))[2:],
-                    peer_urls=member["peerURLs"],
-                    client_urls=member["clientURLs"],
-                )
-                for member in result["members"]
-            }
+        logger.debug(f"Member list: {result}")
+        if not result:
+            return None
 
-    @retry(stop=stop_after_attempt(5), wait=wait_fixed(5), reraise=True)
-    def health_check(self, cluster: bool = False) -> bool:
+        result = json.loads(result)
+        return {
+            member["name"]: Member(
+                id=str(hex(member["ID"]))[2:],
+                name=member["name"],
+                peer_urls=member["peerURLs"],
+                client_urls=member["clientURLs"],
+            )
+            for member in result["members"]
+        }
+
+    def is_healthy(self, cluster: bool = False) -> bool:
         """Run the `endpoint health` command and return True if healthy.
 
         Args:
@@ -239,24 +232,33 @@ class EtcdClient:
             bool: True if the cluster or node is healthy.
         """
         logger.debug("Running etcd health check.")
+        try:
+            for attempt in tenacity.Retrying(
+                stop=tenacity.stop_after_attempt(5),
+                wait=tenacity.wait_fixed(5),
+                reraise=True,
+            ):
+                with attempt:
+                    result = self._run_etcdctl(
+                        auth_password=self.password,
+                        auth_username=self.user,
+                        command="endpoint",
+                        subcommand="health",
+                        endpoints=self.client_url,
+                        output_format="json",
+                        cluster_arg=cluster,
+                    )
 
-        result = self._run_etcdctl(
-            auth_password=self.password,
-            auth_username=self.user,
-            command="endpoint",
-            subcommand="health",
-            endpoints=self.client_url,
-            output_format="json",
-            cluster_arg=cluster,
-        )
+                    if result is None:
+                        return False
 
-        if result is None:
-            raise ValueError("etcd health check failed")
+                    for endpoint in json.loads(result):
+                        if not endpoint["health"]:
+                            return False
 
-        for endpoint in json.loads(result):
-            if not endpoint["health"]:
-                return False
-
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return False
         return True
 
     def broadcast_peer_url(self, endpoints: str, member_id: str, peer_urls: str) -> None:

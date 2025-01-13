@@ -53,17 +53,17 @@ class Status(Enum):
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
-    MISSING_TLS_RELATION = StatusLevel(BlockedStatus("missing tls relation"), "DEBUG")
-    MISSING_CERTIFICATES = StatusLevel(MaintenanceStatus("missing certificates"), "DEBUG")
-    TLS_NOT_READY = StatusLevel(MaintenanceStatus("tls not ready"), "DEBUG")
-    PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
-    CLIENT_TLS_MISSING = StatusLevel(BlockedStatus("client tls relation missing"), "DEBUG")
-    PEER_TLS_MISSING = StatusLevel(BlockedStatus("peer tls relation missing"), "DEBUG")
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
-    CLIENT_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
+    PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
+    TLS_MISSING_CERTIFICATES = StatusLevel(MaintenanceStatus("missing certificates"), "DEBUG")
+    TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be configured..."), "DEBUG")
+    TLS_DISABLING = StatusLevel(MaintenanceStatus("Disabling TLS..."), "DEBUG")
+    TLS_CLIENT_TLS_MISSING = StatusLevel(BlockedStatus("client tls relation missing"), "DEBUG")
+    TLS_PEER_TLS_MISSING = StatusLevel(BlockedStatus("peer tls relation missing"), "DEBUG")
+    TLS_CLIENT_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
         MaintenanceStatus("client tls needs to be removed"), "DEBUG"
     )
-    PEER_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
+    TLS_PEER_TLS_NEEDS_TO_BE_REMOVED = StatusLevel(
         MaintenanceStatus("peer tls needs to be removed"), "DEBUG"
     )
     TLS_TRANSITION_FAILED = StatusLevel(

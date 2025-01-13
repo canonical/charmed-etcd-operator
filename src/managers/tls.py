@@ -35,7 +35,7 @@ class TLSManager:
         self.workload = workload
         self.substrate = substrate
 
-    def set_tls_state(self, state: TLSState):
+    def set_tls_state(self, state: TLSState) -> None:
         """Set the TLS state.
 
         Args:
@@ -48,7 +48,7 @@ class TLSManager:
             }
         )
 
-    def write_certificate(self, certificate: ProviderCertificate, private_key: PrivateKey):
+    def write_certificate(self, certificate: ProviderCertificate, private_key: PrivateKey) -> None:
         """Write certificates to disk.
 
         Args:
@@ -68,33 +68,35 @@ class TLSManager:
         private_key_path = certificate_path.with_suffix(".key")
         self.workload.write_file(private_key.raw, private_key_path.as_posix())
         self.workload.write_file(certificate.certificate.raw, certificate_path.as_posix())
-        self.set_cert_status(cert_type, is_ready=True)
+        self.set_cert_state(cert_type, is_ready=True)
 
-    def add_trusted_ca(self, ca_cert: str, client: bool = False):
+    def add_trusted_ca(self, ca_cert: str, client: bool = False) -> None:
         """Add trusted CA to the system.
 
         Args:
             ca_cert (str): The CA certificate.
             client (bool): Add the client CA. Defaults to False.
         """
-        ca_certs_path = Path(self.workload.paths.tls.peer_ca)
         if client:
             ca_certs_path = Path(self.workload.paths.tls.client_ca)
+        else:
+            ca_certs_path = Path(self.workload.paths.tls.peer_ca)
 
         cas = self._load_trusted_ca(client=client)
         if ca_cert not in cas:
             cas.append(ca_cert)
             self.workload.write_file("\n".join(cas), ca_certs_path.as_posix())
 
-    def _load_trusted_ca(self, client: bool = False):
+    def _load_trusted_ca(self, client: bool = False) -> list[str]:
         """Load trusted CA from the system.
 
         Args:
             client (bool): Load the client CA. Defaults to False.
         """
-        ca_certs_path = Path(self.workload.paths.tls.peer_ca)
         if client:
             ca_certs_path = Path(self.workload.paths.tls.client_ca)
+        else:
+            ca_certs_path = Path(self.workload.paths.tls.peer_ca)
 
         if not ca_certs_path.exists():
             return []
@@ -104,27 +106,29 @@ class TLSManager:
         # add the marker back to the certificate
         return [cert.strip() + "\n-----END CERTIFICATE-----" for cert in raw_cas if cert.strip()]
 
-    def set_cert_status(self, cert_type: CertType, is_ready: bool):
-        """Set the certificate status.
+    def set_cert_state(self, cert_type: CertType, is_ready: bool) -> None:
+        """Set the certificate state.
 
         Args:
             cert_type (CertType): The certificate type.
-            is_ready (bool): The certificate status.
+            is_ready (bool): The certificate state.
         """
         self.state.unit_server.update({f"{cert_type.value}-cert-ready": str(is_ready)})
 
-    def delete_certificates(self):
+    def delete_certificates(self) -> None:
         """Delete the certificate, key and its CA from disk."""
+        logger.debug("Deleting certificates")
         for cert_type in CertType:
             logger.debug(f"Deleting {cert_type} certificate")
-            cert_path = Path(self.workload.paths.tls.peer_cert)
-            key_path = Path(self.workload.paths.tls.peer_key)
-            ca_path = Path(self.workload.paths.tls.peer_ca)
 
             if cert_type == CertType.CLIENT:
                 cert_path = Path(self.workload.paths.tls.client_cert)
                 ca_path = Path(self.workload.paths.tls.client_ca)
                 key_path = Path(self.workload.paths.tls.client_key)
+            else:
+                cert_path = Path(self.workload.paths.tls.peer_cert)
+                key_path = Path(self.workload.paths.tls.peer_key)
+                ca_path = Path(self.workload.paths.tls.peer_ca)
 
             if cert_path.exists():
                 cert_path.unlink()
