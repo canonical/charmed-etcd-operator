@@ -99,3 +99,12 @@ class WorkloadBase(ABC):
     def restart(self) -> None:
         """Restart the workload service."""
         pass
+
+    @abstractmethod
+    def remove_file(self, file: str) -> None:
+        """Remove a file.
+
+        Args:
+            file (str): Path to the file.
+        """
+        pass
