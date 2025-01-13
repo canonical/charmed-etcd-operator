@@ -10,7 +10,11 @@ import subprocess
 
 import tenacity
 
-from common.exceptions import EtcdAuthNotEnabledError, EtcdUserManagementError
+from common.exceptions import (
+    EtcdAuthNotEnabledError,
+    EtcdUserManagementError,
+    HealthCheckFailedError,
+)
 from core.models import Member
 from literals import INTERNAL_USER, SNAP_NAME, TLS_ROOT_DIR
 
@@ -239,6 +243,9 @@ class EtcdClient:
                 reraise=True,
             ):
                 with attempt:
+                    logger.debug(
+                        f"Checking health for cluster attempt: {attempt.retry_state.attempt_number}"
+                    )
                     result = self._run_etcdctl(
                         auth_password=self.password,
                         auth_username=self.user,
@@ -250,11 +257,13 @@ class EtcdClient:
                     )
 
                     if result is None:
-                        return False
+                        raise HealthCheckFailedError("Health check command failed")
 
                     for endpoint in json.loads(result):
                         if not endpoint["health"]:
-                            return False
+                            raise HealthCheckFailedError(
+                                f"Health check failed for endpoint {endpoint['endpoint']}"
+                            )
 
         except Exception as e:
             logger.error(f"Health check failed: {e}")
