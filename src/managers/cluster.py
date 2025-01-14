@@ -112,7 +112,7 @@ class ClusterManager:
                     {"cluster_members": cluster_members, "learning_member": member_id}
                 )
                 logger.info(f"Added unit {unit_name} as new cluster member {member_id}.")
-            except EtcdClusterManagementError:
+            except (EtcdClusterManagementError, JSONDecodeError):
                 raise
         else:
             raise KeyError(f"Peer relation data for unit {unit_name} not found.")
