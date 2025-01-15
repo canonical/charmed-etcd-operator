@@ -79,10 +79,10 @@ def test_certificates_broken():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={
-            "client-cert-ready": "True",
-            "peer-cert-ready": "True",
-            "tls-client-state": "tls",
-            "tls-peer-state": "tls",
+            "client_cert_ready": "True",
+            "peer_cert_ready": "True",
+            "tls_client_state": "tls",
+            "tls_peer_state": "tls",
         },
     )
     restart_peer_relation = testing.PeerRelation(id=4, endpoint=RESTART_RELATION)
@@ -113,10 +113,10 @@ def test_certificates_broken():
             ):
                 charm.tls_events._on_certificates_broken(event)
                 assert charm.state.unit_server.tls_client_state == TLSState.NO_TLS
-                assert peer_relation.local_unit_data["tls-client-state"] == TLSState.NO_TLS.value
-                assert peer_relation.local_unit_data["client-cert-ready"] == "False"
-                assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.TLS.value
-                assert peer_relation.local_unit_data["peer-cert-ready"] == "True"
+                assert peer_relation.local_unit_data["tls_client_state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["client_cert_ready"] == "False"
+                assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.TLS.value
+                assert peer_relation.local_unit_data["peer_cert_ready"] == "True"
 
             event.relation.name = PEER_TLS_RELATION_NAME
             with patch(
@@ -125,10 +125,10 @@ def test_certificates_broken():
             ):
                 charm.tls_events._on_certificates_broken(event)
                 assert charm.state.unit_server.tls_peer_state == TLSState.NO_TLS
-                assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.NO_TLS.value
-                assert peer_relation.local_unit_data["peer-cert-ready"] == "False"
-                assert peer_relation.local_unit_data["tls-client-state"] == TLSState.NO_TLS.value
-                assert peer_relation.local_unit_data["client-cert-ready"] == "False"
+                assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["peer_cert_ready"] == "False"
+                assert peer_relation.local_unit_data["tls_client_state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["client_cert_ready"] == "False"
 
 
 def test_certificate_available_new_cluster():
@@ -204,7 +204,7 @@ def test_certificate_available_new_cluster():
         ):
             event.certificate = client_certificate
             charm.tls_events._on_certificate_available(event)
-            assert peer_relation.local_unit_data["tls-client-state"] == TLSState.TLS.value
+            assert peer_relation.local_unit_data["tls_client_state"] == TLSState.TLS.value
 
         with patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
@@ -212,7 +212,7 @@ def test_certificate_available_new_cluster():
         ):
             event.certificate = peer_certificate
             charm.tls_events._on_certificate_available(event)
-            assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.TLS.value
+            assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.TLS.value
 
     # peer_relation.local_unit_data.clear()
     # peer_relation.local_app_data.clear()
@@ -292,7 +292,7 @@ def test_certificate_available_enabling_tls():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"initial-cluster-state": "existing"},
+        local_app_data={"initial_cluster_state": "existing"},
         local_unit_data={"ip": "localhost"},
     )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -421,7 +421,7 @@ def test_enabling_tls_one_restart():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"initial-cluster-state": "existing"},
+        local_app_data={"initial_cluster_state": "existing"},
         local_unit_data={"ip": "localhost"},
     )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -536,11 +536,9 @@ def test_enabling_tls_one_restart():
                 assert charm.state.unit_server.certs_ready
 
         # reset databags
-        # local_app_data={"initial-cluster-state": "existing"},
-        # local_unit_data={"ip": "localhost"},
         peer_relation.local_unit_data.clear()
         peer_relation.local_app_data.clear()
-        peer_relation.local_app_data["initial-cluster-state"] = "existing"
+        peer_relation.local_app_data["initial_cluster_state"] = "existing"
         peer_relation.local_unit_data["ip"] = "localhost"
         # Peer cert added case but no restart
         with (
@@ -590,7 +588,7 @@ def test_certificates_relation_created():
         state_out = ctx.run(ctx.on.relation_created(relation=peer_tls_relation), state_in)
         assert state_out.unit_status == Status.TLS_ENABLING_PEER_TLS.value.status
         assert (
-            state_out.get_relation(peer_relation.id).local_unit_data["tls-peer-state"]
+            state_out.get_relation(peer_relation.id).local_unit_data["tls_peer_state"]
             == TLSState.TO_TLS.value
         )
 
@@ -605,6 +603,6 @@ def test_certificates_relation_created():
         state_out = ctx.run(ctx.on.relation_created(relation=client_tls_relation), state_in)
         assert state_out.unit_status == Status.TLS_ENABLING_CLIENT_TLS.value.status
         assert (
-            state_out.get_relation(peer_relation.id).local_unit_data["tls-client-state"]
+            state_out.get_relation(peer_relation.id).local_unit_data["tls_client_state"]
             == TLSState.TO_TLS.value
         )

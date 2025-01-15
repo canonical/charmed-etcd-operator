@@ -101,22 +101,22 @@ class EtcdServer(RelationState):
     @property
     def tls_client_state(self) -> TLSState:
         """The current TLS state of the etcd server."""
-        return TLSState(self.relation_data.get("tls-client-state", TLSState.NO_TLS.value))
+        return TLSState(self.relation_data.get("tls_client_state", TLSState.NO_TLS.value))
 
     @property
     def tls_peer_state(self) -> TLSState:
         """The current TLS state of the etcd server."""
-        return TLSState(self.relation_data.get("tls-peer-state", TLSState.NO_TLS.value))
+        return TLSState(self.relation_data.get("tls_peer_state", TLSState.NO_TLS.value))
 
     @property
     def peer_cert_ready(self) -> bool:
         """Check if the peer certificate is ready."""
-        return self.relation_data.get("peer-cert-ready", "") == "True"
+        return self.relation_data.get("peer_cert_ready", "") == "True"
 
     @property
     def client_cert_ready(self) -> bool:
         """Check if the client certificate is ready."""
-        return self.relation_data.get("client-cert-ready", "") == "True"
+        return self.relation_data.get("client_cert_ready", "") == "True"
 
     @property
     def certs_ready(self) -> bool:
@@ -140,7 +140,7 @@ class EtcdCluster(RelationState):
     @property
     def initial_cluster_state(self) -> str:
         """The initial cluster state ('new' or 'existing') of the etcd cluster."""
-        return self.relation_data.get("initial-cluster-state", "new")
+        return self.relation_data.get("initial_cluster_state", "new")
 
     @property
     def internal_user_credentials(self) -> dict[str, str]:

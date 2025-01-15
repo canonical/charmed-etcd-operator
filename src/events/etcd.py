@@ -116,7 +116,7 @@ class EtcdEvents(Object):
                     return
 
             self.charm.set_status(Status.ACTIVE)
-            self.charm.state.cluster.update({"initial-cluster-state": "existing"})
+            self.charm.state.cluster.update({"initial_cluster_state": "existing"})
 
         else:
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
@@ -134,7 +134,7 @@ class EtcdEvents(Object):
         """Handle event received by a new unit when joining the cluster relation."""
         self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
         if self.charm.unit.is_leader():
-            self.charm.state.cluster.update({"initial-cluster-state": "new"})
+            self.charm.state.cluster.update({"initial_cluster_state": "new"})
 
     def _on_cluster_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""

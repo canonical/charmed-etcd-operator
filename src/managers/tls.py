@@ -45,7 +45,7 @@ class TLSManager:
         logger.debug(f"Setting {tls_type.value} TLS state to {state}")
         self.state.unit_server.update(
             {
-                f"tls-{tls_type.value}-state": state.value,
+                f"tls_{tls_type.value}_state": state.value,
             }
         )
 
@@ -115,7 +115,7 @@ class TLSManager:
             cert_type (TLSType): The certificate type.
             is_ready (bool): The certificate state.
         """
-        self.state.unit_server.update({f"{cert_type.value}-cert-ready": str(is_ready)})
+        self.state.unit_server.update({f"{cert_type.value}_cert_ready": str(is_ready)})
 
     def delete_certificates(self, cert_type: TLSType) -> None:
         """Delete the certificate, key and its CA from disk."""
