@@ -14,10 +14,10 @@ from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
 from events.etcd import EtcdEvents
 from events.tls import TLSEvents
-from literals import RESTART_RELATION, SUBSTRATE, DebugLevel, Status, TLSState
+from literals import RESTART_RELATION, SUBSTRATE, DebugLevel, Status, TLSState, TLSType
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
-from managers.tls import TLSManager, TLSType
+from managers.tls import TLSManager
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
