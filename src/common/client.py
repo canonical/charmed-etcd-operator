@@ -44,7 +44,7 @@ class EtcdClient:
             try:
                 endpoint_status = json.loads(result)[0]
             except json.JSONDecodeError:
-                pass
+                raise
 
         return endpoint_status
 
@@ -106,19 +106,26 @@ class EtcdClient:
             member=member_name,
             peer_url=peer_url,
             learner=True,
+            output_format="json",
         ):
-            # the subcommand will return the following output:
-            # Member 3e23287c34b94e09 added to cluster c4d701b62779596b
-            #
-            # ETCD_NAME="etcd8"
-            # ETCD_INITIAL_CLUSTER="etcd8=http://10.86.196.119:2380,etcd7=http://10.86.196.232:2380"
-            # ETCD_INITIAL_ADVERTISE_PEER_URLS="http://10.86.196.119:2380"
-            # ETCD_INITIAL_CLUSTER_STATE="existing"
-            #
-            # we need to parse this for the `ETCD_INITIAL_CLUSTER` configuration
-            result = result.split("\n")
-            logger.debug(f"Updated cluster members: {result[0]}")
-            return result[3].split("ETCD_INITIAL_CLUSTER=")[1].strip('"'), result[0].split()[1]
+            try:
+                cluster = json.loads(result)
+                cluster_members = ""
+                member_id = ""
+                for member in cluster["members"]:
+                    if member.get("name"):
+                        cluster_members += f"{member['name']}={member['peerURLs'][0]},"
+                    if member["peerURLs"][0] == peer_url:
+                        # the member ID is returned as int, but needs to be processed as hex
+                        # e.g. ID=4477466968462020105 needs to be stored as 3e23287c34b94e09
+                        member_id = f"{member['ID']:0>2x}"
+                # for the newly added member, the member name will not be included in the response
+                # we have to append it separately
+                cluster_members += f"{member_name}={peer_url}"
+            except (json.JSONDecodeError, KeyError):
+                raise
+            logger.debug(f"Updated cluster members: {cluster_members}, new member: {member_id}")
+            return cluster_members, str(member_id)
         else:
             raise EtcdClusterManagementError(f"Failed to add {member_name} as learner.")
 
