@@ -680,17 +680,17 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
 
     new_peer_certificate = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER)
     assert new_peer_certificate, "Failed to get new peer certificate"
-    assert (
-        new_peer_certificate != current_peer_certificate
-    ), "Certificates are the same after rotation"
+    assert new_peer_certificate != current_peer_certificate, (
+        "Certificates are the same after rotation"
+    )
 
     new_client_certificate = get_certificate_from_unit(
         model, leader_unit, cert_type=TLSType.CLIENT
     )
     assert new_client_certificate, "Failed to get new client certificate"
-    assert (
-        new_client_certificate != current_client_certificate
-    ), "Certificates are the same after rotation"
+    assert new_client_certificate != current_client_certificate, (
+        "Certificates are the same after rotation"
+    )
 
     logger.info("Certificates are different after rotation")
 
