@@ -5,10 +5,14 @@
 import json
 import logging
 import subprocess
+import time
 
 from pytest_operator.plugin import OpsTest
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
+
+WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
 
 
 async def existing_app(ops_test: OpsTest) -> str | None:
@@ -55,3 +59,30 @@ def count_writes(endpoints: str, user: str, password: str) -> int:
         return int(subprocess.getoutput(etcd_command).split("\n")[1])
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         logger.warning(e)
+
+
+def assert_continuous_writes_increasing(endpoints: str, user: str, password: str) -> None:
+    """Assert that the continuous writes are increasing."""
+    writes_count = count_writes(endpoints, user, password)
+    time.sleep(10)
+    more_writes = count_writes(endpoints, user, password)
+    assert more_writes > writes_count, "Writes not continuing to DB"
+
+
+def assert_continuous_writes_consistent(endpoints: str, user: str, password: str) -> None:
+    """Assert that the continuous writes are consistent."""
+    try:
+        for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
+            with attempt:
+                with open(WRITES_LAST_WRITTEN_VAL_PATH, "r") as f:
+                    last_written_value = int(f.read().rstrip())
+    except RetryError:
+        last_written_value = 0
+
+    for endpoint in endpoints.split(","):
+        last_etcd_value = count_writes(endpoint, user, password)
+        logger.info(f"Continuous writes consistency: endpoint: {endpoint}")
+        logger.info(
+            f"expected value: {last_written_value}, last value in endpoint: {last_etcd_value}."
+        )
+        assert last_written_value == last_etcd_value

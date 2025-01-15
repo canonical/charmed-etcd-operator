@@ -3,11 +3,14 @@
 # See LICENSE file for licensing details.
 
 import logging
+import os
 import subprocess
 import sys
 import time
 
 logger = logging.getLogger(__name__)
+
+WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
 
 
 def continuous_writes(endpoints: str, user: str, password: str):
@@ -25,6 +28,10 @@ def continuous_writes(endpoints: str, user: str, password: str):
         try:
             result = subprocess.getoutput(etcd_command).split("\n")[0]
             logger.info(result)
+            # write last expected written value on disk
+            with open(WRITES_LAST_WRITTEN_VAL_PATH, "w") as f:
+                f.write(str(count))
+                os.fsync(f)
             count += 1
             time.sleep(1)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:

@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 import logging
-import time
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -17,7 +16,8 @@ from ..helpers import (
     get_secret_by_label,
 )
 from .helpers import (
-    count_writes,
+    assert_continuous_writes_consistent,
+    assert_continuous_writes_increasing,
     existing_app,
     start_continuous_writes,
     stop_continuous_writes,
@@ -58,10 +58,6 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     # start writing data to the cluster
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
-    # after some time, get the current count
-    time.sleep(10)
-    init_writes = count_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
-
     # scale up
     await ops_test.model.applications[app].add_unit(count=2)
     await ops_test.model.wait_for_idle(
@@ -79,7 +75,6 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     cluster_members = get_cluster_members(endpoints)
     assert len(cluster_members) == init_units_count + 2
 
-    # check if data was continuously written to the cluster
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
-    final_writes = count_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
-    assert final_writes > init_writes
+    assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
