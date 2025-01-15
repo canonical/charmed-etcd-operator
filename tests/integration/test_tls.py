@@ -468,12 +468,13 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
         == TEST_VALUE
     ), "Failed to read new key"
 
-    # enable peer TLS and check if the cluster is still accessible
+    # enable client TLS and check if the cluster is still accessible
     logger.info("Integrating client-certificates relation")
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
