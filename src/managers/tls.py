@@ -20,8 +20,8 @@ from literals import SUBSTRATES, TLSState
 logger = logging.getLogger(__name__)
 
 
-class CertType(Enum):
-    """Certificate types."""
+class TLSType(Enum):
+    """TLS types."""
 
     PEER = "peer"
     CLIENT = "client"
@@ -35,16 +35,17 @@ class TLSManager:
         self.workload = workload
         self.substrate = substrate
 
-    def set_tls_state(self, state: TLSState) -> None:
+    def set_tls_state(self, state: TLSState, tls_type: TLSType) -> None:
         """Set the TLS state.
 
         Args:
             state (TLSState): The TLS state.
+            tls_type (TLSType): The tls type type.
         """
-        logger.debug(f"Setting TLS state to {state}")
+        logger.debug(f"Setting {tls_type.value} TLS state to {state}")
         self.state.unit_server.update(
             {
-                "tls-state": state.value,
+                f"tls-{tls_type.value}-state": state.value,
             }
         )
 
@@ -57,8 +58,8 @@ class TLSManager:
         """
         logger.debug("Writing certificates to disk")
         ca_cert = certificate.ca
-        cert_type = CertType(certificate.certificate.organization)
-        if cert_type == CertType.CLIENT:
+        cert_type = TLSType(certificate.certificate.organization)
+        if cert_type == TLSType.CLIENT:
             certificate_path = self.workload.paths.tls.client_cert
             private_key_path = self.workload.paths.tls.client_key
             self.add_trusted_ca(ca_cert.raw, client=True)
@@ -107,27 +108,24 @@ class TLSManager:
         # add the marker back to the certificate
         return [cert.strip() + "\n-----END CERTIFICATE-----" for cert in raw_cas if cert.strip()]
 
-    def set_cert_state(self, cert_type: CertType, is_ready: bool) -> None:
+    def set_cert_state(self, cert_type: TLSType, is_ready: bool) -> None:
         """Set the certificate state.
 
         Args:
-            cert_type (CertType): The certificate type.
+            cert_type (TLSType): The certificate type.
             is_ready (bool): The certificate state.
         """
         self.state.unit_server.update({f"{cert_type.value}-cert-ready": str(is_ready)})
 
-    def delete_certificates(self) -> None:
+    def delete_certificates(self, cert_type: TLSType) -> None:
         """Delete the certificate, key and its CA from disk."""
-        logger.debug("Deleting certificates")
-        for cert_type in CertType:
-            logger.debug(f"Deleting {cert_type} certificate")
-
-            if cert_type == CertType.CLIENT:
-                self.workload.remove_file(self.workload.paths.tls.client_cert)
-                self.workload.remove_file(self.workload.paths.tls.client_ca)
-                self.workload.remove_file(self.workload.paths.tls.client_key)
-            else:
-                self.workload.remove_file(self.workload.paths.tls.peer_cert)
-                self.workload.remove_file(self.workload.paths.tls.peer_ca)
-                self.workload.remove_file(self.workload.paths.tls.peer_key)
-            logger.debug(f"Deleted {cert_type} certificate")
+        logger.debug(f"Deleting {cert_type.value} certificates")
+        if cert_type == TLSType.CLIENT:
+            self.workload.remove_file(self.workload.paths.tls.client_cert)
+            self.workload.remove_file(self.workload.paths.tls.client_ca)
+            self.workload.remove_file(self.workload.paths.tls.client_key)
+        else:
+            self.workload.remove_file(self.workload.paths.tls.peer_cert)
+            self.workload.remove_file(self.workload.paths.tls.peer_ca)
+            self.workload.remove_file(self.workload.paths.tls.peer_key)
+        logger.debug(f"Deleted {cert_type.value} certificate")

@@ -83,8 +83,15 @@ class EtcdEvents(Object):
                 event.defer()
                 return
 
-            logger.debug(f"TLSState for {server.member_name}: {server.tls_state}")
-            if server.tls_state != TLSState.TLS and server.tls_state != TLSState.NO_TLS:
+            logger.debug(
+                f"TLSState for {server.member_name}: client: {server.tls_client_state} - peer: {server.tls_peer_state}"
+            )
+            if (
+                server.tls_client_state != TLSState.TLS
+                and server.tls_client_state != TLSState.NO_TLS
+            ) or (
+                server.tls_peer_state != TLSState.TLS and server.tls_peer_state != TLSState.NO_TLS
+            ):
                 logger.info(f"Deferring start because TLS is not ready for {server.member_name}.")
                 event.defer()
                 return

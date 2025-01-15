@@ -89,22 +89,24 @@ class EtcdServer(RelationState):
     @property
     def peer_url(self) -> str:
         """The peer connection endpoint for the etcd server."""
-        return f"{self.scheme}://{self.ip}:{PEER_PORT}"
+        scheme = "https" if self.tls_peer_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+        return f"{scheme}://{self.ip}:{PEER_PORT}"
 
     @property
     def client_url(self) -> str:
         """The client connection endpoint for the etcd server."""
-        return f"{self.scheme}://{self.ip}:{CLIENT_PORT}"
+        scheme = "https" if self.tls_client_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+        return f"{scheme}://{self.ip}:{CLIENT_PORT}"
 
     @property
-    def tls_state(self) -> TLSState:
+    def tls_client_state(self) -> TLSState:
         """The current TLS state of the etcd server."""
-        return TLSState(self.relation_data.get("tls-state", TLSState.NO_TLS.value))
+        return TLSState(self.relation_data.get("tls-client-state", TLSState.NO_TLS.value))
 
     @property
-    def scheme(self) -> str:
-        """The HTTP or HTTPS protocol based on the TLS state."""
-        return "https" if self.tls_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+    def tls_peer_state(self) -> TLSState:
+        """The current TLS state of the etcd server."""
+        return TLSState(self.relation_data.get("tls-peer-state", TLSState.NO_TLS.value))
 
     @property
     def peer_cert_ready(self) -> bool:
