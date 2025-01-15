@@ -16,8 +16,7 @@ from ops import RelationBrokenEvent, RelationCreatedEvent
 from ops.framework import Object
 
 from common.exceptions import TLSMissingCertificateOrKeyError
-from literals import CLIENT_TLS_RELATION_NAME, PEER_TLS_RELATION_NAME, Status, TLSState
-from managers.tls import TLSType
+from literals import CLIENT_TLS_RELATION_NAME, PEER_TLS_RELATION_NAME, Status, TLSState, TLSType
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -110,6 +109,21 @@ class TLSEvents(Object):
 
         # write certificates to disk
         self.charm.tls_manager.write_certificate(cert, private_key)
+
+        # Rotating certificates
+        if (
+            cert_type == TLSType.PEER
+            and self.charm.state.unit_server.tls_peer_state == TLSState.TLS
+        ):
+            logger.debug("Rotating peer certificates")
+            return
+
+        if (
+            cert_type == TLSType.CLIENT
+            and self.charm.state.unit_server.tls_client_state == TLSState.TLS
+        ):
+            logger.debug("Rotating client certificates")
+            return
 
         # if the cluster is new, no need to write config or restart just set the tls state
         if self.charm.state.cluster.initial_cluster_state == "new":

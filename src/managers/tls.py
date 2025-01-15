@@ -5,7 +5,6 @@
 """Manager for handling TLS related events."""
 
 import logging
-from enum import Enum
 from pathlib import Path
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
@@ -15,16 +14,9 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import SUBSTRATES, TLSState
+from literals import SUBSTRATES, TLSState, TLSType
 
 logger = logging.getLogger(__name__)
-
-
-class TLSType(Enum):
-    """TLS types."""
-
-    PEER = "peer"
-    CLIENT = "client"
 
 
 class TLSManager:

@@ -11,7 +11,7 @@ from typing import Dict
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT, SNAP_NAME
+from literals import CLIENT_PORT, SNAP_NAME, TLSType
 
 logger = logging.getLogger(__name__)
 
@@ -96,14 +96,14 @@ def get_cluster_endpoints(
     )
 
 
-async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str:
+async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str | None:
     """Retrieve the leader unit name."""
     for unit in ops_test.model.applications[app_name].units:
         if await unit.is_leader_from_status():
             return unit.name
 
 
-async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str]:
+async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] | None:
     secrets_raw = await ops_test.juju("list-secrets")
     secret_ids = [
         secret_line.split()[0] for secret_line in secrets_raw[1].split("\n")[1:] if secret_line
@@ -117,3 +117,13 @@ async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str]:
 
         if label == secret_data[secret_id].get("label"):
             return secret_data[secret_id]["content"]["Data"]
+
+
+def get_certificate_from_unit(model: str, unit: str, cert_type: TLSType) -> str | None:
+    """Retrieve a certificate from a unit."""
+    command = f'juju ssh --model={model} {unit} "cat /var/snap/charmed-etcd/common/tls/{cert_type.value}.pem"'
+    output = subprocess.getoutput(command)
+    if output.startswith("-----BEGIN CERTIFICATE-----"):
+        return output
+
+    return None

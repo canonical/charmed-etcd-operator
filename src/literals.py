@@ -75,3 +75,10 @@ class TLSState(Enum):
     TO_TLS = "to-tls"
     TLS = "tls"
     TO_NO_TLS = "to-no-tls"
+
+
+class TLSType(Enum):
+    """TLS types."""
+
+    PEER = "peer"
+    CLIENT = "client"
