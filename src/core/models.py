@@ -140,7 +140,7 @@ class EtcdCluster(RelationState):
     @property
     def initial_cluster_state(self) -> str:
         """The initial cluster state ('new' or 'existing') of the etcd cluster."""
-        return self.relation_data.get("initial-cluster-state", "")
+        return self.relation_data.get("initial-cluster-state", "new")
 
     @property
     def internal_user_credentials(self) -> dict[str, str]:

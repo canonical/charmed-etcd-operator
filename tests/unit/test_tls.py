@@ -17,6 +17,8 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 from ops import testing
 
 from charm import EtcdOperatorCharm
+from common.exceptions import TLSMissingCertificateOrKeyError
+from core.models import Member
 from literals import (
     CLIENT_TLS_RELATION_NAME,
     PEER_RELATION,
@@ -25,29 +27,50 @@ from literals import (
     Status,
     TLSState,
 )
-from managers.tls import CertType
+from managers.tls import TLSType
+
+MEMBER_LIST_DICT = {
+    "charmed-etcd0": Member(
+        id="1",
+        name="etcd-test-1",
+        peer_urls=["http://localhost:2380"],
+        client_urls=["http://localhost:2379"],
+    ),
+    "charmed-etcd1": Member(
+        id="2",
+        name="etcd-test-2",
+        peer_urls=["http://localhost:2381"],
+        client_urls=["http://localhost:2380"],
+    ),
+}
 
 
 def test_enable_tls_on_start():
     ctx = testing.Context(EtcdOperatorCharm)
-    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={
+            "ip": "localhost",
+        },
+    )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
     client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
 
     state_in = testing.State(
-        relations=[peer_relation, peer_tls_relation],
+        relations=[peer_relation, peer_tls_relation, client_tls_relation],
     )
 
-    with patch("workload.EtcdWorkload.alive", return_value=True):
-        state_out = ctx.run(ctx.on.relation_joined(relation=peer_tls_relation), state_in)
-        assert state_out.unit_status == Status.TLS_CLIENT_TLS_MISSING.value.status
-
-    state_in = testing.State(
-        relations=[peer_relation, client_tls_relation],
-    )
-    with patch("workload.EtcdWorkload.alive", return_value=True):
-        state_out = ctx.run(ctx.on.relation_joined(relation=client_tls_relation), state_in)
-        assert state_out.unit_status == Status.TLS_PEER_TLS_MISSING.value.status
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.write_file"),
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates"
+        ),
+        patch("managers.tls.TLSManager.write_certificate"),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == Status.ACTIVE.value.status
 
 
 def test_certificates_broken():
@@ -58,7 +81,8 @@ def test_certificates_broken():
         local_unit_data={
             "client-cert-ready": "True",
             "peer-cert-ready": "True",
-            "tls-state": "tls",
+            "tls-client-state": "tls",
+            "tls-peer-state": "tls",
         },
     )
     restart_peer_relation = testing.PeerRelation(id=4, endpoint=RESTART_RELATION)
@@ -67,69 +91,44 @@ def test_certificates_broken():
 
     state_in = testing.State(
         relations=[peer_relation, restart_peer_relation, peer_tls_relation, client_tls_relation],
-    )
-
-    state_out = ctx.run(ctx.on.relation_broken(relation=peer_tls_relation), state_in)
-    assert state_out.unit_status == Status.TLS_CLIENT_TLS_NEEDS_TO_BE_REMOVED.value.status
-    assert (
-        state_out.get_relation(peer_relation.id).local_unit_data["tls-state"]
-        == TLSState.UPDATING_PEER_CERTS.value
-    )
-    assert state_out.get_relation(peer_relation.id).local_unit_data["peer-cert-ready"] == "False"
-    assert state_out.get_relation(peer_relation.id).local_unit_data["client-cert-ready"] == "True"
-
-    peer_relation.local_unit_data["peer-cert-ready"] = "True"
-    state_out = ctx.run(ctx.on.relation_broken(relation=client_tls_relation), state_in)
-    assert state_out.unit_status == Status.TLS_PEER_TLS_NEEDS_TO_BE_REMOVED.value.status
-    assert (
-        state_out.get_relation(peer_relation.id).local_unit_data["tls-state"]
-        == TLSState.UPDATING_CLIENT_CERTS.value
-    )
-    assert state_out.get_relation(peer_relation.id).local_unit_data["client-cert-ready"] == "False"
-    assert state_out.get_relation(peer_relation.id).local_unit_data["peer-cert-ready"] == "True"
-
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_unit_data={
-            "client-cert-ready": "True",
-            "peer-cert-ready": "True",
-            "tls-state": "tls",
-        },
-    )
-    restart_peer_relation = testing.PeerRelation(id=4, endpoint=RESTART_RELATION)
-    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
-    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
-
-    state_in = testing.State(
-        relations=[peer_relation, restart_peer_relation, peer_tls_relation, client_tls_relation],
-    )
-    ctx.run(ctx.on.relation_broken(relation=peer_tls_relation), state_in)
-
-    state_in = testing.State(
-        relations=[peer_relation, restart_peer_relation, client_tls_relation],
     )
 
     with (
         ctx(ctx.on.update_status(), state_in) as mgr,
     ):
         charm: EtcdOperatorCharm = mgr.charm  # type: ignore
-
-        def mock_rolling_restart(_):
-            charm._restart(None)
-
         with (
-            patch("charm.EtcdOperatorCharm.rolling_restart", mock_rolling_restart),
             patch("managers.cluster.ClusterManager.broadcast_peer_url"),
             patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
             patch("managers.config.ConfigManager.set_config_properties"),
             patch("pathlib.Path.exists", return_value=True),
             patch("pathlib.Path.unlink"),
+            patch("managers.cluster.ClusterManager.restart_member", return_value=True),
         ):
             event = MagicMock()
             event.relation.name = CLIENT_TLS_RELATION_NAME
-            charm.tls_events._on_certificates_broken(event)
-            assert charm.state.unit_server.tls_state == TLSState.NO_TLS
+            with patch(
+                "charm.EtcdOperatorCharm.rolling_restart",
+                lambda _, callback_override: charm._restart_disable_client_tls(event),
+            ):
+                charm.tls_events._on_certificates_broken(event)
+                assert charm.state.unit_server.tls_client_state == TLSState.NO_TLS
+                assert peer_relation.local_unit_data["tls-client-state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["client-cert-ready"] == "False"
+                assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.TLS.value
+                assert peer_relation.local_unit_data["peer-cert-ready"] == "True"
+
+            event.relation.name = PEER_TLS_RELATION_NAME
+            with patch(
+                "charm.EtcdOperatorCharm.rolling_restart",
+                lambda _, callback_override: charm._restart_disable_peer_tls(event),
+            ):
+                charm.tls_events._on_certificates_broken(event)
+                assert charm.state.unit_server.tls_peer_state == TLSState.NO_TLS
+                assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["peer-cert-ready"] == "False"
+                assert peer_relation.local_unit_data["tls-client-state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["client-cert-ready"] == "False"
 
 
 def test_certificate_available_new_cluster():
@@ -149,7 +148,7 @@ def test_certificate_available_new_cluster():
     peer_csr = generate_csr(
         private_key=requirer_private_key,
         common_name="etcd-test-1",
-        organization=CertType.PEER.value,
+        organization=TLSType.PEER.value,
     )
     peer_certificate = generate_certificate(
         ca_private_key=provider_private_key,
@@ -168,7 +167,7 @@ def test_certificate_available_new_cluster():
     client_csr = generate_csr(
         private_key=requirer_private_key,
         common_name="etcd-test-1",
-        organization=CertType.CLIENT.value,
+        organization=TLSType.CLIENT.value,
     )
     client_certificate = generate_certificate(
         ca_private_key=provider_private_key,
@@ -188,6 +187,7 @@ def test_certificate_available_new_cluster():
     state_in = testing.State(
         relations=[peer_relation, client_tls_relation],
     )
+
     with (
         ctx(ctx.on.update_status(), state_in) as mgr,
         patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
@@ -197,89 +197,97 @@ def test_certificate_available_new_cluster():
     ):
         charm: EtcdOperatorCharm = mgr.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
-        charm.tls_manager.set_tls_state(TLSState.TO_TLS)
+        charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.CLIENT)
         with patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([client_provider_certificate], requirer_private_key),
         ):
             event.certificate = client_certificate
             charm.tls_events._on_certificate_available(event)
-        assert charm.unit.status == Status.TLS_PEER_TLS_MISSING.value.status
+            assert peer_relation.local_unit_data["tls-client-state"] == TLSState.TLS.value
 
-    peer_relation.local_unit_data.clear()
-    peer_relation.local_app_data.clear()
-    state_in = testing.State(
-        relations=[peer_relation, peer_tls_relation],
-    )
-    with (
-        ctx(ctx.on.update_status(), state_in) as mgr,
-        patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
-        patch("workload.EtcdWorkload.write_file"),
-        patch("pathlib.Path.exists", return_value=True),
-        patch("workload.EtcdWorkload.alive", return_value=True),
-    ):
-        charm: EtcdOperatorCharm = mgr.charm  # type: ignore
-        event = MagicMock(spec=CertificateAvailableEvent)
-        charm.tls_manager.set_tls_state(TLSState.TO_TLS)
         with patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([peer_provider_certificate], requirer_private_key),
         ):
-            event.certificate = client_certificate
-            charm.tls_events._on_certificate_available(event)
-        assert charm.unit.status == Status.TLS_CLIENT_TLS_MISSING.value.status
-
-    peer_relation.local_unit_data.clear()
-    peer_relation.local_app_data.clear()
-    state_in = testing.State(
-        relations=[peer_relation, peer_tls_relation, client_tls_relation],
-    )
-    with (
-        ctx(ctx.on.update_status(), state_in) as mgr,
-        patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
-        patch("workload.EtcdWorkload.write_file"),
-        patch("pathlib.Path.exists", return_value=True),
-        patch("workload.EtcdWorkload.alive", return_value=True),
-    ):
-        charm: EtcdOperatorCharm = mgr.charm  # type: ignore
-        event = MagicMock(spec=CertificateAvailableEvent)
-        charm.tls_manager.set_tls_state(TLSState.TO_TLS)
-
-        with (
-            patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
-                return_value=([peer_provider_certificate], None),
-            ),
-            patch("pathlib.Path.exists", return_value=False),
-        ):
-            event.certificate = peer_certificate
-            with pytest.raises(Exception):
-                charm.tls_events._on_certificate_available(event)
-
-        with (
-            patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
-                return_value=([peer_provider_certificate], requirer_private_key),
-            ),
-            patch("pathlib.Path.exists", return_value=False),
-        ):
             event.certificate = peer_certificate
             charm.tls_events._on_certificate_available(event)
-            assert charm.state.unit_server.peer_cert_ready
+            assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.TLS.value
 
-        with patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
-            return_value=([client_provider_certificate], requirer_private_key),
-        ):
-            event.certificate = client_certificate
-            charm.tls_events._on_certificate_available(event)
+    # peer_relation.local_unit_data.clear()
+    # peer_relation.local_app_data.clear()
+    # state_in = testing.State(
+    #     relations=[peer_relation, peer_tls_relation],
+    # )
+    # with (
+    #     ctx(ctx.on.update_status(), state_in) as mgr,
+    #     patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
+    #     patch("workload.EtcdWorkload.write_file"),
+    #     patch("pathlib.Path.exists", return_value=True),
+    #     patch("workload.EtcdWorkload.alive", return_value=True),
+    # ):
+    #     charm: EtcdOperatorCharm = mgr.charm  # type: ignore
+    #     event = MagicMock(spec=CertificateAvailableEvent)
+    #     charm.tls_manager.set_tls_state(TLSState.TO_TLS)
+    #     with patch(
+    #         "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+    #         return_value=([peer_provider_certificate], requirer_private_key),
+    #     ):
+    #         event.certificate = client_certificate
+    #         charm.tls_events._on_certificate_available(event)
+    #     assert charm.unit.status == Status.TLS_CLIENT_TLS_MISSING.value.status
 
-            assert charm.state.unit_server.client_cert_ready
-            assert charm.state.unit_server.certs_ready
-            assert charm.state.unit_server.tls_state == TLSState.TLS
+    # peer_relation.local_unit_data.clear()
+    # peer_relation.local_app_data.clear()
+    # state_in = testing.State(
+    #     relations=[peer_relation, peer_tls_relation, client_tls_relation],
+    # )
+    # with (
+    #     ctx(ctx.on.update_status(), state_in) as mgr,
+    #     patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
+    #     patch("workload.EtcdWorkload.write_file"),
+    #     patch("pathlib.Path.exists", return_value=True),
+    #     patch("workload.EtcdWorkload.alive", return_value=True),
+    # ):
+    #     charm: EtcdOperatorCharm = mgr.charm  # type: ignore
+    #     event = MagicMock(spec=CertificateAvailableEvent)
+    #     charm.tls_manager.set_tls_state(TLSState.TO_TLS)
+
+    #     with (
+    #         patch(
+    #             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+    #             return_value=([peer_provider_certificate], None),
+    #         ),
+    #         patch("pathlib.Path.exists", return_value=False),
+    #     ):
+    #         event.certificate = peer_certificate
+    #         with pytest.raises(Exception):
+    #             charm.tls_events._on_certificate_available(event)
+
+    #     with (
+    #         patch(
+    #             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+    #             return_value=([peer_provider_certificate], requirer_private_key),
+    #         ),
+    #         patch("pathlib.Path.exists", return_value=False),
+    #     ):
+    #         event.certificate = peer_certificate
+    #         charm.tls_events._on_certificate_available(event)
+    #         assert charm.state.unit_server.peer_cert_ready
+
+    #     with patch(
+    #         "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+    #         return_value=([client_provider_certificate], requirer_private_key),
+    #     ):
+    #         event.certificate = client_certificate
+    #         charm.tls_events._on_certificate_available(event)
+
+    #         assert charm.state.unit_server.client_cert_ready
+    #         assert charm.state.unit_server.certs_ready
+    #         assert charm.state.unit_server.tls_state == TLSState.TLS
 
 
-def test_certificate_available_turning_tls_on():
+def test_certificate_available_enabling_tls():
     ctx = testing.Context(EtcdOperatorCharm)
     peer_relation = testing.PeerRelation(
         id=1,
@@ -305,7 +313,7 @@ def test_certificate_available_turning_tls_on():
     peer_csr = generate_csr(
         private_key=requirer_private_key,
         common_name="etcd-test-1",
-        organization=CertType.PEER.value,
+        organization=TLSType.PEER.value,
     )
     peer_certificate = generate_certificate(
         ca_private_key=provider_private_key,
@@ -324,7 +332,7 @@ def test_certificate_available_turning_tls_on():
     client_csr = generate_csr(
         private_key=requirer_private_key,
         common_name="etcd-test-1",
-        organization=CertType.CLIENT.value,
+        organization=TLSType.CLIENT.value,
     )
     client_certificate = generate_certificate(
         ca_private_key=provider_private_key,
@@ -350,38 +358,223 @@ def test_certificate_available_turning_tls_on():
     ):
         charm: EtcdOperatorCharm = mgr.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
-        charm.tls_manager.set_tls_state(TLSState.TO_TLS)
+        charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.PEER)
 
         with (
-            patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
-                return_value=([peer_provider_certificate], requirer_private_key),
-            ),
             patch("pathlib.Path.exists", return_value=False),
-        ):
-            event.certificate = peer_certificate
-            charm.tls_events._on_certificate_available(event)
-            assert charm.state.unit_server.peer_cert_ready
-
-        def mock_rolling_restart(_):
-            charm._restart(event)
-
-        with (
-            patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
-                return_value=([client_provider_certificate], requirer_private_key),
-            ),
-            patch("charm.EtcdOperatorCharm.rolling_restart", mock_rolling_restart),
             patch("managers.cluster.ClusterManager.broadcast_peer_url"),
             patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
-            patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
+            patch("managers.cluster.ClusterManager.restart_member", return_value=True),
         ):
-            event.certificate = client_certificate
-            charm.tls_events._on_certificate_available(event)
+            # Error case where private key is missing
+            with pytest.raises(TLSMissingCertificateOrKeyError):
+                with (
+                    patch(
+                        "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                        return_value=([peer_provider_certificate], None),
+                    ),
+                    patch(
+                        "charm.EtcdOperatorCharm.rolling_restart",
+                        lambda _, callback: charm._restart_enable_peer_tls(event),
+                    ),
+                ):
+                    event.certificate = peer_certificate
+                    charm.tls_events._on_certificate_available(event)
 
-            assert charm.state.unit_server.client_cert_ready
-            assert charm.state.unit_server.certs_ready
-            assert charm.state.unit_server.tls_state == TLSState.TLS
+            # Peer cert added case
+            with (
+                patch(
+                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    return_value=([peer_provider_certificate], requirer_private_key),
+                ),
+                patch(
+                    "charm.EtcdOperatorCharm.rolling_restart",
+                    lambda _, callback: charm._restart_enable_peer_tls(event),
+                ),
+            ):
+                event.certificate = peer_certificate
+                charm.tls_events._on_certificate_available(event)
+                assert charm.state.unit_server.peer_cert_ready
+                assert charm.state.unit_server.tls_peer_state == TLSState.TLS
+
+            # client cert added case
+            with (
+                patch(
+                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    return_value=([client_provider_certificate], requirer_private_key),
+                ),
+                patch(
+                    "charm.EtcdOperatorCharm.rolling_restart",
+                    lambda _, callback: charm._restart_enable_client_tls(event),
+                ),
+            ):
+                event.certificate = client_certificate
+                charm.tls_events._on_certificate_available(event)
+
+                assert charm.state.unit_server.client_cert_ready
+                assert charm.state.unit_server.tls_client_state == TLSState.TLS
+                assert charm.state.unit_server.certs_ready
+
+
+def test_enabling_tls_one_restart():
+    ctx = testing.Context(EtcdOperatorCharm)
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"initial-cluster-state": "existing"},
+        local_unit_data={"ip": "localhost"},
+    )
+    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
+    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+
+    state_in = testing.State(
+        relations=[peer_relation, peer_tls_relation, client_tls_relation],
+    )
+
+    provider_private_key = generate_private_key()
+    provider_ca_certificate = generate_ca(
+        private_key=provider_private_key,
+        common_name="example.com",
+        validity=timedelta(days=365),
+    )
+
+    requirer_private_key = generate_private_key()
+    peer_csr = generate_csr(
+        private_key=requirer_private_key,
+        common_name="etcd-test-1",
+        organization=TLSType.PEER.value,
+    )
+    peer_certificate = generate_certificate(
+        ca_private_key=provider_private_key,
+        csr=peer_csr,
+        ca=provider_ca_certificate,
+        validity=timedelta(days=1),
+    )
+    peer_provider_certificate = ProviderCertificate(
+        relation_id=peer_tls_relation.id,
+        certificate=peer_certificate,
+        certificate_signing_request=peer_csr,
+        ca=provider_ca_certificate,
+        chain=[provider_ca_certificate, peer_certificate],
+        revoked=False,
+    )
+    client_csr = generate_csr(
+        private_key=requirer_private_key,
+        common_name="etcd-test-1",
+        organization=TLSType.CLIENT.value,
+    )
+    client_certificate = generate_certificate(
+        ca_private_key=provider_private_key,
+        csr=client_csr,
+        ca=provider_ca_certificate,
+        validity=timedelta(days=1),
+    )
+    client_provider_certificate = ProviderCertificate(
+        relation_id=client_tls_relation.id,
+        certificate=client_certificate,
+        certificate_signing_request=client_csr,
+        ca=provider_ca_certificate,
+        chain=[provider_ca_certificate, client_certificate],
+        revoked=False,
+    )
+
+    with (
+        ctx(ctx.on.update_status(), state_in) as mgr,
+        patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("pathlib.Path.exists", return_value=True),
+        patch("workload.EtcdWorkload.alive", return_value=True),
+    ):
+        charm: EtcdOperatorCharm = mgr.charm  # type: ignore
+        event = MagicMock(spec=CertificateAvailableEvent)
+
+        # Peer cert added case but no restart
+        with (
+            patch("pathlib.Path.exists", return_value=False),
+            patch("common.client.EtcdClient.broadcast_peer_url"),
+            patch(
+                "common.client.EtcdClient.member_list",
+                return_value=MEMBER_LIST_DICT,
+            ),
+            patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
+            patch("managers.cluster.ClusterManager.restart_member"),
+        ):
+            charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.PEER)
+            charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.CLIENT)
+            with (
+                patch(
+                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    return_value=([peer_provider_certificate], requirer_private_key),
+                ),
+                patch(
+                    "charm.EtcdOperatorCharm.rolling_restart",
+                    lambda _, callback: charm._restart_enable_peer_tls(event),
+                ),
+            ):
+                event.certificate = peer_certificate
+                charm.tls_events._on_certificate_available(event)
+                assert charm.state.unit_server.peer_cert_ready
+                assert charm.state.unit_server.tls_peer_state == TLSState.TO_TLS
+
+            # client cert added case and restart handles both peer and client
+            with (
+                patch(
+                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    return_value=([client_provider_certificate], requirer_private_key),
+                ),
+                patch(
+                    "charm.EtcdOperatorCharm.rolling_restart",
+                    lambda _, callback: charm._restart_enable_client_tls(event),
+                ),
+            ):
+                event.certificate = client_certificate
+                charm.tls_events._on_certificate_available(event)
+
+                assert charm.state.unit_server.client_cert_ready
+                assert charm.state.unit_server.tls_client_state == TLSState.TLS
+                assert charm.state.unit_server.tls_peer_state == TLSState.TLS
+                assert charm.state.unit_server.certs_ready
+
+        # reset databags
+        # local_app_data={"initial-cluster-state": "existing"},
+        # local_unit_data={"ip": "localhost"},
+        peer_relation.local_unit_data.clear()
+        peer_relation.local_app_data.clear()
+        peer_relation.local_app_data["initial-cluster-state"] = "existing"
+        peer_relation.local_unit_data["ip"] = "localhost"
+        # Peer cert added case but no restart
+        with (
+            patch("pathlib.Path.exists", return_value=False),
+            patch("common.client.EtcdClient.broadcast_peer_url"),
+            patch(
+                "common.client.EtcdClient.member_list",
+                return_value=MEMBER_LIST_DICT,
+            ),
+            patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
+            patch("managers.cluster.ClusterManager.restart_member"),
+        ):
+            charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.PEER)
+            charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.CLIENT)
+            with (
+                patch(
+                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    return_value=([client_provider_certificate], requirer_private_key),
+                ),
+                patch(
+                    "charm.EtcdOperatorCharm.rolling_restart",
+                    lambda _, callback: charm._restart_enable_client_tls(event),
+                ),
+            ):
+                event.certificate = client_certificate
+                charm.tls_events._on_certificate_available(event)
+                assert charm.state.unit_server.client_cert_ready
+                assert charm.state.unit_server.tls_client_state == TLSState.TO_TLS
+                event.defer.assert_called_once()
+
+                charm.tls_manager.set_cert_state(TLSType.PEER, True)
+                charm.tls_events._on_certificate_available(event)
+                assert charm.state.unit_server.tls_peer_state == TLSState.TLS
+                assert charm.state.unit_server.tls_client_state == TLSState.TLS
 
 
 def test_certificates_relation_created():
@@ -395,8 +588,23 @@ def test_certificates_relation_created():
 
     with patch("workload.EtcdWorkload.alive", return_value=True):
         state_out = ctx.run(ctx.on.relation_created(relation=peer_tls_relation), state_in)
-        assert state_out.unit_status == Status.TLS_NOT_READY.value.status
+        assert state_out.unit_status == Status.TLS_ENABLING_PEER_TLS.value.status
         assert (
-            state_out.get_relation(peer_relation.id).local_unit_data["tls-state"]
+            state_out.get_relation(peer_relation.id).local_unit_data["tls-peer-state"]
+            == TLSState.TO_TLS.value
+        )
+
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    client_tls_relation = testing.Relation(id=2, endpoint=CLIENT_TLS_RELATION_NAME)
+
+    state_in = testing.State(
+        relations=[peer_relation, client_tls_relation],
+    )
+
+    with patch("workload.EtcdWorkload.alive", return_value=True):
+        state_out = ctx.run(ctx.on.relation_created(relation=client_tls_relation), state_in)
+        assert state_out.unit_status == Status.TLS_ENABLING_CLIENT_TLS.value.status
+        assert (
+            state_out.get_relation(peer_relation.id).local_unit_data["tls-client-state"]
             == TLSState.TO_TLS.value
         )
