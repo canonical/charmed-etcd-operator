@@ -147,7 +147,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             logger.debug("Peer TLS already disabled, skipping")
             return
 
-        # disbale peer tls
+        # disable peer tls
         self.cluster_manager.broadcast_peer_url(
             self.state.unit_server.peer_url.replace("https://", "http://")
         )
