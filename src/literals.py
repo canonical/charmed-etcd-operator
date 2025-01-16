@@ -43,6 +43,13 @@ class StatusLevel:
     log_level: DebugLevel
 
 
+class EtcdClusterState(Enum):
+    """Enum for Cluster state in etcd."""
+
+    EXISTING = "existing"
+    NEW = "new"
+
+
 class Status(Enum):
     """Collection of possible statuses for the charm."""
 

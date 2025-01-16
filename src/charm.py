@@ -32,7 +32,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
         # --- MANAGERS ---
-        self.cluster_manager = ClusterManager(self.state, self.workload)
+        self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
         self.config_manager = ConfigManager(
             state=self.state, workload=self.workload, config=self.config
         )

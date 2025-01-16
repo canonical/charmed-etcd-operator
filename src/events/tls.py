@@ -125,8 +125,8 @@ class TLSEvents(Object):
             logger.debug("Rotating client certificates")
             return
 
-        # if the cluster is new, no need to write config or restart just set the tls state
-        if self.charm.state.cluster.initial_cluster_state == "new":
+        # if the cluster is new and the member hasn't started yet, no need to write config or restart just set the tls state
+        if not self.charm.state.unit_server.is_started:
             self.charm.tls_manager.set_tls_state(state=TLSState.TLS, tls_type=cert_type)
             return
 

@@ -47,30 +47,89 @@ MEMBER_LIST_DICT = {
 
 def test_enable_tls_on_start():
     ctx = testing.Context(EtcdOperatorCharm)
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_unit_data={
-            "ip": "localhost",
-        },
-    )
-    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
-    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
-
-    state_in = testing.State(
-        relations=[peer_relation, peer_tls_relation, client_tls_relation],
-    )
-
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.start"),
         patch("workload.EtcdWorkload.write_file"),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates"
         ),
         patch("managers.tls.TLSManager.write_certificate"),
+        patch("managers.cluster.ClusterManager.enable_authentication"),
     ):
+        peer_relation = testing.PeerRelation(
+            id=1,
+            endpoint=PEER_RELATION,
+            local_unit_data={
+                "ip": "localhost",
+            },
+        )
+        peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
+        client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+
+        state_in = testing.State(
+            relations=[peer_relation, peer_tls_relation, client_tls_relation], leader=True
+        )
+        # no tls
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == Status.ACTIVE.value.status
+        assert peer_relation.local_unit_data["state"] == "started"
+        assert peer_relation.local_app_data["cluster_state"] == "existing"
+
+        # tls not ready
+        peer_relation = testing.PeerRelation(
+            id=1,
+            endpoint=PEER_RELATION,
+            local_unit_data={
+                "ip": "localhost",
+                "tls_peer_state": TLSState.TO_TLS.value,
+            },
+        )
+        peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
+        client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+
+        state_in = testing.State(
+            relations=[peer_relation, peer_tls_relation, client_tls_relation], leader=True
+        )
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert "start" in [event.name for event in state_out.deferred]
+
+        peer_relation = testing.PeerRelation(
+            id=1,
+            endpoint=PEER_RELATION,
+            local_unit_data={
+                "ip": "localhost",
+                "tls_client_state": TLSState.TO_TLS.value,
+            },
+        )
+        peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
+        client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+
+        state_in = testing.State(
+            relations=[peer_relation, peer_tls_relation, client_tls_relation], leader=True
+        )
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert "start" in [event.name for event in state_out.deferred]
+
+        peer_relation = testing.PeerRelation(
+            id=1,
+            endpoint=PEER_RELATION,
+            local_unit_data={
+                "ip": "localhost",
+                "tls_peer_state": TLSState.TLS.value,
+                "tls_client_state": TLSState.TLS.value,
+            },
+        )
+        peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
+        client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+
+        state_in = testing.State(
+            relations=[peer_relation, peer_tls_relation, client_tls_relation], leader=True
+        )
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == Status.ACTIVE.value.status
+        assert peer_relation.local_unit_data["state"] == "started"
+        assert peer_relation.local_app_data["cluster_state"] == "existing"
 
 
 def test_certificates_broken():
@@ -292,7 +351,7 @@ def test_certificate_available_enabling_tls():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"initial_cluster_state": "existing"},
+        local_app_data={"cluster_state": "existing"},
         local_unit_data={"ip": "localhost"},
     )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -421,8 +480,8 @@ def test_enabling_tls_one_restart():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"initial_cluster_state": "existing"},
-        local_unit_data={"ip": "localhost"},
+        local_app_data={"cluster_state": "existing"},
+        local_unit_data={"ip": "localhost", "state": "started"},
     )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
     client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
@@ -538,8 +597,9 @@ def test_enabling_tls_one_restart():
         # reset databags
         peer_relation.local_unit_data.clear()
         peer_relation.local_app_data.clear()
-        peer_relation.local_app_data["initial_cluster_state"] = "existing"
+        peer_relation.local_app_data["cluster_state"] = "existing"
         peer_relation.local_unit_data["ip"] = "localhost"
+        peer_relation.local_unit_data["state"] = "started"
         # Peer cert added case but no restart
         with (
             patch("pathlib.Path.exists", return_value=False),
@@ -613,7 +673,7 @@ def test_certificate_expiration():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"initial_cluster_state": "existing"},
+        local_app_data={"cluster_state": "existing"},
         local_unit_data={"ip": "localhost"},
     )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)

@@ -80,6 +80,8 @@ class ClusterState(Object):
     def servers(self) -> Set[EtcdServer]:
         """Get all servers/units in the current peer relation, including this unit itself.
 
+        Note: This is not to be confused with the list of cluster members.
+
         Returns:
             Set of EtcdServers with their unit data.
         """

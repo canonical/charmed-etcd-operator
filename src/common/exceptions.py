@@ -23,3 +23,7 @@ class TLSMissingCertificateOrKeyError(Exception):
 
 class HealthCheckFailedError(Exception):
     """Custom Exception if a health check failed."""
+
+
+class EtcdClusterManagementError(Exception):
+    """Custom Exception if cluster management operation fails."""
