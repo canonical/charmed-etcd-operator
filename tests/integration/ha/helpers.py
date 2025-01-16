@@ -81,8 +81,7 @@ def assert_continuous_writes_consistent(endpoints: str, user: str, password: str
 
     for endpoint in endpoints.split(","):
         last_etcd_value = count_writes(endpoint, user, password)
-        logger.info(f"Continuous writes consistency: endpoint: {endpoint}")
-        logger.info(
-            f"expected value: {last_written_value}, last value in endpoint: {last_etcd_value}."
+        # when stopping the writes, it may happen that data was written to etcd but not to file yet
+        assert last_written_value in [last_etcd_value, last_etcd_value + 1], (
+            f"endpoint: {endpoint}, expected value: {last_written_value}, last value in endpoint: {last_etcd_value}."
         )
-        assert last_written_value == last_etcd_value
