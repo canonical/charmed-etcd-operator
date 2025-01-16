@@ -7,8 +7,13 @@
 import json
 import logging
 import subprocess
+from typing import Tuple
 
-from common.exceptions import EtcdAuthNotEnabledError, EtcdUserManagementError
+from common.exceptions import (
+    EtcdAuthNotEnabledError,
+    EtcdClusterManagementError,
+    EtcdUserManagementError,
+)
 from literals import INTERNAL_USER, SNAP_NAME
 
 logger = logging.getLogger(__name__)
@@ -39,7 +44,7 @@ class EtcdClient:
             try:
                 endpoint_status = json.loads(result)[0]
             except json.JSONDecodeError:
-                pass
+                raise
 
         return endpoint_status
 
@@ -83,6 +88,61 @@ class EtcdClient:
         else:
             raise EtcdAuthNotEnabledError("Failed to enable authentication in etcd.")
 
+    def add_member_as_learner(self, member_name: str, peer_url: str) -> Tuple[str, str]:
+        """Add a new member as learner to the etcd-cluster.
+
+        Returns:
+            - The updated `ETCD_INITIAL_CLUSTER` to be used as config `initial-cluster` for
+            starting the new cluster member
+            - The `MEMBER_ID` of the newly added member, to be used for promoting the new member
+            as full-voting after starting up
+        """
+        if result := self._run_etcdctl(
+            command="member",
+            subcommand="add",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            member=member_name,
+            peer_url=peer_url,
+            learner=True,
+            output_format="json",
+        ):
+            try:
+                cluster = json.loads(result)
+                cluster_members = ""
+                member_id = ""
+                for member in cluster["members"]:
+                    if member.get("name"):
+                        cluster_members += f"{member['name']}={member['peerURLs'][0]},"
+                    if member["peerURLs"][0] == peer_url:
+                        # the member ID is returned as int, but needs to be processed as hex
+                        # e.g. ID=4477466968462020105 needs to be stored as 3e23287c34b94e09
+                        member_id = f"{member['ID']:0>2x}"
+                # for the newly added member, the member name will not be included in the response
+                # we have to append it separately
+                cluster_members += f"{member_name}={peer_url}"
+            except (json.JSONDecodeError, KeyError):
+                raise
+            logger.debug(f"Updated cluster members: {cluster_members}, new member: {member_id}")
+            return cluster_members, str(member_id)
+        else:
+            raise EtcdClusterManagementError(f"Failed to add {member_name} as learner.")
+
+    def promote_member(self, member_id: str) -> None:
+        """Promote a learner-member to full-voting member in the etcd-cluster."""
+        if result := self._run_etcdctl(
+            command="member",
+            subcommand="promote",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            member=member_id,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdClusterManagementError(f"Failed to promote member {member_id}.")
+
     def _run_etcdctl(  # noqa: C901
         self,
         command: str,
@@ -95,6 +155,9 @@ class EtcdClient:
         auth_password: str | None = None,
         user: str | None = None,
         user_password: str | None = None,
+        member: str | None = None,
+        peer_url: str | None = None,
+        learner: bool = False,
         output_format: str = "simple",
         use_input: str | None = None,
     ) -> str | None:
@@ -112,6 +175,9 @@ class EtcdClient:
             auth_password: password used for authentication
             user: username to be added or updated in etcd
             user_password: password to be set for the user that is added to etcd
+            member: member name or id, required for commands `member add/update/promote/remove`
+            peer_url: url of a member to be used for cluster-internal communication
+            learner: flag for adding a new cluster member as not-voting member
             output_format: set the output format (fields, json, protobuf, simple, table)
             use_input: supply text input to be passed to the `etcdctl` command (e.g. for
                         non-interactive password change)
@@ -138,6 +204,12 @@ class EtcdClient:
                 args.append(f"--user={auth_username}")
             if auth_password:
                 args.append(f"--password={auth_password}")
+            if member:
+                args.append(member)
+            if peer_url:
+                args.append(f"--peer-urls={peer_url}")
+            if learner:
+                args.append("--learner=True")
             if output_format:
                 args.append(f"-w={output_format}")
             if use_input:

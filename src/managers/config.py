@@ -41,15 +41,24 @@ class ConfigManager:
             List of properties to be written to the config file.
         """
         with open(f"{WORKING_DIR}/config/etcd.conf.yml") as config:
+            # load the config properties provided from the template in this repo
+            # it does NOT load the template from disk in the charm unit
+            # this is in order to avoid config drift
             config_properties = yaml.safe_load(config)
 
         config_properties["name"] = self.state.unit_server.member_name
+        if self.state.cluster.cluster_state:
+            config_properties["initial-cluster-state"] = self.state.cluster.cluster_state
+            config_properties["initial-cluster"] = self.state.cluster.cluster_members
+        else:
+            config_properties["initial-cluster-state"] = "new"
+            # on very first cluster initialization, only the leader should be cluster member
+            # all other units will be added to the cluster subsequently
+            config_properties["initial-cluster"] = self.state.unit_server.member_endpoint
         config_properties["initial-advertise-peer-urls"] = self.state.unit_server.peer_url
-        config_properties["initial-cluster-state"] = self.state.cluster.initial_cluster_state
         config_properties["listen-peer-urls"] = self.state.unit_server.peer_url
         config_properties["listen-client-urls"] = self.state.unit_server.client_url
         config_properties["advertise-client-urls"] = self.state.unit_server.client_url
-        config_properties["initial-cluster"] = self._get_cluster_endpoints()
 
         return yaml.safe_dump(config_properties)
 
