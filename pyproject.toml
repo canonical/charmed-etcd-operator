@@ -51,14 +51,14 @@ ops = "^2.17.0"
 [tool.poetry.group.integration.dependencies]
 ops = "^2.17.0"
 pytest = "*"
-pytest-github-secrets = {git = "https://github.com/canonical/data-platform-workflows", tag = "v26.0.0", subdirectory = "python/pytest_plugins/github_secrets"}
+pytest-github-secrets = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/github_secrets"}
 pytest-asyncio = "*"
 pytest-operator = "^0.28.0"
-pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workflows", tag = "v26.0.0", subdirectory = "python/pytest_plugins/pytest_operator_cache"}
-pytest-operator-groups = {git = "https://github.com/canonical/data-platform-workflows", tag = "v26.0.0", subdirectory = "python/pytest_plugins/pytest_operator_groups"}
+pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/pytest_operator_cache"}
+pytest-operator-groups = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/pytest_operator_groups"}
 juju = "3.5.2"
 allure-pytest = "*"
-allure-pytest-collection-report = {git = "https://github.com/canonical/data-platform-workflows", tag = "v26.0.0", subdirectory = "python/pytest_plugins/allure_pytest_collection_report"}
+allure-pytest-collection-report = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/allure_pytest_collection_report"}
 # pin websockets to <14.0 because of breaking changes in this version
 # see also: https://github.com/juju/python-libjuju/issues/1184
 websockets = "<14.0"
