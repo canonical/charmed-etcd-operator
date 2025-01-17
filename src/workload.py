@@ -65,6 +65,6 @@ class EtcdWorkload(WorkloadBase):
         self.etcd.restart(services=[SNAP_SERVICE])
 
     @override
-    def remove_file(self, file):
+    def remove_file(self, file) -> None:
         path = Path(file)
         path.unlink(missing_ok=True)

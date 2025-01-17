@@ -367,7 +367,7 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
             tls_enabled=True,
         )
         == TEST_VALUE
-    ), "Failed to old read key"
+    ), "Failed to read old key"
 
     assert put_key(
         model,
@@ -502,7 +502,7 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
             tls_enabled=True,
         )
         == TEST_VALUE
-    ), "Failed to old read key"
+    ), "Failed to read old key"
 
     assert put_key(
         model,
@@ -646,7 +646,7 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
             tls_enabled=True,
         )
         == TEST_VALUE
-    ), "Failed to old read key"
+    ), "Failed to read old key"
 
     assert put_key(
         model,
@@ -706,7 +706,7 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
             tls_enabled=True,
         )
         == TEST_VALUE
-    ), "Failed to old read key"
+    ), "Failed to read old key"
 
     assert put_key(
         model,

@@ -337,6 +337,7 @@ class EtcdClient:
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return False
+        logger.debug("Health check passed.")
         return True
 
     def broadcast_peer_url(self, endpoints: str, member_id: str, peer_urls: str) -> None:
