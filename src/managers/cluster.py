@@ -18,7 +18,7 @@ from common.exceptions import (
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, EtcdClusterState
+from literals import INTERNAL_USER, EtcdClusterState, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +179,11 @@ class ClusterManager:
 
         # we need to make sure all required information are available before adding the member
         if server.member_name and server.ip and server.peer_url:
+            peer_url = server.peer_url
+            # When the peer relation joined event is triggered, the peer_url is in http:// format
+            # because the node would still not have gotten its certificates
+            if self.state.unit_server.tls_peer_state == TLSState.TLS:
+                peer_url = peer_url.replace("http://", "https://")
             try:
                 client = EtcdClient(
                     username=self.admin_user,
@@ -186,7 +191,7 @@ class ClusterManager:
                     client_url=self.state.unit_server.client_url,
                 )
                 cluster_members, member_id = client.add_member_as_learner(
-                    server.member_name, server.peer_url
+                    server.member_name, peer_url
                 )
                 self.state.cluster.update(
                     {"cluster_members": cluster_members, "learning_member": member_id}
