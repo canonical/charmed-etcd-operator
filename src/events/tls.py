@@ -137,20 +137,19 @@ class TLSEvents(Object):
         logger.debug(
             f"client cert ready: {self.charm.state.unit_server.client_cert_ready} ; peer cert ready: {self.charm.state.unit_server.peer_cert_ready}"
         )
-        if cert_type == TLSType.PEER:
-            if self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS:
-                logger.info("Client TLS relation created enable peer TLS and skip restarting")
-                return
-        else:
-            if (
-                self.charm.state.unit_server.tls_peer_state == TLSState.TO_TLS
-                and not self.charm.state.unit_server.peer_cert_ready
-            ):
-                logger.info(
-                    "Peer TLS relation created but cert not ready. defer enabling client TLS"
-                )
-                event.defer()
-                return
+        if (
+            cert_type == TLSType.PEER
+            and self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS
+        ):
+            logger.info("Client TLS relation created enable peer TLS and skip restarting")
+            return
+        elif (
+            self.charm.state.unit_server.tls_peer_state == TLSState.TO_TLS
+            and not self.charm.state.unit_server.peer_cert_ready
+        ):
+            logger.info("Peer TLS relation created but cert not ready. defer enabling client TLS")
+            event.defer()
+            return
 
         # write config and restart workload
         self.charm.rolling_restart(f"_restart_enable_{cert_type.value}_tls")

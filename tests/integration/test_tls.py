@@ -45,8 +45,6 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
     # Build and deploy charm from local source folder
     etcd_charm = await ops_test.build_charm(".")
-    model = ops_test.model_full_name
-    assert model is not None, "Model is not set"
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
     await ops_test.model.deploy(etcd_charm, num_units=NUM_UNITS)
@@ -118,6 +116,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_tls(ops_test: OpsTest) -> None:
+    """Disable TLS on a running cluster and check if it is still accessible."""
     assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
     assert model is not None, "Model is not set"
@@ -189,6 +188,7 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_enable_tls(ops_test: OpsTest) -> None:
+    """Enable TLS on a running cluster and check if it is still accessible."""
     assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
     assert model is not None, "Model is not set"
@@ -261,6 +261,7 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
+    """Disable then enable peer TLS on a running cluster and check if it is still accessible."""
     assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
     assert model is not None, "Model is not set"
@@ -398,6 +399,7 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
+    """Disable then enable client TLS on a running cluster and check if it is still accessible."""
     assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
     assert model is not None, "Model is not set"
@@ -533,6 +535,7 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_certificate_expiration(ops_test: OpsTest) -> None:
+    """Test the TLS certificate expiration on a running cluster."""
     assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
     assert model is not None, "Model is not set"

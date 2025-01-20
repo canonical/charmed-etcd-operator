@@ -68,12 +68,10 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
+        tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
         if (
-            self.charm.state.unit_server.tls_client_state != TLSState.TLS
-            and self.charm.state.unit_server.tls_client_state != TLSState.NO_TLS
-        ) or (
-            self.charm.state.unit_server.tls_peer_state != TLSState.TLS
-            and self.charm.state.unit_server.tls_peer_state != TLSState.NO_TLS
+            self.charm.state.unit_server.tls_client_state in tls_transition_states
+            or self.charm.state.unit_server.tls_peer_state in tls_transition_states
         ):
             logger.info(
                 f"Deferring start because TLS is not ready for {self.charm.state.unit_server.member_name}."
