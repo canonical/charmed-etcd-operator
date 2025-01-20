@@ -54,10 +54,8 @@ def get_key(
 
 def get_cluster_members(endpoints: str) -> list[dict]:
     """Query all cluster members from etcd using `etcdctl`."""
-    logger.info(f"endpoints: {endpoints}")
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
     result = subprocess.getoutput(etcd_command).split("\n")[0]
-    logger.info(f"result: {result}")
 
     return json.loads(result)["members"]
 
