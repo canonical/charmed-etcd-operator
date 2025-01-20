@@ -8,7 +8,7 @@ import subprocess
 import time
 
 from pytest_operator.plugin import OpsTest
-from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +71,14 @@ def assert_continuous_writes_increasing(endpoints: str, user: str, password: str
 
 def assert_continuous_writes_consistent(endpoints: str, user: str, password: str) -> None:
     """Assert that the continuous writes are consistent."""
-    try:
-        for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
-            with attempt:
-                with open(WRITES_LAST_WRITTEN_VAL_PATH, "r") as f:
-                    last_written_value = int(f.read().rstrip())
-    except RetryError:
-        last_written_value = 0
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
+        with attempt:
+            with open(WRITES_LAST_WRITTEN_VAL_PATH, "r") as f:
+                last_written_value = int(f.read().rstrip())
 
     for endpoint in endpoints.split(","):
         last_etcd_value = count_writes(endpoint, user, password)
         # when stopping the writes, it may happen that data was written to etcd but not to file yet
-        assert last_written_value in [last_etcd_value, last_etcd_value + 1], (
+        assert last_written_value <= last_etcd_value, (
             f"endpoint: {endpoint}, expected value: {last_written_value}, last value in endpoint: {last_etcd_value}."
         )
