@@ -15,3 +15,15 @@ description: |
 peers:
   etcd-peers:
     interface: etcd_peers
+
+storage:
+  data:
+    type: filesystem
+    location: /var/snap/charmed-etcd/common/var/lib/etcd
+    description: storage for etcd data
+    minimum-size: 1G
+  logs:
+    type: filesystem
+    location: /var/snap/charmed-etcd/common/var/log/etcd
+    description: storage for logfiles of etcd server
+    minimum-size: 1G
