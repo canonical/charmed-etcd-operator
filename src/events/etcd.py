@@ -172,14 +172,17 @@ class EtcdEvents(Object):
             if admin_secret_id == event.secret.id:
                 self.update_admin_password(admin_secret_id)
 
-    def _on_storage_detaching(self) -> None:
+    def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
         """Handle removal of the data storage mount, e.g. when removing a unit."""
         try:
             self.charm.cluster_manager.remove_member()
-        except RetryError:
+        except EtcdClusterManagementError:
             # We want this hook to error out if we cannot remove the cluster member
             # otherwise the cluster could become unavailable because of quorum loss
+            self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)
             return
+
+        self.charm.set_status(Status.REMOVED)
 
     def update_admin_password(self, admin_secret_id: str) -> None:
         """Compare current admin password and update in etcd if required."""
