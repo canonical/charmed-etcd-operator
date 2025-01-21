@@ -4,17 +4,33 @@
 
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import ops
 import yaml
 from ops import testing
 
 from charm import EtcdOperatorCharm
+from core.models import Member
 from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
+
+MEMBER_LIST_DICT = {
+    "charmed-etcd0": Member(
+        id="1",
+        name="etcd-test-1",
+        peer_urls=["http://localhost:2380"],
+        client_urls=["http://localhost:2379"],
+    ),
+    "charmed-etcd1": Member(
+        id="2",
+        name="etcd-test-2",
+        peer_urls=["http://localhost:2381"],
+        client_urls=["http://localhost:2380"],
+    ),
+}
 
 
 def test_install_failure_blocked_status():
@@ -192,3 +208,26 @@ def test_config_changed():
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+
+def test_unit_removal():
+    ctx = testing.Context(EtcdOperatorCharm)
+    data_storage = testing.Storage("data")
+    state_in = testing.State(storages=[data_storage])
+
+    with (
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("subprocess.run"),
+        patch("workload.EtcdWorkload.stop"),
+    ):
+        state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
+        assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
+
+    with (
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="remove member")),
+        # mock the `wait` in tenacity.retry to avoid delay in retrying
+        patch("tenacity.nap.time.sleep", MagicMock()),
+    ):
+        state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
+        assert state_out.unit_status == ops.BlockedStatus("cluster management error")
