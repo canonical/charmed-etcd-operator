@@ -9,3 +9,15 @@ options:
       be auto-generated if this option is not set. It is for internal use only
       and SHOULD NOT be used by applications. This needs to be a Juju Secret URI pointing
       to a secret that contains the following content: `root: <password>`.
+  
+  tls-peer-private-key:
+    type: secret
+    description: |
+      The private key for the etcd peer TLS certificate. This needs to be a Juju Secret URI
+      pointing to a secret that contains the private key.
+  
+  tls-client-private-key:
+    type: secret
+    description: |
+      The private key for the etcd client TLS certificate. This needs to be a Juju Secret URI
+      pointing to a secret that contains the private key.

@@ -10,7 +10,7 @@ from ops.model import ModelError, SecretNotFoundError
 logger = logging.getLogger(__name__)
 
 
-def get_secret_from_id(model, secret_id: str) -> dict[str, str] | None:
+def get_secret_from_id(model, secret_id: str) -> dict[str, str]:
     """Resolve the given id of a Juju secret and return the content as a dict.
 
     Args:

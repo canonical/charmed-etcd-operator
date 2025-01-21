@@ -33,6 +33,8 @@ SUBSTRATE = "vm"
 
 PEER_TLS_RELATION_NAME = "peer-certificates"
 CLIENT_TLS_RELATION_NAME = "client-certificates"
+TLS_PEER_PRIVATE_KEY_CONFIG = "tls-peer-private-key"
+TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 
 
 @dataclass
