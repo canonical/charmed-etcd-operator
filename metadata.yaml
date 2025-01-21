@@ -24,8 +24,6 @@ storage:
     minimum-size: 1G
   logs:
     type: filesystem
-    # location to be adjusted when adding file logging to etcd
-    # for now, we use the default
     location: /var/snap/charmed-etcd/common/var/log/etcd
     description: storage for logfiles of etcd server
     minimum-size: 1G
