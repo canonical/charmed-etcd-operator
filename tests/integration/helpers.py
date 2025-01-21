@@ -102,11 +102,12 @@ def get_cluster_endpoints(
     )
 
 
-async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str | None:
+async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str:
     """Retrieve the leader unit name."""
     for unit in ops_test.model.applications[app_name].units:
         if await unit.is_leader_from_status():
             return unit.name
+    raise Exception("No leader unit found")
 
 
 async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] | None:
@@ -123,6 +124,8 @@ async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] |
 
         if label == secret_data[secret_id].get("label"):
             return secret_data[secret_id]["content"]["Data"]
+
+    return None
 
 
 def get_certificate_from_unit(model: str, unit: str, cert_type: TLSType) -> str | None:
