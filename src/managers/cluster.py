@@ -188,6 +188,8 @@ class ClusterManager:
                 password=self.admin_password,
                 client_url=self.state.unit_server.client_url,
             )
+            # by querying the member's id we make sure the cluster is available with quorum
+            # otherwise we raise and retry
             client.remove_member(self.member.id)
-        except EtcdClusterManagementError:
+        except (EtcdClusterManagementError, ValueError):
             raise

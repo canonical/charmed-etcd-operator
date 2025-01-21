@@ -176,20 +176,21 @@ class EtcdEvents(Object):
         if self.charm.app.planned_units() > 0:
             try:
                 self.charm.cluster_manager.remove_member()
-            except EtcdClusterManagementError:
+            except (EtcdClusterManagementError, ValueError):
                 # We want this hook to error out if we cannot remove the cluster member
                 # otherwise the cluster could become unavailable because of quorum loss
                 self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)
                 return
         else:
             logger.info("Removing last unit from etcd cluster.")
-            self.charm.state.cluster.update(
-                {
-                    "cluster_state": "",
-                    "cluster_members": "",
-                    "authentication": "",
-                }
-            )
+            if self.charm.unit.is_leader():
+                self.charm.state.cluster.update(
+                    {
+                        "cluster_state": "",
+                        "cluster_members": "",
+                        "authentication": "",
+                    }
+                )
 
         self.charm.workload.stop()
         self.charm.set_status(Status.REMOVED)
