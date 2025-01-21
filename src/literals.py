@@ -17,6 +17,7 @@ SNAP_SERVICE = "etcd"
 # it's the current config path for the legacy-etcd snap
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 
+DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
 CLIENT_PORT = 2379
 PEER_PORT = 2380

@@ -27,6 +27,11 @@ class WorkloadBase(ABC):
         """Write content to a file."""
         pass
 
+    @abstractmethod
+    def stop(self) -> None:
+        """Stop the workload service."""
+        pass
+
     @staticmethod
     def generate_password() -> str:
         """Create randomized string for use as app passwords.

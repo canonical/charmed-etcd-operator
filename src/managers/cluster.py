@@ -8,6 +8,8 @@ import logging
 import socket
 from json import JSONDecodeError
 
+from tenacity import retry, stop_after_attempt, wait_random_exponential
+
 from common.client import EtcdClient
 from common.exceptions import (
     EtcdAuthNotEnabledError,
@@ -16,6 +18,7 @@ from common.exceptions import (
     RaftLeaderNotFoundError,
 )
 from core.cluster import ClusterState
+from core.models import Member
 from core.workload import WorkloadBase
 from literals import INTERNAL_USER, EtcdClusterState
 
@@ -90,6 +93,29 @@ class ClusterManager:
         except EtcdUserManagementError:
             raise
 
+    @property
+    def member(self) -> Member:
+        """Get the member information of the current unit.
+
+        Returns:
+            Member: The member object.
+        """
+        logger.debug(f"Getting member for unit {self.state.unit_server.member_name}")
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        member_list = client.member_list()
+        if member_list is None:
+            raise ValueError("member list command failed")
+        if self.state.unit_server.member_name not in member_list:
+            raise ValueError("member name not found")
+
+        logger.debug(f"Member: {member_list[self.state.unit_server.member_name].id}")
+        return member_list[self.state.unit_server.member_name]
+
     def add_member(self, unit_name: str) -> None:
         """Add a new member to the etcd cluster."""
         # retrieve the member information for the newly joined unit from the set of EtcdServers
@@ -148,3 +174,21 @@ class ClusterManager:
 
         self.state.cluster.update({"learning_member": ""})
         logger.info(f"Successfully promoted learning member {member_id}.")
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_random_exponential(multiplier=2, max=60),
+        reraise=True,
+    )
+    def remove_member(self) -> None:
+        """Remove a cluster member and stop the workload."""
+        try:
+            client = EtcdClient(
+                username=self.admin_user,
+                password=self.admin_password,
+                client_url=self.state.unit_server.client_url,
+            )
+            client.remove_member(self.member.id)
+        except EtcdClusterManagementError:
+            raise
+        self.workload.stop()

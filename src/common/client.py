@@ -14,6 +14,7 @@ from common.exceptions import (
     EtcdClusterManagementError,
     EtcdUserManagementError,
 )
+from core.models import Member
 from literals import INTERNAL_USER, SNAP_NAME
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,50 @@ class EtcdClient:
             logger.debug(result)
         else:
             raise EtcdClusterManagementError(f"Failed to promote member {member_id}.")
+
+    def member_list(self) -> dict[str, Member] | None:
+        """Run the `member list` command in etcd.
+
+        Returns:
+            dict[str, MemberListResult]: A dictionary with the member name as key and the
+            MemberListResult as value.
+        """
+        result = self._run_etcdctl(
+            command="member",
+            subcommand="list",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            output_format="json",
+        )
+        logger.debug(f"Member list: {result}")
+        if not result:
+            return None
+
+        result = json.loads(result)
+        return {
+            member["name"]: Member(
+                id=str(hex(member["ID"]))[2:],
+                name=member["name"],
+                peer_urls=member["peerURLs"],
+                client_urls=member["clientURLs"],
+            )
+            for member in result["members"]
+        }
+
+    def remove_member(self, member_id: str) -> None:
+        """Remove a cluster member."""
+        if result := self._run_etcdctl(
+            command="member",
+            subcommand="remove",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            member=member_id,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdClusterManagementError(f"Failed to remove {member_id}.")
 
     def _run_etcdctl(  # noqa: C901
         self,

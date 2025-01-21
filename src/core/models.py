@@ -5,6 +5,7 @@
 """Collection of state objects for the Etcd relations, apps and units."""
 
 import logging
+from dataclasses import dataclass
 
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
@@ -160,3 +161,13 @@ class EtcdCluster(RelationState):
         will unset the `member_id` here.
         """
         return self.relation_data.get("learning_member", "")
+
+
+@dataclass
+class Member:
+    """Class representing the members of an ETCD cluster."""
+
+    id: str
+    name: str
+    peer_urls: list[str]
+    client_urls: list[str]

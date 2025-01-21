@@ -17,6 +17,7 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 from ops.model import ModelError, SecretNotFoundError
+from tenacity import RetryError
 
 from common.exceptions import (
     EtcdAuthNotEnabledError,
@@ -24,7 +25,13 @@ from common.exceptions import (
     EtcdUserManagementError,
 )
 from common.secrets import get_secret_from_id
-from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status
+from literals import (
+    DATA_STORAGE,
+    INTERNAL_USER,
+    INTERNAL_USER_PASSWORD_CONFIG,
+    PEER_RELATION,
+    Status,
+)
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -59,6 +66,9 @@ class EtcdEvents(Object):
         self.framework.observe(self.charm.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.charm.on.update_status, self._on_update_status)
         self.framework.observe(self.charm.on.secret_changed, self._on_secret_changed)
+        self.framework.observe(
+            self.charm.on[DATA_STORAGE].storage_detaching, self._on_storage_detaching
+        )
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -161,6 +171,15 @@ class EtcdEvents(Object):
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
             if admin_secret_id == event.secret.id:
                 self.update_admin_password(admin_secret_id)
+
+    def _on_storage_detaching(self) -> None:
+        """Handle removal of the data storage mount, e.g. when removing a unit."""
+        try:
+            self.charm.cluster_manager.remove_member()
+        except RetryError:
+            # We want this hook to error out if we cannot remove the cluster member
+            # otherwise the cluster could become unavailable because of quorum loss
+            return
 
     def update_admin_password(self, admin_secret_id: str) -> None:
         """Compare current admin password and update in etcd if required."""

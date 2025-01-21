@@ -59,3 +59,10 @@ class EtcdWorkload(WorkloadBase):
         path = Path(file)
         path.parent.mkdir(exist_ok=True, parents=True)
         path.write_text(content)
+
+    @override
+    def stop(self) -> None:
+        try:
+            self.etcd.stop(services=[SNAP_SERVICE])
+        except snap.SnapError as e:
+            logger.exception(str(e))
