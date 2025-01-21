@@ -191,4 +191,3 @@ class ClusterManager:
             client.remove_member(self.member.id)
         except EtcdClusterManagementError:
             raise
-        self.workload.stop()

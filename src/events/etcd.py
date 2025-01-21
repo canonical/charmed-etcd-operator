@@ -17,7 +17,6 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 from ops.model import ModelError, SecretNotFoundError
-from tenacity import RetryError
 
 from common.exceptions import (
     EtcdAuthNotEnabledError,
@@ -174,14 +173,25 @@ class EtcdEvents(Object):
 
     def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
         """Handle removal of the data storage mount, e.g. when removing a unit."""
-        try:
-            self.charm.cluster_manager.remove_member()
-        except EtcdClusterManagementError:
-            # We want this hook to error out if we cannot remove the cluster member
-            # otherwise the cluster could become unavailable because of quorum loss
-            self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)
-            return
+        if self.charm.app.planned_units() > 0:
+            try:
+                self.charm.cluster_manager.remove_member()
+            except EtcdClusterManagementError:
+                # We want this hook to error out if we cannot remove the cluster member
+                # otherwise the cluster could become unavailable because of quorum loss
+                self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)
+                return
+        else:
+            logger.info("Removing last unit from etcd cluster.")
+            self.charm.state.cluster.update(
+                {
+                    "cluster_state": "",
+                    "cluster_members": "",
+                    "authentication": "",
+                }
+            )
 
+        self.charm.workload.stop()
         self.charm.set_status(Status.REMOVED)
 
     def update_admin_password(self, admin_secret_id: str) -> None:

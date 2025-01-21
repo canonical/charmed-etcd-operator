@@ -4,7 +4,7 @@
 
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import ops
 import yaml
@@ -212,8 +212,17 @@ def test_config_changed():
 
 def test_unit_removal():
     ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "cluster_state": "existing",
+            "authentication": "enabled",
+            "cluster_members": "abc",
+        },
+    )
     data_storage = testing.Storage("data")
-    state_in = testing.State(storages=[data_storage])
+    state_in = testing.State(storages=[data_storage], relations={relation})
 
     with (
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
@@ -222,6 +231,9 @@ def test_unit_removal():
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
+        assert state_out.get_relation(1).local_app_data.get("authentication")
+        assert state_out.get_relation(1).local_app_data.get("cluster_state")
+        assert state_out.get_relation(1).local_app_data.get("cluster_members")
 
     with (
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
@@ -231,3 +243,17 @@ def test_unit_removal():
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert state_out.unit_status == ops.BlockedStatus("cluster management error")
+
+    state_in = testing.State(
+        storages=[data_storage], relations={relation}, planned_units=0, leader=True
+    )
+    with (
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("subprocess.run"),
+        patch("workload.EtcdWorkload.stop"),
+    ):
+        state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
+        assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
+        assert not state_out.get_relation(1).local_app_data.get("authentication")
+        assert not state_out.get_relation(1).local_app_data.get("cluster_state")
+        assert not state_out.get_relation(1).local_app_data.get("cluster_members")
