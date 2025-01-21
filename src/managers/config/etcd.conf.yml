@@ -1,4 +1,7 @@
 data-dir: "/var/snap/charmed-etcd/common/var/lib/etcd"
+log-outputs: ["/var/snap/charmed-etcd/common/var/log/etcd/etcd.log"]
+enable-log-rotation: true
+log-rotation-config-json: '{"maxsize": 100, "maxage": 0, "maxbackups": 0, "localtime": false, "compress": false}'
 initial-cluster-token: 'etcd-cluster'
 snapshot-count: 10000
 heartbeat-interval: 100
