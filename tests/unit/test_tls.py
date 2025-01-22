@@ -807,7 +807,7 @@ def test_certificate_expiration():
                 restart_mock.assert_not_called()
 
 
-def test_ca_rotation(certificate_available_context):
+def test_ca_peer_rotation(certificate_available_context):
     manager = certificate_available_context.manager
     peer_relation = certificate_available_context.peer_relation
     # provider_ca_certificate = certificate_available_context.provider_ca_certificate
@@ -844,6 +844,7 @@ def test_ca_rotation(certificate_available_context):
             return_value=([peer_provider_certificate], requirer_private_key),
         ),
         patch("charm.EtcdOperatorCharm._restart"),
+        # patch("ops.framework.BoundEvent.emit"),
     ):
         charm: EtcdOperatorCharm = manager.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
@@ -885,15 +886,6 @@ def test_ca_rotation(certificate_available_context):
             restart_mock.assert_not_called()
             assert event.defer.call_count == 2, "event should not have been deferred"
 
-        # clean up old cas
-        event = MagicMock()
-        event.cert_type = TLSType.PEER
-        charm.tls_events._on_clean_ca(event)
-        event.defer.assert_called_once()
-
-        # all units have updated their certs
-        peer_relation.peers_data[1]["tls_peer_ca_rotation"] = TLSCARotationState.CERT_UPDATED.value
-        peer_relation.peers_data[2]["tls_peer_ca_rotation"] = TLSCARotationState.CERT_UPDATED.value
         with (
             patch(
                 "charm.EtcdOperatorCharm.rolling_restart",
@@ -903,9 +895,144 @@ def test_ca_rotation(certificate_available_context):
             patch("workload.EtcdWorkload.remove_file"),
             patch("managers.tls.TLSManager.add_trusted_ca"),
         ):
+            # clean up old cas
+            event = MagicMock()
+            event.cert_type = TLSType.PEER
+            # Not all units have added the new ca
+            peer_relation.peers_data[1]["tls_peer_ca_rotation"] = (
+                TLSCARotationState.NEW_CA_DETECTED.value
+            )
             charm.tls_events._on_clean_ca(event)
+            event.defer.assert_called_once()
+
+            # all units have updated their certs
+            peer_relation.peers_data[1]["tls_peer_ca_rotation"] = (
+                TLSCARotationState.CERT_UPDATED.value
+            )
+            peer_relation.peers_data[2]["tls_peer_ca_rotation"] = (
+                TLSCARotationState.CERT_UPDATED.value
+            )
+
+            manager.run()
             assert (
-                charm.state.unit_server.tls_peer_ca_rotation_state
-                == TLSCARotationState.NO_ROTATION
+                peer_relation.local_unit_data["tls_peer_ca_rotation"]
+                == TLSCARotationState.NO_ROTATION.value
+            )
+            event.defer.assert_called_once()
+
+
+def test_ca_client_rotation(certificate_available_context):
+    manager = certificate_available_context.manager
+    peer_relation = certificate_available_context.peer_relation
+    client_provider_certificate = certificate_available_context.client_provider_certificate
+    requirer_private_key = certificate_available_context.requirer_private_key
+    client_certificate = certificate_available_context.client_certificate
+
+    peer_relation.local_unit_data.clear()
+    peer_relation.local_app_data.clear()
+    peer_relation.local_unit_data.update(
+        {
+            "client_cert_ready": "True",
+            "peer_cert_ready": "True",
+            "hostname": "localhost",
+            "ip": "localhost",
+            "tls_client_state": "tls",
+            "tls_peer_state": "tls",
+            "state": "started",
+        }
+    )
+
+    peer_relation.local_app_data.update(
+        {
+            "cluster_state": "existing",
+            "authenticating": "enabled",
+        }
+    )
+    with (
+        manager,
+        patch("managers.tls.TLSManager._load_trusted_ca", return_value=[]),
+        patch("managers.tls.TLSManager.add_trusted_ca"),
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+            return_value=([client_provider_certificate], requirer_private_key),
+        ),
+        patch("charm.EtcdOperatorCharm._restart"),
+        # patch("ops.framework.BoundEvent.emit"),
+    ):
+        charm: EtcdOperatorCharm = manager.charm  # type: ignore
+        event = MagicMock(spec=CertificateAvailableEvent)
+        event.certificate = client_certificate
+
+        # detect new ca and store it
+        with patch(
+            "charm.EtcdOperatorCharm.rolling_restart",
+            lambda _, callback: charm._restart_ca_rotation(event),
+        ):
+            charm.tls_events._on_certificate_available(event)
+            assert charm.state.unit_server.client_cert_ready
+            assert charm.state.unit_server.tls_client_state == TLSState.TLS
+            assert (
+                charm.state.unit_server.tls_client_ca_rotation_state
+                == TLSCARotationState.NEW_CA_ADDED
+            )
+            event.defer.assert_called_once()
+
+        # Other units have not updated their certs
+        charm.tls_events._on_certificate_available(event)
+        assert (
+            charm.state.unit_server.tls_client_ca_rotation_state == TLSCARotationState.NEW_CA_ADDED
+        ), "Client CA rotation state should not be updated"
+        assert event.defer.call_count == 2, "Should defer until all units have updated their certs"
+
+        peer_relation.peers_data[1]["tls_client_ca_rotation"] = (
+            TLSCARotationState.NEW_CA_ADDED.value
+        )
+        peer_relation.peers_data[2]["tls_client_ca_rotation"] = (
+            TLSCARotationState.NEW_CA_ADDED.value
+        )
+        with (
+            patch("managers.tls.TLSManager.write_certificate") as write_certificate_mock,
+            patch("charm.EtcdOperatorCharm.rolling_restart") as restart_mock,
+        ):
+            charm.tls_events._on_certificate_available(event)
+            assert (
+                charm.state.unit_server.tls_client_ca_rotation_state
+                == TLSCARotationState.CERT_UPDATED
+            )
+            write_certificate_mock.assert_called_once()
+            restart_mock.assert_not_called()
+            assert event.defer.call_count == 2, "event should not have been deferred"
+
+        with (
+            patch(
+                "charm.EtcdOperatorCharm.rolling_restart",
+                lambda _, callback: charm._restart_clean_cas(None),
+            ),
+            patch("managers.tls.TLSManager._load_trusted_ca", return_value=["old_ca", "new_ca"]),
+            patch("workload.EtcdWorkload.remove_file"),
+            patch("managers.tls.TLSManager.add_trusted_ca"),
+        ):
+            # clean up old cas
+            event = MagicMock()
+            event.cert_type = TLSType.CLIENT
+            # Not all units have added the new ca
+            peer_relation.peers_data[1]["tls_client_ca_rotation"] = (
+                TLSCARotationState.NEW_CA_DETECTED.value
+            )
+            charm.tls_events._on_clean_ca(event)
+            event.defer.assert_called_once()
+
+            # all units have updated their certs
+            peer_relation.peers_data[1]["tls_client_ca_rotation"] = (
+                TLSCARotationState.CERT_UPDATED.value
+            )
+            peer_relation.peers_data[2]["tls_client_ca_rotation"] = (
+                TLSCARotationState.CERT_UPDATED.value
+            )
+
+            manager.run()
+            assert (
+                peer_relation.local_unit_data["tls_client_ca_rotation"]
+                == TLSCARotationState.NO_ROTATION.value
             )
             event.defer.assert_called_once()
