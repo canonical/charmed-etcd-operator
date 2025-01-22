@@ -163,7 +163,7 @@ def test_peer_relation_created():
     state_in = testing.State(relations={relation})
     with (
         patch("managers.cluster.ClusterManager.get_host_mapping", return_value=test_data),
-        patch("managers.cluster.ClusterManager.get_leader"),
+        patch("managers.cluster.ClusterManager.leader"),
     ):
         state_out = ctx.run(ctx.on.relation_created(relation=relation), state_in)
         assert state_out.get_relation(1).local_unit_data.get("hostname") == test_data["hostname"]
@@ -171,24 +171,25 @@ def test_peer_relation_created():
 
 def test_get_leader():
     test_ip = "10.54.237.119"
+    member_id = 11187096354790748301
     test_data = {
         "Endpoint": f"http://{test_ip}:{CLIENT_PORT}",
         "Status": {
             "header": {
                 "cluster_id": 9102535641521235766,
-                "member_id": 11187096354790748301,
+                "member_id": member_id,
             },
             "version": "3.4.22",
-            "leader": 11187096354790748301,
+            "leader": member_id,
         },
     }
 
     ctx = testing.Context(EtcdOperatorCharm)
-    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_unit_data={"ip": test_ip})
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation})
     with patch("managers.cluster.EtcdClient.get_endpoint_status", return_value=test_data):
         with ctx(ctx.on.relation_joined(relation=relation), state_in) as context:
-            assert context.charm.cluster_manager.get_leader() == f"http://{test_ip}:{CLIENT_PORT}"
+            assert context.charm.cluster_manager.leader == hex(member_id)[2:]
 
 
 def test_config_changed():
@@ -230,6 +231,7 @@ def test_unit_removal():
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("subprocess.run"),
         patch("workload.EtcdWorkload.stop"),
+        patch("managers.cluster.ClusterManager.leader"),
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
@@ -239,6 +241,7 @@ def test_unit_removal():
 
     with (
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.leader"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="remove member")),
         # mock the `wait` in tenacity.retry to avoid delay in retrying
         patch("tenacity.nap.time.sleep", MagicMock()),
@@ -251,6 +254,7 @@ def test_unit_removal():
     )
     with (
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.leader"),
         patch("subprocess.run"),
         patch("workload.EtcdWorkload.stop"),
     ):

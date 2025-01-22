@@ -46,31 +46,26 @@ class ClusterManager:
 
         return {"hostname": hostname, "ip": ip}
 
-    def get_leader(self) -> str | None:
-        """Query the etcd cluster for the raft leader and return the client_url as string.
+    @property
+    def leader(self) -> str:
+        """Query the etcd cluster for the raft leader.
 
         Returns:
-            str | None: The client URL of the raft leader or None if no leader is found.
+            str: The member id of the raft leader in hex representation.
         """
-        # loop through list of hosts and compare their member id with the leader
-        # if they match, return this host's endpoint
-        for endpoint in self.cluster_endpoints:
+        try:
             client = EtcdClient(
-                username=self.admin_user, password=self.admin_password, client_url=endpoint
+                username=self.admin_user,
+                password=self.admin_password,
+                client_url=self.state.unit_server.client_url,
             )
-            try:
-                endpoint_status = client.get_endpoint_status()
-                member_id = endpoint_status["Status"]["header"]["member_id"]
-                leader_id = endpoint_status["Status"]["leader"]
-                if member_id == leader_id:
-                    leader = endpoint
-                    return leader
-            except (KeyError, JSONDecodeError) as e:
-                # for now, we don't raise an error if there is no leader
-                # this may change when we have actual relevant tasks performed against the leader
-                raise RaftLeaderNotFoundError(f"No raft leader found in cluster: {e}")
-
-        return None
+            endpoint_status = client.get_endpoint_status()
+            leader_id = endpoint_status["Status"]["leader"]
+            # the leader ID is returned as int, but needs to be processed as hex
+            # e.g. ID=4477466968462020105 needs to be returned as 3e23287c34b94e09
+            return hex(leader_id)[2:]
+        except (KeyError, JSONDecodeError) as e:
+            raise RaftLeaderNotFoundError(f"No raft leader found: {e}")
 
     def enable_authentication(self) -> None:
         """Enable the etcd admin user and authentication."""
@@ -249,6 +244,8 @@ class ClusterManager:
                 password=self.admin_password,
                 client_url=self.state.unit_server.client_url,
             )
+            if self.member.id == self.leader:
+                logger.debug(f"This unit is the leader: {self.member.id} == {self.leader}")
             # by querying the member's id we make sure the cluster is available with quorum
             # otherwise we raise and retry
             client.remove_member(self.member.id)

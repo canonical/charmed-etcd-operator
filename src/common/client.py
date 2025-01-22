@@ -133,7 +133,7 @@ class EtcdClient:
                     if member["peerURLs"][0] == peer_url:
                         # the member ID is returned as int, but needs to be processed as hex
                         # e.g. ID=4477466968462020105 needs to be stored as 3e23287c34b94e09
-                        member_id = f"{member['ID']:0>2x}"
+                        member_id = f"{hex(member['ID'])[2:]}"
                 # for the newly added member, the member name will not be included in the response
                 # we have to append it separately
                 cluster_members += f"{member_name}={peer_url}"
@@ -196,7 +196,7 @@ class EtcdClient:
             member["name"]: Member(
                 id=str(hex(member["ID"]))[2:],
                 name=member["name"],
-                peer_url=member["peerURLs"],
+                peer_urls=member["peerURLs"],
                 client_urls=member["clientURLs"],
             )
             for member in result["members"]
