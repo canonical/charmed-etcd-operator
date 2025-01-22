@@ -128,9 +128,11 @@ async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] |
     return None
 
 
-def get_certificate_from_unit(model: str, unit: str, cert_type: TLSType) -> str | None:
+def get_certificate_from_unit(
+    model: str, unit: str, cert_type: TLSType, is_ca: bool = False
+) -> str | None:
     """Retrieve a certificate from a unit."""
-    command = f'juju ssh --model={model} {unit} "cat /var/snap/charmed-etcd/common/tls/{cert_type.value}.pem"'
+    command = f'juju ssh --model={model} {unit} "cat /var/snap/charmed-etcd/common/tls/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
     output = subprocess.getoutput(command)
     if output.startswith("-----BEGIN CERTIFICATE-----"):
         return output

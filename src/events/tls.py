@@ -85,6 +85,8 @@ class TLSEvents(Object):
             ],
         )
 
+        self.framework.observe(self.clean_ca_event, self._on_clean_ca)
+
         for relation in [self.peer_certificate, self.client_certificate]:
             self.framework.observe(
                 relation.on.certificate_available, self._on_certificate_available
@@ -154,7 +156,10 @@ class TLSEvents(Object):
             return
 
         # writing certificate after CA rotation
-        if tls_ca_rotation_state == TLSCARotationState.NEW_CA_ADDED:
+        if tls_ca_rotation_state in [
+            TLSCARotationState.NEW_CA_DETECTED,
+            TLSCARotationState.NEW_CA_ADDED,
+        ]:
             if not self.charm.tls_manager.is_new_ca_saved_on_all_servers(cert_type):
                 logger.debug("Waiting for all servers to update CA")
                 event.defer()
