@@ -12,11 +12,17 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
 )
-from ops import RelationBrokenEvent, RelationCreatedEvent
-from ops.framework import Object
+from ops import EventSource, Handle, RelationBrokenEvent, RelationCreatedEvent
+from ops.framework import EventBase, Object
 
-from common.exceptions import TLSMissingCertificateOrKeyError
-from literals import CLIENT_TLS_RELATION_NAME, PEER_TLS_RELATION_NAME, Status, TLSState, TLSType
+from literals import (
+    CLIENT_TLS_RELATION_NAME,
+    PEER_TLS_RELATION_NAME,
+    Status,
+    TLSCARotationState,
+    TLSState,
+    TLSType,
+)
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -24,8 +30,30 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class CleanCAEvent(EventBase):
+    """Event for cleaning up old CAs."""
+
+    def __init__(
+        self,
+        handle: Handle,
+        cert_type: TLSType,
+    ):
+        super().__init__(handle)
+        self.cert_type = cert_type
+
+    def snapshot(self) -> dict:
+        """Snapshot of lock event."""
+        return {"cert_type": self.cert_type.value}
+
+    def restore(self, snapshot: dict):
+        """Restores lock event."""
+        self.cert_type = TLSType(snapshot["cert_type"])
+
+
 class TLSEvents(Object):
     """Event handlers for related applications on the `certificates` relation interface."""
+
+    clean_ca_event = EventSource(CleanCAEvent)
 
     def __init__(self, charm: "EtcdOperatorCharm"):
         super().__init__(charm, "tls")
@@ -56,6 +84,8 @@ class TLSEvents(Object):
                 ),
             ],
         )
+
+        self.framework.observe(self.clean_ca_event, self._on_clean_ca)
 
         self.framework.observe(
             self.peer_certificate.on.certificate_available, self._on_certificate_available
@@ -101,28 +131,57 @@ class TLSEvents(Object):
         )
 
         certs, private_key = relation_requirer.get_assigned_certificates()
-        cert = certs[0] if certs else None
+        cert = certs[0]
 
-        if not cert or not private_key:
-            logger.error("Missing certificate or private key")
-            raise TLSMissingCertificateOrKeyError("Missing certificate or private key")
+        tls_state = (
+            self.charm.state.unit_server.tls_peer_state
+            if cert_type == TLSType.PEER
+            else self.charm.state.unit_server.tls_client_state
+        )
+        tls_ca_rotation_state = (
+            self.charm.state.unit_server.tls_peer_ca_rotation_state
+            if cert_type == TLSType.PEER
+            else self.charm.state.unit_server.tls_client_ca_rotation_state
+        )
 
-        # write certificates to disk
-        self.charm.tls_manager.write_certificate(cert, private_key)
-
-        # Rotating certificates
         if (
-            cert_type == TLSType.PEER
-            and self.charm.state.unit_server.tls_peer_state == TLSState.TLS
+            tls_state == TLSState.TLS
+            and self.charm.tls_manager.is_new_ca(cert.ca.raw, cert_type)
+            and tls_ca_rotation_state == TLSCARotationState.NO_ROTATION
         ):
-            logger.debug("Rotating peer certificates")
+            logger.debug(f"New {cert_type} CA detected, updating trusted CAs")
+            self.charm.tls_manager.add_trusted_ca(cert.ca.raw, cert_type)
+            self.charm.tls_manager.set_ca_rotation_state(
+                cert_type, TLSCARotationState.NEW_CA_DETECTED
+            )
+            self.charm.rolling_restart("_restart_ca_rotation")
+            event.defer()
             return
 
-        if (
-            cert_type == TLSType.CLIENT
-            and self.charm.state.unit_server.tls_client_state == TLSState.TLS
-        ):
-            logger.debug("Rotating client certificates")
+        # writing certificate after CA rotation
+        if tls_ca_rotation_state in [
+            TLSCARotationState.NEW_CA_DETECTED,
+            TLSCARotationState.NEW_CA_ADDED,
+        ]:
+            if not self.charm.tls_manager.is_new_ca_saved_on_all_servers(cert_type):
+                logger.debug("Waiting for all servers to update CA")
+                event.defer()
+                return
+        # write certificates to disk
+        self.charm.tls_manager.write_certificate(cert, private_key)  # type: ignore
+
+        # New CA added to all servers,  TLS is enabled, cert updated -> no rolling restart needed
+        if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NEW_CA_ADDED:
+            logger.debug(f"Updating {cert_type.value} certificates with new CA")
+            self.charm.tls_manager.set_ca_rotation_state(
+                cert_type, TLSCARotationState.CERT_UPDATED
+            )
+            self.clean_ca_event.emit(cert_type=cert_type)
+            return
+
+        # TLS enabled and no CA rotation -> Simple certificate rotation
+        if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NO_ROTATION:
+            logger.debug(f"Rotating {cert_type.value} certificates")
             return
 
         # if the cluster is new and the member hasn't started yet, no need to write config or restart just set the tls state
@@ -174,3 +233,18 @@ class TLSEvents(Object):
 
         # write config and restart workload
         self.charm.rolling_restart(callback_override=f"_restart_disable_{cert_type.value}_tls")
+
+    def _on_clean_ca(self, event: CleanCAEvent) -> None:
+        """Handle the `clean-ca` event.
+
+        Args:
+            event (CleanCAEvent): The event object.
+        """
+        # if all servers have updated the cert, restart the workload to clean up the old CA
+        if self.charm.tls_manager.is_cert_updated_on_all_servers(event.cert_type):
+            self.charm.rolling_restart("_restart_clean_cas")
+        else:
+            logger.debug(
+                "Waiting for all servers to update certificates before cleaning up old CAs"
+            )
+            event.defer()

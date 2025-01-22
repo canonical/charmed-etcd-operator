@@ -5,7 +5,6 @@
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-import pytest
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
     ProviderCertificate,
@@ -17,7 +16,6 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 from ops import testing
 
 from charm import EtcdOperatorCharm
-from common.exceptions import TLSMissingCertificateOrKeyError
 from core.models import Member
 from literals import (
     CLIENT_TLS_RELATION_NAME,
@@ -353,21 +351,6 @@ def test_certificate_available_enabling_tls():
             patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
             patch("managers.cluster.ClusterManager.restart_member", return_value=True),
         ):
-            # Error case where private key is missing
-            with pytest.raises(TLSMissingCertificateOrKeyError):
-                with (
-                    patch(
-                        "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
-                        return_value=([peer_provider_certificate], None),
-                    ),
-                    patch(
-                        "charm.EtcdOperatorCharm.rolling_restart",
-                        lambda _, callback: charm._restart_enable_peer_tls(event),
-                    ),
-                ):
-                    event.certificate = peer_certificate
-                    charm.tls_events._on_certificate_available(event)
-
             # Peer cert added case
             with (
                 patch(
@@ -664,6 +647,7 @@ def test_certificate_expiration():
         patch("workload.EtcdWorkload.write_file"),
         patch("pathlib.Path.exists", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.tls.TLSManager.is_new_ca", return_value=False),
     ):
         charm: EtcdOperatorCharm = mgr.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
