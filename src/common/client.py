@@ -158,112 +158,19 @@ class EtcdClient:
         else:
             raise EtcdClusterManagementError(f"Failed to promote member {member_id}.")
 
-    def _run_etcdctl(  # noqa: C901
-        self,
-        command: str,
-        endpoints: str,
-        subcommand: str | None = None,
-        # We need to be able to run `etcdctl` without user/pw
-        # otherwise it will error if auth is not yet enabled
-        # this is relevant for `user add` and `auth enable` commands
-        auth_username: str | None = None,
-        auth_password: str | None = None,
-        user: str | None = None,
-        user_password: str | None = None,
-        member: str | None = None,
-        peer_url: str | None = None,
-        learner: bool = False,
-        output_format: str = "simple",
-        use_input: str | None = None,
-        member_id: str | None = None,
-        peer_urls: str | None = None,
-        cluster_arg: bool = False,
-    ) -> str | None:
-        """Execute `etcdctl` command via subprocess.
-
-        This method aims to provide a very clear interface for executing `etcdctl` and minimize
-        the margin of error on cluster operations. The following arguments can be passed to the
-        `etcdctl` command as parameters.
-
-        Args:
-            command: command to execute with etcdctl, e.g. `elect`, `member` or `endpoint`
-            subcommand: subcommand to add to the previous command, e.g. `add` or `status`
-            endpoints: str-formatted list of endpoints to run the command against
-            auth_username: username used for authentication
-            auth_password: password used for authentication
-            user: username to be added or updated in etcd
-            user_password: password to be set for the user that is added to etcd
-            member: member name or id, required for commands `member add/update/promote/remove`
-            peer_url: url of a member to be used for cluster-internal communication
-            learner: flag for adding a new cluster member as not-voting member
-            output_format: set the output format (fields, json, protobuf, simple, table)
-            use_input: supply text input to be passed to the `etcdctl` command (e.g. for
-                        non-interactive password change)
-            member_id: member ID to be used in the command
-            peer_urls: peer URLs to be used in the command
-            cluster_arg: set to `True` if the command requires the `--cluster` argument
-
-        Returns:
-            The output of the subprocess-command as a string. In case of error, this will
-            return `None`. It will not raise an error in order to leave error handling up
-            to the caller. Depending on what command is executed, the ways of handling errors
-            might differ.
-        """
-        try:
-            args = [f"{SNAP_NAME}.etcdctl", command]
-            if subcommand:
-                args.append(subcommand)
-            if member_id:
-                args.append(member_id)
-            if user:
-                args.append(user)
-            if user_password == "":
-                args.append("--no-password=True")
-            elif user_password:
-                args.append(f"--new-user-password={user_password}")
-            if endpoints:
-                args.append(f"--endpoints={endpoints}")
-            if auth_username:
-                args.append(f"--user={auth_username}")
-            if auth_password:
-                args.append(f"--password={auth_password}")
-            if member:
-                args.append(member)
-            if peer_url:
-                args.append(f"--peer-urls={peer_url}")
-            if learner:
-                args.append("--learner=True")
-            if output_format:
-                args.append(f"-w={output_format}")
-            if use_input:
-                args.append("--interactive=False")
-            if peer_urls:
-                args.append(f"--peer-urls={peer_urls}")
-            if "https" in endpoints:
-                args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
-                args.append(f"--key={TLS_ROOT_DIR}/client.key")
-                args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
-            if cluster_arg:
-                args.append("--cluster")
-
-            result = subprocess.run(
-                args,
-                check=True,
-                text=True,
-                capture_output=True,
-                input=use_input,
-                timeout=10,
-            ).stdout.strip()
-        except subprocess.CalledProcessError as e:
-            logger.error(
-                f"etcdctl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"
-            )
-            return None
-        except subprocess.TimeoutExpired as e:
-            logger.error(f"Timed out running etcdctl: {e.stderr}")
-            return None
-
-        return result
+    def remove_member(self, member_id: str) -> None:
+        """Remove a cluster member."""
+        if result := self._run_etcdctl(
+            command="member",
+            subcommand="remove",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            member=member_id,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdClusterManagementError(f"Failed to remove {member_id}.")
 
     def member_list(self) -> dict[str, Member] | None:
         """Run the `member list` command in etcd.
@@ -289,7 +196,7 @@ class EtcdClient:
             member["name"]: Member(
                 id=str(hex(member["ID"]))[2:],
                 name=member["name"],
-                peer_urls=member["peerURLs"],
+                peer_url=member["peerURLs"],
                 client_urls=member["clientURLs"],
             )
             for member in result["members"]
@@ -354,6 +261,105 @@ class EtcdClient:
             endpoints=endpoints,
             auth_username=self.user,
             auth_password=self.password,
-            member_id=member_id,
-            peer_urls=peer_urls,
+            member=member_id,
+            peer_url=peer_urls,
         )
+
+    def _run_etcdctl(  # noqa: C901
+        self,
+        command: str,
+        endpoints: str,
+        subcommand: str | None = None,
+        # We need to be able to run `etcdctl` without user/pw
+        # otherwise it will error if auth is not yet enabled
+        # this is relevant for `user add` and `auth enable` commands
+        auth_username: str | None = None,
+        auth_password: str | None = None,
+        user: str | None = None,
+        user_password: str | None = None,
+        member: str | None = None,
+        peer_url: str | None = None,
+        learner: bool = False,
+        output_format: str = "simple",
+        use_input: str | None = None,
+        cluster_arg: bool = False,
+    ) -> str | None:
+        """Execute `etcdctl` command via subprocess.
+
+        This method aims to provide a very clear interface for executing `etcdctl` and minimize
+        the margin of error on cluster operations. The following arguments can be passed to the
+        `etcdctl` command as parameters.
+
+        Args:
+            command: command to execute with etcdctl, e.g. `elect`, `member` or `endpoint`
+            subcommand: subcommand to add to the previous command, e.g. `add` or `status`
+            endpoints: str-formatted list of endpoints to run the command against
+            auth_username: username used for authentication
+            auth_password: password used for authentication
+            user: username to be added or updated in etcd
+            user_password: password to be set for the user that is added to etcd
+            member: member name or id, required for commands `member add/update/promote/remove`
+            peer_url: url of a member to be used for cluster-internal communication
+            learner: flag for adding a new cluster member as not-voting member
+            output_format: set the output format (fields, json, protobuf, simple, table)
+            use_input: supply text input to be passed to the `etcdctl` command (e.g. for
+                        non-interactive password change)
+            cluster_arg: set to `True` if the command requires the `--cluster` argument
+
+        Returns:
+            The output of the subprocess-command as a string. In case of error, this will
+            return `None`. It will not raise an error in order to leave error handling up
+            to the caller. Depending on what command is executed, the ways of handling errors
+            might differ.
+        """
+        try:
+            args = [f"{SNAP_NAME}.etcdctl", command]
+            if subcommand:
+                args.append(subcommand)
+            if user:
+                args.append(user)
+            if user_password == "":
+                args.append("--no-password=True")
+            elif user_password:
+                args.append(f"--new-user-password={user_password}")
+            if endpoints:
+                args.append(f"--endpoints={endpoints}")
+            if auth_username:
+                args.append(f"--user={auth_username}")
+            if auth_password:
+                args.append(f"--password={auth_password}")
+            if member:
+                args.append(member)
+            if peer_url:
+                args.append(f"--peer-urls={peer_url}")
+            if learner:
+                args.append("--learner=True")
+            if output_format:
+                args.append(f"-w={output_format}")
+            if use_input:
+                args.append("--interactive=False")
+            if "https" in endpoints:
+                args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
+                args.append(f"--key={TLS_ROOT_DIR}/client.key")
+                args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
+            if cluster_arg:
+                args.append("--cluster")
+
+            result = subprocess.run(
+                args,
+                check=True,
+                text=True,
+                capture_output=True,
+                input=use_input,
+                timeout=10,
+            ).stdout.strip()
+        except subprocess.CalledProcessError as e:
+            logger.error(
+                f"etcdctl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"
+            )
+            return None
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"Timed out running etcdctl: {e.stderr}")
+            return None
+
+        return result
