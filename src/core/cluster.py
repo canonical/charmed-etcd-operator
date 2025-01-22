@@ -15,7 +15,13 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from ops import Object, Relation, Unit
 
 from core.models import EtcdCluster, EtcdServer
-from literals import PEER_RELATION, SECRETS_APP, SUBSTRATES
+from literals import (
+    CLIENT_TLS_RELATION_NAME,
+    PEER_RELATION,
+    PEER_TLS_RELATION_NAME,
+    SECRETS_APP,
+    SUBSTRATES,
+)
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -95,3 +101,13 @@ class ClusterState(Object):
         servers.add(self.unit_server)
 
         return servers
+
+    @property
+    def peer_tls_relation(self) -> Relation | None:
+        """Get the unit certificates relation."""
+        return self.model.get_relation(PEER_TLS_RELATION_NAME)
+
+    @property
+    def client_tls_relation(self) -> Relation | None:
+        """Get the unit certificates relation."""
+        return self.model.get_relation(CLIENT_TLS_RELATION_NAME)

@@ -24,7 +24,7 @@ from common.exceptions import (
     EtcdUserManagementError,
 )
 from common.secrets import get_secret_from_id
-from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status
+from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status, TLSState
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -68,6 +68,17 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
+        tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
+        if (
+            self.charm.state.unit_server.tls_client_state in tls_transition_states
+            or self.charm.state.unit_server.tls_peer_state in tls_transition_states
+        ):
+            logger.info(
+                f"Deferring start because TLS is not ready for {self.charm.state.unit_server.member_name}."
+            )
+            event.defer()
+            return
+
         self.charm.config_manager.set_config_properties()
 
         if self.charm.unit.is_leader() and not self.charm.state.cluster.cluster_state:

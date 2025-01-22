@@ -5,11 +5,12 @@
 """Collection of state objects for the Etcd relations, apps and units."""
 
 import logging
+from dataclasses import dataclass
 
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
 
-from literals import CLIENT_PORT, INTERNAL_USER, PEER_PORT, SUBSTRATES
+from literals import CLIENT_PORT, INTERNAL_USER, PEER_PORT, SUBSTRATES, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -92,17 +93,49 @@ class EtcdServer(RelationState):
     @property
     def peer_url(self) -> str:
         """The peer connection endpoint for the etcd server."""
-        return f"http://{self.ip}:{PEER_PORT}"
+        scheme = "https" if self.tls_peer_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+        return f"{scheme}://{self.ip}:{PEER_PORT}"
 
     @property
     def client_url(self) -> str:
         """The client connection endpoint for the etcd server."""
-        return f"http://{self.ip}:{CLIENT_PORT}"
+        scheme = "https" if self.tls_client_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+        return f"{scheme}://{self.ip}:{CLIENT_PORT}"
+
+    @property
+    def tls_client_state(self) -> TLSState:
+        """The current TLS state of the etcd server."""
+        return TLSState(self.relation_data.get("tls_client_state", TLSState.NO_TLS.value))
+
+    @property
+    def tls_peer_state(self) -> TLSState:
+        """The current TLS state of the etcd server."""
+        return TLSState(self.relation_data.get("tls_peer_state", TLSState.NO_TLS.value))
+
+    @property
+    def peer_cert_ready(self) -> bool:
+        """Check if the peer certificate is ready."""
+        return self.relation_data.get("peer_cert_ready", "") == "True"
+
+    @property
+    def client_cert_ready(self) -> bool:
+        """Check if the client certificate is ready."""
+        return self.relation_data.get("client_cert_ready", "") == "True"
+
+    @property
+    def certs_ready(self) -> bool:
+        """Check if all certificates are ready."""
+        return self.peer_cert_ready and self.client_cert_ready
 
     @property
     def member_endpoint(self) -> str:
         """Concatenate member_name and peer_url."""
         return f"{self.member_name}={self.peer_url}"
+
+    @property
+    def is_started(self) -> bool:
+        """Check if the unit has started."""
+        return self.relation_data.get("state", "") == "started"
 
 
 class EtcdCluster(RelationState):
@@ -160,3 +193,13 @@ class EtcdCluster(RelationState):
         will unset the `member_id` here.
         """
         return self.relation_data.get("learning_member", "")
+
+
+@dataclass
+class Member:
+    """Class representing the members of an ETCD cluster."""
+
+    id: str
+    name: str
+    peer_urls: list[str]
+    client_urls: list[str]
