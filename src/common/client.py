@@ -172,6 +172,19 @@ class EtcdClient:
         else:
             raise EtcdClusterManagementError(f"Failed to remove {member_id}.")
 
+    def move_leader(self, new_leader_id: str) -> None:
+        """Transfer Raft leadership to another etcd cluster member."""
+        if result := self._run_etcdctl(
+            command="move-leader",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            member=new_leader_id,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdClusterManagementError(f"Failed to transfer leadership to {new_leader_id}.")
+
     def member_list(self) -> dict[str, Member] | None:
         """Run the `member list` command in etcd.
 

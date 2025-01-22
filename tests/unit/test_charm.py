@@ -227,6 +227,7 @@ def test_unit_removal():
     data_storage = testing.Storage("data")
     state_in = testing.State(storages=[data_storage], relations={relation})
 
+    # test the happy path
     with (
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("subprocess.run"),
@@ -239,6 +240,7 @@ def test_unit_removal():
         assert state_out.get_relation(1).local_app_data.get("cluster_state")
         assert state_out.get_relation(1).local_app_data.get("cluster_members")
 
+    # in case of error when removing the member, unit should be in blocked state with error
     with (
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("managers.cluster.ClusterManager.leader"),
@@ -249,6 +251,7 @@ def test_unit_removal():
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert state_out.unit_status == ops.BlockedStatus("cluster management error")
 
+    # if all units are removed, cluster state data should be cleaned from application databag
     state_in = testing.State(
         storages=[data_storage], relations={relation}, planned_units=0, leader=True
     )

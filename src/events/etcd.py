@@ -22,6 +22,7 @@ from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
     EtcdUserManagementError,
+    RaftLeaderNotFoundError,
 )
 from common.secrets import get_secret_from_id
 from literals import (
@@ -188,7 +189,7 @@ class EtcdEvents(Object):
         if self.charm.app.planned_units() > 0:
             try:
                 self.charm.cluster_manager.remove_member()
-            except (EtcdClusterManagementError, ValueError):
+            except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
                 # We want this hook to error out if we cannot remove the cluster member
                 # otherwise the cluster could become unavailable because of quorum loss
                 self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)

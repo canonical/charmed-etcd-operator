@@ -245,9 +245,29 @@ class ClusterManager:
                 client_url=self.state.unit_server.client_url,
             )
             if self.member.id == self.leader:
-                logger.debug(f"This unit is the leader: {self.member.id} == {self.leader}")
+                new_leader_id = self.select_new_leader()
+                logger.debug(f"Next selected leader: {new_leader_id}")
+                client.move_leader(new_leader_id)
             # by querying the member's id we make sure the cluster is available with quorum
             # otherwise we raise and retry
             client.remove_member(self.member.id)
-        except (EtcdClusterManagementError, ValueError):
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
             raise
+
+    def select_new_leader(self) -> str:
+        """Choose a new leader from the current cluster members.
+
+        Returns:
+            str: The member id of the next cluster member in hex representation.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        member_list = client.member_list()
+        if member_list is None:
+            raise ValueError("member list command failed")
+        member_list.pop(self.state.unit_server.member_name, None)
+        return next(iter(member_list.values())).id
