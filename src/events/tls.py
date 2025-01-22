@@ -154,18 +154,16 @@ class TLSEvents(Object):
             return
 
         # writing certificate after CA rotation
-        if tls_ca_rotation_state in [
-            TLSCARotationState.NEW_CA_DETECTED,
-            TLSCARotationState.NEW_CA_ADDED,
-        ]:
+        if tls_ca_rotation_state == TLSCARotationState.NEW_CA_ADDED:
             if not self.charm.tls_manager.is_new_ca_saved_on_all_servers(cert_type):
                 logger.debug("Waiting for all servers to update CA")
                 event.defer()
                 return
+
         # write certificates to disk
         self.charm.tls_manager.write_certificate(cert, private_key)  # type: ignore
 
-        # New CA added to all servers,  TLS is enabled, cert updated -> no rolling restart needed
+        # TLS is enabled, New CA added to all servers, and cert updated -> no rolling restart needed
         if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NEW_CA_ADDED:
             logger.debug(f"Updating {cert_type.value} certificates with new CA")
             self.charm.tls_manager.set_ca_rotation_state(
@@ -184,13 +182,8 @@ class TLSEvents(Object):
             self.charm.tls_manager.set_tls_state(state=TLSState.TLS, tls_type=cert_type)
             return
 
+        # Transition to TLS
         # peer tls needs to be enabled before client tls if both are transitioning (because of peer url broadcasting)
-        logger.debug(
-            f"client state: {self.charm.state.unit_server.tls_client_state} ; peer state: {self.charm.state.unit_server.tls_peer_state}"
-        )
-        logger.debug(
-            f"client cert ready: {self.charm.state.unit_server.client_cert_ready} ; peer cert ready: {self.charm.state.unit_server.peer_cert_ready}"
-        )
         if (
             cert_type == TLSType.PEER
             and self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS
