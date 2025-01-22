@@ -11,7 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 def get_secret_from_id(model, secret_id: str) -> dict[str, str] | None:
-    """Resolve the given id of a Juju secret and return the content as a dict."""
+    """Resolve the given id of a Juju secret and return the content as a dict.
+
+    Args:
+        model (Model): Model object.
+        secret_id (str): The id of the secret.
+
+    Returns:
+        dict: The content of the secret.
+    """
     try:
         secret_content = model.get_secret(id=secret_id).get_content(refresh=True)
     except SecretNotFoundError:

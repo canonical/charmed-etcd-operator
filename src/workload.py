@@ -66,3 +66,12 @@ class EtcdWorkload(WorkloadBase):
             self.etcd.stop(services=[SNAP_SERVICE])
         except snap.SnapError as e:
             logger.exception(str(e))
+
+    @override
+    def restart(self) -> None:
+        self.etcd.restart(services=[SNAP_SERVICE])
+
+    @override
+    def remove_file(self, file) -> None:
+        path = Path(file)
+        path.unlink(missing_ok=True)

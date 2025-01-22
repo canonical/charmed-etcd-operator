@@ -45,8 +45,9 @@ def test_install_failure_blocked_status():
 def test_internal_user_creation():
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    restart_relation = testing.PeerRelation(id=2, endpoint="restart")
 
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, restart_relation}, leader=True)
     state_out = ctx.run(ctx.on.leader_elected(), state_in)
     secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")
@@ -80,6 +81,7 @@ def test_start():
     # if authentication cannot be enabled, the charm should be blocked
     state_in = testing.State(relations={relation}, leader=True)
     with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
