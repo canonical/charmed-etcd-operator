@@ -85,15 +85,10 @@ class TLSEvents(Object):
             ],
         )
 
-        self.framework.observe(self.clean_ca_event, self._on_clean_ca)
-
-        self.framework.observe(
-            self.peer_certificate.on.certificate_available, self._on_certificate_available
-        )
-
-        self.framework.observe(
-            self.client_certificate.on.certificate_available, self._on_certificate_available
-        )
+        for relation in [self.peer_certificate, self.client_certificate]:
+            self.framework.observe(
+                relation.on.certificate_available, self._on_certificate_available
+            )
 
         for relation in [PEER_TLS_RELATION_NAME, CLIENT_TLS_RELATION_NAME]:
             self.framework.observe(

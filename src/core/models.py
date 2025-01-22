@@ -102,10 +102,39 @@ class EtcdServer(RelationState):
         """The peer connection endpoint for the etcd server."""
         scheme = "https" if self.tls_peer_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
         return f"{scheme}://{self.ip}:{PEER_PORT}"
+        scheme = "https" if self.tls_peer_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+        return f"{scheme}://{self.ip}:{PEER_PORT}"
 
     @property
     def client_url(self) -> str:
         """The client connection endpoint for the etcd server."""
+        scheme = "https" if self.tls_client_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+        return f"{scheme}://{self.ip}:{CLIENT_PORT}"
+
+    @property
+    def tls_client_state(self) -> TLSState:
+        """The current TLS state of the etcd server."""
+        return TLSState(self.relation_data.get("tls_client_state", TLSState.NO_TLS.value))
+
+    @property
+    def tls_peer_state(self) -> TLSState:
+        """The current TLS state of the etcd server."""
+        return TLSState(self.relation_data.get("tls_peer_state", TLSState.NO_TLS.value))
+
+    @property
+    def peer_cert_ready(self) -> bool:
+        """Check if the peer certificate is ready."""
+        return self.relation_data.get("peer_cert_ready", "") == "True"
+
+    @property
+    def client_cert_ready(self) -> bool:
+        """Check if the client certificate is ready."""
+        return self.relation_data.get("client_cert_ready", "") == "True"
+
+    @property
+    def certs_ready(self) -> bool:
+        """Check if all certificates are ready."""
+        return self.peer_cert_ready and self.client_cert_ready
         scheme = "https" if self.tls_client_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
         return f"{scheme}://{self.ip}:{CLIENT_PORT}"
 
@@ -214,6 +243,16 @@ class EtcdCluster(RelationState):
         will unset the `member_id` here.
         """
         return self.relation_data.get("learning_member", "")
+
+
+@dataclass
+class Member:
+    """Class representing the members of an ETCD cluster."""
+
+    id: str
+    name: str
+    peer_urls: list[str]
+    client_urls: list[str]
 
 
 @dataclass

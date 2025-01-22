@@ -17,8 +17,10 @@ SNAP_SERVICE = "etcd"
 # it's the current config path for the legacy-etcd snap
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
+TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
 
 PEER_RELATION = "etcd-peers"
+RESTART_RELATION = "restart"
 RESTART_RELATION = "restart"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
@@ -30,6 +32,9 @@ SECRETS_APP = ["root-password"]
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 SUBSTRATES = Literal["vm", "k8s"]
 SUBSTRATE = "vm"
+
+PEER_TLS_RELATION_NAME = "peer-certificates"
+CLIENT_TLS_RELATION_NAME = "client-certificates"
 
 PEER_TLS_RELATION_NAME = "peer-certificates"
 CLIENT_TLS_RELATION_NAME = "client-certificates"

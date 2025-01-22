@@ -119,6 +119,25 @@ def test_update_status():
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
 
+    # test data storage
+    # Set up storage with some content:
+    data_storage = testing.Storage("data")
+    (data_storage.get_filesystem(ctx) / "myfile.data").write_text("helloworld")
+
+    with patch("workload.EtcdWorkload.alive", return_value=True):
+        with ctx(ctx.on.update_status(), testing.State(storages=[data_storage])) as context:
+            data = context.charm.model.storages["data"][0]
+            data_loc = data.location
+            data_path = data_loc / "myfile.data"
+            assert data_path.exists()
+            assert data_path.read_text() == "helloworld"
+
+            test_file = data_loc / "test.txt"
+            test_file.write_text("test_line")
+
+    # Verify that writing the file did work as expected.
+    assert (data_storage.get_filesystem(ctx) / "test.txt").read_text() == "test_line"
+
 
 def test_peer_relation_created():
     test_data = {"hostname": "my_hostname", "ip": "my_ip"}

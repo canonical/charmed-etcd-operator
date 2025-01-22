@@ -45,9 +45,14 @@ class EtcdOperatorCharm(ops.CharmBase):
             state=self.state, workload=self.workload, config=self.config
         )
         self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
+        self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
 
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
+        self.tls_events = TLSEvents(self)
+
+        # --- LIB EVENT HANDLERS ---
+        self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)
         self.tls_events = TLSEvents(self)
 
         # --- LIB EVENT HANDLERS ---
