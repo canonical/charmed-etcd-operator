@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
-import os
+import pathlib
 import signal
 import subprocess
 import sys
@@ -18,6 +18,7 @@ continue_running = True
 def continuous_writes(endpoints: str, user: str, password: str):
     key = "cw_key"
     count = 0
+    pathlib.Path(WRITES_LAST_WRITTEN_VAL_PATH).unlink(missing_ok=True)
 
     while continue_running:
         count += 1
@@ -37,9 +38,7 @@ def continuous_writes(endpoints: str, user: str, password: str):
         time.sleep(1)
     else:
         # write last expected written value on disk when terminating
-        with open(WRITES_LAST_WRITTEN_VAL_PATH, "w") as f:
-            f.write(str(count))
-            os.fsync(f)
+        pathlib.Path(WRITES_LAST_WRITTEN_VAL_PATH).write_text(str(count))
 
 
 def handle_stop_signal(signum, frame) -> None:
