@@ -27,7 +27,7 @@ def put_key(
     password: str | None = None,
     tls_enabled: bool = False,
 ) -> str:
-    """Write data to etcd using `etcdctl` via `juju ssh`."""
+    """Write data to etcd using `etcdctl`."""
     etcd_command = f"etcdctl put {key} {value} --endpoints={endpoints}"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
@@ -35,9 +35,9 @@ def put_key(
         etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
     return subprocess.getoutput(etcd_command).split("\n")[0]
 
@@ -57,9 +57,9 @@ def get_key(
         etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
     return subprocess.getoutput(etcd_command).split("\n")[1]
 
@@ -69,9 +69,9 @@ def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
     result = subprocess.getoutput(etcd_command).split("\n")[0]
 
@@ -124,3 +124,14 @@ def get_certificate_from_unit(model: str, unit: str, cert_type: TLSType) -> str 
         return output
 
     return None
+
+
+async def download_client_certificate_from_unit(
+    ops_test: OpsTest, app_name: str = APP_NAME
+) -> None:
+    """Copy the client certificate files from a unit to the host's filesystem."""
+    unit = ops_test.model.applications[app_name].units[0]
+    tls_path = "/var/snap/charmed-etcd/common/tls"
+
+    for file in ["client.pem", "client.key", "client_ca.pem"]:
+        await unit.scp_from(f"{tls_path}/{file}", file)
