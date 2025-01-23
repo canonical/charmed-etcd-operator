@@ -4,6 +4,7 @@
 
 import logging
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -11,13 +12,14 @@ import time
 logger = logging.getLogger(__name__)
 
 WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
+continue_running = True
 
 
 def continuous_writes(endpoints: str, user: str, password: str):
     key = "cw_key"
     count = 0
 
-    while True:
+    while continue_running:
         count += 1
         etcd_command = f"""etcdctl \
                         put {key} {count} \
@@ -32,17 +34,26 @@ def continuous_writes(endpoints: str, user: str, password: str):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             pass
 
-        # write last expected written value on disk
+        time.sleep(1)
+    else:
+        # write last expected written value on disk when terminating
         with open(WRITES_LAST_WRITTEN_VAL_PATH, "w") as f:
             f.write(str(count))
             os.fsync(f)
-        time.sleep(1)
+
+
+def handle_stop_signal(signum, frame) -> None:
+    global continue_running
+    continue_running = False
 
 
 def main():
     endpoints = sys.argv[1]
     user = sys.argv[2]
     password = sys.argv[3]
+
+    # handle the stop signal for a graceful stop of the writes process
+    signal.signal(signal.SIGTERM, handle_stop_signal)
 
     continuous_writes(endpoints, user, password)
 
