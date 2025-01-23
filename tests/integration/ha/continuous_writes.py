@@ -18,6 +18,7 @@ def continuous_writes(endpoints: str, user: str, password: str):
     count = 0
 
     while True:
+        count += 1
         etcd_command = f"""etcdctl \
                         put {key} {count} \
                         --endpoints={endpoints} \
@@ -35,7 +36,6 @@ def continuous_writes(endpoints: str, user: str, password: str):
         with open(WRITES_LAST_WRITTEN_VAL_PATH, "w") as f:
             f.write(str(count))
             os.fsync(f)
-        count += 1
         time.sleep(1)
 
 
