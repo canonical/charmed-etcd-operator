@@ -59,3 +59,12 @@ class EtcdWorkload(WorkloadBase):
         path = Path(file)
         path.parent.mkdir(exist_ok=True, parents=True)
         path.write_text(content)
+
+    @override
+    def restart(self) -> None:
+        self.etcd.restart(services=[SNAP_SERVICE])
+
+    @override
+    def remove_file(self, file) -> None:
+        path = Path(file)
+        path.unlink(missing_ok=True)

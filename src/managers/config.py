@@ -12,7 +12,7 @@ from ops.model import ConfigData
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import CONFIG_FILE
+from literals import TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class ConfigManager:
         self.state = state
         self.workload = workload
         self.config = config
-        self.config_file = CONFIG_FILE
+        self.config_file = workload.paths.config_file
 
     @property
     def config_properties(self) -> str:
@@ -60,10 +60,66 @@ class ConfigManager:
         config_properties["listen-client-urls"] = self.state.unit_server.client_url
         config_properties["advertise-client-urls"] = self.state.unit_server.client_url
 
+        if self.state.unit_server.tls_client_state in [TLSState.TO_TLS, TLSState.TLS]:
+            # replace http with https in listen-client-urls and advertise-client-urls
+            config_properties["listen-client-urls"] = self.state.unit_server.client_url.replace(
+                "http://", "https://"
+            )
+            config_properties["advertise-client-urls"] = self.state.unit_server.client_url.replace(
+                "http://", "https://"
+            )
+            # set the client-transport-security
+            config_properties["client-transport-security"] = {
+                "cert-file": self.workload.paths.tls.client_cert,
+                "key-file": self.workload.paths.tls.client_key,
+                "client-cert-auth": True,
+                "trusted-ca-file": self.workload.paths.tls.client_ca,
+            }
+        if self.state.unit_server.tls_peer_state in [TLSState.TO_TLS, TLSState.TLS]:
+            # replace http with https in listen-peer-urls, initial-cluster and initial-advertise-peer-urls
+            config_properties["listen-peer-urls"] = self.state.unit_server.peer_url.replace(
+                "http://", "https://"
+            )
+            config_properties["initial-cluster"] = config_properties["initial-cluster"].replace(
+                self.state.unit_server.peer_url,
+                self.state.unit_server.peer_url.replace("http://", "https://"),
+            )
+            config_properties["initial-advertise-peer-urls"] = config_properties[
+                "initial-advertise-peer-urls"
+            ].replace("http://", "https://")
+
+            # set the peer-transport-security
+            config_properties["peer-transport-security"] = {
+                "cert-file": self.workload.paths.tls.peer_cert,
+                "key-file": self.workload.paths.tls.peer_key,
+                "client-cert-auth": True,
+                "trusted-ca-file": self.workload.paths.tls.peer_ca,
+            }
+
+        if self.state.unit_server.tls_client_state == TLSState.TO_NO_TLS:
+            config_properties["listen-client-urls"] = self.state.unit_server.client_url.replace(
+                "https://", "http://"
+            )
+            config_properties["advertise-client-urls"] = self.state.unit_server.client_url.replace(
+                "https://", "http://"
+            )
+
+        if self.state.unit_server.tls_peer_state == TLSState.TO_NO_TLS:
+            config_properties["listen-peer-urls"] = self.state.unit_server.peer_url.replace(
+                "https://", "http://"
+            )
+            config_properties["initial-cluster"] = config_properties["initial-cluster"].replace(
+                "https://", "http://"
+            )
+            config_properties["initial-advertise-peer-urls"] = config_properties[
+                "initial-advertise-peer-urls"
+            ].replace("https://", "http://")
+
         return yaml.safe_dump(config_properties)
 
     def set_config_properties(self) -> None:
         """Write the config properties to the config file."""
+        logger.debug("Writing configuration")
         self.workload.write_file(
             content=self.config_properties,
             file=self.config_file,
@@ -73,7 +129,7 @@ class ConfigManager:
         """Concatenate peer-urls of all cluster members.
 
         Returns:
-            Str of member name and peer url for all cluster members in required syntax, e.g.:
+            str: Member name and peer url for all cluster members in required syntax, e.g.:
             etcd1=http://10.54.237.109:2380,etcd2=http://10.54.237.57:2380
         """
         cluster_endpoints = ",".join(

@@ -29,8 +29,9 @@ def test_install_failure_blocked_status():
 def test_internal_user_creation():
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    restart_relation = testing.PeerRelation(id=2, endpoint="restart")
 
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, restart_relation}, leader=True)
     state_out = ctx.run(ctx.on.leader_elected(), state_in)
     secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")
@@ -64,6 +65,7 @@ def test_start():
     # if authentication cannot be enabled, the charm should be blocked
     state_in = testing.State(relations={relation}, leader=True)
     with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
@@ -116,6 +118,25 @@ def test_update_status():
     with patch("workload.EtcdWorkload.alive", return_value=False):
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
+
+    # test data storage
+    # Set up storage with some content:
+    data_storage = testing.Storage("data")
+    (data_storage.get_filesystem(ctx) / "myfile.data").write_text("helloworld")
+
+    with patch("workload.EtcdWorkload.alive", return_value=True):
+        with ctx(ctx.on.update_status(), testing.State(storages=[data_storage])) as context:
+            data = context.charm.model.storages["data"][0]
+            data_loc = data.location
+            data_path = data_loc / "myfile.data"
+            assert data_path.exists()
+            assert data_path.read_text() == "helloworld"
+
+            test_file = data_loc / "test.txt"
+            test_file.write_text("test_line")
+
+    # Verify that writing the file did work as expected.
+    assert (data_storage.get_filesystem(ctx) / "test.txt").read_text() == "test_line"
 
 
 def test_peer_relation_created():

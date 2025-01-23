@@ -17,5 +17,13 @@ class EtcdAuthNotEnabledError(Exception):
     """Custom Exception if authentication could not be enabled in the etcd cluster."""
 
 
+class TLSMissingCertificateOrKeyError(Exception):
+    """Custom Exception if a TLS certificate or key is missing."""
+
+
+class HealthCheckFailedError(Exception):
+    """Custom Exception if a health check failed."""
+
+
 class EtcdClusterManagementError(Exception):
     """Custom Exception if cluster management operation fails."""
