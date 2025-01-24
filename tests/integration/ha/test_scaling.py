@@ -78,3 +78,40 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_scale_down(ops_test: OpsTest) -> None:
+    """Make sure a unit is removed from the etcd cluster without downtime."""
+    app = (await existing_app(ops_test)) or APP_NAME
+    init_units_count = len(ops_test.model.applications[app].units)
+    init_endpoints = get_cluster_endpoints(ops_test, app)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
+
+    # scale down
+    unit = ops_test.model.applications[app].units[-1]
+    await ops_test.model.applications[app].destroy_unit(unit.name)
+    await ops_test.model.wait_for_idle(
+        apps=[app],
+        status="active",
+        wait_for_exact_units=init_units_count - 1,
+        timeout=1000,
+    )
+    num_units = len(ops_test.model.applications[app].units)
+    assert num_units == init_units_count - 1
+
+    # check if unit has been removed from etcd cluster
+    endpoints = get_cluster_endpoints(ops_test, app)
+
+    cluster_members = get_cluster_members(endpoints)
+    assert len(cluster_members) == init_units_count - 1
+
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    stop_continuous_writes()
+    assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)

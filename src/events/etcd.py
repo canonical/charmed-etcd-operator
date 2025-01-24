@@ -150,6 +150,7 @@ class EtcdEvents(Object):
         if self.charm.unit.is_leader():
             logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
             cluster_members = self.charm.state.cluster.cluster_members.split(",")
+            # re-assemble the string without the departing unit
             updated_cluster_members = ",".join(
                 m for m in cluster_members if event.unit.name.replace("/", "") not in m
             )
