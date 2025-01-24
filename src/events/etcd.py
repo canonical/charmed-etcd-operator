@@ -146,8 +146,14 @@ class EtcdEvents(Object):
                 return
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """Handle event received by a unit leaves the cluster relation."""
-        pass
+        """Handle event received by all units when a unit leaves the cluster relation."""
+        if self.charm.unit.is_leader():
+            logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
+            cluster_members = self.charm.state.cluster.cluster_members.split(",")
+            updated_cluster_members = ",".join(
+                m for m in cluster_members if event.unit.name.replace("/", "") not in m
+            )
+            self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
