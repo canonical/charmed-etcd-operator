@@ -3,47 +3,58 @@
 # See LICENSE file for licensing details.
 
 import logging
+import pathlib
+import signal
 import subprocess
 import sys
 import time
 
-from literals import SNAP_NAME
-
 logger = logging.getLogger(__name__)
 
+WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
+continue_running = True
 
-def continuous_writes(model: str, unit: str, endpoints: str, user: str, password: str):
+
+def continuous_writes(endpoints: str, user: str, password: str):
     key = "cw_key"
     count = 0
+    pathlib.Path(WRITES_LAST_WRITTEN_VAL_PATH).unlink(missing_ok=True)
 
-    while True:
-        etcd_command = f"""{SNAP_NAME}.etcdctl \
+    while continue_running:
+        count += 1
+        etcd_command = f"""etcdctl \
                         put {key} {count} \
                         --endpoints={endpoints} \
                         --user={user} \
                         --password={password}
                         """
-        juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
 
         try:
-            result = subprocess.getoutput(juju_command).split("\n")[0]
+            result = subprocess.getoutput(etcd_command).split("\n")[0]
             logger.info(result)
-            count += 1
-            time.sleep(1)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            logger.warning(e)
-            time.sleep(1)
-            continue
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            pass
+
+        time.sleep(1)
+    else:
+        # write last expected written value on disk when terminating
+        pathlib.Path(WRITES_LAST_WRITTEN_VAL_PATH).write_text(str(count))
+
+
+def handle_stop_signal(signum, frame) -> None:
+    global continue_running
+    continue_running = False
 
 
 def main():
-    model = sys.argv[1]
-    unit = sys.argv[2]
-    endpoints = sys.argv[3]
-    user = sys.argv[4]
-    password = sys.argv[5]
+    endpoints = sys.argv[1]
+    user = sys.argv[2]
+    password = sys.argv[3]
 
-    continuous_writes(model, unit, endpoints, user, password)
+    # handle the stop signal for a graceful stop of the writes process
+    signal.signal(signal.SIGTERM, handle_stop_signal)
+
+    continuous_writes(endpoints, user, password)
 
 
 if __name__ == "__main__":
