@@ -272,9 +272,9 @@ def test_certificates_broken():
     )
 
     with (
-        ctx(ctx.on.update_status(), state_in) as mgr,
+        ctx(ctx.on.update_status(), state_in) as manager,
     ):
-        charm: EtcdOperatorCharm = mgr.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm  # type: ignore
         with (
             patch("managers.cluster.ClusterManager.broadcast_peer_url"),
             patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
@@ -309,71 +309,26 @@ def test_certificates_broken():
                 assert peer_relation.local_unit_data["client_cert_ready"] == "False"
 
 
-def test_certificate_available_new_cluster():
-    ctx = testing.Context(EtcdOperatorCharm)
-    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
-    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
-    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+def test_certificate_available_new_cluster(certificate_available_context):
+    manager = certificate_available_context.manager
+    peer_relation = certificate_available_context.peer_relation
+    peer_provider_certificate = certificate_available_context.peer_provider_certificate
+    requirer_private_key = certificate_available_context.requirer_private_key
+    peer_certificate = certificate_available_context.peer_certificate
+    provider_ca_certificate = certificate_available_context.provider_ca_certificate
+    client_provider_certificate = certificate_available_context.client_provider_certificate
+    client_certificate = certificate_available_context.client_certificate
 
-    provider_private_key = generate_private_key()
-    provider_ca_certificate = generate_ca(
-        private_key=provider_private_key,
-        common_name="example.com",
-        validity=timedelta(days=365),
-    )
-
-    requirer_private_key = generate_private_key()
-    peer_csr = generate_csr(
-        private_key=requirer_private_key,
-        common_name="etcd-test-1",
-        organization=TLSType.PEER.value,
-    )
-    peer_certificate = generate_certificate(
-        ca_private_key=provider_private_key,
-        csr=peer_csr,
-        ca=provider_ca_certificate,
-        validity=timedelta(days=1),
-    )
-    peer_provider_certificate = ProviderCertificate(
-        relation_id=peer_tls_relation.id,
-        certificate=peer_certificate,
-        certificate_signing_request=peer_csr,
-        ca=provider_ca_certificate,
-        chain=[provider_ca_certificate, peer_certificate],
-        revoked=False,
-    )
-    client_csr = generate_csr(
-        private_key=requirer_private_key,
-        common_name="etcd-test-1",
-        organization=TLSType.CLIENT.value,
-    )
-    client_certificate = generate_certificate(
-        ca_private_key=provider_private_key,
-        csr=client_csr,
-        ca=provider_ca_certificate,
-        validity=timedelta(days=1),
-    )
-    client_provider_certificate = ProviderCertificate(
-        relation_id=client_tls_relation.id,
-        certificate=client_certificate,
-        certificate_signing_request=client_csr,
-        ca=provider_ca_certificate,
-        chain=[provider_ca_certificate, client_certificate],
-        revoked=False,
-    )
-
-    state_in = testing.State(
-        relations=[peer_relation, client_tls_relation],
-    )
-
+    peer_relation.local_unit_data.clear()
+    peer_relation.local_app_data.clear()
     with (
-        ctx(ctx.on.update_status(), state_in) as mgr,
+        manager,
         patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
         patch("workload.EtcdWorkload.write_file"),
         patch("pathlib.Path.exists", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
-        charm: EtcdOperatorCharm = mgr.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
         charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.CLIENT)
         with patch(
@@ -393,76 +348,38 @@ def test_certificate_available_new_cluster():
             assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.TLS.value
 
 
-def test_certificate_available_enabling_tls():
-    ctx = testing.Context(EtcdOperatorCharm)
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_app_data={"cluster_state": "existing"},
-        local_unit_data={"ip": "localhost"},
+def test_certificate_available_enabling_tls(certificate_available_context):
+    manager = certificate_available_context.manager
+    peer_provider_certificate = certificate_available_context.peer_provider_certificate
+    requirer_private_key = certificate_available_context.requirer_private_key
+    peer_certificate = certificate_available_context.peer_certificate
+    provider_ca_certificate = certificate_available_context.provider_ca_certificate
+    client_provider_certificate = certificate_available_context.client_provider_certificate
+    client_certificate = certificate_available_context.client_certificate
+    peer_relation = certificate_available_context.peer_relation
+    peer_relation.local_unit_data.clear()
+    peer_relation.local_app_data.clear()
+    peer_relation.local_unit_data.update(
+        {
+            "hostname": "localhost",
+            "ip": "localhost",
+            "state": "started",
+        }
     )
-    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
-    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
-
-    state_in = testing.State(
-        relations=[peer_relation, peer_tls_relation, client_tls_relation],
+    peer_relation.local_app_data.update(
+        {
+            "cluster_state": "existing",
+            "authenticating": "enabled",
+        }
     )
-
-    provider_private_key = generate_private_key()
-    provider_ca_certificate = generate_ca(
-        private_key=provider_private_key,
-        common_name="example.com",
-        validity=timedelta(days=365),
-    )
-
-    requirer_private_key = generate_private_key()
-    peer_csr = generate_csr(
-        private_key=requirer_private_key,
-        common_name="etcd-test-1",
-        organization=TLSType.PEER.value,
-    )
-    peer_certificate = generate_certificate(
-        ca_private_key=provider_private_key,
-        csr=peer_csr,
-        ca=provider_ca_certificate,
-        validity=timedelta(days=1),
-    )
-    peer_provider_certificate = ProviderCertificate(
-        relation_id=peer_tls_relation.id,
-        certificate=peer_certificate,
-        certificate_signing_request=peer_csr,
-        ca=provider_ca_certificate,
-        chain=[provider_ca_certificate, peer_certificate],
-        revoked=False,
-    )
-    client_csr = generate_csr(
-        private_key=requirer_private_key,
-        common_name="etcd-test-1",
-        organization=TLSType.CLIENT.value,
-    )
-    client_certificate = generate_certificate(
-        ca_private_key=provider_private_key,
-        csr=client_csr,
-        ca=provider_ca_certificate,
-        validity=timedelta(days=1),
-    )
-    client_provider_certificate = ProviderCertificate(
-        relation_id=client_tls_relation.id,
-        certificate=client_certificate,
-        certificate_signing_request=client_csr,
-        ca=provider_ca_certificate,
-        chain=[provider_ca_certificate, client_certificate],
-        revoked=False,
-    )
-
     with (
-        ctx(ctx.on.update_status(), state_in) as mgr,
+        manager,
         patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
         patch("workload.EtcdWorkload.write_file"),
         patch("pathlib.Path.exists", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
-        charm: EtcdOperatorCharm = mgr.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
         charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.PEER)
 
@@ -507,76 +424,40 @@ def test_certificate_available_enabling_tls():
                 assert charm.state.unit_server.certs_ready
 
 
-def test_enabling_tls_one_restart():
-    ctx = testing.Context(EtcdOperatorCharm)
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_app_data={"cluster_state": "existing"},
-        local_unit_data={"ip": "localhost", "state": "started"},
-    )
-    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
-    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+def test_enabling_tls_one_restart(certificate_available_context):
+    manager = certificate_available_context.manager
+    peer_relation = certificate_available_context.peer_relation
+    peer_provider_certificate = certificate_available_context.peer_provider_certificate
+    requirer_private_key = certificate_available_context.requirer_private_key
+    peer_certificate = certificate_available_context.peer_certificate
+    provider_ca_certificate = certificate_available_context.provider_ca_certificate
+    client_provider_certificate = certificate_available_context.client_provider_certificate
+    client_certificate = certificate_available_context.client_certificate
 
-    state_in = testing.State(
-        relations=[peer_relation, peer_tls_relation, client_tls_relation],
+    peer_relation.local_unit_data.clear()
+    peer_relation.local_app_data.clear()
+    peer_relation.local_unit_data.update(
+        {
+            "hostname": "localhost",
+            "ip": "localhost",
+            "state": "started",
+        }
     )
-
-    provider_private_key = generate_private_key()
-    provider_ca_certificate = generate_ca(
-        private_key=provider_private_key,
-        common_name="example.com",
-        validity=timedelta(days=365),
-    )
-
-    requirer_private_key = generate_private_key()
-    peer_csr = generate_csr(
-        private_key=requirer_private_key,
-        common_name="etcd-test-1",
-        organization=TLSType.PEER.value,
-    )
-    peer_certificate = generate_certificate(
-        ca_private_key=provider_private_key,
-        csr=peer_csr,
-        ca=provider_ca_certificate,
-        validity=timedelta(days=1),
-    )
-    peer_provider_certificate = ProviderCertificate(
-        relation_id=peer_tls_relation.id,
-        certificate=peer_certificate,
-        certificate_signing_request=peer_csr,
-        ca=provider_ca_certificate,
-        chain=[provider_ca_certificate, peer_certificate],
-        revoked=False,
-    )
-    client_csr = generate_csr(
-        private_key=requirer_private_key,
-        common_name="etcd-test-1",
-        organization=TLSType.CLIENT.value,
-    )
-    client_certificate = generate_certificate(
-        ca_private_key=provider_private_key,
-        csr=client_csr,
-        ca=provider_ca_certificate,
-        validity=timedelta(days=1),
-    )
-    client_provider_certificate = ProviderCertificate(
-        relation_id=client_tls_relation.id,
-        certificate=client_certificate,
-        certificate_signing_request=client_csr,
-        ca=provider_ca_certificate,
-        chain=[provider_ca_certificate, client_certificate],
-        revoked=False,
+    peer_relation.local_app_data.update(
+        {
+            "cluster_state": "existing",
+            "authenticating": "enabled",
+        }
     )
 
     with (
-        ctx(ctx.on.update_status(), state_in) as mgr,
+        manager,
         patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
         patch("workload.EtcdWorkload.write_file"),
         patch("pathlib.Path.exists", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
-        charm: EtcdOperatorCharm = mgr.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
 
         # Peer cert added case but no restart
@@ -700,77 +581,24 @@ def test_certificates_relation_created():
         )
 
 
-def test_certificate_expiration():
-    ctx = testing.Context(EtcdOperatorCharm)
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_app_data={"cluster_state": "existing"},
-        local_unit_data={"ip": "localhost"},
-    )
-    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
-    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
-
-    state_in = testing.State(
-        relations=[peer_relation, peer_tls_relation, client_tls_relation],
-    )
-
-    provider_private_key = generate_private_key()
-    provider_ca_certificate = generate_ca(
-        private_key=provider_private_key,
-        common_name="example.com",
-        validity=timedelta(days=365),
-    )
-
-    requirer_private_key = generate_private_key()
-    peer_csr = generate_csr(
-        private_key=requirer_private_key,
-        common_name="etcd-test-1",
-        organization=TLSType.PEER.value,
-    )
-    peer_certificate = generate_certificate(
-        ca_private_key=provider_private_key,
-        csr=peer_csr,
-        ca=provider_ca_certificate,
-        validity=timedelta(days=1),
-    )
-    peer_provider_certificate = ProviderCertificate(
-        relation_id=peer_tls_relation.id,
-        certificate=peer_certificate,
-        certificate_signing_request=peer_csr,
-        ca=provider_ca_certificate,
-        chain=[provider_ca_certificate, peer_certificate],
-        revoked=False,
-    )
-    client_csr = generate_csr(
-        private_key=requirer_private_key,
-        common_name="etcd-test-1",
-        organization=TLSType.CLIENT.value,
-    )
-    client_certificate = generate_certificate(
-        ca_private_key=provider_private_key,
-        csr=client_csr,
-        ca=provider_ca_certificate,
-        validity=timedelta(days=1),
-    )
-    client_provider_certificate = ProviderCertificate(
-        relation_id=client_tls_relation.id,
-        certificate=client_certificate,
-        certificate_signing_request=client_csr,
-        ca=provider_ca_certificate,
-        chain=[provider_ca_certificate, client_certificate],
-        revoked=False,
-    )
+def test_certificate_expiration(certificate_available_context):
+    manager = certificate_available_context.manager
+    peer_provider_certificate = certificate_available_context.peer_provider_certificate
+    requirer_private_key = certificate_available_context.requirer_private_key
+    peer_certificate = certificate_available_context.peer_certificate
+    provider_ca_certificate = certificate_available_context.provider_ca_certificate
+    client_provider_certificate = certificate_available_context.client_provider_certificate
+    client_certificate = certificate_available_context.client_certificate
 
     with (
-        ctx(ctx.on.update_status(), state_in) as mgr,
+        manager,
         patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
         patch("workload.EtcdWorkload.write_file"),
         patch("pathlib.Path.exists", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("managers.tls.TLSManager.is_new_ca", return_value=False),
     ):
-        charm: EtcdOperatorCharm = mgr.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
 
         # Peer cert added case but no restart
@@ -810,7 +638,6 @@ def test_certificate_expiration():
 def test_ca_peer_rotation(certificate_available_context):
     manager = certificate_available_context.manager
     peer_relation = certificate_available_context.peer_relation
-    # provider_ca_certificate = certificate_available_context.provider_ca_certificate
     peer_provider_certificate = certificate_available_context.peer_provider_certificate
     requirer_private_key = certificate_available_context.requirer_private_key
     peer_certificate = certificate_available_context.peer_certificate
@@ -844,7 +671,6 @@ def test_ca_peer_rotation(certificate_available_context):
             return_value=([peer_provider_certificate], requirer_private_key),
         ),
         patch("charm.EtcdOperatorCharm._restart"),
-        # patch("ops.framework.BoundEvent.emit"),
     ):
         charm: EtcdOperatorCharm = manager.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
@@ -957,7 +783,6 @@ def test_ca_client_rotation(certificate_available_context):
             return_value=([client_provider_certificate], requirer_private_key),
         ),
         patch("charm.EtcdOperatorCharm._restart"),
-        # patch("ops.framework.BoundEvent.emit"),
     ):
         charm: EtcdOperatorCharm = manager.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
