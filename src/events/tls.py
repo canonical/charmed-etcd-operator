@@ -168,7 +168,7 @@ class TLSEvents(Object):
         # write certificates to disk
         self.charm.tls_manager.write_certificate(cert, private_key)  # type: ignore
 
-        # TLS is enabled, New CA added to all servers, and cert updated -> no rolling restart needed
+        # TLS is enabled, New CA added to all servers, and cert updated -> no rolling restart needed until we clean up old CA
         if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NEW_CA_ADDED:
             logger.debug(f"Updating {cert_type.value} certificates with new CA")
             self.charm.tls_manager.set_ca_rotation_state(

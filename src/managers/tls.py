@@ -148,6 +148,7 @@ class TLSManager:
             else self.workload.paths.tls.peer_ca
         )
         self.workload.remove_file(cas_path)
+        # The last CA is the new CA, so we add it back
         self.add_trusted_ca(cas[-1], tls_type)
 
     def set_ca_rotation_state(self, tls_type: TLSType, state: TLSCARotationState) -> None:
