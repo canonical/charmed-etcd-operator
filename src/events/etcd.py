@@ -206,6 +206,7 @@ class EtcdEvents(Object):
                 )
 
         self.charm.workload.stop()
+        self.charm.state.unit_server.update({"state": ""})
         self.charm.set_status(Status.REMOVED)
 
     def update_admin_password(self, admin_secret_id: str) -> None:

@@ -140,6 +140,7 @@ def test_certificates_broken():
             "peer_cert_ready": "True",
             "tls_client_state": "tls",
             "tls_peer_state": "tls",
+            "state": "started",
         },
     )
     restart_peer_relation = testing.PeerRelation(id=4, endpoint=RESTART_RELATION)
