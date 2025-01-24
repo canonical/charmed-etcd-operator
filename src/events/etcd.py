@@ -30,11 +30,9 @@ from literals import (
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
-    TLS_CLIENT_PRIVATE_KEY_CONFIG,
-    TLS_PEER_PRIVATE_KEY_CONFIG,
+    TLS_PRIVATE_KEY_CONFIG,
     Status,
     TLSState,
-    TLSType,
 )
 
 if TYPE_CHECKING:
@@ -124,17 +122,14 @@ class EtcdEvents(Object):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
-        if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
-            self.update_private_key(tls_peer_private_key_id, tls_type=TLSType.PEER)  # type: ignore
-
-        if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
-            self.update_private_key(tls_client_private_key_id, tls_type=TLSType.CLIENT)  # type: ignore
+        if tls_private_key_id := self.charm.config.get(TLS_PRIVATE_KEY_CONFIG):
+            self.update_private_key(tls_private_key_id)  # type: ignore
 
         if not self.charm.unit.is_leader():
             return
 
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
-            self.update_admin_password(admin_secret_id)
+            self.update_admin_password(admin_secret_id)  # type: ignore
 
     def _on_peer_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
@@ -183,20 +178,16 @@ class EtcdEvents(Object):
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
-        if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
-            if tls_peer_private_key_id == event.secret.id:
-                self.update_private_key(tls_peer_private_key_id, tls_type=TLSType.PEER)  # type: ignore
-
-        if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
-            if tls_client_private_key_id == event.secret.id:
-                self.update_private_key(tls_client_private_key_id, tls_type=TLSType.CLIENT)  # type: ignore
+        if tls_private_key_id := self.charm.config.get(TLS_PRIVATE_KEY_CONFIG):
+            if tls_private_key_id == event.secret.id:
+                self.update_private_key(tls_private_key_id)  # type: ignore
 
         if not self.charm.unit.is_leader():
             return
 
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
             if admin_secret_id == event.secret.id:
-                self.update_admin_password(admin_secret_id)
+                self.update_admin_password(admin_secret_id)  # type: ignore
 
     def update_admin_password(self, admin_secret_id: str) -> None:
         """Compare current admin password and update in etcd if required."""
@@ -221,12 +212,9 @@ class EtcdEvents(Object):
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
 
-    def update_private_key(self, private_key_id: str, tls_type: TLSType) -> None:
+    def update_private_key(self, private_key_id: str) -> None:
         """Update the private key in etcd."""
-        logger.debug(f"Updating {tls_type.value} private key.")
-        import pdb
-
-        pdb.set_trace()
+        logger.debug("Updating TLS private key.")
         try:
             if secret_content := get_secret_from_id(self.charm.model, private_key_id).get(
                 "private-key"
@@ -238,26 +226,20 @@ class EtcdEvents(Object):
                 )
 
                 if not re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", private_key):
-                    logger.error(f"Invalid private key format for {tls_type.value}.")
+                    logger.error("Invalid private key format.")
                     return
 
-                tls_relation = (
-                    self.charm.tls_events.peer_certificate
-                    if tls_type == TLSType.PEER
-                    else self.charm.tls_events.client_certificate
-                )
-                if tls_relation is None:
-                    logger.error(f"Missing {tls_type.value} relation.")
-                    return
-
-                if old_private_key := tls_relation.private_key:
+                if old_private_key := self.charm.tls_events.peer_certificate.private_key:
                     if old_private_key.raw != private_key:
                         secret = self.charm.model.get_secret(
-                            label=tls_relation._get_private_key_secret_label()
+                            label=self.charm.tls_events.peer_certificate._get_private_key_secret_label()
                         )
                         secret.set_content({"private-key": private_key})
-                        tls_relation._cleanup_certificate_requests()
-                        tls_relation._send_certificate_requests()
+                        secret.get_content(refresh=True)
+                        self.charm.tls_events.peer_certificate._cleanup_certificate_requests()
+                        self.charm.tls_events.peer_certificate._send_certificate_requests()
+                        self.charm.tls_events.client_certificate._cleanup_certificate_requests()
+                        self.charm.tls_events.client_certificate._send_certificate_requests()
 
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)

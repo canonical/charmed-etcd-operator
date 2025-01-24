@@ -16,7 +16,7 @@ from literals import CLIENT_PORT, SNAP_NAME, TLSType
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-APP_NAME = METADATA["name"]
+APP_NAME: str = METADATA["name"]
 
 
 def put_key(
@@ -133,3 +133,24 @@ def get_certificate_from_unit(model: str, unit: str, cert_type: TLSType) -> str 
         return output
 
     return None
+
+
+async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str]) -> str:
+    """Add a secret to the model.
+
+    Args:
+        ops_test (OpsTest): The current test harness.
+        secret_name (str): The name of the secret.
+        content (dict[str, str]): The content of the secret.
+
+    Returns:
+        str: The secret ID.
+    """
+    assert ops_test.model is not None, "Model is not set"
+    return_code, std_out, std_err = await ops_test.juju(
+        "add-secret", secret_name, " ".join([f"{key}={value}" for key, value in content.items()])
+    )
+
+    assert return_code == 0, f"Failed to add secret: {std_err}"
+    logger.info(f"Added secret {secret_name} to the model")
+    return std_out.strip()
