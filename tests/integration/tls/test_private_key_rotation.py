@@ -14,6 +14,7 @@ from literals import INTERNAL_USER, PEER_RELATION, TLS_PRIVATE_KEY_CONFIG, TLSTy
 from ..helpers import (
     APP_NAME,
     add_secret,
+    download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
@@ -67,10 +68,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     model = ops_test.model_full_name
     assert model is not None, "Model is not set"
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -88,8 +88,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
     assert (
         put_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -101,8 +99,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     ), "Failed to write key"
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -124,7 +120,6 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     assert current_private_keys, "Failed to get current private key"
 
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
 
     leader_current_peer_cert = get_certificate_from_unit(
         model,  # type: ignore
@@ -159,7 +154,7 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)  # type: ignore
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -169,8 +164,6 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,  # type: ignore
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -182,8 +175,6 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
 
     assert (
         put_key(
-            model,  # type: ignore
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -195,8 +186,6 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     ), "Failed to write key"
     assert (
         get_key(
-            model,  # type: ignore
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
