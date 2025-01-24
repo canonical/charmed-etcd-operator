@@ -59,7 +59,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     # make sure data can be written to the cluster
@@ -140,7 +140,7 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
