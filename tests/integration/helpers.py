@@ -11,7 +11,7 @@ from typing import Dict
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT, SNAP_NAME, TLSType
+from literals import CLIENT_PORT, TLSType
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,6 @@ APP_NAME: str = METADATA["name"]
 
 
 def put_key(
-    model: str,
-    unit: str,
     endpoints: str,
     key: str,
     value: str,
@@ -29,26 +27,22 @@ def put_key(
     password: str | None = None,
     tls_enabled: bool = False,
 ) -> str:
-    """Write data to etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
+    """Write data to etcd using `etcdctl`."""
+    etcd_command = f"etcdctl put {key} {value} --endpoints={endpoints}"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
     if password:
         etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
-
-    return subprocess.getoutput(juju_command).split("\n")[0]
+    return subprocess.getoutput(etcd_command).split("\n")[0]
 
 
 def get_key(
-    model: str,
-    unit: str,
     endpoints: str,
     key: str,
     user: str | None = None,
@@ -56,36 +50,30 @@ def get_key(
     tls_enabled: bool = False,
 ) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
+    etcd_command = f"etcdctl get {key} --endpoints={endpoints}"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
     if password:
         etcd_command = f"{etcd_command} --password={password}"
-
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
-
-    return subprocess.getoutput(juju_command).split("\n")[1]
+    return subprocess.getoutput(etcd_command).split("\n")[1]
 
 
-def get_cluster_members(
-    model: str, unit: str, endpoints: str, tls_enabled: bool = False
-) -> list[dict]:
-    """Query all cluster members from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl member list --endpoints={endpoints} -w=json"
+def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]:
+    """Query all cluster members from etcd using `etcdctl`."""
+    etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
-    result = subprocess.getoutput(juju_command).split("\n")[0]
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
 
     return json.loads(result)["members"]
 
@@ -157,3 +145,14 @@ async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str
     assert return_code == 0, f"Failed to add secret: {std_err}"
     logger.info(f"Added secret {secret_name} to the model")
     return std_out.strip()
+
+
+async def download_client_certificate_from_unit(
+    ops_test: OpsTest, app_name: str = APP_NAME
+) -> None:
+    """Copy the client certificate files from a unit to the host's filesystem."""
+    unit = ops_test.model.applications[app_name].units[0]
+    tls_path = "/var/snap/charmed-etcd/common/tls"
+
+    for file in ["client.pem", "client.key", "client_ca.pem"]:
+        await unit.scp_from(f"{tls_path}/{file}", file)
