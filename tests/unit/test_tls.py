@@ -2,10 +2,12 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import base64
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
+    LIBID,
     CertificateAvailableEvent,
     ProviderCertificate,
     generate_ca,
@@ -14,6 +16,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     generate_private_key,
 )
 from ops import testing
+from scenario import Secret
 
 from charm import EtcdOperatorCharm
 from core.models import Member
@@ -22,6 +25,7 @@ from literals import (
     PEER_RELATION,
     PEER_TLS_RELATION_NAME,
     RESTART_RELATION,
+    TLS_PRIVATE_KEY_CONFIG,
     Status,
     TLSState,
 )
@@ -683,3 +687,108 @@ def test_certificate_expiration():
                 charm.tls_events._on_certificate_available(event)
                 assert charm.state.unit_server.tls_client_state == TLSState.TLS
                 restart_mock.assert_not_called()
+
+
+def test_set_tls_private_key():
+    ctx = testing.Context(EtcdOperatorCharm)
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={
+            "client_cert_ready": "True",
+            "peer_cert_ready": "True",
+            "tls_client_state": "tls",
+            "tls_peer_state": "tls",
+            "state": "started",
+        },
+    )
+    restart_peer_relation = testing.PeerRelation(id=4, endpoint=RESTART_RELATION)
+    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
+    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+
+    private_key = generate_private_key().raw
+    secret = Secret(
+        {"private-key": private_key},
+        label=TLS_PRIVATE_KEY_CONFIG,
+        # owner="app",
+    )
+    state_in = testing.State(
+        relations=[peer_relation, restart_peer_relation, peer_tls_relation, client_tls_relation],
+        secrets={
+            secret,
+            Secret(
+                {"private-key": "initial_private_key"},
+                label=f"{LIBID}-private-key-0",
+                owner="unit",
+            ),
+        },
+        config={"tls-private-key": secret.id},
+    )
+
+    with (
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
+        ) as cleanup,
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._send_certificate_requests"
+        ) as send,
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert (
+            state_out.get_secret(label=f"{LIBID}-private-key-0").latest_content["private-key"]  # type: ignore
+            == private_key
+        )
+        assert cleanup.call_count == 2, (
+            "_cleanup_certificate_requests should be called once for peer and once for client"
+        )
+        assert send.call_count == 2, (
+            "_send_certificate_requests should be called once for peer and once for client"
+        )
+
+        # update private key
+        newer_private_key = generate_private_key().raw
+        secret.latest_content["private-key"] = base64.b64encode(  # type: ignore
+            newer_private_key.encode()
+        ).decode()  # type: ignore
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
+
+        assert (
+            state_out.get_secret(label=f"{LIBID}-private-key-0").latest_content["private-key"]  # type: ignore
+            == newer_private_key
+        )
+        assert cleanup.call_count == 4, (
+            "_cleanup_certificate_requests should be called once for peer and once for client"
+        )
+        assert send.call_count == 4, (
+            "_send_certificate_requests should be called once for peer and once for client"
+        )
+
+        # invalid key
+        invalid_key = base64.b64encode("invalid_key".encode()).decode()
+        secret.latest_content["private-key"] = invalid_key  # type: ignore
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
+        assert (
+            state_out.get_secret(label=f"{LIBID}-private-key-0").latest_content["private-key"]  # type: ignore
+            == newer_private_key
+        )
+        assert cleanup.call_count == 4, (
+            "_cleanup_certificate_requests should be called once for peer and once for client"
+        )
+        assert send.call_count == 4, (
+            "_send_certificate_requests should be called once for peer and once for client"
+        )
+
+        state_in.config["tls-private-key"] = "secret:cu9ibpp34trs4baf20c0"
+
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert (
+            state_out.get_secret(label=f"{LIBID}-private-key-0").latest_content["private-key"]  # type: ignore
+            == newer_private_key
+        )
+
+        assert cleanup.call_count == 4, (
+            "_cleanup_certificate_requests should be called once for peer and once for client"
+        )
+        assert send.call_count == 4, (
+            "_send_certificate_requests should be called once for peer and once for client"
+        )
