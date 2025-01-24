@@ -62,12 +62,10 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
-    assert ops_test.model is not None, "Model is not set"
     model = ops_test.model_full_name
-    assert model is not None, "Model is not set"
+
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
 
     cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
@@ -117,9 +115,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_disable_tls(ops_test: OpsTest) -> None:
     """Disable TLS on a running cluster and check if it is still accessible."""
-    assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
-    assert model is not None, "Model is not set"
 
     # disable TLS and check if the cluster is still accessible
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
@@ -132,7 +128,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
 
     cluster_members = get_cluster_members(model, leader_unit, endpoints)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
@@ -189,9 +184,7 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_enable_tls(ops_test: OpsTest) -> None:
     """Enable TLS on a running cluster and check if it is still accessible."""
-    assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
-    assert model is not None, "Model is not set"
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -202,7 +195,6 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
 
     cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
@@ -262,12 +254,10 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     """Disable then enable peer TLS on a running cluster and check if it is still accessible."""
-    assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
-    assert model is not None, "Model is not set"
 
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
+
     # get current certificate
     logger.info("Reading the current certificate from leader unit")
     current_certificate = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER)
@@ -282,7 +272,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
     cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
@@ -400,12 +389,10 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     """Disable then enable client TLS on a running cluster and check if it is still accessible."""
-    assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
-    assert model is not None, "Model is not set"
 
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
+
     # get current certificate
     logger.info("Reading the current certificate from leader unit")
     current_certificate = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.CLIENT)
@@ -420,7 +407,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
     cluster_members = get_cluster_members(model, leader_unit, endpoints)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
@@ -536,12 +522,9 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_certificate_expiration(ops_test: OpsTest) -> None:
     """Test the TLS certificate expiration on a running cluster."""
-    assert ops_test.model, "Model is not set"
     model = ops_test.model_full_name
-    assert model is not None, "Model is not set"
 
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
 
     # disable TLS and check if the cluster is still accessible
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
@@ -553,7 +536,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-    assert leader_unit, "Leader unit is not set"
 
     cluster_members = get_cluster_members(model, leader_unit, endpoints)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"

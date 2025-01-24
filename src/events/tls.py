@@ -15,7 +15,6 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 from ops import RelationBrokenEvent, RelationCreatedEvent
 from ops.framework import Object
 
-from common.exceptions import TLSMissingCertificateOrKeyError
 from literals import CLIENT_TLS_RELATION_NAME, PEER_TLS_RELATION_NAME, Status, TLSState, TLSType
 
 if TYPE_CHECKING:
@@ -57,13 +56,10 @@ class TLSEvents(Object):
             ],
         )
 
-        self.framework.observe(
-            self.peer_certificate.on.certificate_available, self._on_certificate_available
-        )
-
-        self.framework.observe(
-            self.client_certificate.on.certificate_available, self._on_certificate_available
-        )
+        for relation in [self.peer_certificate, self.client_certificate]:
+            self.framework.observe(
+                relation.on.certificate_available, self._on_certificate_available
+            )
 
         for relation in [PEER_TLS_RELATION_NAME, CLIENT_TLS_RELATION_NAME]:
             self.framework.observe(
@@ -101,14 +97,10 @@ class TLSEvents(Object):
         )
 
         certs, private_key = relation_requirer.get_assigned_certificates()
-        cert = certs[0] if certs else None
-
-        if not cert or not private_key:
-            logger.error("Missing certificate or private key")
-            raise TLSMissingCertificateOrKeyError("Missing certificate or private key")
+        cert = certs[0]
 
         # write certificates to disk
-        self.charm.tls_manager.write_certificate(cert, private_key)
+        self.charm.tls_manager.write_certificate(cert, private_key)  # type: ignore
 
         # Rotating certificates
         if (
