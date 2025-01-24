@@ -74,7 +74,7 @@ class EtcdOperatorCharm(ops.CharmBase):
     def rolling_restart(self, callback_override: str | None = None) -> None:
         """Initiate a rolling restart."""
         logger.info(
-            f"Initiating a rolling restart unit {self.unit.name} with callback {callback_override}"
+            f"Initiating a rolling restart in unit {self.unit.name} with callback {callback_override}"
         )
         self.on[RESTART_RELATION].acquire_lock.emit(callback_override=callback_override)
 
@@ -175,19 +175,20 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
-    def _restart_ca_rotation(self, _):
+    def _restart_ca_rotation(self, _) -> None:
         """Restart callback for CA rotation."""
         logger.debug("ca rotation restart")
         self._restart(None)
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
             self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NEW_CA_ADDED)
+
         if (
             self.state.unit_server.tls_client_ca_rotation_state
             == TLSCARotationState.NEW_CA_DETECTED
         ):
             self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NEW_CA_ADDED)
 
-    def _restart_clean_cas(self, _):
+    def _restart_clean_cas(self, _) -> None:
         """Restart callback for cleaning up old CAs."""
         logger.debug("cleaning up old CAs")
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.CERT_UPDATED:

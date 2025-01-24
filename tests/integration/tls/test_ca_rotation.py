@@ -13,6 +13,7 @@ from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
 from ..helpers import (
     APP_NAME,
+    download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
@@ -39,8 +40,6 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 
     The initial cluster should be formed and accessible.
     """
-    assert ops_test.model is not None, "Model is not set"
-    model = ops_test.model_full_name
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
     await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
@@ -57,7 +56,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
 
     cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
@@ -71,8 +70,6 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 
     assert (
         put_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -84,8 +81,6 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     ), "Failed to write key"
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -111,9 +106,22 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
     current_peer_ca = get_certificate_from_unit(
         model, leader_unit, cert_type=TLSType.PEER, is_ca=True
     )
+    assert current_peer_ca, "Failed to get the current peer CA certificate"
+
     current_client_ca = get_certificate_from_unit(
         model, leader_unit, cert_type=TLSType.CLIENT, is_ca=True
     )
+    assert current_client_ca, "Failed to get the current client CA certificate"
+
+    current_peer_certificate = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.PEER, is_ca=False
+    )
+    assert current_peer_certificate, "Failed to get the current peer certificate"
+
+    current_client_certificate = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.CLIENT, is_ca=False
+    )
+    assert current_client_certificate, "Failed to get the current client certificate"
 
     logger.info("Rotating the CA certificate")
     tls_config = {"ca-common-name": "new-etcd-ca"}
@@ -126,16 +134,36 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
 
     logger.info("Checking if the CA certificates are rotated")
     new_peer_ca = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER, is_ca=True)
+    assert new_peer_ca, "Failed to get the new peer CA certificate"
 
     new_client_ca = get_certificate_from_unit(
         model, leader_unit, cert_type=TLSType.CLIENT, is_ca=True
     )
+    assert new_client_ca, "Failed to get the new client CA certificate"
+
+    new_peer_certificate = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.PEER, is_ca=False
+    )
+    assert new_peer_certificate, "Failed to get the new peer certificate"
+
+    new_client_certificate = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.CLIENT, is_ca=False
+    )
+    assert new_client_certificate, "Failed to get the new client certificate"
 
     assert current_peer_ca != new_peer_ca, "Peer CA certificate was not rotated"
     assert current_client_ca != new_client_ca, "Client CA certificate was not rotated"
 
     logger.info("Both CA certificates are rotated")
 
+    assert current_peer_certificate != new_peer_certificate, "Peer certificate was not rotated"
+    assert current_client_certificate != new_client_certificate, (
+        "Client certificate was not rotated"
+    )
+
+    logger.info("Both certificates are rotated")
+
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
     # Check if the cluster is still accessible
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
@@ -151,8 +179,6 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTP peerURLs and HTTPS clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -163,8 +189,6 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -175,8 +199,6 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,

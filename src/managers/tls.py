@@ -149,6 +149,9 @@ class TLSManager:
         )
         self.workload.remove_file(cas_path)
         # The last CA is the new CA, so we add it back
+        # We will have at most 2 CAs in the list, the old and the new one
+        # These CAs are for certificates used by the server only so no need
+        # for multiple active CAs
         self.add_trusted_ca(cas[-1], tls_type)
 
     def set_ca_rotation_state(self, tls_type: TLSType, state: TLSCARotationState) -> None:
@@ -167,7 +170,6 @@ class TLSManager:
         Args:
             cert_type (TLSType): The certificate type.
         """
-        is_ca_stored_on_all_servers = True
         for server in self.state.servers:
             server_ca_rotation_state = (
                 server.tls_peer_ca_rotation_state
@@ -178,9 +180,8 @@ class TLSManager:
                 TLSCARotationState.NO_ROTATION,
                 TLSCARotationState.NEW_CA_DETECTED,
             ]:
-                is_ca_stored_on_all_servers = False
-                break
-        return is_ca_stored_on_all_servers
+                return False
+        return True
 
     def is_cert_updated_on_all_servers(self, cert_type: TLSType) -> bool:
         """Check if the certificate is updated on all servers.
@@ -188,7 +189,6 @@ class TLSManager:
         Args:
             cert_type (TLSType): The certificate type.
         """
-        is_cert_updated_on_all_servers = True
         for server in self.state.servers:
             server_ca_state = (
                 server.tls_peer_ca_rotation_state
@@ -199,7 +199,5 @@ class TLSManager:
                 TLSCARotationState.NEW_CA_DETECTED,
                 TLSCARotationState.NEW_CA_ADDED,
             ]:
-                is_cert_updated_on_all_servers = False
-                break
-
-        return is_cert_updated_on_all_servers
+                return False
+        return True

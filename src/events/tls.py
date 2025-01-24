@@ -41,11 +41,11 @@ class CleanCAEvent(EventBase):
         super().__init__(handle)
         self.cert_type = cert_type
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, str]:
         """Snapshot of lock event."""
         return {"cert_type": self.cert_type.value}
 
-    def restore(self, snapshot: dict):
+    def restore(self, snapshot: dict[str, str]) -> None:
         """Restores lock event."""
         self.cert_type = TLSType(snapshot["cert_type"])
 
