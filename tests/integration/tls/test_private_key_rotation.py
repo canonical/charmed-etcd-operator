@@ -27,7 +27,7 @@ from ..helpers import (
 logger = logging.getLogger(__name__)
 
 TLS_NAME = "self-signed-certificates"
-NUM_UNITS = 2
+NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 90
