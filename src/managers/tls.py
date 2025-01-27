@@ -14,7 +14,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import SUBSTRATES, TLSState, TLSType
+from literals import SUBSTRATES, TLSCARotationState, TLSState, TLSType
 
 logger = logging.getLogger(__name__)
 
@@ -54,40 +54,52 @@ class TLSManager:
         if cert_type == TLSType.CLIENT:
             certificate_path = self.workload.paths.tls.client_cert
             private_key_path = self.workload.paths.tls.client_key
-            self.add_trusted_ca(ca_cert.raw, client=True)
         else:
             certificate_path = self.workload.paths.tls.peer_cert
             private_key_path = self.workload.paths.tls.peer_key
-            self.add_trusted_ca(ca_cert.raw, client=False)
 
+        self.add_trusted_ca(ca_cert.raw, cert_type)
         self.workload.write_file(private_key.raw, private_key_path)
         self.workload.write_file(certificate.certificate.raw, certificate_path)
         self.set_cert_state(cert_type, is_ready=True)
 
-    def add_trusted_ca(self, ca_cert: str, client: bool = False) -> None:
+    def is_new_ca(self, ca_cert: str, tls_type: TLSType) -> bool:
+        """Check if the CA is new.
+
+        Args:
+            ca_cert (str): The CA certificate.
+            tls_type (TLSType): The TLS type.
+
+        Returns:
+            bool: True if the CA is new, False otherwise.
+        """
+        cas = self._load_trusted_ca(tls_type)
+        return ca_cert not in cas
+
+    def add_trusted_ca(self, ca_cert: str, tls_type: TLSType = TLSType.PEER) -> None:
         """Add trusted CA to the system.
 
         Args:
             ca_cert (str): The CA certificate.
-            client (bool): Add the client CA. Defaults to False.
+            tls_type (TLSType): The TLS type. Defaults to TLSType.PEER.
         """
-        if client:
+        if tls_type == TLSType.CLIENT:
             ca_certs_path = self.workload.paths.tls.client_ca
         else:
             ca_certs_path = self.workload.paths.tls.peer_ca
 
-        cas = self._load_trusted_ca(client=client)
+        cas = self._load_trusted_ca(tls_type)
         if ca_cert not in cas:
             cas.append(ca_cert)
             self.workload.write_file("\n".join(cas), ca_certs_path)
 
-    def _load_trusted_ca(self, client: bool = False) -> list[str]:
+    def _load_trusted_ca(self, tls_type) -> list[str]:
         """Load trusted CA from the system.
 
         Args:
-            client (bool): Load the client CA. Defaults to False.
+            tls_type (TLSType): The TLS type. Defaults to TLSType.PEER.
         """
-        if client:
+        if tls_type == TLSType.CLIENT:
             ca_certs_path = Path(self.workload.paths.tls.client_ca)
         else:
             ca_certs_path = Path(self.workload.paths.tls.peer_ca)
@@ -121,3 +133,71 @@ class TLSManager:
             self.workload.remove_file(self.workload.paths.tls.peer_ca)
             self.workload.remove_file(self.workload.paths.tls.peer_key)
         logger.debug(f"Deleted {cert_type.value} certificate")
+
+    def clean_cas(self, tls_type: TLSType) -> None:
+        """Clean the CAs from the system.
+
+        Args:
+            tls_type (TLSType): The TLS type.
+        """
+        cas = self._load_trusted_ca(tls_type)
+        # clear cas file
+        cas_path = (
+            self.workload.paths.tls.client_ca
+            if tls_type == TLSType.CLIENT
+            else self.workload.paths.tls.peer_ca
+        )
+        self.workload.remove_file(cas_path)
+        # The last CA is the new CA, so we add it back
+        # We will have at most 2 CAs in the list, the old and the new one
+        # These CAs are for certificates used by the server only so no need
+        # for multiple active CAs
+        self.add_trusted_ca(cas[-1], tls_type)
+
+    def set_ca_rotation_state(self, tls_type: TLSType, state: TLSCARotationState) -> None:
+        """Set the CA rotation state.
+
+        Args:
+            tls_type (TLSType): The TLS type.
+            state (TLSCARotationState): The CA rotation state.
+        """
+        logger.debug(f"Setting {tls_type.value} CA rotation state to {state}")
+        self.state.unit_server.update({f"tls_{tls_type.value}_ca_rotation": str(state.value)})
+
+    def is_new_ca_saved_on_all_servers(self, cert_type: TLSType) -> bool:
+        """Check if the new CA is saved on all servers.
+
+        Args:
+            cert_type (TLSType): The certificate type.
+        """
+        for server in self.state.servers:
+            server_ca_rotation_state = (
+                server.tls_peer_ca_rotation_state
+                if cert_type == TLSType.PEER
+                else server.tls_client_ca_rotation_state
+            )
+            if server_ca_rotation_state in [
+                TLSCARotationState.NO_ROTATION,
+                TLSCARotationState.NEW_CA_DETECTED,
+            ]:
+                return False
+        return True
+
+    def is_cert_updated_on_all_servers(self, cert_type: TLSType) -> bool:
+        """Check if the certificate is updated on all servers.
+
+        Args:
+            cert_type (TLSType): The certificate type.
+        """
+        for server in self.state.servers:
+            server_ca_state = (
+                server.tls_peer_ca_rotation_state
+                if cert_type == TLSType.PEER
+                else server.tls_client_ca_rotation_state
+            )
+            if server_ca_state in [
+                TLSCARotationState.NEW_CA_DETECTED,
+                TLSCARotationState.NEW_CA_ADDED,
+            ]:
+                return False
+        return True
