@@ -185,99 +185,6 @@ class EtcdClient:
         else:
             raise EtcdClusterManagementError(f"Failed to transfer leadership to {new_leader_id}.")
 
-    def member_list(self) -> dict[str, Member] | None:
-        """Run the `member list` command in etcd.
-
-        Returns:
-            dict[str, MemberListResult]: A dictionary with the member name as key and the
-            MemberListResult as value.
-        """
-        result = self._run_etcdctl(
-            command="member",
-            subcommand="list",
-            endpoints=self.client_url,
-            auth_username=self.user,
-            auth_password=self.password,
-            output_format="json",
-        )
-        logger.debug(f"Member list: {result}")
-        if not result:
-            return None
-
-        result = json.loads(result)
-        return {
-            member["name"]: Member(
-                id=str(hex(member["ID"]))[2:],
-                name=member["name"],
-                peer_urls=member["peerURLs"],
-                client_urls=member["clientURLs"],
-            )
-            for member in result["members"]
-        }
-
-    def is_healthy(self, cluster: bool = False) -> bool:
-        """Run the `endpoint health` command and return True if healthy.
-
-        Args:
-            cluster (bool): set to `True` to check the health of the entire cluster.
-
-        Returns:
-            bool: True if the cluster or node is healthy.
-        """
-        logger.debug("Running etcd health check.")
-        try:
-            for attempt in tenacity.Retrying(
-                stop=tenacity.stop_after_attempt(5),
-                wait=tenacity.wait_fixed(5),
-                reraise=True,
-            ):
-                with attempt:
-                    logger.debug(
-                        f"Checking health for cluster attempt: {attempt.retry_state.attempt_number}"
-                    )
-                    result = self._run_etcdctl(
-                        auth_password=self.password,
-                        auth_username=self.user,
-                        command="endpoint",
-                        subcommand="health",
-                        endpoints=self.client_url,
-                        output_format="json",
-                        cluster_arg=cluster,
-                    )
-
-                    if result is None:
-                        raise HealthCheckFailedError("Health check command failed")
-
-                    for endpoint in json.loads(result):
-                        if not endpoint["health"]:
-                            raise HealthCheckFailedError(
-                                f"Health check failed for endpoint {endpoint['endpoint']}"
-                            )
-
-        except Exception as e:
-            logger.error(f"Health check failed: {e}")
-            return False
-        logger.debug("Health check passed.")
-        return True
-
-    def broadcast_peer_url(self, endpoints: str, member_id: str, peer_urls: str) -> None:
-        """Broadcast the peer URL to all units in the cluster.
-
-        Args:
-            endpoints (str): The endpoints to run the command against.
-            member_id (str): The member ID to broadcast the peer URL for.
-            peer_urls (str): The peer URLs to broadcast.
-        """
-        self._run_etcdctl(
-            command="member",
-            subcommand="update",
-            endpoints=endpoints,
-            auth_username=self.user,
-            auth_password=self.password,
-            member=member_id,
-            peer_url=peer_urls,
-        )
-
     def _run_etcdctl(  # noqa: C901
         self,
         command: str,
@@ -376,3 +283,96 @@ class EtcdClient:
             return None
 
         return result
+
+    def member_list(self) -> dict[str, Member] | None:
+        """Run the `member list` command in etcd.
+
+        Returns:
+            dict[str, MemberListResult]: A dictionary with the member name as key and the
+            MemberListResult as value.
+        """
+        result = self._run_etcdctl(
+            command="member",
+            subcommand="list",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            output_format="json",
+        )
+        logger.debug(f"Member list: {result}")
+        if not result:
+            return None
+
+        result = json.loads(result)
+        return {
+            member["name"]: Member(
+                id=str(hex(member["ID"]))[2:],
+                name=member["name"],
+                peer_urls=member["peerURLs"],
+                client_urls=member["clientURLs"],
+            )
+            for member in result["members"]
+        }
+
+    def is_healthy(self, cluster: bool = False) -> bool:
+        """Run the `endpoint health` command and return True if healthy.
+
+        Args:
+            cluster (bool): set to `True` to check the health of the entire cluster.
+
+        Returns:
+            bool: True if the cluster or node is healthy.
+        """
+        logger.debug("Running etcd health check.")
+        try:
+            for attempt in tenacity.Retrying(
+                stop=tenacity.stop_after_attempt(5),
+                wait=tenacity.wait_fixed(5),
+                reraise=True,
+            ):
+                with attempt:
+                    logger.debug(
+                        f"Checking health for cluster attempt: {attempt.retry_state.attempt_number}"
+                    )
+                    result = self._run_etcdctl(
+                        auth_password=self.password,
+                        auth_username=self.user,
+                        command="endpoint",
+                        subcommand="health",
+                        endpoints=self.client_url,
+                        output_format="json",
+                        cluster_arg=cluster,
+                    )
+
+                    if result is None:
+                        raise HealthCheckFailedError("Health check command failed")
+
+                    for endpoint in json.loads(result):
+                        if not endpoint["health"]:
+                            raise HealthCheckFailedError(
+                                f"Health check failed for endpoint {endpoint['endpoint']}"
+                            )
+
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return False
+        logger.debug("Health check passed.")
+        return True
+
+    def broadcast_peer_url(self, endpoints: str, member_id: str, peer_urls: str) -> None:
+        """Broadcast the peer URL to all units in the cluster.
+
+        Args:
+            endpoints (str): The endpoints to run the command against.
+            member_id (str): The member ID to broadcast the peer URL for.
+            peer_urls (str): The peer URLs to broadcast.
+        """
+        self._run_etcdctl(
+            command="member",
+            subcommand="update",
+            endpoints=endpoints,
+            auth_username=self.user,
+            auth_password=self.password,
+            member=member_id,
+            peer_url=peer_urls,
+        )

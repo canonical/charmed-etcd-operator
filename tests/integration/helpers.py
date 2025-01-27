@@ -90,6 +90,39 @@ def get_cluster_endpoints(
     )
 
 
+def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
+    """Query the Raft leader via the `endpoint status` and `member list` commands.
+
+    Returns:
+        str: the member-name of the Raft leader, e.g. `etcd42`
+    """
+    etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+                --cacert client_ca.pem \
+                --cert client.pem \
+                --key client.key"
+
+    # query leader id
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    members = json.loads(result)
+    leader_id = members[0]["Status"]["leader"]
+
+    # query member name for leader id
+    etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+                --cacert client_ca.pem \
+                --cert client.pem \
+                --key client.key"
+
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    members = json.loads(result)
+    for member in members["members"]:
+        if member["ID"] == leader_id:
+            return member["name"]
+
+
 async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str:
     """Retrieve the leader unit name."""
     for unit in ops_test.model.applications[app_name].units:
