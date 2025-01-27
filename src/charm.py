@@ -14,7 +14,15 @@ from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
 from events.etcd import EtcdEvents
 from events.tls import TLSEvents
-from literals import RESTART_RELATION, SUBSTRATE, DebugLevel, Status, TLSState, TLSType
+from literals import (
+    RESTART_RELATION,
+    SUBSTRATE,
+    DebugLevel,
+    Status,
+    TLSCARotationState,
+    TLSState,
+    TLSType,
+)
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.tls import TLSManager
@@ -65,7 +73,9 @@ class EtcdOperatorCharm(ops.CharmBase):
 
     def rolling_restart(self, callback_override: str | None = None) -> None:
         """Initiate a rolling restart."""
-        logger.info(f"Initiating a rolling restart unit {self.unit.name}")
+        logger.info(
+            f"Initiating a rolling restart in unit {self.unit.name} with callback {callback_override}"
+        )
         self.on[RESTART_RELATION].acquire_lock.emit(callback_override=callback_override)
 
     def _restart_enable_client_tls(self, _) -> None:
@@ -164,6 +174,32 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.cluster_manager.restart_member():
             self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
+
+    def _restart_ca_rotation(self, _) -> None:
+        """Restart callback for CA rotation."""
+        logger.debug("ca rotation restart")
+        self._restart(None)
+        if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
+            self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NEW_CA_ADDED)
+
+        if (
+            self.state.unit_server.tls_client_ca_rotation_state
+            == TLSCARotationState.NEW_CA_DETECTED
+        ):
+            self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NEW_CA_ADDED)
+
+    def _restart_clean_cas(self, _) -> None:
+        """Restart callback for cleaning up old CAs."""
+        logger.debug("cleaning up old CAs")
+        if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.CERT_UPDATED:
+            self.tls_manager.clean_cas(TLSType.PEER)
+            self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NO_ROTATION)
+
+        if self.state.unit_server.tls_client_ca_rotation_state == TLSCARotationState.CERT_UPDATED:
+            self.tls_manager.clean_cas(TLSType.CLIENT)
+            self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NO_ROTATION)
+
+        self._restart(None)
 
 
 if __name__ == "__main__":  # pragma: nocover

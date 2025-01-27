@@ -90,3 +90,12 @@ class TLSType(Enum):
 
     PEER = "peer"
     CLIENT = "client"
+
+
+class TLSCARotationState(Enum):
+    """TLS CA Rotation state."""
+
+    NO_ROTATION = "no-rotation"
+    NEW_CA_DETECTED = "new-ca-detected"
+    NEW_CA_ADDED = "new-ca-added"
+    CERT_UPDATED = "cert-updated"
