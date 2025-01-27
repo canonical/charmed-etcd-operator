@@ -126,6 +126,15 @@ async def test_scale_down(ops_test: OpsTest) -> None:
 async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     """Make sure the etcd cluster is still available when the Raft leader is removed."""
     app = (await existing_app(ops_test)) or APP_NAME
+
+    await ops_test.model.applications[app].add_unit(count=1)
+    await ops_test.model.wait_for_idle(
+        apps=[app],
+        status="active",
+        wait_for_exact_units=3,
+        timeout=1000,
+    )
+
     init_units_count = len(ops_test.model.applications[app].units)
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
@@ -171,7 +180,7 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
 async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     """Make sure multiple units can be removed from the etcd cluster without downtime."""
     app = (await existing_app(ops_test)) or APP_NAME
-    await ops_test.model.applications[app].add_unit(count=2)
+    await ops_test.model.applications[app].add_unit(count=1)
     await ops_test.model.wait_for_idle(
         apps=[app],
         status="active",
