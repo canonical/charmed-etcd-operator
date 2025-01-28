@@ -67,6 +67,7 @@ async def test_scale_up(ops_test: OpsTest) -> None:
         apps=[app],
         status="active",
         wait_for_exact_units=init_units_count + 2,
+        wait_for_active=True,
         # give the cluster some time to settle down
         idle_period=60,
         timeout=1000,
@@ -106,6 +107,7 @@ async def test_scale_down(ops_test: OpsTest) -> None:
         apps=[app],
         status="active",
         wait_for_exact_units=init_units_count - 1,
+        wait_for_active=True,
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
@@ -134,6 +136,7 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
         apps=[app],
         status="active",
         wait_for_exact_units=3,
+        wait_for_active=True,
         # give the cluster some time to settle down
         idle_period=60,
         timeout=1000,
@@ -158,6 +161,7 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
         apps=[app],
         status="active",
         wait_for_exact_units=init_units_count - 1,
+        wait_for_active=True,
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
@@ -189,6 +193,7 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
         apps=[app],
         status="active",
         wait_for_exact_units=3,
+        wait_for_active=True,
         # give the cluster some time to settle down
         idle_period=60,
         timeout=1000,
@@ -209,6 +214,7 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
         apps=[app],
         status="active",
         wait_for_exact_units=1,
+        wait_for_active=True,
         timeout=1000,
     )
 
@@ -251,6 +257,7 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
         apps=[app],
         status="active",
         wait_for_exact_units=3,
+        wait_for_active=True,
         # give the cluster some time to settle down
         idle_period=60,
         timeout=1000,
@@ -291,6 +298,7 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
         apps=[app],
         status="active",
         wait_for_exact_units=init_units_count - 1,
+        wait_for_active=True,
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
