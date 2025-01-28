@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import base64
+import json
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
@@ -346,6 +347,7 @@ def test_certificate_available_new_cluster(certificate_available_context):
             event.certificate = client_certificate
             charm.tls_events._on_certificate_available(event)
             assert peer_relation.local_unit_data["tls_client_state"] == TLSState.TLS.value
+            assert charm.state.client_tls_relation, "Client relation not set"
 
         with patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
@@ -354,6 +356,7 @@ def test_certificate_available_new_cluster(certificate_available_context):
             event.certificate = peer_certificate
             charm.tls_events._on_certificate_available(event)
             assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.TLS.value
+            assert charm.state.peer_tls_relation, "Peer relation not set"
 
 
 def test_certificate_available_enabling_tls(certificate_available_context):
@@ -475,8 +478,25 @@ def test_enabling_tls_one_restart(certificate_available_context):
             patch("pathlib.Path.exists", return_value=False),
             patch("common.client.EtcdClient.broadcast_peer_url"),
             patch(
-                "common.client.EtcdClient.member_list",
-                return_value=MEMBER_LIST_DICT,
+                "common.client.EtcdClient._run_etcdctl",
+                return_value=json.dumps(
+                    {
+                        "members": [
+                            {
+                                "name": "charmed-etcd0",
+                                "ID": 11187096354790748301,
+                                "clientURLs": ["http://ip0:2380"],
+                                "peerURLs": ["http://ip0:2380"],
+                            },
+                            {
+                                "name": "charmed-etcd1",
+                                "ID": 4477466968462020105,
+                                "clientURLs": ["http://ip1:2380"],
+                                "peerURLs": ["http://ip1:2380"],
+                            },
+                        ]
+                    }
+                ),
             ),
             patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
             patch("managers.cluster.ClusterManager.restart_member"),
@@ -789,7 +809,13 @@ def test_ca_peer_rotation(certificate_available_context):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([peer_provider_certificate], requirer_private_key),
         ),
-        patch("charm.EtcdOperatorCharm._restart"),
+        # patch("charm.EtcdOperatorCharm._restart"),
+        patch("managers.config.ConfigManager.set_config_properties"),
+        patch("workload.EtcdWorkload.restart"),
+        patch(
+            "common.client.EtcdClient._run_etcdctl",
+            return_value='[{"endpoint":"http://10.73.32.158:2379","health":true,"took":"520.652µs"}]',
+        ),
     ):
         charm: EtcdOperatorCharm = manager.charm  # type: ignore
         event = MagicMock(spec=CertificateAvailableEvent)
