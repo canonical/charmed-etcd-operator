@@ -194,7 +194,6 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
         timeout=1000,
     )
 
-    init_units_count = len(ops_test.model.applications[app].units)
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -214,13 +213,13 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     )
 
     num_units = len(ops_test.model.applications[app].units)
-    assert num_units == init_units_count - 2
+    assert num_units == 1
 
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
     cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == init_units_count - 2
+    assert len(cluster_members) == 1
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
