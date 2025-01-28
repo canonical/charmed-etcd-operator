@@ -247,6 +247,7 @@ def test_unit_removal():
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="remove member")),
         # mock the `wait` in tenacity.retry to avoid delay in retrying
         patch("tenacity.nap.time.sleep", MagicMock()),
+        patch("workload.EtcdWorkload.stop"),
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert state_out.unit_status == ops.BlockedStatus("cluster management error")
