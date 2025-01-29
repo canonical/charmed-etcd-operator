@@ -29,6 +29,7 @@ from ..helpers import (
     get_secret_by_label,
     put_key,
 )
+from ..helpers_deployment import wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], apps_statuses=["active"])
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -167,7 +168,7 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     await ops_test.model.applications[APP_NAME].set_config(
         {TLS_PEER_PRIVATE_KEY_CONFIG: secret_id}
     )
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, TLS_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], apps_statuses=["active"])
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
@@ -232,7 +233,7 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     await ops_test.model.applications[APP_NAME].set_config(
         {TLS_CLIENT_PRIVATE_KEY_CONFIG: secret_id}
     )
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, TLS_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], apps_statuses=["active"])
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
