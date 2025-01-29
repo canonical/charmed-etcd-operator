@@ -17,7 +17,7 @@ from ..helpers import (
     get_juju_leader_unit_name,
     get_raft_leader,
     get_secret_by_label,
-    wait_for_all_units_active_idle,
+    wait_for_cluster_formation,
 )
 from .helpers import (
     assert_continuous_writes_consistent,
@@ -74,7 +74,6 @@ async def test_scale_up(ops_test: OpsTest) -> None:
         timeout=1000,
     )
 
-    wait_for_all_units_active_idle(ops_test, [app])
     num_units = len(ops_test.model.applications[app].units)
     assert num_units == init_units_count + 2, (
         f"Expected {init_units_count + 2} units, got {num_units}."
@@ -158,7 +157,9 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
         idle_period=60,
         timeout=1000,
     )
-    wait_for_all_units_active_idle(ops_test, [app])
+
+    # we need to wait for all members to be promoted to full-voting member before scaling down
+    await wait_for_cluster_formation(ops_test, app)
 
     init_units_count = len(ops_test.model.applications[app].units)
 
@@ -218,7 +219,9 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
         idle_period=60,
         timeout=1000,
     )
-    wait_for_all_units_active_idle(ops_test, [app])
+
+    # we need to wait for all members to be promoted to full-voting member before scaling down
+    await wait_for_cluster_formation(ops_test, app)
 
     # remove all units except one
     for unit in ops_test.model.applications[app].units[1:]:
@@ -276,7 +279,6 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
         idle_period=60,
         timeout=1000,
     )
-    wait_for_all_units_active_idle(ops_test, [app])
 
     endpoints = get_cluster_endpoints(ops_test, app)
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)

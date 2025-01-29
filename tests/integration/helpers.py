@@ -7,12 +7,12 @@ import logging
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT, TLSType
+from literals import CLIENT_PORT, PEER_RELATION, TLSType
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +124,56 @@ def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
             return member["name"]
 
 
+async def get_application_relation_data(
+    ops_test: OpsTest, application_name: str, relation_name: str, key: str
+) -> str | None:
+    """Get relation data for an application.
+
+    Args:
+        ops_test: The ops test framework instance
+        application_name: The name of the application
+        relation_name: name of the relation to get connection data from
+        key: key of data to be retrieved
+        relation_id: id of the relation to get connection data from
+
+    Returns:
+        the relation data that was requested, or None if no data in the relation
+
+    Raises:
+        ValueError if it's not possible to get application unit data
+            or if there is no data for the particular relation endpoint.
+    """
+    unit_name = await get_juju_leader_unit_name(ops_test, application_name)
+    raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    if not raw_data:
+        raise ValueError(f"no unit info could be grabbed for {unit_name}")
+    data = yaml.safe_load(raw_data)
+    # Filter the data based on the relation name.
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == relation_name]
+    if len(relation_data) == 0:
+        raise ValueError(
+            f"no relation data could be grabbed on relation with endpoint {relation_name}"
+        )
+    return relation_data[0]["application-data"].get(key)
+
+
+async def wait_for_cluster_formation(ops_test: OpsTest, app_name: str = APP_NAME):
+    """Wait until all cluster members have been promoted to full-voting member."""
+    try:
+        if learner := await get_application_relation_data(
+            ops_test, app_name, PEER_RELATION, "learning_member"
+        ):
+            while True:
+                logger.info(f"Waiting for learning-member {learner}")
+                time.sleep(5)
+                # this will raise with `ValueError` if not found and thereby break the loop
+                learner = await get_application_relation_data(
+                    ops_test, app_name, PEER_RELATION, "learning_member"
+                )
+    except ValueError:
+        pass
+
+
 async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str:
     """Retrieve the leader unit name."""
     for unit in ops_test.model.applications[app_name].units:
@@ -171,20 +221,3 @@ async def download_client_certificate_from_unit(
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
         await unit.scp_from(f"{tls_path}/{file}", file)
-
-
-def wait_for_all_units_active_idle(ops_test: OpsTest, app_names: List[str]) -> None:
-    """Check the workload status for all units and block until they are active."""
-    all_units_active_idle = False
-
-    while not all_units_active_idle:
-        logger.info("Waiting for all unit workloads and agents to be active / idle.")
-        all_units_active_idle = True
-        for app_name in app_names:
-            for unit in ops_test.model.applications[app_name].units:
-                if unit.workload_status != "active" or unit.agent_status != "idle":
-                    all_units_active_idle = False
-                    logger.info(
-                        f"Unit {unit.name} status is {unit.workload_status} / {unit.agent_status}."
-                    )
-        time.sleep(5)
