@@ -5,8 +5,9 @@
 import json
 import logging
 import subprocess
+import time
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import yaml
 from pytest_operator.plugin import OpsTest
@@ -170,3 +171,20 @@ async def download_client_certificate_from_unit(
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
         await unit.scp_from(f"{tls_path}/{file}", file)
+
+
+def wait_for_all_units_active_idle(ops_test: OpsTest, app_names: List[str]) -> None:
+    """Check the workload status for all units and block until they are active."""
+    all_units_active_idle = False
+
+    while not all_units_active_idle:
+        logger.info("Waiting for all unit workloads and agents to be active / idle.")
+        all_units_active_idle = True
+        for app_name in app_names:
+            for unit in ops_test.model.applications[app_name].units:
+                if unit.workload_status != "active" or unit.agent_status != "idle":
+                    all_units_active_idle = False
+                    logger.info(
+                        f"Unit {unit.name} status is {unit.workload_status} / {unit.agent_status}."
+                    )
+        time.sleep(5)

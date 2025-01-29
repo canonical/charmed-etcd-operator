@@ -17,6 +17,7 @@ from ..helpers import (
     get_juju_leader_unit_name,
     get_raft_leader,
     get_secret_by_label,
+    wait_for_all_units_active_idle,
 )
 from .helpers import (
     assert_continuous_writes_consistent,
@@ -72,14 +73,20 @@ async def test_scale_up(ops_test: OpsTest) -> None:
         idle_period=60,
         timeout=1000,
     )
+
+    wait_for_all_units_active_idle(ops_test, [app])
     num_units = len(ops_test.model.applications[app].units)
-    assert num_units == init_units_count + 2
+    assert num_units == init_units_count + 2, (
+        f"Expected {init_units_count + 2} units, got {num_units}."
+    )
 
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
     cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == init_units_count + 2
+    assert len(cluster_members) == init_units_count + 2, (
+        f"Expected {init_units_count + 2} cluster members, got {len(cluster_members)}."
+    )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
@@ -111,13 +118,17 @@ async def test_scale_down(ops_test: OpsTest) -> None:
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
-    assert num_units == init_units_count - 1
+    assert num_units == init_units_count - 1, (
+        f"Expected {init_units_count - 1} units, got {num_units}."
+    )
 
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
     cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == init_units_count - 1
+    assert len(cluster_members) == init_units_count - 1, (
+        f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
+    )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
@@ -130,6 +141,12 @@ async def test_scale_down(ops_test: OpsTest) -> None:
 async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     """Make sure the etcd cluster is still available when the Raft leader is removed."""
     app = (await existing_app(ops_test)) or APP_NAME
+    init_endpoints = get_cluster_endpoints(ops_test, app)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
     await ops_test.model.applications[app].add_unit(count=1)
     await ops_test.model.wait_for_idle(
@@ -141,21 +158,13 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
         idle_period=60,
         timeout=1000,
     )
+    wait_for_all_units_active_idle(ops_test, [app])
 
     init_units_count = len(ops_test.model.applications[app].units)
-    init_endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
-
-    # start writing data to the cluster
-    start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
     # find and remove the unit that is the current Raft leader
     init_raft_leader = get_raft_leader(endpoints=init_endpoints)
-    for unit in ops_test.model.applications[app].units:
-        if unit.name.replace("/", "") == init_raft_leader:
-            await ops_test.model.applications[app].destroy_unit(unit.name)
-            break
+    await ops_test.model.applications[app].destroy_unit(init_raft_leader.replace(app, f"{app}/"))
 
     await ops_test.model.wait_for_idle(
         apps=[app],
@@ -165,13 +174,17 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
-    assert num_units == init_units_count - 1
+    assert num_units == init_units_count - 1, (
+        f"Expected {init_units_count - 1} units, got {num_units}."
+    )
 
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
     cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == init_units_count - 1
+    assert len(cluster_members) == init_units_count - 1, (
+        f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
+    )
 
     # check that another unit is now the Raft leader
     new_raft_leader = get_raft_leader(endpoints=endpoints)
@@ -188,6 +201,13 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
 async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     """Make sure multiple units can be removed from the etcd cluster without downtime."""
     app = (await existing_app(ops_test)) or APP_NAME
+    init_endpoints = get_cluster_endpoints(ops_test, app)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
+
     await ops_test.model.applications[app].add_unit(count=1)
     await ops_test.model.wait_for_idle(
         apps=[app],
@@ -198,13 +218,7 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
         idle_period=60,
         timeout=1000,
     )
-
-    init_endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
-
-    # start writing data to the cluster
-    start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
+    wait_for_all_units_active_idle(ops_test, [app])
 
     # remove all units except one
     for unit in ops_test.model.applications[app].units[1:]:
@@ -219,13 +233,13 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     )
 
     num_units = len(ops_test.model.applications[app].units)
-    assert num_units == 1
+    assert num_units == 1, f"Expected 1 unit, got {num_units}."
 
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
     cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == 1
+    assert len(cluster_members) == 1, f"Expected 1 cluster member, got {len(cluster_members)}."
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
@@ -262,6 +276,7 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
         idle_period=60,
         timeout=1000,
     )
+    wait_for_all_units_active_idle(ops_test, [app])
 
     endpoints = get_cluster_endpoints(ops_test, app)
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -269,7 +284,7 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     time.sleep(10)
 
     cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == 3
+    assert len(cluster_members) == 3, f"Expected 3 cluster members, got {len(cluster_members)}."
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
@@ -302,13 +317,17 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
-    assert num_units == init_units_count - 1
+    assert num_units == init_units_count - 1, (
+        f"Expected {init_units_count - 1} units, got {num_units}."
+    )
 
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
     cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == init_units_count - 1
+    assert len(cluster_members) == init_units_count - 1, (
+        f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
+    )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
