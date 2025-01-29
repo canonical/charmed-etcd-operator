@@ -542,12 +542,12 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
 
-    # enable peer TLS and check if the cluster is still accessible
+    # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=15)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
