@@ -246,7 +246,7 @@ class EtcdEvents(Object):
 
         if secret_content is None:
             logger.error(f"Secret {private_key_id} does not contain a private key.")
-            self.charm.set_status(Status.INVALID_PRIVATE_KEY)
+            self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
             return
 
         private_key = (
@@ -257,7 +257,7 @@ class EtcdEvents(Object):
 
         if not re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", private_key):
             logger.error("Invalid private key format.")
-            self.charm.set_status(Status.INVALID_PRIVATE_KEY)
+            self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
             return
 
         # TODO once TLS lib supports setting private key the logic below should be updated to use

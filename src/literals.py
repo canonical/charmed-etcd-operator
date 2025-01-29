@@ -74,7 +74,7 @@ class Status(Enum):
     TLS_PEER_TRANSITION_FAILED = StatusLevel(
         BlockedStatus("Failed to transition to/from peer tls"), "ERROR"
     )
-    INVALID_PRIVATE_KEY = StatusLevel(
+    TLS_INVALID_PRIVATE_KEY = StatusLevel(
         BlockedStatus("The private key provided is not valid. Please provide a valid private key"),
         "ERROR",
     )
