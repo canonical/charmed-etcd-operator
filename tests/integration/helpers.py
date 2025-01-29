@@ -19,6 +19,10 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
 
 
+class SecretNotFoundError(Exception):
+    """Raised when a secret is not found."""
+
+
 def put_key(
     endpoints: str,
     key: str,
@@ -98,7 +102,7 @@ async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME)
     raise Exception("No leader unit found")
 
 
-async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] | None:
+async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str]:
     secrets_raw = await ops_test.juju("list-secrets")
     secret_ids = [
         secret_line.split()[0] for secret_line in secrets_raw[1].split("\n")[1:] if secret_line
@@ -113,7 +117,7 @@ async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] |
         if label == secret_data[secret_id].get("label"):
             return secret_data[secret_id]["content"]["Data"]
 
-    return None
+    raise SecretNotFoundError(f"Secret with label {label} not found")
 
 
 def get_certificate_from_unit(

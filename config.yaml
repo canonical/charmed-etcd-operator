@@ -10,8 +10,12 @@ options:
       and SHOULD NOT be used by applications. This needs to be a Juju Secret URI pointing
       to a secret that contains the following content: `root: <password>`.
   
-  tls-private-key:
+  tls-peer-private-key:
     type: secret
     description: |
-      The private key for the TLS certificates. This needs to be a Juju Secret URI
-      pointing to a secret that contains the private key.
+      A Juju secret URI of a secret containing the private key for peer-to-peer TLS certificates.
+  
+  tls-client-private-key:
+    type: secret
+    description: |
+      A Juju secret URI of a secret containing the private key for server-to-client TLS certificates.
