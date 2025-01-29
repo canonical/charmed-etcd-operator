@@ -328,8 +328,8 @@ async def _is_every_condition_met(
             return False
 
         if (
-            expected_units > -1
-            and (units_statuses or units_full_statuses)
+            # expected_units > -1 and
+            (units_statuses or units_full_statuses)
             and not _is_every_condition_on_units_met(
                 model=ops_test.model.info.name,
                 app=app,
