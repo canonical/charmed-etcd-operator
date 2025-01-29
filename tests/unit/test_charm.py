@@ -9,8 +9,10 @@ from unittest.mock import MagicMock, patch
 import ops
 import yaml
 from ops import testing
+from pytest import raises
 
 from charm import EtcdOperatorCharm
+from common.exceptions import EtcdClusterManagementError
 from core.models import Member
 from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
@@ -240,7 +242,7 @@ def test_unit_removal():
         assert state_out.get_relation(1).local_app_data.get("cluster_state")
         assert state_out.get_relation(1).local_app_data.get("cluster_members")
 
-    # in case of error when removing the member, unit should be in blocked state with error
+    # in case of error when removing the member, unit should in error state
     with (
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("managers.cluster.ClusterManager.leader"),
@@ -249,8 +251,10 @@ def test_unit_removal():
         patch("tenacity.nap.time.sleep", MagicMock()),
         patch("workload.EtcdWorkload.stop"),
     ):
-        state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
-        assert state_out.unit_status == ops.BlockedStatus("cluster management error")
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.storage_detaching(data_storage), state_in)
+
+        assert isinstance(e.value.__cause__, EtcdClusterManagementError)
 
     # if all units are removed, cluster state data should be cleaned from application databag
     state_in = testing.State(
