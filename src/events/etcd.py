@@ -147,14 +147,16 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
-        if self.charm.unit.is_leader():
-            logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
-            cluster_members = self.charm.state.cluster.cluster_members.split(",")
-            # re-assemble the string without the departing unit
-            updated_cluster_members = ",".join(
-                m for m in cluster_members if event.unit.name.replace("/", "") not in m
-            )
-            self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
+        if not self.charm.unit.is_leader():
+            return
+
+        logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
+        cluster_members = self.charm.state.cluster.cluster_members.split(",")
+        # re-assemble the string without the departing unit
+        updated_cluster_members = ",".join(
+            m for m in cluster_members if event.unit.name.replace("/", "") not in m
+        )
+        self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
@@ -199,8 +201,7 @@ class EtcdEvents(Object):
             except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
                 # We want this hook to error out if we cannot remove the cluster member
                 # otherwise the cluster could become unavailable because of quorum loss
-                self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)
-                return
+                raise
         else:
             logger.info("Removing last unit from etcd cluster.")
             if self.charm.unit.is_leader():

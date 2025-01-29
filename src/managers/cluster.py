@@ -232,7 +232,7 @@ class ClusterManager:
         logger.info(f"Successfully promoted learning member {member_id}.")
 
     @retry(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(10),
         wait=wait_random_exponential(multiplier=2, max=60),
         reraise=True,
     )
