@@ -191,7 +191,13 @@ class EtcdEvents(Object):
                         self.charm.state.cluster.update(
                             {f"{INTERNAL_USER}-password": new_password}
                         )
+                        self.charm.set_status(Status.ACTIVE)
                     except EtcdUserManagementError as e:
                         logger.error(e)
+                        self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
+            else:
+                logger.warning(f"Invalid username in secret {admin_secret_id}.")
+                self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
+            self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
