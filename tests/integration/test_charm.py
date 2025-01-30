@@ -37,7 +37,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     etcd_charm = await ops_test.build_charm(".")
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(etcd_charm, num_units=NUM_UNITS)
+    await ops_test.model.deploy(etcd_charm, base="ubuntu@24.04", num_units=NUM_UNITS)
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # check if all units have been added to the cluster

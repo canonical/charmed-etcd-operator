@@ -38,7 +38,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     etcd_charm = await ops_test.build_charm(".")
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(etcd_charm, num_units=1)
+    await ops_test.model.deploy(etcd_charm, base="ubuntu@24.04", num_units=1)
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     assert len(ops_test.model.applications[APP_NAME].units) == 1

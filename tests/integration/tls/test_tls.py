@@ -48,7 +48,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     etcd_charm = await ops_test.build_charm(".")
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(etcd_charm, num_units=NUM_UNITS)
+    await ops_test.model.deploy(etcd_charm, base="ubuntu@24.04", num_units=NUM_UNITS)
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
