@@ -26,7 +26,7 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "noble", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -61,7 +61,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     assert get_key(endpoints, user=INTERNAL_USER, password=password, key=TEST_KEY) == TEST_VALUE
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "noble", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_authentication(ops_test: OpsTest) -> None:
@@ -73,7 +73,7 @@ async def test_authentication(ops_test: OpsTest) -> None:
     assert put_key(endpoints, key=TEST_KEY, value=TEST_VALUE) != "OK"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "noble", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_update_admin_password(ops_test: OpsTest) -> None:
