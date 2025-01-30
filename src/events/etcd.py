@@ -242,6 +242,7 @@ class EtcdEvents(Object):
             )
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
+            self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
             return
 
         if secret_content is None:

@@ -747,6 +747,7 @@ def test_set_tls_private_key():
             state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
             == newer_private_key
         )
+        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
         assert cleanup.call_count == 2, "_cleanup_certificate_requests should not have been called"
         assert send.call_count == 2, "_send_certificate_requests should not have been called"
 
@@ -757,6 +758,7 @@ def test_set_tls_private_key():
             state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
             == newer_private_key
         )
+        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
         assert cleanup.call_count == 2, "_cleanup_certificate_requests should not have been called"
         assert send.call_count == 2, "_send_certificate_requests should not have been called"
 
@@ -767,7 +769,7 @@ def test_set_tls_private_key():
             state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
             == newer_private_key
         )
-
+        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
         assert cleanup.call_count == 2, "_cleanup_certificate_requests should not have been called"
         assert send.call_count == 2, "_send_certificate_requests should not have been called"
 
