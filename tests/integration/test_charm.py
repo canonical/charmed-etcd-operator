@@ -17,6 +17,7 @@ from .helpers import (
     get_secret_by_label,
     put_key,
 )
+from .helpers_deployment import wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
     # Deploy the charm and wait for active/idle status
     await ops_test.model.deploy(etcd_charm, num_units=NUM_UNITS)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME])
 
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
@@ -95,7 +96,7 @@ async def test_update_admin_password(ops_test: OpsTest) -> None:
     await ops_test.model.applications[APP_NAME].set_config(
         {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
     )
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME])
 
     # perform read operation with the updated password
     assert (
@@ -104,7 +105,7 @@ async def test_update_admin_password(ops_test: OpsTest) -> None:
 
     # update the config again and remove the option `admin-password`
     await ops_test.model.applications[APP_NAME].reset_config([INTERNAL_USER_PASSWORD_CONFIG])
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME])
 
     # make sure we can still read data with the previously set password
     assert (

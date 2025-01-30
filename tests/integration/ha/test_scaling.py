@@ -15,6 +15,7 @@ from ..helpers import (
     get_cluster_members,
     get_secret_by_label,
 )
+from ..helpers_deployment import wait_until
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -39,7 +40,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
     # Deploy the charm and wait for active/idle status
     await ops_test.model.deploy(etcd_charm, num_units=1)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     assert len(ops_test.model.applications[APP_NAME].units) == 1
 
@@ -60,12 +61,7 @@ async def test_scale_up(ops_test: OpsTest) -> None:
 
     # scale up
     await ops_test.model.applications[app].add_unit(count=2)
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=init_units_count + 2,
-        timeout=1000,
-    )
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count + 2)
     num_units = len(ops_test.model.applications[app].units)
     assert num_units == init_units_count + 2
 
