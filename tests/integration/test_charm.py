@@ -11,6 +11,7 @@ from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
 from .helpers import (
     APP_NAME,
+    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_key,
@@ -33,11 +34,8 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
     The initial cluster should be formed and accessible.
     """
-    # Build and deploy charm from local source folder
-    etcd_charm = await ops_test.build_charm(".")
-
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(etcd_charm, base="ubuntu@24.04", num_units=NUM_UNITS)
+    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # check if all units have been added to the cluster

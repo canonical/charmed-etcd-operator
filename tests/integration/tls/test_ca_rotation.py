@@ -13,6 +13,7 @@ from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
 from ..helpers import (
     APP_NAME,
+    CHARM_PATH,
     download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
@@ -43,11 +44,10 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
     await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
-    # Build and deploy charm from local source folder
-    etcd_charm = await ops_test.build_charm(".")
+
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(etcd_charm, base="ubuntu@24.04", num_units=NUM_UNITS)
+    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")

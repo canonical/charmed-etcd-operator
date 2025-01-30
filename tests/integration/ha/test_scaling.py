@@ -11,6 +11,7 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
+    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_secret_by_label,
@@ -35,10 +36,8 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if await existing_app(ops_test):
         return
 
-    etcd_charm = await ops_test.build_charm(".")
-
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(etcd_charm, base="ubuntu@24.04", num_units=1)
+    await ops_test.model.deploy(CHARM_PATH, num_units=1)
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     assert len(ops_test.model.applications[APP_NAME].units) == 1

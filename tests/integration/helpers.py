@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
+CHARM_PATH = "./charmed-etcd_ubuntu@24.04-amd64.charm"
 
 
 def put_key(
