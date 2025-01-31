@@ -4,17 +4,35 @@
 
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import ops
 import yaml
 from ops import testing
+from pytest import raises
 
 from charm import EtcdOperatorCharm
+from common.exceptions import EtcdClusterManagementError
+from core.models import Member
 from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
+
+MEMBER_LIST_DICT = {
+    "charmed-etcd0": Member(
+        id="1",
+        name="etcd-test-1",
+        peer_urls=["http://localhost:2380"],
+        client_urls=["http://localhost:2379"],
+    ),
+    "charmed-etcd1": Member(
+        id="2",
+        name="etcd-test-2",
+        peer_urls=["http://localhost:2381"],
+        client_urls=["http://localhost:2380"],
+    ),
+}
 
 
 def test_install_failure_blocked_status():
@@ -147,7 +165,7 @@ def test_peer_relation_created():
     state_in = testing.State(relations={relation})
     with (
         patch("managers.cluster.ClusterManager.get_host_mapping", return_value=test_data),
-        patch("managers.cluster.ClusterManager.get_leader"),
+        patch("managers.cluster.ClusterManager.leader"),
     ):
         state_out = ctx.run(ctx.on.relation_created(relation=relation), state_in)
         assert state_out.get_relation(1).local_unit_data.get("hostname") == test_data["hostname"]
@@ -155,24 +173,25 @@ def test_peer_relation_created():
 
 def test_get_leader():
     test_ip = "10.54.237.119"
+    member_id = 11187096354790748301
     test_data = {
         "Endpoint": f"http://{test_ip}:{CLIENT_PORT}",
         "Status": {
             "header": {
                 "cluster_id": 9102535641521235766,
-                "member_id": 11187096354790748301,
+                "member_id": member_id,
             },
             "version": "3.4.22",
-            "leader": 11187096354790748301,
+            "leader": member_id,
         },
     }
 
     ctx = testing.Context(EtcdOperatorCharm)
-    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_unit_data={"ip": test_ip})
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation})
     with patch("managers.cluster.EtcdClient.get_endpoint_status", return_value=test_data):
         with ctx(ctx.on.relation_joined(relation=relation), state_in) as context:
-            assert context.charm.cluster_manager.get_leader() == f"http://{test_ip}:{CLIENT_PORT}"
+            assert context.charm.cluster_manager.leader == hex(member_id)[2:]
 
 
 def test_config_changed():
@@ -194,3 +213,61 @@ def test_config_changed():
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+
+def test_unit_removal():
+    ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "cluster_state": "existing",
+            "authentication": "enabled",
+            "cluster_members": "abc",
+        },
+    )
+    data_storage = testing.Storage("data")
+    state_in = testing.State(storages=[data_storage], relations={relation})
+
+    # test the happy path
+    with (
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("subprocess.run"),
+        patch("workload.EtcdWorkload.stop"),
+        patch("managers.cluster.ClusterManager.leader"),
+    ):
+        state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
+        assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
+        assert state_out.get_relation(1).local_app_data.get("authentication")
+        assert state_out.get_relation(1).local_app_data.get("cluster_state")
+        assert state_out.get_relation(1).local_app_data.get("cluster_members")
+
+    # in case of error when removing the member, unit should in error state
+    with (
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.leader"),
+        patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="remove member")),
+        # mock the `wait` in tenacity.retry to avoid delay in retrying
+        patch("tenacity.nap.time.sleep", MagicMock()),
+        patch("workload.EtcdWorkload.stop"),
+    ):
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.storage_detaching(data_storage), state_in)
+
+        assert isinstance(e.value.__cause__, EtcdClusterManagementError)
+
+    # if all units are removed, cluster state data should be cleaned from application databag
+    state_in = testing.State(
+        storages=[data_storage], relations={relation}, planned_units=0, leader=True
+    )
+    with (
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.leader"),
+        patch("subprocess.run"),
+        patch("workload.EtcdWorkload.stop"),
+    ):
+        state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
+        assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
+        assert not state_out.get_relation(1).local_app_data.get("authentication")
+        assert not state_out.get_relation(1).local_app_data.get("cluster_state")
+        assert not state_out.get_relation(1).local_app_data.get("cluster_members")

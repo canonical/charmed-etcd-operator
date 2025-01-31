@@ -22,9 +22,17 @@ from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
     EtcdUserManagementError,
+    RaftLeaderNotFoundError,
 )
 from common.secrets import get_secret_from_id
-from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, Status, TLSState
+from literals import (
+    DATA_STORAGE,
+    INTERNAL_USER,
+    INTERNAL_USER_PASSWORD_CONFIG,
+    PEER_RELATION,
+    Status,
+    TLSState,
+)
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -59,6 +67,9 @@ class EtcdEvents(Object):
         self.framework.observe(self.charm.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.charm.on.update_status, self._on_update_status)
         self.framework.observe(self.charm.on.secret_changed, self._on_secret_changed)
+        self.framework.observe(
+            self.charm.on[DATA_STORAGE].storage_detaching, self._on_storage_detaching
+        )
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -135,8 +146,17 @@ class EtcdEvents(Object):
                 return
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """Handle event received by a unit leaves the cluster relation."""
-        pass
+        """Handle event received by all units when a unit leaves the cluster relation."""
+        if not self.charm.unit.is_leader():
+            return
+
+        logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
+        cluster_members = self.charm.state.cluster.cluster_members.split(",")
+        # re-assemble the string without the departing unit
+        updated_cluster_members = ",".join(
+            m for m in cluster_members if event.unit.name.replace("/", "") not in m
+        )
+        self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
@@ -172,6 +192,30 @@ class EtcdEvents(Object):
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
             if admin_secret_id == event.secret.id:
                 self.update_admin_password(admin_secret_id)
+
+    def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
+        """Handle removal of the data storage mount, e.g. when removing a unit."""
+        if self.charm.app.planned_units() > 0:
+            try:
+                self.charm.cluster_manager.remove_member()
+            except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
+                # We want this hook to error out if we cannot remove the cluster member
+                # otherwise the cluster could become unavailable because of quorum loss
+                raise
+        else:
+            logger.info("Removing last unit from etcd cluster.")
+            if self.charm.unit.is_leader():
+                self.charm.state.cluster.update(
+                    {
+                        "cluster_state": "",
+                        "cluster_members": "",
+                        "authentication": "",
+                    }
+                )
+
+        self.charm.workload.stop()
+        self.charm.state.unit_server.update({"state": ""})
+        self.charm.set_status(Status.REMOVED)
 
     def update_admin_password(self, admin_secret_id: str) -> None:
         """Compare current admin password and update in etcd if required."""
