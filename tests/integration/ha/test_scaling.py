@@ -113,6 +113,8 @@ async def test_scale_down(ops_test: OpsTest) -> None:
         status="active",
         wait_for_exact_units=init_units_count - 1,
         wait_for_active=True,
+        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
+        raise_on_error=False,
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
@@ -171,6 +173,8 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
         status="active",
         wait_for_exact_units=init_units_count - 1,
         wait_for_active=True,
+        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
+        raise_on_error=False,
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
@@ -231,6 +235,8 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
         status="active",
         wait_for_exact_units=1,
         wait_for_active=True,
+        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
+        raise_on_error=False,
         timeout=1000,
     )
 
@@ -264,6 +270,8 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(
         apps=[app],
         wait_for_exact_units=0,
+        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
+        raise_on_error=False,
         timeout=1000,
     )
 
@@ -315,6 +323,8 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
         status="active",
         wait_for_exact_units=init_units_count - 1,
         wait_for_active=True,
+        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
+        raise_on_error=False,
         timeout=1000,
     )
     num_units = len(ops_test.model.applications[app].units)
