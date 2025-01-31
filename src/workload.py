@@ -61,6 +61,10 @@ class EtcdWorkload(WorkloadBase):
         path.write_text(content)
 
     @override
+    def stop(self) -> None:
+        self.etcd.stop(services=[SNAP_SERVICE])
+
+    @override
     def restart(self) -> None:
         self.etcd.restart(services=[SNAP_SERVICE])
 
