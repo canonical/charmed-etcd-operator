@@ -10,7 +10,14 @@ from dataclasses import dataclass
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
 
-from literals import CLIENT_PORT, INTERNAL_USER, PEER_PORT, SUBSTRATES, TLSState
+from literals import (
+    CLIENT_PORT,
+    INTERNAL_USER,
+    PEER_PORT,
+    SUBSTRATES,
+    TLSCARotationState,
+    TLSState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +143,20 @@ class EtcdServer(RelationState):
     def is_started(self) -> bool:
         """Check if the unit has started."""
         return self.relation_data.get("state", "") == "started"
+
+    @property
+    def tls_peer_ca_rotation_state(self) -> TLSCARotationState:
+        """Check if the peer CA rotation is enabled."""
+        return TLSCARotationState(
+            self.relation_data.get("tls_peer_ca_rotation", TLSCARotationState.NO_ROTATION.value)
+        )
+
+    @property
+    def tls_client_ca_rotation_state(self) -> TLSCARotationState:
+        """Check if the client CA rotation is enabled."""
+        return TLSCARotationState(
+            self.relation_data.get("tls_client_ca_rotation", TLSCARotationState.NO_ROTATION.value)
+        )
 
 
 class EtcdCluster(RelationState):

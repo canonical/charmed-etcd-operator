@@ -18,6 +18,7 @@ SNAP_SERVICE = "etcd"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
 
+DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
 RESTART_RELATION = "restart"
 CLIENT_PORT = 2379
@@ -60,6 +61,8 @@ class Status(Enum):
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
+    CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
+    REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")
@@ -89,3 +92,12 @@ class TLSType(Enum):
 
     PEER = "peer"
     CLIENT = "client"
+
+
+class TLSCARotationState(Enum):
+    """TLS CA Rotation state."""
+
+    NO_ROTATION = "no-rotation"
+    NEW_CA_DETECTED = "new-ca-detected"
+    NEW_CA_ADDED = "new-ca-added"
+    CERT_UPDATED = "cert-updated"

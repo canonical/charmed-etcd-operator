@@ -5,13 +5,14 @@
 import json
 import logging
 import subprocess
+import time
 from pathlib import Path
 from typing import Dict
 
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT, SNAP_NAME, TLSType
+from literals import CLIENT_PORT, PEER_RELATION, TLSType
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +21,6 @@ APP_NAME = METADATA["name"]
 
 
 def put_key(
-    model: str,
-    unit: str,
     endpoints: str,
     key: str,
     value: str,
@@ -29,26 +28,22 @@ def put_key(
     password: str | None = None,
     tls_enabled: bool = False,
 ) -> str:
-    """Write data to etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl put {key} {value} --endpoints={endpoints}"
+    """Write data to etcd using `etcdctl`."""
+    etcd_command = f"etcdctl put {key} {value} --endpoints={endpoints}"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
     if password:
         etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
-
-    return subprocess.getoutput(juju_command).split("\n")[0]
+    return subprocess.getoutput(etcd_command).split("\n")[0]
 
 
 def get_key(
-    model: str,
-    unit: str,
     endpoints: str,
     key: str,
     user: str | None = None,
@@ -56,36 +51,30 @@ def get_key(
     tls_enabled: bool = False,
 ) -> str:
     """Read data from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl get {key} --endpoints={endpoints}"
+    etcd_command = f"etcdctl get {key} --endpoints={endpoints}"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
     if password:
         etcd_command = f"{etcd_command} --password={password}"
-
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
-
-    return subprocess.getoutput(juju_command).split("\n")[1]
+    return subprocess.getoutput(etcd_command).split("\n")[1]
 
 
-def get_cluster_members(
-    model: str, unit: str, endpoints: str, tls_enabled: bool = False
-) -> list[dict]:
-    """Query all cluster members from etcd using `etcdctl` via `juju ssh`."""
-    etcd_command = f"{SNAP_NAME}.etcdctl member list --endpoints={endpoints} -w=json"
+def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]:
+    """Query all cluster members from etcd using `etcdctl`."""
+    etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
-            --cacert /var/snap/charmed-etcd/common/tls/client_ca.pem \
-            --cert /var/snap/charmed-etcd/common/tls/client.pem \
-            --key /var/snap/charmed-etcd/common/tls/client.key"
-    juju_command = f"juju ssh --model={model} {unit} {etcd_command}"
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
 
-    result = subprocess.getoutput(juju_command).split("\n")[0]
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
 
     return json.loads(result)["members"]
 
@@ -100,6 +89,89 @@ def get_cluster_endpoints(
             for unit in ops_test.model.applications[app_name].units
         ]
     )
+
+
+def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
+    """Query the Raft leader via the `endpoint status` and `member list` commands.
+
+    Returns:
+        str: the member-name of the Raft leader, e.g. `etcd42`
+    """
+    etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+                --cacert client_ca.pem \
+                --cert client.pem \
+                --key client.key"
+
+    # query leader id
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    members = json.loads(result)
+    leader_id = members[0]["Status"]["leader"]
+
+    # query member name for leader id
+    etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+                --cacert client_ca.pem \
+                --cert client.pem \
+                --key client.key"
+
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    members = json.loads(result)
+    for member in members["members"]:
+        if member["ID"] == leader_id:
+            return member["name"]
+
+
+async def get_application_relation_data(
+    ops_test: OpsTest, application_name: str, relation_name: str, key: str
+) -> str | None:
+    """Get relation data for an application.
+
+    Args:
+        ops_test: The ops test framework instance
+        application_name: The name of the application
+        relation_name: name of the relation to get connection data from
+        key: key of data to be retrieved
+        relation_id: id of the relation to get connection data from
+
+    Returns:
+        the relation data that was requested, or None if no data in the relation
+
+    Raises:
+        ValueError if it's not possible to get application unit data
+            or if there is no data for the particular relation endpoint.
+    """
+    unit_name = await get_juju_leader_unit_name(ops_test, application_name)
+    raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    if not raw_data:
+        raise ValueError(f"no unit info could be grabbed for {unit_name}")
+    data = yaml.safe_load(raw_data)
+    # Filter the data based on the relation name.
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == relation_name]
+    if len(relation_data) == 0:
+        raise ValueError(
+            f"no relation data could be grabbed on relation with endpoint {relation_name}"
+        )
+    return relation_data[0]["application-data"].get(key)
+
+
+async def wait_for_cluster_formation(ops_test: OpsTest, app_name: str = APP_NAME):
+    """Wait until all cluster members have been promoted to full-voting member."""
+    try:
+        if learner := await get_application_relation_data(
+            ops_test, app_name, PEER_RELATION, "learning_member"
+        ):
+            while True:
+                logger.info(f"Waiting for learning-member {learner}")
+                time.sleep(5)
+                # this will raise with `ValueError` if not found and thereby break the loop
+                learner = await get_application_relation_data(
+                    ops_test, app_name, PEER_RELATION, "learning_member"
+                )
+    except ValueError:
+        pass
 
 
 async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str:
@@ -128,11 +200,24 @@ async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] |
     return None
 
 
-def get_certificate_from_unit(model: str, unit: str, cert_type: TLSType) -> str | None:
+def get_certificate_from_unit(
+    model: str, unit: str, cert_type: TLSType, is_ca: bool = False
+) -> str | None:
     """Retrieve a certificate from a unit."""
-    command = f'juju ssh --model={model} {unit} "cat /var/snap/charmed-etcd/common/tls/{cert_type.value}.pem"'
+    command = f'juju ssh --model={model} {unit} "cat /var/snap/charmed-etcd/common/tls/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
     output = subprocess.getoutput(command)
     if output.startswith("-----BEGIN CERTIFICATE-----"):
         return output
 
     return None
+
+
+async def download_client_certificate_from_unit(
+    ops_test: OpsTest, app_name: str = APP_NAME
+) -> None:
+    """Copy the client certificate files from a unit to the host's filesystem."""
+    unit = ops_test.model.applications[app_name].units[0]
+    tls_path = "/var/snap/charmed-etcd/common/tls"
+
+    for file in ["client.pem", "client.key", "client_ca.pem"]:
+        await unit.scp_from(f"{tls_path}/{file}", file)

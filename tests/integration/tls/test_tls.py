@@ -11,8 +11,9 @@ from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
-from .helpers import (
+from ..helpers import (
     APP_NAME,
+    download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
@@ -62,12 +63,10 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
-    model = ops_test.model_full_name
-
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -85,8 +84,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
     assert (
         put_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -98,8 +95,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     ), "Failed to write key"
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -115,9 +110,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_disable_tls(ops_test: OpsTest) -> None:
     """Disable TLS on a running cluster and check if it is still accessible."""
-    model = ops_test.model_full_name
-
-    # disable TLS and check if the cluster is still accessible
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
 
     logger.info("Removing peer-certificates and client-certificates relations")
@@ -127,9 +119,7 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-
-    cluster_members = get_cluster_members(model, leader_unit, endpoints)
+    cluster_members = get_cluster_members(endpoints)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -146,8 +136,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTP peerURLs and clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -157,8 +145,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -168,8 +154,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -184,9 +168,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_enable_tls(ops_test: OpsTest) -> None:
     """Enable TLS on a running cluster and check if it is still accessible."""
-    model = ops_test.model_full_name
-
-    # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
@@ -194,9 +175,9 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -213,8 +194,6 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -225,8 +204,6 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -237,8 +214,6 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -272,8 +247,9 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -290,8 +266,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTP peerURLs and HTTPS clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -302,8 +276,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -314,8 +286,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -331,7 +301,7 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -349,8 +319,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -361,8 +329,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     ), "Failed to read old key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -373,8 +339,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -409,7 +373,7 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints)
+    cluster_members = get_cluster_members(endpoints)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -426,8 +390,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTPS peerURLs and HTTP clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -437,8 +399,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -448,8 +408,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -465,7 +423,10 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -483,8 +444,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -495,8 +454,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     ), "Failed to read old key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -507,8 +464,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -526,8 +481,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     """Test the TLS certificate expiration on a running cluster."""
     model = ops_test.model_full_name
 
-    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
-
     # disable TLS and check if the cluster is still accessible
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
     logger.info("Removing peer-certificates relation and client-certificates relation")
@@ -539,7 +492,7 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(model, leader_unit, endpoints)
+    cluster_members = get_cluster_members(endpoints)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -556,8 +509,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTP peerURLs and clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -567,8 +518,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -578,8 +527,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -602,7 +549,10 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[APP_NAME, TLS_NAME], status="active", timeout=1000)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    cluster_members = get_cluster_members(model, leader_unit, endpoints, tls_enabled=True)
+    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -624,8 +574,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -636,8 +584,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     ), "Failed to read old key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -648,8 +594,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -682,10 +626,9 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     logger.info("Certificates are different after rotation")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
@@ -696,8 +639,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     ), "Failed to read old key"
 
     assert put_key(
-        model,
-        leader_unit,
         endpoints,
         user=INTERNAL_USER,
         password=password,
@@ -708,8 +649,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
 
     assert (
         get_key(
-            model,
-            leader_unit,
             endpoints,
             user=INTERNAL_USER,
             password=password,
