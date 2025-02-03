@@ -31,10 +31,12 @@ Machine  State    Address         Inst id        Base          AZ  Message
 3        started  10.105.253.27   juju-fed980-3  ubuntu@22.04      Running
 ```
 
-You can trust that Charmed Etcd added the node correctly. If you want to verify 
-that it is now a cluster member, you can also use an etcd client to check.
+The `Charmed Etcd` operator has added the node to your etcd cluster correctly.
+If you want to verify that it is now a cluster member, you can also use an etcd 
+client to check.
 
-We recommend the tool `etcdctl`, which can be installed running the following commands:
+We recommend the tool `etcdctl`, which can be installed, e.g. as a [package in 
+Ubuntu](https://packages.ubuntu.com/search?keywords=etcd-client&searchon=names&suite=all&section=all), running the following commands:
 ```shell
 $ sudo apt-get update
 $ sudo apt-get install etcd-client
@@ -67,6 +69,7 @@ juju status. Here you will see four units / nodes:
 - charmed-etcd/1
 - charmed-etcd/2
 - charmed-etcd/3
+
 To remove the unit charmed-etcd/3 run:
 
 ```shell
