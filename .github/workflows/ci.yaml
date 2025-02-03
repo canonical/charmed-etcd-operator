@@ -11,7 +11,7 @@ on:
   pull_request:
   schedule:
     - cron: '53 0 * * *'  # Daily at 00:53 UTC
-  # Triggered on push to branch "main" by .github/workflows/release.yaml
+  # Triggered on push to default branch by .github/workflows/release.yaml
   workflow_call:
     outputs:
       artifact-prefix:

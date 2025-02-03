@@ -5,7 +5,7 @@ name: Release to Charmhub
 on:
   push:
     branches:
-      - main
+      - 3.5/edge
 
 jobs:
   ci-tests:
