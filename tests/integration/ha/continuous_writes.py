@@ -42,7 +42,7 @@ def continuous_writes(endpoints: str, user: str, password: str):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             pass
 
-        time.sleep(1)
+        time.sleep(0.2)
     else:
         # write last expected written value on disk when terminating
         pathlib.Path(WRITES_LAST_WRITTEN_VAL_PATH).write_text(str(count))
