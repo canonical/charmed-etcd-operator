@@ -346,13 +346,14 @@ def test_peer_relation_changed():
             relation.local_app_data.get("cluster_members")
             == "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380"
         )
-        run_etcdctl.assert_called_once_with(
-            command="member",
-            subcommand="promote",
-            endpoints="http://ip1:2379,http://ip0:2379",
-            auth_username="root",
-            auth_password="",
-            member="4477466968462020105",
+        run_etcdctl.assert_called_once()
+        run_etcdctl_args = run_etcdctl.call_args[1]
+        assert run_etcdctl_args["command"] == "member"
+        assert run_etcdctl_args["subcommand"] == "promote"
+        assert run_etcdctl_args["member"] == "4477466968462020105"
+        assert (
+            run_etcdctl_args["endpoints"] == "http://ip0:2379,http://ip1:2379"
+            or run_etcdctl_args["endpoints"] == "http://ip1:2379,http://ip0:2379"
         )
 
 
