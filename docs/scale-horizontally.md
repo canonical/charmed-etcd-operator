@@ -60,7 +60,7 @@ $ etcdctl member list --endpoints=10.105.253.210:2379 -w=table
 +------------------+---------+---------------+----------------------------+----------------------------+------------+
 ```
 
-# Remove a node
+## Remove a node
 > Warning: It is **highly recommended** to always have a cluster size greater 
 > than two in production. It is unsafe to remove a member from a two member 
 > cluster. If there is a failure during the removal process, the cluster might
