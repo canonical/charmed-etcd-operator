@@ -222,3 +222,18 @@ async def download_client_certificate_from_unit(
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
         await unit.scp_from(f"{tls_path}/{file}", file)
+
+
+def get_storage_id(ops_test: OpsTest, unit_name: str, storage_name: str) -> str:
+    """Retrieve the storage id associated with a unit."""
+    model_name = ops_test.model.info.name
+
+    storage_data = subprocess.check_output(f"juju storage --model={model_name}".split())
+    storage_data = storage_data.decode("utf-8")
+    for line in storage_data.splitlines():
+        # skip the header and irrelevant lines
+        if not line or "Storage" in line or "detached" in line:
+            continue
+
+        if line.split()[0] == unit_name and line.split()[1].startswith(storage_name):
+            return line.split()[1]
