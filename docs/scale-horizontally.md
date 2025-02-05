@@ -69,10 +69,10 @@ $ etcdctl member list --endpoints=10.105.253.210:2379 -w=table
 Removing a unit from the Juju application scales down your etcd cluster by one 
 node. Before we scale down the nodes we no longer need, list all the units with 
 juju status. Here you will see four units / nodes: 
-- charmed-etcd/0
-- charmed-etcd/1
-- charmed-etcd/2
-- charmed-etcd/3
+- `charmed-etcd/0`
+- `charmed-etcd/1`
+- `charmed-etcd/2`
+- `charmed-etcd/3`
 
 To remove the unit charmed-etcd/3 run:
 
