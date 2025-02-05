@@ -688,8 +688,8 @@ def test_set_tls_private_key():
 
     private_key = generate_private_key().raw
     # TODO change label once https://github.com/canonical/tls-certificates-interface/pull/307 is merged
-    peer_secret_label = f"{LIBID}-private-key-0"
-    client_secret_label = f"{LIBID}-private-key-0"
+    peer_secret_label = f"{LIBID}-private-key-0-{PEER_TLS_RELATION_NAME}"
+    client_secret_label = f"{LIBID}-private-key-0-{CLIENT_TLS_RELATION_NAME}"
 
     secret = Secret(
         {"private-key": private_key},
@@ -700,8 +700,13 @@ def test_set_tls_private_key():
         secrets={
             secret,
             Secret(
-                {"private-key": "initial_private_key"},
+                {"private-key": "initial_peer_private_key"},
                 label=peer_secret_label,
+                owner="unit",
+            ),
+            Secret(
+                {"private-key": "initial_client_private_key"},
+                label=client_secret_label,
                 owner="unit",
             ),
         },
@@ -721,7 +726,11 @@ def test_set_tls_private_key():
         assert (
             state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
             == private_key
-        )
+        ), "Private key should have been set"
+        assert (
+            state_out.get_secret(label=client_secret_label).latest_content["private-key"]
+            == "initial_client_private_key"
+        ), "Client private key should not have been set"
         cleanup.assert_called_once()
         send.assert_called_once()
 
@@ -783,8 +792,13 @@ def test_set_tls_private_key():
         secrets={
             secret,
             Secret(
-                {"private-key": "initial_private_key"},
+                {"private-key": "initial_client_private_key"},
                 label=client_secret_label,
+                owner="unit",
+            ),
+            Secret(
+                {"private-key": "initial_peer_private_key"},
+                label=peer_secret_label,
                 owner="unit",
             ),
         },
@@ -804,7 +818,11 @@ def test_set_tls_private_key():
         assert (
             state_out.get_secret(label=client_secret_label).latest_content["private-key"]
             == private_key
-        )
+        ), "Private key should have been set"
+        assert (
+            state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
+            == "initial_peer_private_key"
+        ), "Peer private key should not have been set"
         cleanup.assert_called_once()
         send.assert_called_once()
 
