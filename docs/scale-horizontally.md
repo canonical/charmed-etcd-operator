@@ -1,4 +1,8 @@
-# Add a node
+# How to scale horizontally
+
+Adding and removing nodes from an etcd deployment is done by scaling [Juju units](https://juju.is/docs/juju/unit). 
+ 
+## Add a node
 You can add additional nodes to your deployed etcd application with the following command:
 
 `juju add-unit charmed-etcd -n 1`
