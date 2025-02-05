@@ -11,7 +11,7 @@ from typing import Literal
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 SNAP_NAME = "charmed-etcd"
-SNAP_REVISION = 1
+SNAP_REVISION = 2
 SNAP_SERVICE = "etcd"
 # this path will be updated when we switch to charmed-etcd snap
 # it's the current config path for the legacy-etcd snap
