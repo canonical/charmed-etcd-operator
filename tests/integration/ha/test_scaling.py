@@ -225,6 +225,7 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     for unit in ops_test.model.applications[app].units:
         await ops_test.model.applications[app].destroy_unit(unit.name)
 
+    # TODO fix wait_until to support this case
     await ops_test.model.wait_for_idle(
         apps=[app],
         wait_for_exact_units=0,
