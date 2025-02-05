@@ -185,7 +185,7 @@ class ClusterManager:
                 client = EtcdClient(
                     username=self.admin_user,
                     password=self.admin_password,
-                    client_url=self.state.unit_server.client_url,
+                    client_url=",".join(e for e in self.cluster_endpoints),
                 )
                 cluster_members, member_id = client.add_member_as_learner(
                     server.member_name, peer_url
@@ -222,7 +222,7 @@ class ClusterManager:
             client = EtcdClient(
                 username=self.admin_user,
                 password=self.admin_password,
-                client_url=self.state.unit_server.client_url,
+                client_url=",".join(e for e in self.cluster_endpoints),
             )
             client.promote_member(member_id=member_id)
         except EtcdClusterManagementError:
@@ -242,7 +242,7 @@ class ClusterManager:
             client = EtcdClient(
                 username=self.admin_user,
                 password=self.admin_password,
-                client_url=self.state.unit_server.client_url,
+                client_url=",".join(e for e in self.cluster_endpoints),
             )
             if self.member.id == self.leader:
                 new_leader_id = self.select_new_leader()
