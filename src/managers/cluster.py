@@ -163,6 +163,20 @@ class ClusterManager:
         Returns:
             bool: True if the workload is running after restart.
         """
+        try:
+            if self.member.id == self.leader:
+                new_leader_id = self.select_new_leader()
+                logger.debug(f"Next selected leader: {new_leader_id}")
+
+                client = EtcdClient(
+                    username=self.admin_user,
+                    password=self.admin_password,
+                    client_url=self.state.unit_server.client_url,
+                )
+                client.move_leader(new_leader_id)
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
+            logger.warning(f"Could not transfer leadership before restarting: {e}")
+
         logger.debug("Restarting workload")
         self.workload.restart()
         return self.is_healthy(cluster=False)
