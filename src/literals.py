@@ -11,13 +11,14 @@ from typing import Literal
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 SNAP_NAME = "charmed-etcd"
-SNAP_REVISION = 1
+SNAP_REVISION = 2
 SNAP_SERVICE = "etcd"
 # this path will be updated when we switch to charmed-etcd snap
 # it's the current config path for the legacy-etcd snap
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
 
+DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
 RESTART_RELATION = "restart"
 CLIENT_PORT = 2379
@@ -62,6 +63,8 @@ class Status(Enum):
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
+    CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
+    REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")

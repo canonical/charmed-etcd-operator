@@ -5,18 +5,20 @@
 import json
 import logging
 import subprocess
+import time
 from pathlib import Path
 from typing import Dict
 
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from literals import CLIENT_PORT, TLSType
+from literals import CLIENT_PORT, PEER_RELATION, TLSType
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
+CHARM_PATH = "./charmed-etcd_ubuntu@24.04-amd64.charm"
 
 
 class SecretNotFoundError(Exception):
@@ -92,6 +94,89 @@ def get_cluster_endpoints(
             for unit in ops_test.model.applications[app_name].units
         ]
     )
+
+
+def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
+    """Query the Raft leader via the `endpoint status` and `member list` commands.
+
+    Returns:
+        str: the member-name of the Raft leader, e.g. `etcd42`
+    """
+    etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+                --cacert client_ca.pem \
+                --cert client.pem \
+                --key client.key"
+
+    # query leader id
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    members = json.loads(result)
+    leader_id = members[0]["Status"]["leader"]
+
+    # query member name for leader id
+    etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+                --cacert client_ca.pem \
+                --cert client.pem \
+                --key client.key"
+
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    members = json.loads(result)
+    for member in members["members"]:
+        if member["ID"] == leader_id:
+            return member["name"]
+
+
+async def get_application_relation_data(
+    ops_test: OpsTest, application_name: str, relation_name: str, key: str
+) -> str | None:
+    """Get relation data for an application.
+
+    Args:
+        ops_test: The ops test framework instance
+        application_name: The name of the application
+        relation_name: name of the relation to get connection data from
+        key: key of data to be retrieved
+        relation_id: id of the relation to get connection data from
+
+    Returns:
+        the relation data that was requested, or None if no data in the relation
+
+    Raises:
+        ValueError if it's not possible to get application unit data
+            or if there is no data for the particular relation endpoint.
+    """
+    unit_name = await get_juju_leader_unit_name(ops_test, application_name)
+    raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    if not raw_data:
+        raise ValueError(f"no unit info could be grabbed for {unit_name}")
+    data = yaml.safe_load(raw_data)
+    # Filter the data based on the relation name.
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == relation_name]
+    if len(relation_data) == 0:
+        raise ValueError(
+            f"no relation data could be grabbed on relation with endpoint {relation_name}"
+        )
+    return relation_data[0]["application-data"].get(key)
+
+
+async def wait_for_cluster_formation(ops_test: OpsTest, app_name: str = APP_NAME):
+    """Wait until all cluster members have been promoted to full-voting member."""
+    try:
+        if learner := await get_application_relation_data(
+            ops_test, app_name, PEER_RELATION, "learning_member"
+        ):
+            while True:
+                logger.info(f"Waiting for learning-member {learner}")
+                time.sleep(5)
+                # this will raise with `ValueError` if not found and thereby break the loop
+                learner = await get_application_relation_data(
+                    ops_test, app_name, PEER_RELATION, "learning_member"
+                )
+    except ValueError:
+        pass
 
 
 async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str:

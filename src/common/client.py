@@ -133,7 +133,7 @@ class EtcdClient:
                     if member["peerURLs"][0] == peer_url:
                         # the member ID is returned as int, but needs to be processed as hex
                         # e.g. ID=4477466968462020105 needs to be stored as 3e23287c34b94e09
-                        member_id = f"{member['ID']:0>2x}"
+                        member_id = f"{hex(member['ID'])[2:]}"
                 # for the newly added member, the member name will not be included in the response
                 # we have to append it separately
                 cluster_members += f"{member_name}={peer_url}"
@@ -158,6 +158,33 @@ class EtcdClient:
         else:
             raise EtcdClusterManagementError(f"Failed to promote member {member_id}.")
 
+    def remove_member(self, member_id: str) -> None:
+        """Remove a cluster member."""
+        if result := self._run_etcdctl(
+            command="member",
+            subcommand="remove",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            member=member_id,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdClusterManagementError(f"Failed to remove {member_id}.")
+
+    def move_leader(self, new_leader_id: str) -> None:
+        """Transfer Raft leadership to another etcd cluster member."""
+        if result := self._run_etcdctl(
+            command="move-leader",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            member=new_leader_id,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdClusterManagementError(f"Failed to transfer leadership to {new_leader_id}.")
+
     def _run_etcdctl(  # noqa: C901
         self,
         command: str,
@@ -175,8 +202,6 @@ class EtcdClient:
         learner: bool = False,
         output_format: str = "simple",
         use_input: str | None = None,
-        member_id: str | None = None,
-        peer_urls: str | None = None,
         cluster_arg: bool = False,
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
@@ -199,8 +224,6 @@ class EtcdClient:
             output_format: set the output format (fields, json, protobuf, simple, table)
             use_input: supply text input to be passed to the `etcdctl` command (e.g. for
                         non-interactive password change)
-            member_id: member ID to be used in the command
-            peer_urls: peer URLs to be used in the command
             cluster_arg: set to `True` if the command requires the `--cluster` argument
 
         Returns:
@@ -213,8 +236,6 @@ class EtcdClient:
             args = [f"{SNAP_NAME}.etcdctl", command]
             if subcommand:
                 args.append(subcommand)
-            if member_id:
-                args.append(member_id)
             if user:
                 args.append(user)
             if user_password == "":
@@ -237,8 +258,6 @@ class EtcdClient:
                 args.append(f"-w={output_format}")
             if use_input:
                 args.append("--interactive=False")
-            if peer_urls:
-                args.append(f"--peer-urls={peer_urls}")
             if "https" in endpoints:
                 args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
                 args.append(f"--key={TLS_ROOT_DIR}/client.key")
@@ -354,6 +373,6 @@ class EtcdClient:
             endpoints=endpoints,
             auth_username=self.user,
             auth_password=self.password,
-            member_id=member_id,
-            peer_urls=peer_urls,
+            member=member_id,
+            peer_url=peer_urls,
         )

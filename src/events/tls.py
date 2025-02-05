@@ -224,8 +224,9 @@ class TLSEvents(Object):
         )
         self.charm.tls_manager.set_cert_state(cert_type, is_ready=False)
 
-        # write config and restart workload
-        self.charm.rolling_restart(callback_override=f"_restart_disable_{cert_type.value}_tls")
+        if self.charm.state.unit_server.is_started:
+            # write config and restart workload
+            self.charm.rolling_restart(callback_override=f"_restart_disable_{cert_type.value}_tls")
 
     def _on_clean_ca(self, event: CleanCAEvent) -> None:
         """Handle the `clean-ca` event.

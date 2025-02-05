@@ -18,7 +18,14 @@ continue_running = True
 def continuous_writes(endpoints: str, user: str, password: str):
     key = "cw_key"
     count = 0
+
+    # clean up from previous runs
     pathlib.Path(WRITES_LAST_WRITTEN_VAL_PATH).unlink(missing_ok=True)
+    etcd_cleanup = f"etcdctl del {key} --endpoints={endpoints} --user={user} --password={password}"
+    try:
+        subprocess.getoutput(etcd_cleanup)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        pass
 
     while continue_running:
         count += 1
