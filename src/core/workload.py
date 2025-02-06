@@ -113,3 +113,23 @@ class WorkloadBase(ABC):
             file (str): Path to the file.
         """
         pass
+
+    @abstractmethod
+    def remove_directory(self, directory: str) -> None:
+        """Remove a directory.
+
+        Args:
+            directory (str): Path to the directory.
+        """
+
+    @abstractmethod
+    def exists(self, path: str) -> bool:
+        """Check if a file or directory exists.
+
+        Args:
+            path (str): Path to the file or directory.
+
+        Returns:
+            bool: True if the file or directory exists, False otherwise.
+        """
+        pass

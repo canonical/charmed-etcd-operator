@@ -108,7 +108,7 @@ class ClusterManager:
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
+            client_url=",".join(e for e in self.cluster_endpoints),
         )
 
         member_list = client.member_list()

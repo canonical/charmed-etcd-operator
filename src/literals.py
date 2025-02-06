@@ -13,10 +13,9 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 SNAP_NAME = "charmed-etcd"
 SNAP_REVISION = 2
 SNAP_SERVICE = "etcd"
-# this path will be updated when we switch to charmed-etcd snap
-# it's the current config path for the legacy-etcd snap
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
+DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"

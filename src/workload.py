@@ -6,6 +6,7 @@
 
 import logging
 from pathlib import Path
+from shutil import rmtree
 
 from charms.operator_libs_linux.v2 import snap
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
@@ -40,7 +41,7 @@ class EtcdWorkload(WorkloadBase):
             True if successfully installed, False if any error occurs.
         """
         try:
-            self.etcd.ensure(snap.SnapState.Present, revision=SNAP_REVISION)
+            self.etcd.ensure(snap.SnapState.Present, revision=SNAP_REVISION, devmode=True)
             self.etcd.hold()
             return True
         except snap.SnapError as e:
@@ -72,3 +73,11 @@ class EtcdWorkload(WorkloadBase):
     def remove_file(self, file) -> None:
         path = Path(file)
         path.unlink(missing_ok=True)
+
+    @override
+    def remove_directory(self, directory: str) -> None:
+        rmtree(directory)
+
+    @override
+    def exists(self, path: str) -> bool:
+        return Path(path).exists()

@@ -27,6 +27,7 @@ from common.exceptions import (
 from common.secrets import get_secret_from_id
 from literals import (
     DATA_STORAGE,
+    DATABASE_DIR,
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
@@ -92,7 +93,13 @@ class EtcdEvents(Object):
 
         self.charm.config_manager.set_config_properties()
 
-        if self.charm.unit.is_leader() and not self.charm.state.cluster.cluster_state:
+        if not self.charm.state.cluster.cluster_state and self.charm.workload.exists(DATABASE_DIR):
+            # this is a new application but storage is re-used
+            self.charm.cluster_manager.start_member()
+            self.charm.state.cluster.update({"authentication": "enabled"})
+            # update cluster membership configuration after recovering existing data
+            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
+        elif not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
             # this is the very first cluster start, this unit starts without being added as member
             # all subsequent units will have to be added as member before starting the workload
             self.charm.cluster_manager.start_member()
@@ -110,6 +117,18 @@ class EtcdEvents(Object):
             in self.charm.state.cluster.cluster_members
         ):
             # this unit has been added to the etcd cluster
+            if self.charm.workload.exists(DATABASE_DIR):
+                logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
+                # storage cannot be re-used on non-leader members
+                try:
+                    self.charm.workload.remove_directory(DATABASE_DIR)
+                    logger.warning(
+                        f"Removed database file from {DATABASE_DIR} to join existing cluster."
+                    )
+                except OSError:
+                    # maybe we should set status with explanation for users here?
+                    raise
+
             self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster
