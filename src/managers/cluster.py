@@ -6,6 +6,7 @@
 
 import logging
 import socket
+import time
 from json import JSONDecodeError
 
 from tenacity import retry, stop_after_attempt, wait_random_exponential
@@ -165,15 +166,7 @@ class ClusterManager:
         """
         try:
             if self.member.id == self.leader:
-                new_leader_id = self.select_new_leader()
-                logger.debug(f"Next selected leader: {new_leader_id}")
-
-                client = EtcdClient(
-                    username=self.admin_user,
-                    password=self.admin_password,
-                    client_url=self.state.unit_server.client_url,
-                )
-                client.move_leader(new_leader_id)
+                self.move_leader()
         except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
             logger.warning(f"Could not transfer leadership before restarting: {e}")
 
@@ -259,9 +252,7 @@ class ClusterManager:
                 client_url=",".join(e for e in self.cluster_endpoints),
             )
             if self.member.id == self.leader:
-                new_leader_id = self.select_new_leader()
-                logger.debug(f"Next selected leader: {new_leader_id}")
-                client.move_leader(new_leader_id)
+                self.move_leader()
             # by querying the member's id we make sure the cluster is available with quorum
             # otherwise we raise and retry
             client.remove_member(self.member.id)
@@ -285,3 +276,19 @@ class ClusterManager:
             raise ValueError("member list command failed")
         member_list.pop(self.state.unit_server.member_name, None)
         return next(iter(member_list.values())).id
+
+    def move_leader(self, new_leader_id: str | None = None) -> None:
+        """Move the leader to the next available member."""
+        if new_leader_id is None:
+            new_leader_id = self.select_new_leader()
+        logger.debug(f"Next selected leader: {new_leader_id}")
+
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=",".join(e for e in self.cluster_endpoints),
+        )
+        client.move_leader(new_leader_id)
+        # leader sometimes takes time to move in the ha test restart test
+        time.sleep(3)
+        logger.info(f"Successfully moved leader to {new_leader_id}.")

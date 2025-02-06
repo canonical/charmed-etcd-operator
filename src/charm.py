@@ -105,6 +105,15 @@ class EtcdOperatorCharm(ops.CharmBase):
         """Enable peer TLS."""
         logger.debug("Peer TLS custom callback")
 
+        current_leader = self.cluster_manager.leader
+        current_member_id = self.cluster_manager.member.id
+        logger.debug(
+            f"current member: {self.state.unit_server.member_name} with id {current_member_id} - current leader: {current_leader}"
+        )
+        if current_member_id == current_leader:
+            logger.debug("current member is the leader, moving leader")
+            self.cluster_manager.move_leader()
+
         # enable peer tls
         self.cluster_manager.broadcast_peer_url(
             self.state.unit_server.peer_url.replace("http://", "https://")
@@ -120,7 +129,8 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # write config and restart workload
         self.config_manager.set_config_properties()
-        if not self.cluster_manager.restart_member():
+        self.workload.restart()
+        if not self.cluster_manager.is_healthy(cluster=False):
             self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
@@ -152,6 +162,16 @@ class EtcdOperatorCharm(ops.CharmBase):
 
     def _restart_disable_peer_tls(self, _) -> None:
         """Disable peer TLS."""
+        logger.debug("Disbale Peer TLS custom callback")
+        current_leader = self.cluster_manager.leader
+        current_member_id = self.cluster_manager.member.id
+        logger.debug(
+            f"current member: {self.state.unit_server.member_name} with id {current_member_id} - current leader: {current_leader}"
+        )
+        if current_member_id == current_leader:
+            logger.debug("current member is the leader, moving leader")
+            self.cluster_manager.move_leader()
+
         logger.debug("Peer TLS custom callback")
         if self.state.unit_server.tls_peer_state == TLSState.NO_TLS:
             logger.debug("Peer TLS already disabled, skipping")
@@ -171,7 +191,8 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # write config and restart workload
         self.config_manager.set_config_properties()
-        if not self.cluster_manager.restart_member():
+        self.workload.restart()
+        if not self.cluster_manager.is_healthy(cluster=False):
             self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
