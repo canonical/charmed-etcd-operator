@@ -8,4 +8,5 @@ providing lifecycle management and handling events (install, start, etc).
 Further documentation can be found in these documents:
 - setup: docs/set-up.md
 - deployment: docs/deploy-etcd.md
+- add or remove nodes: docs/scale-horizontally.md
 - manage passwords: docs/manage-passwords.md
