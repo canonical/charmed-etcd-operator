@@ -162,7 +162,7 @@ class EtcdOperatorCharm(ops.CharmBase):
 
     def _restart_disable_peer_tls(self, _) -> None:
         """Disable peer TLS."""
-        logger.debug("Disbale Peer TLS custom callback")
+        logger.debug("Disable Peer TLS custom callback")
         current_leader = self.cluster_manager.leader
         current_member_id = self.cluster_manager.member.id
         logger.debug(
