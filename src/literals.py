@@ -34,6 +34,8 @@ SUBSTRATE = "vm"
 
 PEER_TLS_RELATION_NAME = "peer-certificates"
 CLIENT_TLS_RELATION_NAME = "client-certificates"
+TLS_PEER_PRIVATE_KEY_CONFIG = "tls-peer-private-key"
+TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 
 
 @dataclass
@@ -70,10 +72,14 @@ class Status(Enum):
     TLS_DISABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Disabling peer TLS..."), "DEBUG")
     TLS_DISABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Disabling client TLS..."), "DEBUG")
     TLS_CLIENT_TRANSITION_FAILED = StatusLevel(
-        BlockedStatus("failed to transition to/from client tls"), "ERROR"
+        BlockedStatus("Failed to transition to/from client tls"), "ERROR"
     )
     TLS_PEER_TRANSITION_FAILED = StatusLevel(
-        BlockedStatus("failed to transition to/from peer tls"), "ERROR"
+        BlockedStatus("Failed to transition to/from peer tls"), "ERROR"
+    )
+    TLS_INVALID_PRIVATE_KEY = StatusLevel(
+        BlockedStatus("The private key provided is not valid. Please provide a valid private key"),
+        "ERROR",
     )
 
 

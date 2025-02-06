@@ -17,8 +17,12 @@ from literals import CLIENT_PORT, PEER_RELATION, TLSType
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-APP_NAME = METADATA["name"]
+APP_NAME: str = METADATA["name"]
 CHARM_PATH = "./charmed-etcd_ubuntu@24.04-amd64.charm"
+
+
+class SecretNotFoundError(Exception):
+    """Raised when a secret is not found."""
 
 
 def put_key(
@@ -183,7 +187,7 @@ async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME)
     raise Exception("No leader unit found")
 
 
-async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] | None:
+async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str]:
     secrets_raw = await ops_test.juju("list-secrets")
     secret_ids = [
         secret_line.split()[0] for secret_line in secrets_raw[1].split("\n")[1:] if secret_line
@@ -198,7 +202,7 @@ async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str] |
         if label == secret_data[secret_id].get("label"):
             return secret_data[secret_id]["content"]["Data"]
 
-    return None
+    raise SecretNotFoundError(f"Secret with label {label} not found")
 
 
 def get_certificate_from_unit(
@@ -211,6 +215,27 @@ def get_certificate_from_unit(
         return output
 
     return None
+
+
+async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str]) -> str:
+    """Add a secret to the model.
+
+    Args:
+        ops_test (OpsTest): The current test harness.
+        secret_name (str): The name of the secret.
+        content (dict[str, str]): The content of the secret.
+
+    Returns:
+        str: The secret ID.
+    """
+    assert ops_test.model is not None, "Model is not set"
+    return_code, std_out, std_err = await ops_test.juju(
+        "add-secret", secret_name, " ".join([f"{key}={value}" for key, value in content.items()])
+    )
+
+    assert return_code == 0, f"Failed to add secret: {std_err}"
+    logger.info(f"Added secret {secret_name} to the model")
+    return std_out.strip()
 
 
 async def download_client_certificate_from_unit(

@@ -2,6 +2,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess
 from unittest.mock import MagicMock, patch
@@ -128,6 +129,27 @@ def test_start():
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
 
+    # non leader waiting promoted
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
+        },
+        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.start") as start,
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.alive", return_value=True),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+        assert state_out.get_relation(1).local_unit_data.get("state") == "started"
+        start.assert_called_once()
+
 
 def test_update_status():
     ctx = testing.Context(EtcdOperatorCharm)
@@ -213,6 +235,126 @@ def test_config_changed():
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+
+def test_peer_relation_joined():
+    ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        peers_data={
+            0: {
+                "hostname": "charmed-etcd0",
+                "ip": "ip0",
+            },
+        },
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    state_out = ctx.run(ctx.on.relation_joined(relation=relation, remote_unit=1), state_in)
+    assert "etcd_peers_relation_joined" in [event.name for event in state_out.deferred]
+
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        peers_data={
+            0: {
+                "hostname": "charmed-etcd0",
+                "ip": "ip0",
+            },
+            1: {
+                "hostname": "charmed-etcd1",
+                "ip": "ip1",
+            },
+        },
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with patch(
+        "common.client.EtcdClient._run_etcdctl",
+        return_value=json.dumps(
+            {
+                "members": [
+                    {
+                        "name": "charmed-etcd0",
+                        "ID": 11187096354790748301,
+                        "clientURLs": ["http://ip0:2380"],
+                        "peerURLs": ["http://ip0:2380"],
+                    },
+                    {
+                        "ID": 4477466968462020105,
+                        "clientURLs": ["http://ip1:2380"],
+                        "peerURLs": ["http://ip1:2380"],
+                    },
+                ]
+            }
+        ),
+    ):
+        state_out = ctx.run(ctx.on.relation_joined(relation=relation, remote_unit=1), state_in)
+        assert relation.local_app_data.get("learning_member") == f"{4477466968462020105:x}"
+        assert (
+            relation.local_app_data.get("cluster_members")
+            == "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380"
+        )
+
+
+def test_peer_relation_changed():
+    ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        peers_data={
+            0: {
+                "hostname": "charmed-etcd0",
+                "ip": "ip0",
+            },
+        },
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    state_out = ctx.run(ctx.on.relation_joined(relation=relation, remote_unit=1), state_in)
+    assert "etcd_peers_relation_joined" in [event.name for event in state_out.deferred]
+
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        peers_data={
+            1: {
+                "hostname": "charmed-etcd1",
+                "ip": "ip1",
+                "state": "started",
+            },
+        },
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
+            "learning_member": "4477466968462020105",
+        },
+        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with patch(
+        "common.client.EtcdClient._run_etcdctl",
+        return_value=None,
+    ) as promote_learning_member:
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        promote_learning_member.assert_called_once()
+        assert state_out.deferred[0].name == "etcd_peers_relation_changed"
+
+    with patch("common.client.EtcdClient._run_etcdctl") as run_etcdctl:
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        assert relation.local_app_data.get("learning_member") is None
+        assert (
+            relation.local_app_data.get("cluster_members")
+            == "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380"
+        )
+        run_etcdctl.assert_called_once()
+        run_etcdctl_args = run_etcdctl.call_args[1]
+        assert run_etcdctl_args["command"] == "member"
+        assert run_etcdctl_args["subcommand"] == "promote"
+        assert run_etcdctl_args["member"] == "4477466968462020105"
+        assert (
+            run_etcdctl_args["endpoints"] == "http://ip0:2379,http://ip1:2379"
+            or run_etcdctl_args["endpoints"] == "http://ip1:2379,http://ip0:2379"
+        )
 
 
 def test_unit_removal():
