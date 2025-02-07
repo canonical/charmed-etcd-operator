@@ -149,7 +149,7 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # write config and restart workload
         self.config_manager.set_config_properties()
-        if not self.cluster_manager.restart_member():
+        if not self.cluster_manager.restart_member(move_leader=False):
             self.set_status(Status.TLS_CLIENT_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
