@@ -18,7 +18,6 @@ from ..helpers import (
     get_juju_leader_unit_name,
     get_raft_leader,
     get_secret_by_label,
-    wait_for_cluster_formation,
 )
 from ..helpers_deployment import wait_until
 from .helpers import (
@@ -139,9 +138,6 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     await ops_test.model.applications[app].add_unit(count=1)
     await wait_until(ops_test, apps=[app], wait_for_exact_units=3, idle_period=60)
 
-    # we need to wait for all members to be promoted to full-voting member before scaling down
-    await wait_for_cluster_formation(ops_test, app)
-
     init_units_count = len(ops_test.model.applications[app].units)
 
     # find and remove the unit that is the current Raft leader
@@ -188,9 +184,6 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
 
     await ops_test.model.applications[app].add_unit(count=1)
     await wait_until(ops_test, apps=[app], wait_for_exact_units=3, idle_period=60)
-
-    # we need to wait for all members to be promoted to full-voting member before scaling down
-    await wait_for_cluster_formation(ops_test, app)
 
     # remove all units except one
     for unit in ops_test.model.applications[app].units[1:]:
