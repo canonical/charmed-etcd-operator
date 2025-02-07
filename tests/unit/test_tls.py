@@ -2,12 +2,15 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import base64
+import json
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
 from charms.tls_certificates_interface.v4.tls_certificates import (
+    LIBID,
     Certificate,
     CertificateAvailableEvent,
     CertificateSigningRequest,
@@ -19,6 +22,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     generate_private_key,
 )
 from ops import testing
+from scenario import Secret
 
 from charm import EtcdOperatorCharm
 from core.models import Member
@@ -27,6 +31,8 @@ from literals import (
     PEER_RELATION,
     PEER_TLS_RELATION_NAME,
     RESTART_RELATION,
+    TLS_CLIENT_PRIVATE_KEY_CONFIG,
+    TLS_PEER_PRIVATE_KEY_CONFIG,
     Status,
     TLSCARotationState,
     TLSState,
@@ -69,6 +75,7 @@ class CertificateAvailableContext:
 
 @pytest.fixture
 def certificate_available_context():
+    """Create a context for testing certificate available event."""
     ctx = testing.Context(EtcdOperatorCharm)
     peer_relation = testing.PeerRelation(
         id=1,
@@ -165,6 +172,7 @@ def certificate_available_context():
 
 
 def test_enable_tls_on_start():
+    """Test enabling TLS on start of a new cluster."""
     ctx = testing.Context(EtcdOperatorCharm)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -252,6 +260,7 @@ def test_enable_tls_on_start():
 
 
 def test_certificates_broken():
+    """Test certificates broken event."""
     ctx = testing.Context(EtcdOperatorCharm)
     peer_relation = testing.PeerRelation(
         id=1,
@@ -275,7 +284,7 @@ def test_certificates_broken():
     with (
         ctx(ctx.on.update_status(), state_in) as manager,
     ):
-        charm: EtcdOperatorCharm = manager.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm
         with (
             patch("managers.cluster.ClusterManager.broadcast_peer_url"),
             patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
@@ -322,6 +331,7 @@ def test_certificates_broken():
 
 
 def test_certificate_available_new_cluster(certificate_available_context):
+    """Test CertificateAvailble event when creating a new cluster."""
     manager = certificate_available_context.manager
     peer_relation = certificate_available_context.peer_relation
     peer_provider_certificate = certificate_available_context.peer_provider_certificate
@@ -340,7 +350,7 @@ def test_certificate_available_new_cluster(certificate_available_context):
         patch("pathlib.Path.exists", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
-        charm: EtcdOperatorCharm = manager.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm
         event = MagicMock(spec=CertificateAvailableEvent)
         charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.CLIENT)
         with patch(
@@ -350,6 +360,7 @@ def test_certificate_available_new_cluster(certificate_available_context):
             event.certificate = client_certificate
             charm.tls_events._on_certificate_available(event)
             assert peer_relation.local_unit_data["tls_client_state"] == TLSState.TLS.value
+            assert charm.state.client_tls_relation, "Client relation not set"
 
         with patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
@@ -358,9 +369,11 @@ def test_certificate_available_new_cluster(certificate_available_context):
             event.certificate = peer_certificate
             charm.tls_events._on_certificate_available(event)
             assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.TLS.value
+            assert charm.state.peer_tls_relation, "Peer relation not set"
 
 
 def test_certificate_available_enabling_tls(certificate_available_context):
+    """Test CertificateAvailble event when enabling TLS."""
     manager = certificate_available_context.manager
     peer_provider_certificate = certificate_available_context.peer_provider_certificate
     requirer_private_key = certificate_available_context.requirer_private_key
@@ -396,7 +409,7 @@ def test_certificate_available_enabling_tls(certificate_available_context):
             return_value={"Status": {"leader": 4477466968462020105}},
         ),
     ):
-        charm: EtcdOperatorCharm = manager.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm
         event = MagicMock(spec=CertificateAvailableEvent)
         charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.PEER)
 
@@ -444,6 +457,7 @@ def test_certificate_available_enabling_tls(certificate_available_context):
 
 
 def test_enabling_tls_one_restart(certificate_available_context):
+    """Test enabling TLS with one restart."""
     manager = certificate_available_context.manager
     peer_relation = certificate_available_context.peer_relation
     peer_provider_certificate = certificate_available_context.peer_provider_certificate
@@ -476,7 +490,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
         patch("pathlib.Path.exists", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
-        charm: EtcdOperatorCharm = manager.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm
         event = MagicMock(spec=CertificateAvailableEvent)
 
         # Peer cert added case but no restart
@@ -484,8 +498,25 @@ def test_enabling_tls_one_restart(certificate_available_context):
             patch("pathlib.Path.exists", return_value=False),
             patch("common.client.EtcdClient.broadcast_peer_url"),
             patch(
-                "common.client.EtcdClient.member_list",
-                return_value=MEMBER_LIST_DICT,
+                "common.client.EtcdClient._run_etcdctl",
+                return_value=json.dumps(
+                    {
+                        "members": [
+                            {
+                                "name": "charmed-etcd0",
+                                "ID": 11187096354790748301,
+                                "clientURLs": ["http://ip0:2380"],
+                                "peerURLs": ["http://ip0:2380"],
+                            },
+                            {
+                                "name": "charmed-etcd1",
+                                "ID": 4477466968462020105,
+                                "clientURLs": ["http://ip1:2380"],
+                                "peerURLs": ["http://ip1:2380"],
+                            },
+                        ]
+                    }
+                ),
             ),
             patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
             patch("managers.cluster.ClusterManager.restart_member"),
@@ -568,6 +599,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
 
 
 def test_certificates_relation_created():
+    """Test TLS certificates relation created."""
     ctx = testing.Context(EtcdOperatorCharm)
     peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -601,6 +633,7 @@ def test_certificates_relation_created():
 
 
 def test_certificate_expiration(certificate_available_context):
+    """Test certificate expiration."""
     manager = certificate_available_context.manager
     peer_provider_certificate = certificate_available_context.peer_provider_certificate
     requirer_private_key = certificate_available_context.requirer_private_key
@@ -617,7 +650,7 @@ def test_certificate_expiration(certificate_available_context):
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("managers.tls.TLSManager.is_new_ca", return_value=False),
     ):
-        charm: EtcdOperatorCharm = manager.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm
         event = MagicMock(spec=CertificateAvailableEvent)
 
         # Peer cert added case but no restart
@@ -654,7 +687,205 @@ def test_certificate_expiration(certificate_available_context):
                 restart_mock.assert_not_called()
 
 
+def test_set_tls_private_key():
+    """Test setting the private key through a config option."""
+    ctx = testing.Context(EtcdOperatorCharm)
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={
+            "client_cert_ready": "True",
+            "peer_cert_ready": "True",
+            "tls_client_state": "tls",
+            "tls_peer_state": "tls",
+            "state": "started",
+        },
+    )
+    restart_peer_relation = testing.PeerRelation(id=4, endpoint=RESTART_RELATION)
+    peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
+    client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
+
+    private_key = generate_private_key().raw
+    # TODO change label once https://github.com/canonical/tls-certificates-interface/pull/307 is merged
+    peer_secret_label = f"{LIBID}-private-key-0-{PEER_TLS_RELATION_NAME}"
+    client_secret_label = f"{LIBID}-private-key-0-{CLIENT_TLS_RELATION_NAME}"
+
+    secret = Secret(
+        {"private-key": private_key},
+        label=TLS_PEER_PRIVATE_KEY_CONFIG,
+    )
+    state_in = testing.State(
+        relations=[peer_relation, restart_peer_relation, peer_tls_relation, client_tls_relation],
+        secrets={
+            secret,
+            Secret(
+                {"private-key": "initial_peer_private_key"},
+                label=peer_secret_label,
+                owner="unit",
+            ),
+            Secret(
+                {"private-key": "initial_client_private_key"},
+                label=client_secret_label,
+                owner="unit",
+            ),
+        },
+        config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
+    )
+
+    with (
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
+        ) as cleanup,
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._send_certificate_requests"
+        ) as send,
+    ):
+        # Configure peer private key configured
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert (
+            state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
+            == private_key
+        ), "Private key should have been set"
+        assert (
+            state_out.get_secret(label=client_secret_label).latest_content["private-key"]
+            == "initial_client_private_key"
+        ), "Client private key should not have been set"
+        cleanup.assert_called_once()
+        send.assert_called_once()
+
+        # Update peer private key
+        newer_private_key = generate_private_key().raw
+        secret.latest_content["private-key"] = base64.b64encode(
+            newer_private_key.encode()
+        ).decode()
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
+
+        assert (
+            state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
+            == newer_private_key
+        )
+        assert cleanup.call_count == 2, "_cleanup_certificate_requests should have been called"
+        assert send.call_count == 2, "_send_certificate_requests should have been called"
+
+        # invalid key
+        invalid_key = base64.b64encode("invalid_key".encode()).decode()
+        secret.latest_content["private-key"] = invalid_key
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
+        assert (
+            state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
+            == newer_private_key
+        )
+        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert cleanup.call_count == 2, "_cleanup_certificate_requests should not have been called"
+        assert send.call_count == 2, "_send_certificate_requests should not have been called"
+
+        secret.latest_content["key"] = invalid_key
+        del secret.latest_content["private-key"]
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
+        assert (
+            state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
+            == newer_private_key
+        )
+        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert cleanup.call_count == 2, "_cleanup_certificate_requests should not have been called"
+        assert send.call_count == 2, "_send_certificate_requests should not have been called"
+
+        state_in.config[TLS_PEER_PRIVATE_KEY_CONFIG] = "secret:cu9ibpp34trs4baf20c0"
+
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert (
+            state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
+            == newer_private_key
+        )
+        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert cleanup.call_count == 2, "_cleanup_certificate_requests should not have been called"
+        assert send.call_count == 2, "_send_certificate_requests should not have been called"
+
+    # client private key
+    secret = Secret(
+        {"private-key": private_key},
+        label=TLS_CLIENT_PRIVATE_KEY_CONFIG,
+    )
+    state_in = testing.State(
+        relations=[peer_relation, restart_peer_relation, peer_tls_relation, client_tls_relation],
+        secrets={
+            secret,
+            Secret(
+                {"private-key": "initial_client_private_key"},
+                label=client_secret_label,
+                owner="unit",
+            ),
+            Secret(
+                {"private-key": "initial_peer_private_key"},
+                label=peer_secret_label,
+                owner="unit",
+            ),
+        },
+        config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
+    )
+
+    with (
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
+        ) as cleanup,
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._send_certificate_requests"
+        ) as send,
+    ):
+        # Configure client private key
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert (
+            state_out.get_secret(label=client_secret_label).latest_content["private-key"]
+            == private_key
+        ), "Private key should have been set"
+        assert (
+            state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
+            == "initial_peer_private_key"
+        ), "Peer private key should not have been set"
+        cleanup.assert_called_once()
+        send.assert_called_once()
+
+        # Update client private key
+        newer_private_key = generate_private_key().raw
+        secret.latest_content["private-key"] = base64.b64encode(
+            newer_private_key.encode()
+        ).decode()
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
+
+        assert (
+            state_out.get_secret(label=client_secret_label).latest_content["private-key"]
+            == newer_private_key
+        )
+        assert cleanup.call_count == 2, "_cleanup_certificate_requests should have been called"
+        assert send.call_count == 2, "_send_certificate_requests should have been called"
+
+    # Relation not ready
+    secret = Secret(
+        {"private-key": private_key},
+        label=TLS_CLIENT_PRIVATE_KEY_CONFIG,
+    )
+    state_in = testing.State(
+        relations=[peer_relation, restart_peer_relation],
+        config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
+        secrets={secret},
+    )
+
+    with (
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
+        ) as cleanup,
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._send_certificate_requests"
+        ) as send,
+    ):
+        # Configure peer private key configured
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        cleanup.assert_not_called()
+        send.assert_not_called()
+
+
 def test_ca_peer_rotation(certificate_available_context):
+    """Test CA rotation for peer certificates."""
     manager = certificate_available_context.manager
     peer_relation = certificate_available_context.peer_relation
     peer_provider_certificate = certificate_available_context.peer_provider_certificate
@@ -689,9 +920,15 @@ def test_ca_peer_rotation(certificate_available_context):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([peer_provider_certificate], requirer_private_key),
         ),
-        patch("charm.EtcdOperatorCharm._restart"),
+        # patch("charm.EtcdOperatorCharm._restart"),
+        patch("managers.config.ConfigManager.set_config_properties"),
+        patch("workload.EtcdWorkload.restart"),
+        patch(
+            "common.client.EtcdClient._run_etcdctl",
+            return_value='[{"endpoint":"http://10.73.32.158:2379","health":true,"took":"520.652µs"}]',
+        ),
     ):
-        charm: EtcdOperatorCharm = manager.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm
         event = MagicMock(spec=CertificateAvailableEvent)
         event.certificate = peer_certificate
 
@@ -767,6 +1004,7 @@ def test_ca_peer_rotation(certificate_available_context):
 
 
 def test_ca_client_rotation(certificate_available_context):
+    """Test CA rotation for client certificates."""
     manager = certificate_available_context.manager
     peer_relation = certificate_available_context.peer_relation
     client_provider_certificate = certificate_available_context.client_provider_certificate
@@ -803,7 +1041,7 @@ def test_ca_client_rotation(certificate_available_context):
         ),
         patch("charm.EtcdOperatorCharm._restart"),
     ):
-        charm: EtcdOperatorCharm = manager.charm  # type: ignore
+        charm: EtcdOperatorCharm = manager.charm
         event = MagicMock(spec=CertificateAvailableEvent)
         event.certificate = client_certificate
 

@@ -7,3 +7,8 @@ __pycache__/
 *.py[cod]
 .idea
 .vscode/
+etcd-v3.4.35-linux-amd64*
+last_written_value
+client.pem
+client.key
+client_ca.pem

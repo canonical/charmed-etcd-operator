@@ -20,6 +20,7 @@ from ..helpers import (
     get_secret_by_label,
     wait_for_cluster_formation,
 )
+from ..helpers_deployment import wait_until
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -42,7 +43,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
     # Deploy the charm and wait for active/idle status
     await ops_test.model.deploy(CHARM_PATH, num_units=1)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     assert len(ops_test.model.applications[APP_NAME].units) == 1
 
@@ -63,16 +64,9 @@ async def test_scale_up(ops_test: OpsTest) -> None:
 
     # scale up
     await ops_test.model.applications[app].add_unit(count=2)
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=init_units_count + 2,
-        wait_for_active=True,
-        # give the cluster some time to settle down
-        idle_period=60,
-        timeout=1000,
+    await wait_until(
+        ops_test, apps=[app], wait_for_exact_units=init_units_count + 2, idle_period=60
     )
-
     num_units = len(ops_test.model.applications[app].units)
     assert num_units == init_units_count + 2, (
         f"Expected {init_units_count + 2} units, got {num_units}."
@@ -108,14 +102,8 @@ async def test_scale_down(ops_test: OpsTest) -> None:
     # scale down
     unit = ops_test.model.applications[app].units[-1]
     await ops_test.model.applications[app].destroy_unit(unit.name)
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=init_units_count - 1,
-        wait_for_active=True,
-        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
-        raise_on_error=False,
-        timeout=1000,
+    await wait_until(
+        ops_test, apps=[app], wait_for_exact_units=init_units_count - 1, idle_period=60
     )
     num_units = len(ops_test.model.applications[app].units)
     assert num_units == init_units_count - 1, (
@@ -149,15 +137,7 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
     await ops_test.model.applications[app].add_unit(count=1)
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=3,
-        wait_for_active=True,
-        # give the cluster some time to settle down
-        idle_period=60,
-        timeout=1000,
-    )
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=3, idle_period=60)
 
     # we need to wait for all members to be promoted to full-voting member before scaling down
     await wait_for_cluster_formation(ops_test, app)
@@ -168,14 +148,8 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     init_raft_leader = get_raft_leader(endpoints=init_endpoints)
     await ops_test.model.applications[app].destroy_unit(init_raft_leader.replace(app, f"{app}/"))
 
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=init_units_count - 1,
-        wait_for_active=True,
-        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
-        raise_on_error=False,
-        timeout=1000,
+    await wait_until(
+        ops_test, apps=[app], wait_for_exact_units=init_units_count - 1, idle_period=60
     )
     num_units = len(ops_test.model.applications[app].units)
     assert num_units == init_units_count - 1, (
@@ -213,15 +187,7 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
     await ops_test.model.applications[app].add_unit(count=1)
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=3,
-        wait_for_active=True,
-        # give the cluster some time to settle down
-        idle_period=60,
-        timeout=1000,
-    )
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=3, idle_period=60)
 
     # we need to wait for all members to be promoted to full-voting member before scaling down
     await wait_for_cluster_formation(ops_test, app)
@@ -230,15 +196,7 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     for unit in ops_test.model.applications[app].units[1:]:
         await ops_test.model.applications[app].destroy_unit(unit.name)
 
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=1,
-        wait_for_active=True,
-        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
-        raise_on_error=False,
-        timeout=1000,
-    )
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=1)
 
     num_units = len(ops_test.model.applications[app].units)
     assert num_units == 1, f"Expected 1 unit, got {num_units}."
@@ -267,6 +225,7 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     for unit in ops_test.model.applications[app].units:
         await ops_test.model.applications[app].destroy_unit(unit.name)
 
+    # TODO fix wait_until to support this case
     await ops_test.model.wait_for_idle(
         apps=[app],
         wait_for_exact_units=0,
@@ -277,15 +236,8 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
 
     # scale up again
     await ops_test.model.applications[app].add_unit(count=3)
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=3,
-        wait_for_active=True,
-        # give the cluster some time to settle down
-        idle_period=60,
-        timeout=1000,
-    )
+
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=3, idle_period=60)
 
     endpoints = get_cluster_endpoints(ops_test, app)
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -318,15 +270,7 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
     juju_leader_unit = await get_juju_leader_unit_name(ops_test, app)
     await ops_test.model.applications[app].destroy_unit(juju_leader_unit)
 
-    await ops_test.model.wait_for_idle(
-        apps=[app],
-        status="active",
-        wait_for_exact_units=init_units_count - 1,
-        wait_for_active=True,
-        # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
-        raise_on_error=False,
-        timeout=1000,
-    )
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count - 1)
     num_units = len(ops_test.model.applications[app].units)
     assert num_units == init_units_count - 1, (
         f"Expected {init_units_count - 1} units, got {num_units}."
