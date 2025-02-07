@@ -6,7 +6,6 @@
 
 import logging
 import socket
-import time
 from json import JSONDecodeError
 
 from tenacity import retry, stop_after_attempt, wait_random_exponential
@@ -109,7 +108,7 @@ class ClusterManager:
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
+            client_url=",".join(e for e in self.cluster_endpoints),
         )
 
         member_list = client.member_list()
@@ -137,7 +136,7 @@ class ClusterManager:
         )
         client.broadcast_peer_url(self.state.unit_server.client_url, self.member.id, peer_urls)
 
-    def is_healthy(self, cluster=True) -> bool:
+    def is_healthy(self, cluster: bool = True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
 
         Args:
@@ -158,17 +157,14 @@ class ClusterManager:
         )
         return client.is_healthy(cluster=cluster)
 
-    def restart_member(self) -> bool:
+    def restart_member(self, move_leader: bool = True) -> bool:
         """Restart the workload.
 
         Returns:
             bool: True if the workload is running after restart.
         """
-        try:
-            if self.member.id == self.leader:
-                self.move_leader()
-        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
-            logger.warning(f"Could not transfer leadership before restarting: {e}")
+        if move_leader:
+            self.move_leader()
 
         logger.debug("Restarting workload")
         self.workload.restart()
@@ -245,14 +241,13 @@ class ClusterManager:
     )
     def remove_member(self) -> None:
         """Remove a cluster member and stop the workload."""
+        self.move_leader()
         try:
             client = EtcdClient(
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=",".join(e for e in self.cluster_endpoints),
             )
-            if self.member.id == self.leader:
-                self.move_leader()
             # by querying the member's id we make sure the cluster is available with quorum
             # otherwise we raise and retry
             client.remove_member(self.member.id)
@@ -277,18 +272,22 @@ class ClusterManager:
         member_list.pop(self.state.unit_server.member_name, None)
         return next(iter(member_list.values())).id
 
-    def move_leader(self, new_leader_id: str | None = None) -> None:
-        """Move the leader to the next available member."""
-        if new_leader_id is None:
-            new_leader_id = self.select_new_leader()
-        logger.debug(f"Next selected leader: {new_leader_id}")
+    def move_leader(self) -> None:
+        """Move the raft leadership of the cluster to the next available member if required."""
+        try:
+            if self.member.id == self.leader:
+                new_leader_id = self.select_new_leader()
+                logger.debug(f"Next selected leader: {new_leader_id}")
 
-        client = EtcdClient(
-            username=self.admin_user,
-            password=self.admin_password,
-            client_url=",".join(e for e in self.cluster_endpoints),
-        )
-        client.move_leader(new_leader_id)
-        # leader sometimes takes time to move in the ha test restart test
-        time.sleep(3)
-        logger.info(f"Successfully moved leader to {new_leader_id}.")
+                client = EtcdClient(
+                    username=self.admin_user,
+                    password=self.admin_password,
+                    client_url=",".join(e for e in self.cluster_endpoints),
+                )
+                client.move_leader(new_leader_id)
+                # wait for leadership to be moved before continuing operation
+                if self.is_healthy(cluster=True):
+                    logger.debug(f"Successfully moved leader to {new_leader_id}.")
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
+            logger.warning(f"Could not transfer cluster leadership: {e}")
+            return

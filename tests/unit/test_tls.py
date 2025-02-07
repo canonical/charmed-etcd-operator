@@ -920,9 +920,8 @@ def test_ca_peer_rotation(certificate_available_context):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([peer_provider_certificate], requirer_private_key),
         ),
-        # patch("charm.EtcdOperatorCharm._restart"),
         patch("managers.config.ConfigManager.set_config_properties"),
-        patch("workload.EtcdWorkload.restart"),
+        patch("managers.cluster.ClusterManager.restart_member"),
         patch(
             "common.client.EtcdClient._run_etcdctl",
             return_value='[{"endpoint":"http://10.73.32.158:2379","health":true,"took":"520.652µs"}]',

@@ -40,6 +40,9 @@ async def test_deploy_with_peer_tls(ops_test: OpsTest) -> None:
     tls_config = {"ca-common-name": "etcd"}
     await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
 
+    if await existing_app(ops_test):
+        return
+
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
     await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
@@ -73,14 +76,14 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     # disable peer TLS and check continuous writes
     logger.info("Removing peer-certificates relations")
     await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+    await wait_until(ops_test, apps=[app_name], timeout=1000)
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # enable peer TLS and check continuous writes
     logger.info("Integrating peer-certificates relations")
     await ops_test.model.integrate(f"{app_name}:peer-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+    await wait_until(ops_test, apps=[app_name], timeout=1000)
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
