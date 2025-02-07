@@ -16,6 +16,7 @@ from ..helpers import (
     get_cluster_endpoints,
     get_secret_by_label,
 )
+from ..helpers_deployment import wait_until
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -46,7 +47,7 @@ async def test_deploy_with_peer_tls(ops_test: OpsTest) -> None:
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -72,14 +73,14 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     # disable peer TLS and check continuous writes
     logger.info("Removing peer-certificates relations")
     await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
-    await ops_test.model.wait_for_idle(apps=[app_name], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # enable peer TLS and check continuous writes
     logger.info("Integrating peer-certificates relations")
     await ops_test.model.integrate(f"{app_name}:peer-certificates", TLS_NAME)
-    await ops_test.model.wait_for_idle(apps=[app_name], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
