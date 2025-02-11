@@ -34,7 +34,6 @@ from literals import (
     TLS_PEER_PRIVATE_KEY_CONFIG,
     Status,
     TLSState,
-    TLSType,
 )
 
 if TYPE_CHECKING:
@@ -128,10 +127,10 @@ class EtcdEvents(Object):
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
-            self.update_private_key(tls_peer_private_key_id, tls_type=TLSType.PEER)
+            self.update_private_key(tls_peer_private_key_id)
 
         if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
-            self.update_private_key(tls_client_private_key_id, tls_type=TLSType.CLIENT)
+            self.update_private_key(tls_client_private_key_id)
 
         if not self.charm.unit.is_leader():
             return
@@ -197,11 +196,11 @@ class EtcdEvents(Object):
         """Handle the secret_changed event."""
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
             if tls_peer_private_key_id == event.secret.id:
-                self.update_private_key(tls_peer_private_key_id, tls_type=TLSType.PEER)
+                self.update_private_key(tls_peer_private_key_id)
 
         if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if tls_client_private_key_id == event.secret.id:
-                self.update_private_key(tls_client_private_key_id, tls_type=TLSType.CLIENT)
+                self.update_private_key(tls_client_private_key_id)
 
         if not self.charm.unit.is_leader():
             return
@@ -257,7 +256,7 @@ class EtcdEvents(Object):
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
 
-    def update_private_key(self, private_key_id: str, tls_type: TLSType) -> None:
+    def update_private_key(self, private_key_id: str) -> None:
         """Update the private key in etcd."""
         logger.debug("Updating TLS private key.")
 
