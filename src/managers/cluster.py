@@ -292,6 +292,6 @@ class ClusterManager:
                 # wait for leadership to be moved before continuing operation
                 if self.is_healthy(cluster=True):
                     logger.debug(f"Successfully moved leader to {new_leader_id}.")
-        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError, HealthCheckFailedError) as e:
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
             logger.warning(f"Could not transfer cluster leadership: {e}")
             return
