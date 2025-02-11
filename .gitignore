@@ -12,3 +12,4 @@ last_written_value
 client.pem
 client.key
 client_ca.pem
+coverage.xml
