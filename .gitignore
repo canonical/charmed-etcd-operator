@@ -13,3 +13,4 @@ log_file
 client.pem
 client.key
 client_ca.pem
+coverage.xml
