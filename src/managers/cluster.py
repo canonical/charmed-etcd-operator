@@ -248,11 +248,15 @@ class ClusterManager:
                 password=self.admin_password,
                 client_url=",".join(e for e in self.cluster_endpoints),
             )
-            # by querying the member's id we make sure the cluster is available with quorum
-            # otherwise we raise and retry
-            client.remove_member(self.member.id)
-        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
+            if self.is_healthy(cluster=True):
+                client.remove_member(self.member.id)
+            else:
+                raise EtcdClusterManagementError("Cluster not healthy.")
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError):
             raise
+        except ValueError:
+            # the unit is not a cluster member anymore, we just move on
+            return
 
     def select_new_leader(self) -> str:
         """Choose a new leader from the current cluster members.
@@ -288,6 +292,6 @@ class ClusterManager:
                 # wait for leadership to be moved before continuing operation
                 if self.is_healthy(cluster=True):
                     logger.debug(f"Successfully moved leader to {new_leader_id}.")
-        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError, HealthCheckFailedError) as e:
             logger.warning(f"Could not transfer cluster leadership: {e}")
             return
