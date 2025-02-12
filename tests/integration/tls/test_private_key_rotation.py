@@ -22,6 +22,7 @@ from literals import (
 from ..helpers import (
     APP_NAME,
     CHARM_PATH,
+    SecretNotFoundError,
     add_secret,
     download_client_certificate_from_unit,
     get_certificate_from_unit,
@@ -224,16 +225,11 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
     logger.info("Getting new private keys")
-    new_peer_private_keys: list[str] = [
-        (
+    for i in range(NUM_UNITS):
+        with pytest.raises(SecretNotFoundError):
             await get_secret_by_label(
                 ops_test, label=f"{LIBID}-private-key-{i}-{PEER_TLS_RELATION_NAME}"
             )
-        )["private-key"]
-        for i in range(NUM_UNITS)
-    ]
-
-    assert new_peer_private_keys, "Failed to get new peer private keys"
 
     new_client_private_keys: list[str] = [
         (
@@ -246,10 +242,6 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     assert new_client_private_keys, "Failed to get new client private keys"
 
     for i in range(NUM_UNITS):
-        assert new_peer_private_keys[i] != current_peer_private_keys[i], (
-            "Private key was not updated"
-        )
-        assert new_peer_private_keys[i] == new_private_key, "Private key was not updated"
         assert new_client_private_keys[i] == current_client_private_keys[i], (
             "Client key was updated"
         )
@@ -308,22 +300,11 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
         == TEST_VALUE
     ), "Failed to read new key"
 
-    new_client_private_keys: list[str] = [
-        (
+    for i in range(NUM_UNITS):
+        with pytest.raises(SecretNotFoundError):
             await get_secret_by_label(
                 ops_test, label=f"{LIBID}-private-key-{i}-{CLIENT_TLS_RELATION_NAME}"
             )
-        )["private-key"]
-        for i in range(NUM_UNITS)
-    ]
-
-    assert new_client_private_keys, "Failed to get new client private keys"
-
-    for i in range(NUM_UNITS):
-        assert new_client_private_keys[i] != current_client_private_keys[i], (
-            "Private key was not updated"
-        )
-        assert new_client_private_keys[i] == new_private_key, "Private key was not updated"
 
     leader_new_client_cert = get_certificate_from_unit(
         model,
