@@ -52,7 +52,7 @@ LIBAPI = 4
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 PYDEPS = [
     "cryptography>=43.0.0",
@@ -1443,7 +1443,7 @@ class TLSCertificatesRequiresV4(Object):
                             logger.debug(
                                 "Secret %s with correct certificate already exists", secret_label
                             )
-                            return
+                            continue
                         secret.set_content(
                             content={
                                 "certificate": str(provider_certificate.certificate),
