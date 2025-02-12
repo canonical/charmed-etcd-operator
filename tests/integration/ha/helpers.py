@@ -17,6 +17,7 @@ from literals import SNAP_NAME, SNAP_REVISION
 logger = logging.getLogger(__name__)
 
 WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
+ETCD_PROCESS = f"/snap/{SNAP_NAME}/{SNAP_REVISION}/bin/etcd"
 
 
 async def existing_app(ops_test: OpsTest) -> str | None:
@@ -91,7 +92,9 @@ def assert_continuous_writes_increasing(endpoints: str, user: str, password: str
     assert more_writes > writes_count, "Writes not continuing to DB"
 
 
-def assert_continuous_writes_consistent(endpoints: str, user: str, password: str) -> None:
+def assert_continuous_writes_consistent(
+    endpoints: str, user: str, password: str, ignore_revision: bool = False
+) -> None:
     """Assert that the continuous writes are consistent."""
     for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
         with attempt:
@@ -100,22 +103,29 @@ def assert_continuous_writes_consistent(endpoints: str, user: str, password: str
 
     for endpoint in endpoints.split(","):
         last_etcd_value, last_etcd_revision = count_writes(endpoint, user, password)
-        # when stopping the writes, it may happen that data was written to etcd but not to file yet
-        assert last_written_value == last_etcd_value == last_etcd_revision, (
-            f"endpoint: {endpoint}, expected value: {last_written_value}, current value: {last_etcd_value}, revision: {last_etcd_revision}."
-        )
+        if ignore_revision:
+            assert last_written_value == last_etcd_value, (
+                f"endpoint: {endpoint}, expected value: {last_written_value}, current value: {last_etcd_value}"
+            )
+        else:
+            assert last_written_value == last_etcd_value == last_etcd_revision, (
+                f"endpoint: {endpoint}, expected value: {last_written_value}, current value: {last_etcd_value}, revision: {last_etcd_revision}."
+            )
 
 
-async def send_process_control_signal(ops_test: OpsTest, unit_name: str, signal: str) -> None:
+async def send_process_control_signal(unit_name: str, model_full_name: str, signal: str) -> None:
     """Send control signal to an etcd-process running on a Juju unit.
 
     Args:
-        ops_test: OpsTest
         unit_name: the Juju unit running the process
+        model_full_name: the Juju model for the unit
         signal: the signal to issue, e.g `SIGKILL`
     """
-    etcd_process = f"/snap/{SNAP_NAME}/{SNAP_REVISION}/bin/etcd"
-    juju_cmd = f"juju ssh {unit_name} -- sudo pkill --signal {signal} -f {etcd_process}"
-    result = subprocess.getoutput(juju_cmd)
+    juju_cmd = f"JUJU_MODEL={model_full_name} juju ssh {unit_name} sudo -i 'pkill --signal {signal} -f {ETCD_PROCESS}'"
 
-    logger.info(result)
+    try:
+        subprocess.check_output(
+            juju_cmd, stderr=subprocess.PIPE, shell=True, universal_newlines=True
+        )
+    except subprocess.CalledProcessError:
+        pass
