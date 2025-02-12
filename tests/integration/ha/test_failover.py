@@ -115,3 +115,90 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(
         endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
     )
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
+    """Make sure the cluster can self-heal when the leader stops."""
+    app = (await existing_app(ops_test)) or APP_NAME
+
+    # the deployment is only HA if at least 3 units
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=NUM_UNITS)
+
+    endpoints = get_cluster_endpoints(ops_test, app)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    time.sleep(10)
+
+    # get details for the current raft leader in the cluster
+    initial_raft_leader = get_raft_leader(endpoints=endpoints)
+    logger.info(f"initial raft leader: {initial_raft_leader}")
+    leader_unit = initial_raft_leader.replace(app, f"{app}/")
+
+    # freeze the etcd process of the cluster/raft leader
+    logger.info(f"freezing etcd process on unit {initial_raft_leader}")
+    await send_process_control_signal(
+        unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGSTOP"
+    )
+
+    # wait until the SIGSTOP fully takes effect
+    time.sleep(10)
+
+    # ensure the stopped unit is not reachable
+    unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    assert not (
+        put_key(
+            unit_endpoint,
+            user=INTERNAL_USER,
+            password=password,
+            key=TEST_KEY,
+            value=TEST_VALUE,
+        )
+        == "OK"
+    )
+
+    # ensure data is still written in the cluster
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+    # continue the etcd process
+    logger.info(f"continuing etcd process on unit {initial_raft_leader}")
+    await send_process_control_signal(
+        unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGCONT"
+    )
+
+    # ensure the stopped unit is reachable again
+    time.sleep(10)
+    assert (
+        put_key(
+            unit_endpoint,
+            user=INTERNAL_USER,
+            password=password,
+            key=TEST_KEY,
+            value=TEST_VALUE,
+        )
+        == "OK"
+    )
+
+    # make sure leadership was moved
+    new_raft_leader = get_raft_leader(endpoints=endpoints)
+    logger.info(f"new raft leader: {new_raft_leader}")
+    assert new_raft_leader != initial_raft_leader, (
+        "raft leadership not transferred after freeze of leader"
+    )
+
+    cluster_members = get_cluster_members(endpoints)
+    assert len(cluster_members) == NUM_UNITS, (
+        f"expected {NUM_UNITS} cluster members, got {len(cluster_members)}"
+    )
+
+    stop_continuous_writes()
+    # By default, etcd uses a 1s election timeout before attempting to replace a lost leader
+    # that's why we will miss writes here, and therefore ignore the revision of the key
+    assert_continuous_writes_consistent(
+        endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
+    )

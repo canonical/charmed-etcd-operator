@@ -125,7 +125,7 @@ async def send_process_control_signal(unit_name: str, model_full_name: str, sign
 
     try:
         subprocess.check_output(
-            juju_cmd, stderr=subprocess.PIPE, shell=True, universal_newlines=True
+            juju_cmd, stderr=subprocess.PIPE, shell=True, universal_newlines=True, timeout=3
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pass
