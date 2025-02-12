@@ -260,7 +260,7 @@ class EtcdEvents(Object):
         """Update the private key in etcd."""
         logger.debug("Updating TLS private key.")
 
-        if self.charm.tls_events._read_and_validate_private_key(private_key_id) is None:
+        if self.charm.tls_events.read_and_validate_private_key(private_key_id) is None:
             self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
             return
 

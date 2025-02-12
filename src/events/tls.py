@@ -94,13 +94,13 @@ class TLSEvents(Object):
 
         if peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
             if (
-                peer_private_key := self._read_and_validate_private_key(peer_private_key_id)
+                peer_private_key := self.read_and_validate_private_key(peer_private_key_id)
             ) is None:
                 self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
 
         if client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if (
-                client_private_key := self._read_and_validate_private_key(client_private_key_id)
+                client_private_key := self.read_and_validate_private_key(client_private_key_id)
             ) is None:
                 self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
 
@@ -291,7 +291,7 @@ class TLSEvents(Object):
             )
             event.defer()
 
-    def _read_and_validate_private_key(
+    def read_and_validate_private_key(
         self, private_key_secret_id: str | None
     ) -> PrivateKey | None:
         """Read and validate the private key.
