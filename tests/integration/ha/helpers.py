@@ -90,6 +90,7 @@ def assert_continuous_writes_increasing(endpoints: str, user: str, password: str
     time.sleep(10)
     more_writes, _ = count_writes(endpoints, user, password)
     assert more_writes > writes_count, "Writes not continuing to DB"
+    logger.info("Continuous writes are increasing.")
 
 
 def assert_continuous_writes_consistent(
@@ -111,6 +112,7 @@ def assert_continuous_writes_consistent(
             assert last_written_value == last_etcd_value == last_etcd_revision, (
                 f"endpoint: {endpoint}, expected value: {last_written_value}, current value: {last_etcd_value}, revision: {last_etcd_revision}."
             )
+        logger.info(f"Continuous writes are consistent on {endpoint}.")
 
 
 async def send_process_control_signal(unit_name: str, model_full_name: str, signal: str) -> None:
@@ -129,3 +131,4 @@ async def send_process_control_signal(unit_name: str, model_full_name: str, sign
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pass
+    logger.info(f"Signal {signal} sent to etcd process on unit {unit_name}.")
