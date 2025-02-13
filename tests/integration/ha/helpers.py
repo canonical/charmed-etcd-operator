@@ -115,7 +115,7 @@ def assert_continuous_writes_consistent(
         logger.info(f"Continuous writes are consistent on {endpoint}.")
 
 
-async def send_process_control_signal(unit_name: str, model_full_name: str, signal: str) -> None:
+def send_process_control_signal(unit_name: str, model_full_name: str, signal: str) -> None:
     """Send control signal to an etcd-process running on a Juju unit.
 
     Args:

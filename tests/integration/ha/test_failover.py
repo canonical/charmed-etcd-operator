@@ -33,6 +33,7 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 NUM_UNITS = 3
+RESTART_DELAY = 30
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
@@ -75,20 +76,19 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
     # axe away the etcd process of the cluster/raft leader
-    await send_process_control_signal(
+    send_process_control_signal(
         unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGKILL"
     )
 
     # now check the availability and formation of the cluster
-    # restart time of systemd is 20 sec
-    time.sleep(25)
+    time.sleep(RESTART_DELAY)
     new_raft_leader = get_raft_leader(endpoints=endpoints)
     logger.info(f"new raft leader: {new_raft_leader}")
     assert new_raft_leader != initial_raft_leader, (
         "raft leadership not transferred after stop of leader"
     )
 
-    # ensure the stopped unit was restarted (via systemctl)
+    # ensure the stopped unit was restarted
     unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
     assert (
         put_key(
@@ -100,11 +100,13 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
         )
         == "OK"
     )
+    logger.info(f"{leader_unit} is available again.")
 
     cluster_members = get_cluster_members(endpoints)
     assert len(cluster_members) == NUM_UNITS, (
         f"expected {NUM_UNITS} cluster members, got {len(cluster_members)}"
     )
+    logger.info(f"Cluster fully formed again with {len(cluster_members)} members.")
 
     # ensure data is written in the cluster
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -140,7 +142,7 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
     # freeze the etcd process of the cluster/raft leader
-    await send_process_control_signal(
+    send_process_control_signal(
         unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGSTOP"
     )
 
@@ -159,12 +161,13 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
         )
         == "OK"
     )
+    logger.info(f"{leader_unit} is stopped.")
 
     # ensure data is still written in the cluster
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # continue the etcd process
-    await send_process_control_signal(
+    send_process_control_signal(
         unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGCONT"
     )
 
@@ -180,6 +183,7 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
         )
         == "OK"
     )
+    logger.info(f"{leader_unit} is available again.")
 
     # make sure leadership was moved
     new_raft_leader = get_raft_leader(endpoints=endpoints)
@@ -192,6 +196,7 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     assert len(cluster_members) == NUM_UNITS, (
         f"expected {NUM_UNITS} cluster members, got {len(cluster_members)}"
     )
+    logger.info(f"Cluster fully formed again with {len(cluster_members)} members.")
 
     stop_continuous_writes()
     # By default, etcd uses a 1s election timeout before attempting to replace a lost leader
@@ -225,20 +230,19 @@ async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
     # axe away the etcd process of the cluster/raft leader
-    await send_process_control_signal(
+    send_process_control_signal(
         unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGTERM"
     )
 
     # now check the availability and formation of the cluster
-    # restart time of systemd is 20 sec
-    time.sleep(25)
+    time.sleep(RESTART_DELAY)
     new_raft_leader = get_raft_leader(endpoints=endpoints)
     logger.info(f"new raft leader: {new_raft_leader}")
     assert new_raft_leader != initial_raft_leader, (
         "raft leadership not transferred after stop of leader"
     )
 
-    # ensure the stopped unit was restarted (via systemctl)
+    # ensure the stopped unit was restarted
     unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
     assert (
         put_key(
@@ -250,17 +254,127 @@ async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
         )
         == "OK"
     )
+    logger.info(f"{leader_unit} is available again.")
 
     cluster_members = get_cluster_members(endpoints)
     assert len(cluster_members) == NUM_UNITS, (
         f"expected {NUM_UNITS} cluster members, got {len(cluster_members)}"
     )
+    logger.info(f"Cluster fully formed again with {len(cluster_members)} members.")
 
     # ensure data is written in the cluster
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
     # By default, etcd uses a 1s election timeout before attempting to replace a lost leader
     # that's why we will miss writes here, and therefore ignore the revision of the key
+    assert_continuous_writes_consistent(
+        endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
+    )
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_full_cluster_restart(ops_test: OpsTest) -> None:
+    """Make sure the cluster can self-heal after all members went down."""
+    app = (await existing_app(ops_test)) or APP_NAME
+
+    # the deployment is only HA if at least 3 units
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=NUM_UNITS)
+
+    endpoints = get_cluster_endpoints(ops_test, app)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    time.sleep(10)
+
+    # axe away the etcd process on all units
+    for unit in ops_test.model.applications[app].units:
+        send_process_control_signal(
+            unit_name=unit.name, model_full_name=ops_test.model_full_name, signal="SIGTERM"
+        )
+
+    # ensure the cluster is not available
+    assert not (
+        put_key(
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=TEST_KEY,
+            value=TEST_VALUE,
+        )
+        == "OK"
+    )
+    logger.info("Cluster is not available after being stopped.")
+
+    # now check the availability and formation of the cluster
+    time.sleep(RESTART_DELAY)
+
+    cluster_members = get_cluster_members(endpoints)
+    assert len(cluster_members) == NUM_UNITS, (
+        f"expected {NUM_UNITS} cluster members, got {len(cluster_members)}"
+    )
+    logger.info(f"Cluster has come back, all {len(cluster_members)} members joined the cluster.")
+
+    # ensure data is written in the cluster
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    stop_continuous_writes()
+    assert_continuous_writes_consistent(
+        endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
+    )
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_full_cluster_crash(ops_test: OpsTest) -> None:
+    """Make sure the cluster can self-heal after all members went down."""
+    app = (await existing_app(ops_test)) or APP_NAME
+
+    # the deployment is only HA if at least 3 units
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=NUM_UNITS)
+
+    endpoints = get_cluster_endpoints(ops_test, app)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    time.sleep(10)
+
+    # axe away the etcd process on all units
+    for unit in ops_test.model.applications[app].units:
+        send_process_control_signal(
+            unit_name=unit.name, model_full_name=ops_test.model_full_name, signal="SIGKILL"
+        )
+
+    # ensure the cluster is not available
+    assert not (
+        put_key(
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=TEST_KEY,
+            value=TEST_VALUE,
+        )
+        == "OK"
+    )
+    logger.info("Cluster is not available after crash.")
+
+    # now check the availability and formation of the cluster
+    time.sleep(RESTART_DELAY)
+
+    cluster_members = get_cluster_members(endpoints)
+    assert len(cluster_members) == NUM_UNITS, (
+        f"expected {NUM_UNITS} cluster members, got {len(cluster_members)}"
+    )
+    logger.info(f"Cluster has come back, all {len(cluster_members)} joined the cluster.")
+
+    # ensure data is written in the cluster
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    stop_continuous_writes()
     assert_continuous_writes_consistent(
         endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
     )
