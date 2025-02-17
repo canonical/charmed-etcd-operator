@@ -9,3 +9,13 @@ options:
       be auto-generated if this option is not set. It is for internal use only
       and SHOULD NOT be used by applications. This needs to be a Juju Secret URI pointing
       to a secret that contains the following content: `root: <password>`.
+  
+  tls-peer-private-key:
+    type: secret
+    description: |
+      A Juju secret URI of a secret containing the private key for peer-to-peer TLS certificates.
+  
+  tls-client-private-key:
+    type: secret
+    description: |
+      A Juju secret URI of a secret containing the private key for client-to-server TLS certificates.

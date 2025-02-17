@@ -132,7 +132,7 @@ class ClusterManager:
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
+            client_url=",".join(e for e in self.cluster_endpoints),
         )
         client.broadcast_peer_url(self.state.unit_server.client_url, self.member.id, peer_urls)
 

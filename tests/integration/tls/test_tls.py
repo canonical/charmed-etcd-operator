@@ -23,6 +23,7 @@ from ..helpers import (
     get_secret_by_label,
     put_key,
 )
+from ..helpers_deployment import wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -116,7 +117,7 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
     await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
     await etcd_app.remove_relation("client-certificates", f"{TLS_NAME}:certificates")
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
@@ -172,7 +173,7 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
@@ -243,7 +244,7 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     logger.info("Removing peer-certificates relation")
     await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
@@ -299,7 +300,7 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating peer-certificates relation")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
@@ -368,7 +369,7 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     logger.info("Removing client-certificates relation")
     await etcd_app.remove_relation("client-certificates", f"{TLS_NAME}:certificates")
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
@@ -420,7 +421,7 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating client-certificates relation")
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
@@ -487,7 +488,7 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
     await etcd_app.remove_relation("client-certificates", f"{TLS_NAME}:certificates")
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
@@ -541,12 +542,12 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
 
-    # enable peer TLS and check if the cluster is still accessible
+    # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, TLS_NAME], status="active", timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=15)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
