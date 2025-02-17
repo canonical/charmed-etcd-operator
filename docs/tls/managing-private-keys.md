@@ -1,8 +1,8 @@
-# Managing Private Keys in TLS
+# Manage private keys in TLS
 
 You can manage private keys used by the charm to generate the certificate signing requests (CSR) by storing the private key in a [juju secret](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/secret/) and then referencing the secret in the [charm configuration](https://canonical-juju.readthedocs-hosted.com/en/latest/user/howto/manage-applications/#configure-an-application).
 
-## Store the Private Key in a Juju Secret
+## Store the private key in a Juju secret
 To store the private key in a juju secret, run the following command:
 
 ```shell
@@ -17,7 +17,7 @@ Once the secret is stored, you can grant the secret to the application using the
 juju grant charmed-etcd tls-peer-private-key
 ```
 
-## Reference the Secret in the Charm Configuration
+## Reference the secret in the charm configuration
 
 To reference the secret in the charm configuration, run:
 

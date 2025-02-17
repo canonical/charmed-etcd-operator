@@ -1,6 +1,6 @@
 # Disable encryption with TLS
 
-To diable encryption with TLS, you can remove the relation between the `charmed-etcd` and the TLS provider on the endpoint specific to the peer-to-peer or client-to-server communication.
+To disable encryption with TLS, remove the relation between `charmed-etcd` and the TLS provider on the endpoint specific to the peer-to-peer or client-to-server communication.
 
 To follow this guide, you need to have a running `charmed-etcd` cluster with TLS enabled. If you haven't deployed `charmed-etcd` with TLS enabled, you can follow the guide [here](./enable-tls.md).
 
@@ -33,15 +33,15 @@ self-signed-certificates:certificates  charmed-etcd:peer-certificates    tls-cer
 
 You can disable peer-to-peer encryption alone, client-to-server encryption alone, or both at the same time.
 
-## Disable Peer-to-Peer Encryption in Transit
+## Disable peer-to-peer encryption in transit
 
-To disable the peer-to-peer communication, run:
+To disable peer-to-peer communication, run:
 
 ```shell
 juju remove-relation self-signed-certificates charmed-etcd:peer-certificates
 ```
 
-You can wait for the relation to be removed by checking the status using `juju status --watch 1s --relations`.
+You can check the status of the relation using `juju status --watch 1s --relations`.
 
 ```shell
 Model  Controller  Cloud/Region         Version  SLA          Timestamp
@@ -71,7 +71,7 @@ self-signed-certificates:certificates  charmed-etcd:client-certificates  tls-cer
 
 Notice that the relation between `self-signed-certificates` and `charmed-etcd` for the peer-to-peer communication has been removed.
 
-## Disable Client-to-Server Encryption in Transit and Mutual Authentication
+## Disable client-to-server encryption in transit and mutual authentication
 
 To disable the client-to-server communication, run:
 
@@ -124,7 +124,7 @@ etcdctl member list --endpoints http://10.73.32.122:2379 -w table
 
 Notice that the cluster is running without encryption. Both the `PEER ADDRS` and `CLIENT ADDRS` are using the HTTP protocol.
 
-## Disbaling both Peer-to-Peer and Client-to-Server Encryption at The Same Time
+## Disable both peer-to-peer and client-to-server encryption at the same time
 
 You can disable both peer-to-peer and client-to-server communication at the same time by removing both relations.
 
@@ -132,11 +132,11 @@ You can disable both peer-to-peer and client-to-server communication at the same
 juju remove-relation self-signed-certificates charmed-etcd:peer-certificates && juju remove-relation self-signed-certificates charmed-etcd:client-certificates
 ```
 
-## Rotating the TLS Certificates
+## Rotate the TLS certificates
 
-There are two scenarios trigger the rotation of TLS certificates:
+There are two scenarios that may trigger the rotation of TLS certificates:
 
-1. The certificate has expired/is about to expire: In this case, the Charmed etcd will automatically request a new certificate.
+1. The certificate has expired/is about to expire: In this case, Charmed etcd will automatically request a new certificate.
 2. You want to rotate the certificate: In this case, you can manually request a new certificate.
 
 To rotate the TLS certificates manually, all you have to do is remove the relation between the `charmed-etcd` and the TLS provider and then add the relation back. The charm will generate new certificates. 
