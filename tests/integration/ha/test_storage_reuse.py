@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 import logging
-import subprocess
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -67,7 +66,7 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     return_code, _, _ = await ops_test.juju(*add_unit_cmd.split())
     assert return_code == 0, f"Failed to add unit with storage {storage_id}"
 
-    new_unit = ops_test.model.applications[app].units[-1]
+    # new_unit = ops_test.model.applications[app].units[-1]
     await ops_test.model.wait_for_idle(
         apps=[app],
         status="active",

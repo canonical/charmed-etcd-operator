@@ -31,6 +31,9 @@ from literals import (
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
+    SNAP_DATA_PATH,
+    SNAP_GROUP,
+    SNAP_USER,
     Status,
     TLSState,
 )
@@ -71,6 +74,15 @@ class EtcdEvents(Object):
         self.framework.observe(
             self.charm.on[DATA_STORAGE].storage_detaching, self._on_storage_detaching
         )
+        self.framework.observe(
+            self.charm.on[DATA_STORAGE].storage_attached, self._on_storage_attached
+        )
+
+    def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
+        """Handle storage attachment."""
+        # fix the permissions of the data dir if re-attaching existing storage
+        self.charm.workload.exec(["chmod", "-R", "750", SNAP_DATA_PATH])
+        self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", SNAP_DATA_PATH])
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -94,7 +106,7 @@ class EtcdEvents(Object):
         self.charm.config_manager.set_config_properties()
 
         if not self.charm.state.cluster.cluster_state and self.charm.workload.exists(DATABASE_DIR):
-            # this is a new application but storage is re-used
+            # this is a new application but storage is reused
             self.charm.cluster_manager.start_member()
             self.charm.state.cluster.update({"authentication": "enabled"})
             # update cluster membership configuration after recovering existing data
@@ -119,7 +131,7 @@ class EtcdEvents(Object):
             # this unit has been added to the etcd cluster
             if self.charm.workload.exists(DATABASE_DIR):
                 logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
-                # storage cannot be re-used on non-leader members
+                # storage cannot be reused on non-leader members
                 try:
                     self.charm.workload.remove_directory(DATABASE_DIR)
                     logger.warning(
