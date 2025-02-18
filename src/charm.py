@@ -106,7 +106,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         logger.debug("Peer TLS custom callback")
 
         # in case of peer TLS we need to move the leader before broadcasting membership updates
-        self.cluster_manager.move_leader()
+        self.cluster_manager.move_leader_if_required()
 
         # enable peer tls
         self.cluster_manager.broadcast_peer_url(
@@ -158,7 +158,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         logger.debug("Disable Peer TLS custom callback")
 
         # in case of peer TLS we need to move the leader before broadcasting membership updates
-        self.cluster_manager.move_leader()
+        self.cluster_manager.move_leader_if_required()
 
         logger.debug("Peer TLS custom callback")
         if self.state.unit_server.tls_peer_state == TLSState.NO_TLS:

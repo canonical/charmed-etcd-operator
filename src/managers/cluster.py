@@ -164,7 +164,7 @@ class ClusterManager:
             bool: True if the workload is running after restart.
         """
         if move_leader:
-            self.move_leader()
+            self.move_leader_if_required()
 
         logger.debug("Restarting workload")
         self.workload.restart()
@@ -241,7 +241,7 @@ class ClusterManager:
     )
     def remove_member(self) -> None:
         """Remove a cluster member and stop the workload."""
-        self.move_leader()
+        self.move_leader_if_required()
         try:
             client = EtcdClient(
                 username=self.admin_user,
@@ -276,7 +276,7 @@ class ClusterManager:
         member_list.pop(self.state.unit_server.member_name, None)
         return next(iter(member_list.values())).id
 
-    def move_leader(self) -> None:
+    def move_leader_if_required(self) -> None:
         """Move the raft leadership of the cluster to the next available member if required."""
         try:
             if self.member.id == self.leader:
@@ -288,7 +288,7 @@ class ClusterManager:
                     password=self.admin_password,
                     client_url=",".join(e for e in self.cluster_endpoints),
                 )
-                client.move_leader(new_leader_id)
+                client.move_leader_if_required(new_leader_id)
                 # wait for leadership to be moved before continuing operation
                 if self.is_healthy(cluster=True):
                     logger.debug(f"Successfully moved leader to {new_leader_id}.")
