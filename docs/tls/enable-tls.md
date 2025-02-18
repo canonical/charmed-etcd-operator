@@ -22,6 +22,7 @@ You can enable peer-to-peer encryption alone, client-to-server encryption alone,
 ```shell
 juju deploy self-signed-certificates --channel edge
 ```
+> etcd uses `v4` of the [tls-certificates library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates). This version is currently only supported in the `edge` channel of the self-signed-certificates charm.
 
 Wait until `self-signed-certificates` is `active`. Use `juju status --watch 1s` to monitor the progress.
 
