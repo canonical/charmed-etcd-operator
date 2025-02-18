@@ -214,9 +214,18 @@ class EtcdEvents(Object):
             return
 
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
-            self.charm.state.cluster.update(
-                {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
-            )
+            if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
+                try:
+                    password = get_secret_from_id(self.charm.model, admin_secret_id).get(
+                        INTERNAL_USER
+                    )
+                except (ModelError, SecretNotFoundError) as e:
+                    logger.error(f"Could not access secret {admin_secret_id}: {e}")
+                    raise
+            else:
+                password = self.charm.workload.generate_password()
+
+            self.charm.state.cluster.update({f"{INTERNAL_USER}-password": password})
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
