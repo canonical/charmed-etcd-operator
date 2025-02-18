@@ -99,6 +99,7 @@ def test_start():
     state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.exists", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
@@ -106,6 +107,24 @@ def test_start():
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
+        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "existing"
+
+    # if the cluster is reusing storage, the workload should start and broadcast its peer URL
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.exists", return_value=True),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.start"),
+        patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
+        patch("managers.cluster.ClusterManager.broadcast_peer_url") as broadcast_peer_url,
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        broadcast_peer_url.assert_called()
+        assert state_out.unit_status == ops.ActiveStatus()
+        assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
+        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "existing"
 
     # if the cluster already exists, the leader should not start but wait for being added as member
     relation = testing.PeerRelation(

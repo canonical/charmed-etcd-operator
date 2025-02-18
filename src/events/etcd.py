@@ -140,7 +140,7 @@ class EtcdEvents(Object):
                         f"Removed database file from {DATABASE_DIR} to join existing cluster."
                     )
                 except OSError:
-                    # maybe we should set status with explanation for users here?
+                    # if removing fails, we cannot start the workload or the member would crash
                     raise
 
             self.charm.cluster_manager.start_member()
