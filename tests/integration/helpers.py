@@ -96,6 +96,15 @@ def get_cluster_endpoints(
     )
 
 
+def get_unit_endpoint(
+    ops_test: OpsTest, unit_name: str, app_name: str = APP_NAME, tls_enabled: bool = False
+) -> str:
+    """Resolve the etcd endpoint for a given unit name."""
+    for unit in ops_test.model.applications[app_name].units:
+        if unit.name == unit_name:
+            return f"{'https' if tls_enabled else 'http'}://{unit.public_address}:{CLIENT_PORT}"
+
+
 def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
     """Query the Raft leader via the `endpoint status` and `member list` commands.
 
