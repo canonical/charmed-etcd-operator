@@ -288,7 +288,7 @@ class ClusterManager:
                     password=self.admin_password,
                     client_url=",".join(e for e in self.cluster_endpoints),
                 )
-                client.move_leader_if_required(new_leader_id)
+                client.move_leader(new_leader_id)
                 # wait for leadership to be moved before continuing operation
                 if self.is_healthy(cluster=True):
                     logger.debug(f"Successfully moved leader to {new_leader_id}.")
