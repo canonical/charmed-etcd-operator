@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
 ETCD_PROCESS = f"/snap/{SNAP_NAME}/{SNAP_REVISION}/bin/etcd"
+ETCD_SERVICE_PATH = "/etc/systemd/system/snap.charmed-etcd.etcd.service"
 
 
 async def existing_app(ops_test: OpsTest) -> str | None:
@@ -132,3 +133,17 @@ def send_process_control_signal(unit_name: str, model_full_name: str, signal: st
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pass
     logger.info(f"Signal {signal} sent to etcd process on unit {unit_name}.")
+
+
+async def patch_restart_delay(ops_test: OpsTest, unit_name: str, delay: int) -> None:
+    """Update the restart delay in the snap's systemd service file."""
+    add_delay_cmd = (
+        f"exec --unit {unit_name} -- "
+        f"sudo sed -i -e '/^[Service]/a RestartSec={delay}' "
+        f"{ETCD_SERVICE_PATH}"
+    )
+    await ops_test.juju(*add_delay_cmd.split(), check=True)
+
+    # reload the daemon for systemd to reflect changes
+    reload_cmd = f"exec --unit {unit_name} -- sudo systemctl daemon-reload"
+    await ops_test.juju(*reload_cmd.split(), check=True)
