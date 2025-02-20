@@ -36,10 +36,6 @@ class ExternalClientsManager:
         """Update the user."""
         managed_users = self.state.cluster.managed_users
 
-        if relation_id not in managed_users:
-            logger.error(f"Relation {relation_id} not found in managed users")
-            return
-
         user = managed_users[relation_id]
         if common_name:
             user.common_name = common_name

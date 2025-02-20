@@ -228,7 +228,7 @@ class TLSEvents(Object):
         # TLS enabled and no CA rotation -> Simple certificate rotation
         if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NO_ROTATION:
             if cert_type == TLSType.CLIENT:
-                self.charm.external_clients_events.update_ecr_data(None)
+                self.charm.external_clients_events.update_ecr_data()
             logger.debug(f"Rotating {cert_type.value} certificates")
             return
 

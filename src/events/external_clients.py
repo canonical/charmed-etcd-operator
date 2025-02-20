@@ -5,7 +5,7 @@
 """External clients related event handlers."""
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
     CommonNameUpdatedEvent,
@@ -31,7 +31,7 @@ class ExternalClientsEvents(Object):
         self.etcd_provides = EtcdProvides(self.charm, EXTERNAL_CLIENTS_RELATION)
 
         self.framework.observe(
-            self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_joined, self.update_ecr_data
+            self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_joined, self._on_relation_joined
         )
 
         self.framework.observe(
@@ -45,7 +45,7 @@ class ExternalClientsEvents(Object):
     def _on_common_name_updated(self, event: CommonNameUpdatedEvent):
         """Handle the common name updated event."""
         if not event.common_name or not event.keys_prefix or not event.ca_chain:
-            logger.error("Common name, keys prefix or CA chain not provided")
+            logger.error("Common name, keys prefix, or CA chain not provided")
             event.defer()
             return
 
@@ -77,13 +77,10 @@ class ExternalClientsEvents(Object):
         self.charm.external_clients_manager.add_managed_user(
             event.relation.id, event.common_name, event.ca_chain
         )
+        self.charm.external_clients_events.update_ecr_data()
 
     def _on_ca_chain_updated(self, event):
         """Handle the ca chain updated event."""
-        if not event.ca_chain:
-            logger.error("CA chain not provided")
-            return
-
         if not self.charm.state.unit_server.tls_client_state == TLSState.TLS:
             logger.error("TLS is not enabled")
             event.defer()
@@ -146,7 +143,7 @@ class ExternalClientsEvents(Object):
             logger.error("New external client detected. Triggering CA chain update")
             self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
 
-    def update_ecr_data(self, _: Any):
+    def update_ecr_data(self):
         """Update the ECR data."""
         if not self.charm.unit.is_leader():
             return
@@ -158,8 +155,10 @@ class ExternalClientsEvents(Object):
         server_certs, _ = self.charm.tls_events.client_certificate.get_assigned_certificates()
         server_ca = server_certs[0].ca.raw
         for relation in self.etcd_provides.relations:
-            if not relation.units:
-                continue
             self.etcd_provides.set_endpoints(relation.id, endpoints)
             self.etcd_provides.set_ca_chain(relation.id, server_ca)
             self.etcd_provides.set_version(relation.id, self.charm.cluster_manager.get_version())
+
+    def _on_relation_joined(self, _):
+        """Add the provider side data to the relation."""
+        self.update_ecr_data()

@@ -160,7 +160,7 @@ class EtcdEvents(Object):
                 self.charm.state.cluster.update(
                     {"endpoints": ",".join(self.charm.cluster_manager.cluster_endpoints)}
                 )
-                self.charm.external_clients_events.update_ecr_data(None)
+                self.charm.external_clients_events.update_ecr_data()
 
         self.charm.external_clients_events.check_new_external_client()
 
