@@ -144,14 +144,25 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
-        if self.charm.unit.is_leader() and self.charm.state.cluster.learning_member:
-            try:
-                # this will promote any learner, not only the unit that updated its relation data
-                self.charm.cluster_manager.promote_learning_member()
-            except EtcdClusterManagementError as e:
-                logger.warning(e)
-                event.defer()
-                return
+        if self.charm.unit.is_leader():
+            if self.charm.state.cluster.learning_member:
+                try:
+                    # this will promote any learner, not only the unit that updated its relation data
+                    self.charm.cluster_manager.promote_learning_member()
+                except EtcdClusterManagementError as e:
+                    logger.warning(e)
+                    event.defer()
+                    return
+
+            if set(self.charm.state.cluster.endpoints) != set(
+                self.charm.cluster_manager.cluster_endpoints
+            ):
+                self.charm.state.cluster.update(
+                    {"endpoints": ",".join(self.charm.cluster_manager.cluster_endpoints)}
+                )
+                self.charm.external_clients_events.update_ecr_data(None)
+
+        self.charm.external_clients_events.check_new_external_client()
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""

@@ -21,6 +21,7 @@ TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
 RESTART_RELATION = "restart"
+EXTERNAL_CLIENTS_RELATION = "etcd-client"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
 

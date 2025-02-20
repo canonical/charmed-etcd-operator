@@ -271,3 +271,128 @@ class ClusterManager:
             raise ValueError("member list command failed")
         member_list.pop(self.state.unit_server.member_name, None)
         return next(iter(member_list.values())).id
+
+    def get_user(self, username: str) -> dict | None:
+        """Get the user information.
+
+        Args:
+            username (str): The username to get.
+
+        Returns:
+            dict | None: The user information or None if the user does not exist.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        return client.get_user(username=username)
+
+    def get_role(self, rolename: str) -> list[dict] | None:
+        """Get the role information.
+
+        Args:
+            rolename (str): The name of the role to get.
+
+        Returns:
+            list[dict] | None: The role's list of permissions or None if the role does not exist.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        return client.get_role(rolename)
+
+    def add_role(self, rolename: str) -> None:
+        """Add a new role.
+
+        Args:
+            rolename (str): The name of the role to add.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        client.add_role(rolename)
+
+    def grant_role(self, username: str, rolename: str) -> None:
+        """Grant a role to a user.
+
+        Args:
+            username (str): The name of the user.
+            rolename (str): The name of the role.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        client.grant_role(username, rolename)
+
+    def grant_permission(self, rolename: str, prefix: str) -> None:
+        """Grant permission to a role.
+
+        Args:
+            rolename (str): The name of the role.
+            prefix (str): The prefix to grant permission to.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        client.grant_permission(rolename, prefix)
+
+    def add_user(self, username: str) -> None:
+        """Add a new user.
+
+        Args:
+            username (str): The name of the user to add.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        client.add_user(username)
+
+    def remove_role(self, rolename: str) -> None:
+        """Remove a role.
+
+        Args:
+            rolename (str): The name of the role to remove.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        client.remove_role(rolename)
+
+    def remove_user(self, username: str) -> None:
+        """Remove a user.
+
+        Args:
+            username (str): The name of the user to remove.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        client.remove_user(username)
+
+    def get_version(self) -> str:
+        """Get the etcd version.
+
+        Returns:
+            str: The etcd version.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        return client.get_version()

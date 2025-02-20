@@ -227,6 +227,8 @@ class TLSEvents(Object):
 
         # TLS enabled and no CA rotation -> Simple certificate rotation
         if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NO_ROTATION:
+            if cert_type == TLSType.CLIENT:
+                self.charm.external_clients_events.update_ecr_data(None)
             logger.debug(f"Rotating {cert_type.value} certificates")
             return
 
@@ -325,3 +327,31 @@ class TLSEvents(Object):
             return None
 
         return private_key
+
+    def collect_client_cas(self) -> list[str]:
+        """Collect client CAs.
+
+        Returns:
+            list[str]: The client CAs.
+        """
+        cas: list[str] = []
+
+        # server ca
+        certs, _ = self.client_certificate.get_assigned_certificates()
+        cas.append(certs[0].ca.raw)
+
+        # managed users cas
+        for managed_user in self.charm.state.cluster.managed_users.values():
+            cas.extend(self.charm.tls_manager.separate_certificates(managed_user.ca_chain))
+
+        return cas
+
+    def collect_peer_ca(self) -> str:
+        """Collect peer CA.
+
+        Returns:
+            str: The peer CA.
+        """
+        # server ca
+        certs, _ = self.peer_certificate.get_assigned_certificates()
+        return certs[0].ca.raw

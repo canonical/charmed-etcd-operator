@@ -13,6 +13,7 @@ from ops import StatusBase
 from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
 from events.etcd import EtcdEvents
+from events.external_clients import ExternalClientsEvents
 from events.tls import TLSEvents
 from literals import (
     RESTART_RELATION,
@@ -25,6 +26,7 @@ from literals import (
 )
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
+from managers.external_clients import ExternalClientsManager
 from managers.tls import TLSManager
 from workload import EtcdWorkload
 
@@ -45,10 +47,14 @@ class EtcdOperatorCharm(ops.CharmBase):
             state=self.state, workload=self.workload, config=self.config
         )
         self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
+        self.external_clients_manager = ExternalClientsManager(
+            self.state, self.workload, SUBSTRATE
+        )
 
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
         self.tls_events = TLSEvents(self)
+        self.external_clients_events = ExternalClientsEvents(self)
 
         # --- LIB EVENT HANDLERS ---
         self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)
@@ -191,13 +197,20 @@ class EtcdOperatorCharm(ops.CharmBase):
     def _restart_clean_cas(self, _) -> None:
         """Restart callback for cleaning up old CAs."""
         logger.debug("cleaning up old CAs")
+
+        # peer CA rotation
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.CERT_UPDATED:
-            self.tls_manager.clean_cas(TLSType.PEER)
+            self.tls_manager.update_cas([self.tls_events.collect_peer_ca()], TLSType.PEER)
             self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NO_ROTATION)
 
+        # client CA rotation
         if self.state.unit_server.tls_client_ca_rotation_state == TLSCARotationState.CERT_UPDATED:
-            self.tls_manager.clean_cas(TLSType.CLIENT)
+            self.tls_manager.update_cas(self.tls_events.collect_client_cas(), TLSType.CLIENT)
             self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NO_ROTATION)
+
+        # Event emitted by ECR
+        if self.state.unit_server.tls_client_ca_rotation_state == TLSCARotationState.NO_ROTATION:
+            self.tls_manager.update_cas(self.tls_events.collect_client_cas(), TLSType.CLIENT)
 
         self._restart(None)
 
