@@ -114,9 +114,6 @@ class ExternalClientsEvents(Object):
         relation_managed_user = managed_users.get(event.relation.id)
 
         if self.charm.unit.is_leader():
-            if not relation_managed_user:
-                logger.warning("User not found")
-                return
             self.charm.cluster_manager.remove_role(relation_managed_user.common_name)
             self.charm.cluster_manager.remove_user(relation_managed_user.common_name)
             self.charm.external_clients_manager.remove_managed_user(event.relation.id)
@@ -126,7 +123,7 @@ class ExternalClientsEvents(Object):
             return
         self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
 
-    def check_new_external_client(self):
+    def check_external_client_updates(self):
         """Check if a new external client is added."""
         if (
             not self.charm.state.unit_server.tls_client_state == TLSState.TLS
