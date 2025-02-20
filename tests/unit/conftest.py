@@ -49,12 +49,6 @@ def cluster_tls_context():
                     for member in MEMBER_LIST_DICT.values()
                 ]
             ),
-            "endpoints": ",".join(
-                [
-                    member.client_urls[0].replace("http://", "https://")
-                    for member in MEMBER_LIST_DICT.values()
-                ]
-            ),
         },
         local_unit_data={
             "ip": current_unit.client_urls[0].replace("http://", "").replace(":2379", ""),
@@ -98,7 +92,6 @@ def cluster_no_tls_context():
             "cluster_members": ",".join(
                 [member.peer_urls[0] for member in MEMBER_LIST_DICT.values()]
             ),
-            "endpoints": ",".join([member.client_urls[0] for member in MEMBER_LIST_DICT.values()]),
         },
         local_unit_data={
             "ip": current_unit.client_urls[0].replace("https://", "").replace(":2379", ""),

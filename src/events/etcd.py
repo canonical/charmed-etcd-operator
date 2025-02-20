@@ -156,8 +156,6 @@ class EtcdEvents(Object):
 
             self.charm.external_clients_events.update_client_relations_data()
 
-        self.charm.external_clients_events.check_external_client_updates()
-
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
         if not self.charm.unit.is_leader():

@@ -37,7 +37,10 @@ class ExternalClientsEvents(Object):
         self.framework.observe(
             self.etcd_provides.on.common_name_updated, self._on_common_name_updated
         )
-        self.framework.observe(self.etcd_provides.on.ca_chain_updated, self._on_ca_chain_updated)
+
+        self.framework.observe(
+            self.etcd_provides.on.client_relation_updated, self._on_client_relation_updated
+        )
         self.framework.observe(
             self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_broken, self._on_relation_broken
         )
@@ -74,7 +77,7 @@ class ExternalClientsEvents(Object):
         self.charm.external_clients_manager.add_managed_user(event.relation.id, event.common_name)
         self.charm.external_clients_events.update_client_relations_data()
 
-    def _on_ca_chain_updated(self, event):
+    def _on_client_relation_updated(self, event):
         """Handle the ca chain updated event."""
         if not self.charm.state.unit_server.tls_client_state == TLSState.TLS:
             logger.error("TLS is not enabled")
@@ -88,18 +91,18 @@ class ExternalClientsEvents(Object):
             logger.debug("CA rotation is in progress")
             event.defer()
             return
+        if self.charm.unit.is_leader():
+            managed_users = self.charm.state.cluster.managed_users
+            relation_managed_user = managed_users.get(event.relation.id)
 
-        managed_users = self.charm.state.cluster.managed_users
-        relation_managed_user = managed_users.get(event.relation.id)
+            if not relation_managed_user:
+                logger.warning("User not found. Waiting for common name update")
+                event.defer()
+                return
 
-        if not relation_managed_user:
-            logger.warning("User not found. Waiting for common name update")
-            event.defer()
-            return
-
-        self.charm.external_clients_manager.update_managed_user(
-            event.relation.id, relation_managed_user
-        )
+            self.charm.external_clients_manager.update_managed_user(
+                event.relation.id, relation_managed_user
+            )
 
         self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
 
@@ -111,28 +114,8 @@ class ExternalClientsEvents(Object):
         if self.charm.unit.is_leader():
             self.charm.cluster_manager.remove_managed_user(relation_managed_user)
             self.charm.external_clients_manager.remove_managed_user(event.relation.id)
-        elif relation_managed_user:
-            logger.debug("Waiting for leader to remove managed user")
-            event.defer()
-            return
+
         self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
-
-    def check_external_client_updates(self):
-        """Check if a new external client is added."""
-        if (
-            not self.charm.state.unit_server.tls_client_state == TLSState.TLS
-            or not self.charm.state.unit_server.tls_client_ca_rotation_state
-            == TLSCARotationState.NO_ROTATION
-        ):
-            return
-
-        cas_stored = self.charm.tls_manager.load_trusted_ca(TLSType.CLIENT)
-
-        collected_cas = self.charm.tls_events.collect_client_cas()
-
-        if set(collected_cas) - set(cas_stored):
-            logger.error("New external client detected. Triggering CA chain update")
-            self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
 
     def update_client_relations_data(self):
         """Update the ECR data."""

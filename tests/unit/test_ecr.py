@@ -49,12 +49,43 @@ def test_add_ecr_new_user(cluster_tls_context):
         charm: EtcdOperatorCharm = manager.charm
         manager.run()
         assert ecr_relation.id in charm.state.cluster.managed_users
-        assert charm.state.cluster.managed_users[ecr_relation.id].common_name == "test-common-name"
-        assert charm.state.cluster.managed_users[ecr_relation.id].ca_chain == "test_ca"
+        assert charm.state.cluster.managed_users[ecr_relation.id] == "test-common-name"
         assert ecr_relation.local_app_data["ca-chain"] == "test_ca_server"
         assert set(ecr_relation.local_app_data["endpoints"].split(",")) == set(
             "https://ip1:2379,https://ip2:2379,https://ip0:2379".split(",")
         )
+
+
+def test_add_ecr_new_user_not_leader(cluster_tls_context):
+    """Test adding an external client relation to the charm."""
+    ctx, relations = cluster_tls_context
+
+    ecr_relation = testing.Relation(
+        id=5,
+        endpoint=EXTERNAL_CLIENTS_RELATION,
+        remote_app_data={
+            "ca-chain": """test_ca""",
+            "common-name": "test-common-name",
+            "keys-prefix": "/test/keys",
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
+        },
+    )
+
+    state_in = testing.State(
+        relations=relations + [ecr_relation],
+        leader=False,
+    )
+
+    with (
+        ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
+        patch(
+            "managers.external_clients.ExternalClientsManager.update_managed_user"
+        ) as update_managed_user,
+        patch("managers.cluster.ClusterManager.add_managed_user") as add_managed_user,
+    ):
+        manager.run()
+        update_managed_user.assert_not_called()
+        add_managed_user.assert_not_called()
 
 
 def test_add_ecr_new_user_no_tls(cluster_no_tls_context):
@@ -86,7 +117,7 @@ def test_add_ecr_new_user_no_tls(cluster_no_tls_context):
         state_out = manager.run()
         defered_event_names = [event.name for event in state_out.deferred]
         assert "common_name_updated" in defered_event_names
-        assert "ca_chain_updated" in defered_event_names
+        assert "client_relation_updated" in defered_event_names
         assert ecr_relation.id not in charm.state.cluster.managed_users
 
 
@@ -119,7 +150,7 @@ def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context):
         state_out = manager.run()
         defered_event_names = [event.name for event in state_out.deferred]
         assert "common_name_updated" in defered_event_names
-        assert "ca_chain_updated" in defered_event_names
+        assert "client_relation_updated" in defered_event_names
         assert ecr_relation.id not in charm.state.cluster.managed_users
 
 
@@ -160,9 +191,7 @@ def test_ecr_update_common_name(cluster_tls_context):
 
     peer_relation = relations[0]
     old_common_name = "test-common-name"
-    peer_relation.local_app_data["managed_users"] = (
-        f'{{"managed_users":{{"5":{{"relation_id":5,"common_name":"{old_common_name}","ca_chain":"test_ca"}}}}}}'
-    )
+    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
 
     ecr_relation = testing.Relation(
         id=5,
@@ -201,7 +230,7 @@ def test_ecr_update_common_name(cluster_tls_context):
         charm: EtcdOperatorCharm = manager.charm
         manager.run()
         assert ecr_relation.id in charm.state.cluster.managed_users
-        assert charm.state.cluster.managed_users[ecr_relation.id].common_name == "new-common-name"
+        assert charm.state.cluster.managed_users[ecr_relation.id] == "new-common-name"
         remove_role.assert_called_once_with(old_common_name)
         remove_user.assert_called_once_with(old_common_name)
 
@@ -212,9 +241,7 @@ def test_ecr_update_ca_chain_while_rotation_happening(cluster_tls_context):
 
     peer_relation = relations[0]
     old_ca = "test_ca"
-    peer_relation.local_app_data["managed_users"] = (
-        f'{{"managed_users":{{"5":{{"relation_id":5,"common_name":"test-common-name","ca_chain":"{old_ca}"}}}}}}'
-    )
+    peer_relation.local_app_data["managed_users"] = '{"5":"test-common-name"}'
 
     peer_relation.local_unit_data["tls_client_ca_rotation"] = TLSCARotationState.NEW_CA_ADDED.value
 
@@ -240,10 +267,8 @@ def test_ecr_update_ca_chain_while_rotation_happening(cluster_tls_context):
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
     ):
-        charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        assert charm.state.cluster.managed_users[ecr_relation.id].ca_chain == old_ca
-        assert "ca_chain_updated" in [event.name for event in state_out.deferred]
+        assert "client_relation_updated" in [event.name for event in state_out.deferred]
 
 
 def test_ecr_relation_broken_leader(cluster_tls_context):
@@ -251,9 +276,7 @@ def test_ecr_relation_broken_leader(cluster_tls_context):
     ctx, relations = cluster_tls_context
 
     peer_relation = relations[0]
-    peer_relation.local_app_data["managed_users"] = (
-        '{"managed_users":{"5":{"relation_id":5,"common_name":"test-common-name","ca_chain":"test_ca"}}}'
-    )
+    peer_relation.local_app_data["managed_users"] = '{"5":"test-common-name"}'
 
     ecr_relation = testing.Relation(
         id=5,
@@ -297,9 +320,7 @@ def test_ecr_relation_broken_not_leader(cluster_tls_context):
     ctx, relations = cluster_tls_context
 
     peer_relation = relations[0]
-    peer_relation.local_app_data["managed_users"] = (
-        '{"managed_users":{"5":{"relation_id":5,"common_name":"test-common-name","ca_chain":"test_ca"}}}'
-    )
+    peer_relation.local_app_data["managed_users"] = '{"5":"test-common-name"}'
 
     ecr_relation = testing.Relation(
         id=5,
@@ -318,24 +339,14 @@ def test_ecr_relation_broken_not_leader(cluster_tls_context):
     state_in = testing.State(
         relations=relations + [ecr_relation],
     )
-
-    with ctx(ctx.on.relation_broken(ecr_relation), state_in) as manager:
-        charm: EtcdOperatorCharm = manager.charm
-        state_out = manager.run()
-        assert ecr_relation.id in charm.state.cluster.managed_users
-        assert "etcd_client_relation_broken" in [event.name for event in state_out.deferred]
-
-    # run deferred event
     with (
-        ctx(ctx.on.update_status(), state_out) as manager,
+        ctx(ctx.on.update_status(), state_in) as manager,
         patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.remove_managed_user") as remove_managed_user,
     ):
-        charm: EtcdOperatorCharm = manager.charm
-        # leader removed the managed user
-        peer_relation.local_app_data["managed_users"] = '{"managed_users":{}}'
-        state_out = manager.run()
-        assert ecr_relation.id not in charm.state.cluster.managed_users
-        assert "etcd_client_relation_broken" not in [event.name for event in state_out.deferred]
+        manager.run()
+        remove_managed_user.assert_not_called()
+        # TODO add more assertions after checking custom event not being emitted in non leader setting
 
 
 def test_ecr_relation_joined(cluster_tls_context):
@@ -371,49 +382,3 @@ def test_ecr_relation_joined(cluster_tls_context):
         assert set(ecr_relation.local_app_data["endpoints"].split(",")) == set(
             "https://ip1:2379,https://ip2:2379,https://ip0:2379".split(",")
         )
-
-
-def test_non_leader_detect_ca(cluster_tls_context):
-    """Test non-leader detecting the CA chain of an ecr."""
-    ctx, relations = cluster_tls_context
-
-    peer_relation = relations[0]
-    peer_relation.local_app_data["managed_users"] = (
-        '{"managed_users":{"5":{"relation_id":5,"common_name":"test-common-name","ca_chain":"test_ca"}}}'
-    )
-
-    peer_relation.peers_data[4] = {
-        "client_cert_ready": "True",
-        "hostname": "charmed-etcd4",
-        "ip": "ip4",
-        "peer_cert_ready": "True",
-        "tls_client_state": "tls",
-        "tls_peer_state": "tls",
-    }
-
-    ecr_relation = testing.Relation(
-        id=5,
-        endpoint=EXTERNAL_CLIENTS_RELATION,
-        remote_app_data={
-            "ca-chain": "new_ca",
-            "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
-            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
-        },
-        local_app_data={
-            "data": '{"ca-chain": "test_ca","common-name": "test-common-name", "keys-prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}'
-        },
-    )
-
-    state_in = testing.State(relations=relations + [ecr_relation], leader=False)
-
-    # peer relation data changed
-    with (
-        ctx(ctx.on.relation_changed(peer_relation), state_in) as manager,
-        patch(
-            "events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "server_ca"]
-        ) as collect_client_cas,
-    ):
-        manager.charm
-        manager.run()
-        collect_client_cas.assert_called_once()
