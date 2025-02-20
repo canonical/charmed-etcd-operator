@@ -215,6 +215,9 @@ class TLSEvents(Object):
 
         # write certificates to disk
         self.charm.tls_manager.write_certificate(cert, private_key)  # type: ignore
+        # if there are client relations add their CAs to the trusted client CAs
+        if cert_type == TLSType.CLIENT and tls_state == TLSState.TO_TLS:
+            self.charm.tls_manager.update_cas(self.collect_client_cas(), cert_type)
 
         # TLS is enabled, New CA added to all servers, and cert updated -> no rolling restart needed until we clean up old CA
         if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NEW_CA_ADDED:
@@ -228,7 +231,7 @@ class TLSEvents(Object):
         # TLS enabled and no CA rotation -> Simple certificate rotation
         if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NO_ROTATION:
             if cert_type == TLSType.CLIENT:
-                self.charm.external_clients_events.update_ecr_data()
+                self.charm.external_clients_events.update_client_relations_data()
             logger.debug(f"Rotating {cert_type.value} certificates")
             return
 
@@ -341,8 +344,15 @@ class TLSEvents(Object):
         cas.append(certs[0].ca.raw)
 
         # managed users cas
-        for managed_user in self.charm.state.cluster.managed_users.values():
-            cas.extend(self.charm.tls_manager.separate_certificates(managed_user.ca_chain))
+        for relation in self.charm.external_clients_events.etcd_provides.relations:
+            logger.debug(
+                f"Collecting CA from relation {relation.id} its CA: {relation.data[relation.app].get('ca-chain', '')}"
+            )
+            cas.extend(
+                self.charm.tls_manager.separate_certificates(
+                    relation.data[relation.app].get("ca-chain", "")
+                )
+            )
 
         return cas
 

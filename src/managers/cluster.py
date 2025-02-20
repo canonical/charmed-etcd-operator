@@ -396,3 +396,25 @@ class ClusterManager:
             client_url=self.state.unit_server.client_url,
         )
         return client.get_version()
+
+    def remove_managed_user(self, username: str):
+        """Remove user and role from the cluster.
+        
+        Args:
+            username (str): The name of the user to remove.
+        """
+        self.remove_role(username)
+        self.remove_user(username)
+        logger.info(f"Removed managed user {username}")
+
+    def add_managed_user(self, username: str, keys_prefix: str):
+        """Add user and role to the cluster.
+        
+        Args:
+            username (str): The name of the user to add.
+        """
+        self.add_user(username)
+        self.add_role(username)
+        self.grant_role(username, username)
+        self.grant_permission(username, keys_prefix)
+        logger.info(f"Added managed user {username}")

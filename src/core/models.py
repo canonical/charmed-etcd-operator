@@ -4,12 +4,12 @@
 
 """Collection of state objects for the Etcd relations, apps and units."""
 
+import json
 import logging
 from dataclasses import dataclass
 
 from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
 from ops.model import Application, Relation, Unit
-from pydantic import BaseModel
 
 from literals import (
     CLIENT_PORT,
@@ -217,16 +217,12 @@ class EtcdCluster(RelationState):
         return self.relation_data.get("learning_member", "")
 
     @property
-    def managed_users(self) -> dict[int, "ManagedUser"]:
+    def managed_users(self) -> dict[int, str]:
         """Get the list of managed users."""
-        return ManagedUsers.model_validate_json(
-            self.relation_data.get("managed_users", '{"managed_users":{}}')
-        ).managed_users
-
-    @property
-    def endpoints(self) -> list[str]:
-        """Get the list of etcd endpoints."""
-        return self.relation_data.get("endpoints", "").split(",")
+        return {
+            int(key): value
+            for key, value in json.loads(self.relation_data.get("managed_users", "{}")).items()
+        }
 
 
 @dataclass
@@ -237,17 +233,3 @@ class Member:
     name: str
     peer_urls: list[str]
     client_urls: list[str]
-
-
-class ManagedUser(BaseModel):
-    """Managed user object."""
-
-    relation_id: int
-    common_name: str
-    ca_chain: str
-
-
-class ManagedUsers(BaseModel):
-    """Managed users object."""
-
-    managed_users: dict[int, ManagedUser]

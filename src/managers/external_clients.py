@@ -4,11 +4,11 @@
 
 """Manager for handling external clients."""
 
+import json
 import logging
 from pathlib import Path
 
 from core.cluster import ClusterState
-from core.models import ManagedUser, ManagedUsers
 from core.workload import WorkloadBase
 from literals import SUBSTRATES
 
@@ -30,17 +30,14 @@ class ExternalClientsManager:
         self.workload = workload
         self.substrate = substrate
 
-    def update_managed_user(self, relation_id: int, common_name: str, ca_chain: str):
+    def update_managed_user(self, relation_id: int, common_name: str):
         """Update the user."""
         managed_users = self.state.cluster.managed_users
-
-        user = managed_users[relation_id]
-        user.common_name = common_name
-        user.ca_chain = ca_chain
+        managed_users[relation_id] = common_name
 
         self.state.cluster.update(
             {
-                "managed_users": ManagedUsers(managed_users=managed_users).model_dump_json(),
+                "managed_users": json.dumps(managed_users),
             }
         )
 
@@ -50,22 +47,17 @@ class ExternalClientsManager:
         del managed_users[relation_id]
         self.state.cluster.update(
             {
-                "managed_users": ManagedUsers(managed_users=managed_users).model_dump_json(),
+                "managed_users": json.dumps(managed_users),
             }
         )
 
-    def add_managed_user(self, relation_id: int, common_name: str, ca_chain: str):
+    def add_managed_user(self, relation_id: int, common_name: str):
         """Add the user."""
         managed_users = self.state.cluster.managed_users
-
-        managed_users[relation_id] = ManagedUser(
-            relation_id=relation_id,
-            common_name=common_name,
-            ca_chain=ca_chain,
-        )
+        managed_users[relation_id] = common_name
 
         self.state.cluster.update(
             {
-                "managed_users": ManagedUsers(managed_users=managed_users).model_dump_json(),
+                "managed_users": json.dumps(managed_users),
             }
         )

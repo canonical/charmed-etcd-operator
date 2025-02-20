@@ -58,26 +58,21 @@ class ExternalClientsEvents(Object):
         relation_managed_user = managed_users.get(event.relation.id)
 
         if self.charm.cluster_manager.get_user(event.common_name) is not None and (
-            relation_managed_user is None or relation_managed_user.common_name != event.common_name
+            relation_managed_user != event.common_name
         ):
             logger.error("User already exists")
+            # TODO Check DP blocked states
             return
 
         if relation_managed_user:
             logger.warning("Removing relation's old user")
-            self.charm.cluster_manager.remove_role(relation_managed_user.common_name)
-            self.charm.cluster_manager.remove_user(relation_managed_user.common_name)
+            self.charm.cluster_manager.remove_managed_user(relation_managed_user)
             self.charm.external_clients_manager.remove_managed_user(event.relation.id)
 
         logger.info("Creating new user")
-        self.charm.cluster_manager.add_user(event.common_name)
-        self.charm.cluster_manager.add_role(event.common_name)
-        self.charm.cluster_manager.grant_role(event.common_name, event.common_name)
-        self.charm.cluster_manager.grant_permission(event.common_name, event.keys_prefix)
-        self.charm.external_clients_manager.add_managed_user(
-            event.relation.id, event.common_name, event.ca_chain
-        )
-        self.charm.external_clients_events.update_ecr_data()
+        self.charm.cluster_manager.add_managed_user(event.common_name, event.keys_prefix)
+        self.charm.external_clients_manager.add_managed_user(event.relation.id, event.common_name)
+        self.charm.external_clients_events.update_client_relations_data()
 
     def _on_ca_chain_updated(self, event):
         """Handle the ca chain updated event."""
@@ -103,7 +98,7 @@ class ExternalClientsEvents(Object):
             return
 
         self.charm.external_clients_manager.update_managed_user(
-            event.relation.id, relation_managed_user.common_name, event.ca_chain
+            event.relation.id, relation_managed_user
         )
 
         self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
@@ -114,8 +109,7 @@ class ExternalClientsEvents(Object):
         relation_managed_user = managed_users.get(event.relation.id)
 
         if self.charm.unit.is_leader():
-            self.charm.cluster_manager.remove_role(relation_managed_user.common_name)
-            self.charm.cluster_manager.remove_user(relation_managed_user.common_name)
+            self.charm.cluster_manager.remove_managed_user(relation_managed_user)
             self.charm.external_clients_manager.remove_managed_user(event.relation.id)
         elif relation_managed_user:
             logger.debug("Waiting for leader to remove managed user")
@@ -140,7 +134,7 @@ class ExternalClientsEvents(Object):
             logger.error("New external client detected. Triggering CA chain update")
             self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
 
-    def update_ecr_data(self):
+    def update_client_relations_data(self):
         """Update the ECR data."""
         if not self.charm.unit.is_leader():
             return
@@ -148,14 +142,20 @@ class ExternalClientsEvents(Object):
         if not self.etcd_provides.relations:
             return
 
-        endpoints = ",".join([server.client_url for server in self.charm.state.servers])
+        endpoints = {server.client_url for server in self.charm.state.servers}
         server_certs, _ = self.charm.tls_events.client_certificate.get_assigned_certificates()
         server_ca = server_certs[0].ca.raw
+        etcd_api_version = self.charm.cluster_manager.get_version()
         for relation in self.etcd_provides.relations:
-            self.etcd_provides.set_endpoints(relation.id, endpoints)
-            self.etcd_provides.set_ca_chain(relation.id, server_ca)
-            self.etcd_provides.set_version(relation.id, self.charm.cluster_manager.get_version())
+            if set(relation.data[self.charm.app].get("endpoints", "").split(",")) != endpoints:
+                self.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
+
+            if relation.data[self.charm.app].get("ca-chain") != server_ca:
+                self.etcd_provides.set_ca_chain(relation.id, server_ca)
+
+            if relation.data[self.charm.app].get("version") != etcd_api_version:
+                self.etcd_provides.set_version(relation.id, etcd_api_version)
 
     def _on_relation_joined(self, _):
         """Add the provider side data to the relation."""
-        self.update_ecr_data()
+        self.update_client_relations_data()

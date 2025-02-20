@@ -154,13 +154,7 @@ class EtcdEvents(Object):
                     event.defer()
                     return
 
-            if set(self.charm.state.cluster.endpoints) != set(
-                self.charm.cluster_manager.cluster_endpoints
-            ):
-                self.charm.state.cluster.update(
-                    {"endpoints": ",".join(self.charm.cluster_manager.cluster_endpoints)}
-                )
-                self.charm.external_clients_events.update_ecr_data()
+            self.charm.external_clients_events.update_client_relations_data()
 
         self.charm.external_clients_events.check_external_client_updates()
 
