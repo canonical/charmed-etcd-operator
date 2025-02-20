@@ -938,7 +938,7 @@ def test_ca_peer_rotation(certificate_available_context):
     )
     with (
         manager,
-        patch("managers.tls.TLSManager._load_trusted_ca", return_value=[]),
+        patch("managers.tls.TLSManager.load_trusted_ca", return_value=[]),
         patch("managers.tls.TLSManager.add_trusted_ca"),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
@@ -947,6 +947,7 @@ def test_ca_peer_rotation(certificate_available_context):
         # patch("charm.EtcdOperatorCharm._restart"),
         patch("managers.config.ConfigManager.set_config_properties"),
         patch("workload.EtcdWorkload.restart"),
+        patch("workload.EtcdWorkload.write_file"),
         patch(
             "common.client.EtcdClient._run_etcdctl",
             return_value='[{"endpoint":"http://10.73.32.158:2379","health":true,"took":"520.652µs"}]',
@@ -997,7 +998,7 @@ def test_ca_peer_rotation(certificate_available_context):
                 "charm.EtcdOperatorCharm.rolling_restart",
                 lambda _, callback: charm._restart_clean_cas(None),
             ),
-            patch("managers.tls.TLSManager._load_trusted_ca", return_value=["old_ca", "new_ca"]),
+            patch("managers.tls.TLSManager.load_trusted_ca", return_value=["old_ca", "new_ca"]),
             patch("workload.EtcdWorkload.remove_file"),
             patch("managers.tls.TLSManager.add_trusted_ca"),
         ):
@@ -1057,8 +1058,9 @@ def test_ca_client_rotation(certificate_available_context):
     )
     with (
         manager,
-        patch("managers.tls.TLSManager._load_trusted_ca", return_value=[]),
+        patch("managers.tls.TLSManager.load_trusted_ca", return_value=[]),
         patch("managers.tls.TLSManager.add_trusted_ca"),
+        patch("workload.EtcdWorkload.write_file"),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([client_provider_certificate], requirer_private_key),
@@ -1114,7 +1116,7 @@ def test_ca_client_rotation(certificate_available_context):
                 "charm.EtcdOperatorCharm.rolling_restart",
                 lambda _, callback: charm._restart_clean_cas(None),
             ),
-            patch("managers.tls.TLSManager._load_trusted_ca", return_value=["old_ca", "new_ca"]),
+            patch("managers.tls.TLSManager.load_trusted_ca", return_value=["old_ca", "new_ca"]),
             patch("workload.EtcdWorkload.remove_file"),
             patch("managers.tls.TLSManager.add_trusted_ca"),
         ):
