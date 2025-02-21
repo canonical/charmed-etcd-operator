@@ -420,7 +420,9 @@ def test_certificate_available_enabling_tls(certificate_available_context):
                 patch("pathlib.Path.exists", return_value=False),
                 patch("managers.cluster.ClusterManager.broadcast_peer_url"),
                 patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
-                patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT.copy()),
+                patch(
+                    "common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT.copy()
+                ),
                 patch("common.client.EtcdClient.move_leader"),
                 patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
             ):
