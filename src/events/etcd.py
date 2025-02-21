@@ -190,7 +190,11 @@ class EtcdEvents(Object):
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
         if not self.charm.workload.alive():
-            self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+            if not self.charm.cluster_manager.restart_member():
+                self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+                return
+
+        self.charm.set_status(Status.ACTIVE)
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""

@@ -11,6 +11,7 @@ from typing import Dict
 
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from literals import CLIENT_PORT, PEER_RELATION, TLSType
 
@@ -96,6 +97,49 @@ def get_cluster_endpoints(
     )
 
 
+def get_unit_endpoint(
+    ops_test: OpsTest, unit_name: str, app_name: str = APP_NAME, tls_enabled: bool = False
+) -> str:
+    """Resolve the etcd endpoint for a given unit name."""
+    for unit in ops_test.model.applications[app_name].units:
+        if unit.name == unit_name:
+            return f"{'https' if tls_enabled else 'http'}://{unit.public_address}:{CLIENT_PORT}"
+
+
+def get_remaining_endpoints(all_endpoints: str, endpoints_to_subtract: str) -> str:
+    """Subtract one comma-delimited list of endpoints from another."""
+    remaining_endpoints = all_endpoints.split(",")
+    remaining_endpoints.remove(endpoints_to_subtract)
+    return ",".join(remaining_endpoints)
+
+
+def is_endpoint_up(
+    endpoint: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> bool:
+    """Check health of an etcd endpoint."""
+    etcd_command = f"etcdctl endpoint health --endpoints={endpoint} -w=json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+
+    try:
+        result = subprocess.getoutput(etcd_command).split("\n")[0]
+        status = json.loads(result)[0]
+        return status["health"]
+    except Exception:
+        return False
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
 def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
     """Query the Raft leader via the `endpoint status` and `member list` commands.
 
@@ -110,9 +154,12 @@ def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
                 --key client.key"
 
     # query leader id
-    result = subprocess.getoutput(etcd_command).split("\n")[0]
-    members = json.loads(result)
-    leader_id = members[0]["Status"]["leader"]
+    try:
+        result = subprocess.getoutput(etcd_command).split("\n")[0]
+        members = json.loads(result)
+        leader_id = members[0]["Status"]["leader"]
+    except KeyError:
+        raise
 
     # query member name for leader id
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"

@@ -12,9 +12,13 @@ from typing import Tuple
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
+from literals import SNAP_NAME, SNAP_REVISION
+
 logger = logging.getLogger(__name__)
 
 WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
+ETCD_PROCESS = f"/snap/{SNAP_NAME}/{SNAP_REVISION}/bin/etcd"
+ETCD_SERVICE_PATH = "/etc/systemd/system/snap.charmed-etcd.etcd.service"
 
 
 async def existing_app(ops_test: OpsTest) -> str | None:
@@ -87,9 +91,12 @@ def assert_continuous_writes_increasing(endpoints: str, user: str, password: str
     time.sleep(10)
     more_writes, _ = count_writes(endpoints, user, password)
     assert more_writes > writes_count, "Writes not continuing to DB"
+    logger.info("Continuous writes are increasing.")
 
 
-def assert_continuous_writes_consistent(endpoints: str, user: str, password: str) -> None:
+def assert_continuous_writes_consistent(
+    endpoints: str, user: str, password: str, ignore_revision: bool = False
+) -> None:
     """Assert that the continuous writes are consistent."""
     for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
         with attempt:
@@ -98,7 +105,45 @@ def assert_continuous_writes_consistent(endpoints: str, user: str, password: str
 
     for endpoint in endpoints.split(","):
         last_etcd_value, last_etcd_revision = count_writes(endpoint, user, password)
-        # when stopping the writes, it may happen that data was written to etcd but not to file yet
-        assert last_written_value == last_etcd_value == last_etcd_revision, (
-            f"endpoint: {endpoint}, expected value: {last_written_value}, current value: {last_etcd_value}, revision: {last_etcd_revision}."
+        if ignore_revision:
+            assert last_written_value == last_etcd_value, (
+                f"endpoint: {endpoint}, expected value: {last_written_value}, current value: {last_etcd_value}"
+            )
+        else:
+            assert last_written_value == last_etcd_value == last_etcd_revision, (
+                f"endpoint: {endpoint}, expected value: {last_written_value}, current value: {last_etcd_value}, revision: {last_etcd_revision}."
+            )
+        logger.info(f"Continuous writes are consistent on {endpoint}.")
+
+
+def send_process_control_signal(unit_name: str, model_full_name: str, signal: str) -> None:
+    """Send control signal to an etcd-process running on a Juju unit.
+
+    Args:
+        unit_name: the Juju unit running the process
+        model_full_name: the Juju model for the unit
+        signal: the signal to issue, e.g `SIGKILL`
+    """
+    juju_cmd = f"JUJU_MODEL={model_full_name} juju ssh {unit_name} sudo -i 'pkill --signal {signal} -f {ETCD_PROCESS}'"
+
+    try:
+        subprocess.check_output(
+            juju_cmd, stderr=subprocess.PIPE, shell=True, universal_newlines=True, timeout=3
         )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        pass
+    logger.info(f"Signal {signal} sent to etcd process on unit {unit_name}.")
+
+
+async def patch_restart_delay(ops_test: OpsTest, unit_name: str, delay: int) -> None:
+    """Update the restart delay in the snap's systemd service file."""
+    add_delay_cmd = (
+        f"exec --unit {unit_name} -- "
+        f"sudo sed -i -e '/^[Service]/a RestartSec={delay}' "
+        f"{ETCD_SERVICE_PATH}"
+    )
+    await ops_test.juju(*add_delay_cmd.split(), check=True)
+
+    # reload the daemon for systemd to reflect changes
+    reload_cmd = f"exec --unit {unit_name} -- sudo systemctl daemon-reload"
+    await ops_test.juju(*reload_cmd.split(), check=True)

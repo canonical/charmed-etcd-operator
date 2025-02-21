@@ -155,7 +155,19 @@ def test_update_status():
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State()
 
-    with patch("workload.EtcdWorkload.alive", return_value=False):
+    # restart workload if not running
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=False),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+
+    # failed restart should block status
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=False),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=False),
+    ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
 
