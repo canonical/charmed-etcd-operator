@@ -214,7 +214,7 @@ class EtcdEvents(Object):
         if self.charm.app.planned_units() > 0:
             try:
                 self.charm.cluster_manager.remove_member()
-            except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
+            except (EtcdClusterManagementError, RaftLeaderNotFoundError):
                 # We want this hook to error out if we cannot remove the cluster member
                 # otherwise the cluster could become unavailable because of quorum loss
                 raise

@@ -41,14 +41,14 @@ from managers.tls import TLSType
 
 MEMBER_LIST_DICT = {
     "charmed-etcd0": Member(
-        id="1",
-        name="etcd-test-1",
+        id="3e23287c34b94e09",
+        name="charmed-etcd0",
         peer_urls=["http://localhost:2380"],
         client_urls=["http://localhost:2379"],
     ),
     "charmed-etcd1": Member(
         id="2",
-        name="etcd-test-2",
+        name="charmed-etcd1",
         peer_urls=["http://localhost:2381"],
         client_urls=["http://localhost:2380"],
     ),
@@ -291,7 +291,13 @@ def test_certificates_broken():
             patch("managers.config.ConfigManager.set_config_properties"),
             patch("pathlib.Path.exists", return_value=True),
             patch("pathlib.Path.unlink"),
-            patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+            patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT.copy()),
+            patch("common.client.EtcdClient.move_leader"),
+            patch(
+                "common.client.EtcdClient.get_endpoint_status",
+                return_value={"Status": {"leader": 4477466968462020105}},
+            ),
+            patch("workload.EtcdWorkload.restart"),
         ):
             event = MagicMock()
             event.relation.name = CLIENT_TLS_RELATION_NAME
@@ -307,9 +313,14 @@ def test_certificates_broken():
                 assert peer_relation.local_unit_data["peer_cert_ready"] == "True"
 
             event.relation.name = PEER_TLS_RELATION_NAME
-            with patch(
-                "charm.EtcdOperatorCharm.rolling_restart",
-                lambda _, callback_override: charm._restart_disable_peer_tls(event),
+            with (
+                patch(
+                    "charm.EtcdOperatorCharm.rolling_restart",
+                    lambda _, callback_override: charm._restart_disable_peer_tls(event),
+                ),
+                patch(
+                    "common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT.copy()
+                ),
             ):
                 charm.tls_events._on_certificates_broken(event)
                 assert charm.state.unit_server.tls_peer_state == TLSState.NO_TLS
@@ -392,6 +403,11 @@ def test_certificate_available_enabling_tls(certificate_available_context):
         patch("workload.EtcdWorkload.write_file"),
         patch("pathlib.Path.exists", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.restart"),
+        patch(
+            "common.client.EtcdClient.get_endpoint_status",
+            return_value={"Status": {"leader": 4477466968462020105}},
+        ),
     ):
         charm: EtcdOperatorCharm = manager.charm
         event = MagicMock(spec=CertificateAvailableEvent)
@@ -401,7 +417,9 @@ def test_certificate_available_enabling_tls(certificate_available_context):
             patch("pathlib.Path.exists", return_value=False),
             patch("managers.cluster.ClusterManager.broadcast_peer_url"),
             patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
-            patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+            patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT.copy()),
+            patch("common.client.EtcdClient.move_leader"),
+            patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
         ):
             # Peer cert added case
             with (
@@ -944,9 +962,8 @@ def test_ca_peer_rotation(certificate_available_context):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([peer_provider_certificate], requirer_private_key),
         ),
-        # patch("charm.EtcdOperatorCharm._restart"),
         patch("managers.config.ConfigManager.set_config_properties"),
-        patch("workload.EtcdWorkload.restart"),
+        patch("managers.cluster.ClusterManager.restart_member"),
         patch(
             "common.client.EtcdClient._run_etcdctl",
             return_value='[{"endpoint":"http://10.73.32.158:2379","health":true,"took":"520.652µs"}]',

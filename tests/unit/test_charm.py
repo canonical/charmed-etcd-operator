@@ -377,6 +377,7 @@ def test_unit_removal():
         patch("subprocess.run"),
         patch("workload.EtcdWorkload.stop"),
         patch("managers.cluster.ClusterManager.leader"),
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
@@ -392,6 +393,7 @@ def test_unit_removal():
         # mock the `wait` in tenacity.retry to avoid delay in retrying
         patch("tenacity.nap.time.sleep", MagicMock()),
         patch("workload.EtcdWorkload.stop"),
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         with raises(testing.errors.UncaughtCharmError) as e:
             ctx.run(ctx.on.storage_detaching(data_storage), state_in)
