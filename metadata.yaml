@@ -18,6 +18,10 @@ peers:
   restart:
     interface: rolling_op
 
+provides:
+  etcd-client:
+    interface: etcd_client
+
 requires:
   peer-certificates:
     interface: tls-certificates
