@@ -35,7 +35,7 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 NUM_UNITS = 3
-RESTART_DELAY_DEFAULT = 30
+RESTART_DELAY_DEFAULT = 20
 RESTART_DELAY_PATCHED = 120
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
@@ -354,6 +354,10 @@ async def test_full_cluster_restart(ops_test: OpsTest) -> None:
         endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
     )
 
+    # reset the restart delay to the original value
+    for unit in ops_test.model.applications[app].units:
+        await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_DEFAULT)
+
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
@@ -414,3 +418,7 @@ async def test_full_cluster_crash(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(
         endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
     )
+
+    # reset the restart delay to the original value
+    for unit in ops_test.model.applications[app].units:
+        await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_DEFAULT)
