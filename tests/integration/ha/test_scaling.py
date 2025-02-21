@@ -18,7 +18,6 @@ from ..helpers import (
     get_juju_leader_unit_name,
     get_raft_leader,
     get_secret_by_label,
-    wait_for_cluster_formation,
 )
 from ..helpers_deployment import wait_until
 from .helpers import (
@@ -137,12 +136,15 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
     await ops_test.model.applications[app].add_unit(count=1)
-    await wait_until(ops_test, apps=[app], wait_for_exact_units=3, idle_period=60)
+    init_units_count = 3
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count, idle_period=60)
 
-    # we need to wait for all members to be promoted to full-voting member before scaling down
-    await wait_for_cluster_formation(ops_test, app)
-
-    init_units_count = len(ops_test.model.applications[app].units)
+    # check cluster membership after scaling up
+    updated_endpoints = get_cluster_endpoints(ops_test, app)
+    cluster_members = get_cluster_members(updated_endpoints)
+    assert len(cluster_members) == init_units_count, (
+        f"Expected {init_units_count} cluster members, got {len(cluster_members)}."
+    )
 
     # find and remove the unit that is the current Raft leader
     init_raft_leader = get_raft_leader(endpoints=init_endpoints)
@@ -157,20 +159,24 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     )
 
     # check if unit has been removed from etcd cluster
-    endpoints = get_cluster_endpoints(ops_test, app)
+    updated_endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(updated_endpoints)
     assert len(cluster_members) == init_units_count - 1, (
         f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
     )
 
     # check that another unit is now the Raft leader
-    new_raft_leader = get_raft_leader(endpoints=endpoints)
+    new_raft_leader = get_raft_leader(endpoints=updated_endpoints)
     assert new_raft_leader != init_raft_leader
 
-    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    assert_continuous_writes_increasing(
+        endpoints=updated_endpoints, user=INTERNAL_USER, password=password
+    )
     stop_continuous_writes()
-    assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    assert_continuous_writes_consistent(
+        endpoints=updated_endpoints, user=INTERNAL_USER, password=password
+    )
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -188,9 +194,6 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
 
     await ops_test.model.applications[app].add_unit(count=1)
     await wait_until(ops_test, apps=[app], wait_for_exact_units=3, idle_period=60)
-
-    # we need to wait for all members to be promoted to full-voting member before scaling down
-    await wait_for_cluster_formation(ops_test, app)
 
     # remove all units except one
     for unit in ops_test.model.applications[app].units[1:]:

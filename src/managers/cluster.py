@@ -132,11 +132,11 @@ class ClusterManager:
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
+            client_url=",".join(e for e in self.cluster_endpoints),
         )
         client.broadcast_peer_url(self.state.unit_server.client_url, self.member.id, peer_urls)
 
-    def is_healthy(self, cluster=True) -> bool:
+    def is_healthy(self, cluster: bool = True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
 
         Args:
@@ -157,12 +157,15 @@ class ClusterManager:
         )
         return client.is_healthy(cluster=cluster)
 
-    def restart_member(self) -> bool:
+    def restart_member(self, move_leader: bool = True) -> bool:
         """Restart the workload.
 
         Returns:
             bool: True if the workload is running after restart.
         """
+        if move_leader:
+            self.move_leader_if_required()
+
         logger.debug("Restarting workload")
         self.workload.restart()
         return self.is_healthy(cluster=False)
@@ -238,21 +241,22 @@ class ClusterManager:
     )
     def remove_member(self) -> None:
         """Remove a cluster member and stop the workload."""
+        self.move_leader_if_required()
         try:
             client = EtcdClient(
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=",".join(e for e in self.cluster_endpoints),
             )
-            if self.member.id == self.leader:
-                new_leader_id = self.select_new_leader()
-                logger.debug(f"Next selected leader: {new_leader_id}")
-                client.move_leader(new_leader_id)
-            # by querying the member's id we make sure the cluster is available with quorum
-            # otherwise we raise and retry
-            client.remove_member(self.member.id)
-        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
+            if self.is_healthy(cluster=True):
+                client.remove_member(self.member.id)
+            else:
+                raise EtcdClusterManagementError("Cluster not healthy.")
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError):
             raise
+        except ValueError:
+            # the unit is not a cluster member anymore, we just move on
+            return
 
     def select_new_leader(self) -> str:
         """Choose a new leader from the current cluster members.
@@ -271,3 +275,23 @@ class ClusterManager:
             raise ValueError("member list command failed")
         member_list.pop(self.state.unit_server.member_name, None)
         return next(iter(member_list.values())).id
+
+    def move_leader_if_required(self) -> None:
+        """Move the raft leadership of the cluster to the next available member if required."""
+        try:
+            if self.member.id == self.leader:
+                new_leader_id = self.select_new_leader()
+                logger.debug(f"Next selected leader: {new_leader_id}")
+
+                client = EtcdClient(
+                    username=self.admin_user,
+                    password=self.admin_password,
+                    client_url=",".join(e for e in self.cluster_endpoints),
+                )
+                client.move_leader(new_leader_id)
+                # wait for leadership to be moved before continuing operation
+                if self.is_healthy(cluster=True):
+                    logger.debug(f"Successfully moved leader to {new_leader_id}.")
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
+            logger.warning(f"Could not transfer cluster leadership: {e}")
+            return

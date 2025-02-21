@@ -105,6 +105,9 @@ class EtcdOperatorCharm(ops.CharmBase):
         """Enable peer TLS."""
         logger.debug("Peer TLS custom callback")
 
+        # in case of peer TLS we need to move the leader before broadcasting membership updates
+        self.cluster_manager.move_leader_if_required()
+
         # enable peer tls
         self.cluster_manager.broadcast_peer_url(
             self.state.unit_server.peer_url.replace("http://", "https://")
@@ -120,7 +123,7 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # write config and restart workload
         self.config_manager.set_config_properties()
-        if not self.cluster_manager.restart_member():
+        if not self.cluster_manager.restart_member(move_leader=False):
             self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
@@ -146,12 +149,17 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # write config and restart workload
         self.config_manager.set_config_properties()
-        if not self.cluster_manager.restart_member():
+        if not self.cluster_manager.restart_member(move_leader=False):
             self.set_status(Status.TLS_CLIENT_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_disable_peer_tls(self, _) -> None:
         """Disable peer TLS."""
+        logger.debug("Disable Peer TLS custom callback")
+
+        # in case of peer TLS we need to move the leader before broadcasting membership updates
+        self.cluster_manager.move_leader_if_required()
+
         logger.debug("Peer TLS custom callback")
         if self.state.unit_server.tls_peer_state == TLSState.NO_TLS:
             logger.debug("Peer TLS already disabled, skipping")
@@ -171,7 +179,7 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # write config and restart workload
         self.config_manager.set_config_properties()
-        if not self.cluster_manager.restart_member():
+        if not self.cluster_manager.restart_member(move_leader=False):
             self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
