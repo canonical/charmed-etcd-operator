@@ -1,0 +1,20 @@
+
+type: charm
+
+platforms:
+  ubuntu@24.04:amd64:
+
+parts:
+  charm:
+    plugin: charm
+
+actions:
+  update:
+    description: Update the common name of the certificate
+    params:
+      common-name:
+        description: The new common name for the certificate
+        type: string
+      ca:
+        description: The CA certificate
+        type: string

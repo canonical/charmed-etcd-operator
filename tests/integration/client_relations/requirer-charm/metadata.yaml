@@ -1,0 +1,9 @@
+name: requirer-charm
+title: Requirer client relation charm
+description: |
+  Requirer client relation charm to test etcd_client
+summary: Requirer client relation charm to test etcd_client
+
+requires:
+  etcd-client:
+    interface: etcd_client

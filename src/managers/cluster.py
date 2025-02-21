@@ -279,7 +279,7 @@ class ClusterManager:
             username (str): The username to get.
 
         Returns:
-            dict | None: The user information or None if the user does not exist.
+            (dict | None): The user information or None if the user does not exist.
         """
         client = EtcdClient(
             username=self.admin_user,
@@ -399,7 +399,7 @@ class ClusterManager:
 
     def remove_managed_user(self, username: str):
         """Remove user and role from the cluster.
-        
+
         Args:
             username (str): The name of the user to remove.
         """
@@ -409,9 +409,10 @@ class ClusterManager:
 
     def add_managed_user(self, username: str, keys_prefix: str):
         """Add user and role to the cluster.
-        
+
         Args:
             username (str): The name of the user to add.
+            keys_prefix (str): The keys prefix to grant permission to.
         """
         self.add_user(username)
         self.add_role(username)

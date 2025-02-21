@@ -63,18 +63,21 @@ class TLSManager:
         self.workload.write_file(certificate.certificate.raw, certificate_path)
         self.set_cert_state(cert_type, is_ready=True)
 
-    def is_new_ca(self, ca_cert: str, tls_type: TLSType) -> bool:
-        """Check if the CA is new.
+    def is_new_ca(self, ca_chain: str, tls_type: TLSType) -> bool:
+        """Check if the CA chain is trusted.
 
         Args:
-            ca_cert (str): The CA certificate.
+            ca_chain (str): The CA certificate.
             tls_type (TLSType): The TLS type.
 
         Returns:
             bool: True if the CA is new, False otherwise.
         """
-        cas = self.load_trusted_ca(tls_type)
-        return ca_cert not in cas
+        trusted_cas = self.load_trusted_ca(tls_type)
+        for ca_cert in self.separate_certificates(ca_chain):
+            if ca_cert not in trusted_cas:
+                return True
+        return False
 
     def add_trusted_ca(self, ca_cert: str, tls_type: TLSType = TLSType.PEER) -> None:
         """Add trusted CA to the system.

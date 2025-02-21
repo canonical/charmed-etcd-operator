@@ -8,6 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
+    ClientRelationUpdatedEvent,
     CommonNameUpdatedEvent,
     EtcdProvides,
 )
@@ -57,19 +58,14 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
 
-        managed_users = self.charm.state.cluster.managed_users
-        relation_managed_user = managed_users.get(event.relation.id)
-
-        if self.charm.cluster_manager.get_user(event.common_name) is not None and (
-            relation_managed_user != event.common_name
-        ):
+        if self.charm.cluster_manager.get_user(event.common_name) is not None:
             logger.error("User already exists")
-            # TODO Check DP blocked states
+            # TODO set blocked status based on DP blocked states
             return
 
-        if relation_managed_user:
+        if event.old_common_name:
             logger.warning("Removing relation's old user")
-            self.charm.cluster_manager.remove_managed_user(relation_managed_user)
+            self.charm.cluster_manager.remove_managed_user(event.old_common_name)
             self.charm.external_clients_manager.remove_managed_user(event.relation.id)
 
         logger.info("Creating new user")
@@ -77,8 +73,14 @@ class ExternalClientsEvents(Object):
         self.charm.external_clients_manager.add_managed_user(event.relation.id, event.common_name)
         self.charm.external_clients_events.update_client_relations_data()
 
-    def _on_client_relation_updated(self, event):
+    def _on_client_relation_updated(self, event: ClientRelationUpdatedEvent):
         """Handle the ca chain updated event."""
+        if not event.ca_chain or not event.keys_prefix or not event.common_name:
+            logger.error("CA chain, keys prefix, or common name not provided")
+            # TODO set blocked status based on DP blocked states
+            event.defer()
+            return
+
         if not self.charm.state.unit_server.tls_client_state == TLSState.TLS:
             logger.error("TLS is not enabled")
             event.defer()
@@ -91,25 +93,24 @@ class ExternalClientsEvents(Object):
             logger.debug("CA rotation is in progress")
             event.defer()
             return
-        if self.charm.unit.is_leader():
-            managed_users = self.charm.state.cluster.managed_users
-            relation_managed_user = managed_users.get(event.relation.id)
+        relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
+            event.relation.id
+        )
 
-            if not relation_managed_user:
-                logger.warning("User not found. Waiting for common name update")
-                event.defer()
-                return
-
-            self.charm.external_clients_manager.update_managed_user(
-                event.relation.id, relation_managed_user
-            )
-
-        self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
+        if relation_managed_user != event.common_name:
+            logger.error("New user not created yet")
+            event.defer()
+            return
+        if relation_managed_user and self.charm.tls_manager.is_new_ca(
+            event.ca_chain, TLSType.CLIENT
+        ):
+            self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
 
     def _on_relation_broken(self, event: RelationBrokenEvent):
         """Handle the relation broken event."""
-        managed_users = self.charm.state.cluster.managed_users
-        relation_managed_user = managed_users.get(event.relation.id)
+        relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
+            event.relation.id
+        )
 
         if self.charm.unit.is_leader():
             self.charm.cluster_manager.remove_managed_user(relation_managed_user)
