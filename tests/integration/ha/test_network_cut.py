@@ -236,20 +236,22 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     )
 
     # ensure the member is up again
-    assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
+    unit_endpoint_updated = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    assert is_endpoint_up(unit_endpoint_updated, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is available again.")
 
-    cluster_members = get_cluster_members(endpoints)
+    endpoints_updated = get_cluster_endpoints(ops_test, app)
+    cluster_members = get_cluster_members(endpoints_updated)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )
     logger.info(f"Cluster fully formed again with {len(cluster_members)} members.")
 
     # ensure data is written in the cluster
-    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    assert_continuous_writes_increasing(endpoints=endpoints_updated, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
     # By default, etcd uses a 1s election timeout before attempting to replace a lost leader
     # that's why we will miss writes here, and therefore ignore the revision of the key
     assert_continuous_writes_consistent(
-        endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
+        endpoints=endpoints_updated, user=INTERNAL_USER, password=password, ignore_revision=True
     )
