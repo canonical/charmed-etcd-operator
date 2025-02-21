@@ -22,6 +22,7 @@ from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
     EtcdUserManagementError,
+    HealthCheckFailedError,
     RaftLeaderNotFoundError,
 )
 from common.secrets import get_secret_from_id
@@ -126,6 +127,19 @@ class EtcdEvents(Object):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
+        # refresh the host information and cluster membership in case of ip change
+        ip_address = self.charm.cluster_manager.get_host_mapping().get("ip")
+        if ip_address != self.charm.state.unit_server.ip:
+            logger.info(f"New ip address: {ip_address}")
+            self.charm.state.unit_server.update({"ip": ip_address})
+            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
+            self.charm.config_manager.set_config_properties()
+            # we need to update the client-urls by restarting etcd
+            # after ip change, this member is unavailable, no need to acquire restart lock
+            if not self.charm.cluster_manager.restart_member(move_leader=False):
+                self.charm.set_status(Status.HEALTH_CHECK_FAILED)
+                raise HealthCheckFailedError("Failed to check health of the member after restart")
+
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
             self.update_private_key(tls_peer_private_key_id)
 
