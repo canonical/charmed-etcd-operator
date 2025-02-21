@@ -108,7 +108,7 @@ class ClusterManager:
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
+            client_url=",".join(e for e in self.cluster_endpoints),
         )
 
         member_list = client.member_list()
@@ -134,7 +134,7 @@ class ClusterManager:
             password=self.admin_password,
             client_url=",".join(e for e in self.cluster_endpoints),
         )
-        client.broadcast_peer_url(self.state.unit_server.client_url, self.member.id, peer_urls)
+        client.broadcast_peer_url(self.member.id, peer_urls)
 
     def is_healthy(self, cluster: bool = True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
