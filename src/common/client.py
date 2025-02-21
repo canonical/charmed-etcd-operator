@@ -359,7 +359,7 @@ class EtcdClient:
         logger.debug("Health check passed.")
         return True
 
-    def broadcast_peer_url(self, endpoints: str, member_id: str, peer_urls: str) -> None:
+    def broadcast_peer_url(self, member_id: str, peer_urls: str) -> None:
         """Broadcast the peer URL to all units in the cluster.
 
         Args:
@@ -370,7 +370,7 @@ class EtcdClient:
         self._run_etcdctl(
             command="member",
             subcommand="update",
-            endpoints=endpoints,
+            endpoints=self.client_url,
             auth_username=self.user,
             auth_password=self.password,
             member=member_id,
