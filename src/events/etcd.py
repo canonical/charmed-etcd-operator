@@ -132,12 +132,12 @@ class EtcdEvents(Object):
         if ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
             self.charm.state.unit_server.update({"ip": ip_address})
+            # update cluster configuration
             self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
             self.charm.config_manager.set_config_properties()
             # we need to update the client-urls by restarting etcd
             # after ip change, this member is unavailable, no need to acquire restart lock
             if not self.charm.cluster_manager.restart_member(move_leader=False):
-                self.charm.set_status(Status.HEALTH_CHECK_FAILED)
                 raise HealthCheckFailedError("Failed to check health of the member after restart")
 
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
@@ -158,14 +158,18 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
-        if self.charm.unit.is_leader() and self.charm.state.cluster.learning_member:
-            try:
-                # this will promote any learner, not only the unit that updated its relation data
-                self.charm.cluster_manager.promote_learning_member()
-            except EtcdClusterManagementError as e:
-                logger.warning(e)
-                event.defer()
-                return
+        if self.charm.unit.is_leader():
+            if self.charm.state.cluster.learning_member:
+                try:
+                    # this will promote any learner, not only the unit that updated its relation data
+                    self.charm.cluster_manager.promote_learning_member()
+                except EtcdClusterManagementError as e:
+                    logger.warning(e)
+                    event.defer()
+                    return
+
+            # reflect membership updates in the cluster state, e.g. ip change or tls switchover
+            self.charm.cluster_manager.update_cluster_member_state()
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
