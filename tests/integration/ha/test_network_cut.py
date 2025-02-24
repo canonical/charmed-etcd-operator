@@ -34,6 +34,7 @@ from .helpers_network import (
     cut_network_from_unit_without_ip_change,
     get_controller_hostname,
     hostname_from_unit,
+    ip_address_from_unit,
     is_unit_reachable,
     restore_network_for_unit_with_ip_change,
     restore_network_for_unit_without_ip_change,
@@ -191,6 +192,7 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
 
     # cut network from the current cluster/raft leader
     leader_hostname = await hostname_from_unit(ops_test, unit_name=leader_unit)
+    leader_ip = await ip_address_from_unit(ops_test, unit_name=leader_unit)
     cut_network_from_unit_with_ip_change(leader_hostname)
 
     # make sure the unit is not reachable from the other units
@@ -225,7 +227,7 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
 
     # reconnect the network for the disconnected unit
     restore_network_for_unit_with_ip_change(leader_hostname)
-    logger.info(f"Network restored for {leader_unit}")
+    logger.info(f"Network has been restored for {leader_unit}")
 
     await wait_until(
         ops_test,
@@ -236,11 +238,12 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     )
 
     # ensure the member is up again
-    unit_endpoint_updated = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    new_unit_ip = await ip_address_from_unit(ops_test, unit_name=leader_unit)
+    unit_endpoint_updated = unit_endpoint.replace(leader_ip, new_unit_ip)
     assert is_endpoint_up(unit_endpoint_updated, user=INTERNAL_USER, password=password)
-    logger.info(f"{leader_unit} is available again.")
+    logger.info(f"{leader_unit} is available again with new ip {new_unit_ip}")
 
-    endpoints_updated = get_cluster_endpoints(ops_test, app)
+    endpoints_updated = endpoints.replace(leader_ip, new_unit_ip)
     cluster_members = get_cluster_members(endpoints_updated)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"

@@ -32,6 +32,22 @@ async def hostname_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     return hostname.strip()
 
 
+async def ip_address_from_unit(ops_test: OpsTest, unit_name: str) -> str:
+    """Get the machine ip address from a specific unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to get the machine
+
+    Returns:
+        The ip address of the machine.
+    """
+    run_command = ["exec", "--unit", unit_name, "--", "hostname", "-i"]
+    _, ip_address, _ = await ops_test.juju(*run_command)
+
+    return ip_address.strip()
+
+
 async def get_controller_hostname(ops_test: OpsTest) -> str:
     """Return controller machine hostname."""
     _, raw_controller, _ = await ops_test.juju("show-controller")
