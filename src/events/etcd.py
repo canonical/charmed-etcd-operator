@@ -132,13 +132,22 @@ class EtcdEvents(Object):
         if ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
             self.charm.state.unit_server.update({"ip": ip_address})
+
             # update cluster configuration
             self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
             self.charm.config_manager.set_config_properties()
+
             # we need to update the client-urls by restarting etcd
             # after ip change, this member is unavailable, no need to acquire restart lock
             if not self.charm.cluster_manager.restart_member(move_leader=False):
                 raise HealthCheckFailedError("Failed to check health of the member after restart")
+
+            # update tls certificates with new ip address
+            if self.charm.state.unit_server.tls_client_state in (
+                TLSState.TO_TLS,
+                TLSState.TLS,
+            ) or self.charm.state.unit_server.tls_peer_state in (TLSState.TO_TLS, TLSState.TLS):
+                self.charm.tls_events.refresh_tls_certificates_event.emit()
 
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
             self.update_private_key(tls_peer_private_key_id)

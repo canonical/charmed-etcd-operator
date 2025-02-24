@@ -8,11 +8,12 @@ import time
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION
+from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
 from ..helpers import (
     APP_NAME,
     CHARM_PATH,
+    get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
     get_raft_leader,
@@ -43,6 +44,7 @@ from .helpers_network import (
 logger = logging.getLogger(__name__)
 
 NUM_UNITS = 3
+TLS_NAME = "self-signed-certificates"
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -165,6 +167,10 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
     app = (await existing_app(ops_test)) or APP_NAME
 
+    # Deploy the TLS charm
+    tls_config = {"ca-common-name": "etcd"}
+    await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
+
     # make sure we have at least two units so we can stop one of them
     if len(ops_test.model.applications[app].units) < 2:
         await ops_test.model.applications[app].add_unit(count=1)
@@ -175,6 +181,11 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
             units_statuses=["active"],
             wait_for_exact_units=2,
         )
+
+    # enable TLS and check if the cluster is still accessible
+    logger.info("Integrating peer-certificates relation")
+    await ops_test.model.integrate(f"{app}:peer-certificates", TLS_NAME)
+    await wait_until(ops_test, apps=[app, TLS_NAME])
 
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
@@ -189,6 +200,11 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     initial_raft_leader = get_raft_leader(endpoints=endpoints)
     logger.info(f"initial raft leader: {initial_raft_leader}")
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
+
+    logger.info("Getting certificate from leader unit")
+    initial_peer_certificate = get_certificate_from_unit(
+        ops_test.model_full_name, leader_unit, cert_type=TLSType.PEER
+    )
 
     # cut network from the current cluster/raft leader
     leader_hostname = await hostname_from_unit(ops_test, unit_name=leader_unit)
@@ -249,6 +265,13 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )
     logger.info(f"Cluster fully formed again with {len(cluster_members)} members.")
+
+    logger.info("Getting new certificate from leader unit")
+    new_peer_certificate = get_certificate_from_unit(
+        ops_test.model_full_name, leader_unit, cert_type=TLSType.PEER
+    )
+    assert new_peer_certificate != initial_peer_certificate, "Peer certificate not updated."
+    logger.info("Certificates are updated after ip change.")
 
     # ensure data is written in the cluster
     assert_continuous_writes_increasing(
