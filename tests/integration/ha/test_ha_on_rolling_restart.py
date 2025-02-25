@@ -31,7 +31,7 @@ TLS_NAME = "self-signed-certificates"
 NUM_UNITS = 3
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_with_peer_tls(ops_test: OpsTest) -> None:
@@ -53,7 +53,7 @@ async def test_deploy_with_peer_tls(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
