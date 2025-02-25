@@ -12,6 +12,7 @@ import time
 logger = logging.getLogger(__name__)
 
 WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
+LOG_FILE_PATH = "log_file"
 continue_running = True
 
 
@@ -37,8 +38,9 @@ def continuous_writes(endpoints: str, user: str, password: str):
                         """
 
         try:
-            result = subprocess.getoutput(etcd_command).split("\n")[0]
-            logger.info(result)
+            result = subprocess.getoutput(etcd_command).split("\n")
+            with open(LOG_FILE_PATH, "a") as log_file:
+                log_file.write(f"{result}\n")
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             pass
 

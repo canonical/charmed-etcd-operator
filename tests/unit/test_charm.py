@@ -174,7 +174,19 @@ def test_update_status():
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State()
 
-    with patch("workload.EtcdWorkload.alive", return_value=False):
+    # restart workload if not running
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=False),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+
+    # failed restart should block status
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=False),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=False),
+    ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
 
@@ -396,6 +408,7 @@ def test_unit_removal():
         patch("subprocess.run"),
         patch("workload.EtcdWorkload.stop"),
         patch("managers.cluster.ClusterManager.leader"),
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
@@ -411,6 +424,7 @@ def test_unit_removal():
         # mock the `wait` in tenacity.retry to avoid delay in retrying
         patch("tenacity.nap.time.sleep", MagicMock()),
         patch("workload.EtcdWorkload.stop"),
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         with raises(testing.errors.UncaughtCharmError) as e:
             ctx.run(ctx.on.storage_detaching(data_storage), state_in)

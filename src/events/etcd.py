@@ -230,7 +230,11 @@ class EtcdEvents(Object):
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
         if not self.charm.workload.alive():
-            self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+            if not self.charm.cluster_manager.restart_member():
+                self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+                return
+
+        self.charm.set_status(Status.ACTIVE)
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
@@ -254,7 +258,7 @@ class EtcdEvents(Object):
         if self.charm.app.planned_units() > 0:
             try:
                 self.charm.cluster_manager.remove_member()
-            except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
+            except (EtcdClusterManagementError, RaftLeaderNotFoundError):
                 # We want this hook to error out if we cannot remove the cluster member
                 # otherwise the cluster could become unavailable because of quorum loss
                 raise

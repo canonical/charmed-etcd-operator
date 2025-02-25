@@ -31,7 +31,7 @@ TLS_NAME = "self-signed-certificates"
 NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
-CERTIFICATE_EXPIRY_TIME = 90
+CERTIFICATE_EXPIRY_TIME = 250
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -536,9 +536,9 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
         == TEST_VALUE
     ), "Failed to read new key"
 
-    # configure TLS operator with 1m validity
-    logger.info(f"Configuring {TLS_NAME} to issue certificates with 1m validity")
-    tls_config = {"ca-common-name": "etcd", "certificate-validity": "1m"}
+    # configure TLS operator with 3m validity as 1m is to little for all following assertions
+    logger.info(f"Configuring {TLS_NAME} to issue certificates with 3m validity")
+    tls_config = {"ca-common-name": "etcd", "certificate-validity": "3m"}
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
 
