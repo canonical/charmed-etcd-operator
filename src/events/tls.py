@@ -66,17 +66,6 @@ class CleanCAEvent(EventBase):
 class RefreshTLSCertificatesEvent(EventBase):
     """Event for refreshing peer TLS certificates."""
 
-    def __init__(self, handle: Handle):
-        super().__init__(handle)
-
-    def snapshot(self) -> dict[str, str]:
-        """Snapshot of lock event."""
-        return {}
-
-    def restore(self, snapshot: dict[str, str]) -> None:
-        """Restores lock event."""
-        pass
-
 
 class TLSEvents(Object):
     """Event handlers for related applications on the `certificates` relation interface."""

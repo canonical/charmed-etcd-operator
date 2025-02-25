@@ -5,6 +5,7 @@
 import asyncio
 import logging
 import shutil
+import subprocess
 
 import pytest
 from juju.application import Application
@@ -32,10 +33,34 @@ NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
 REQUIRER_NAME = "requirer-charm"
+REQUIRER_TLS_NAME = "requirer-tls-provider"
 
-common_name = "test-common-name"
+common_name = REQUIRER_NAME
 key_prefix = "/test/"
-ca_chain = "-----BEGIN CERTIFICATE-----\ntest_ca\n-----END CERTIFICATE-----"
+# ca_chain = "-----BEGIN CERTIFICATE-----\ntest_ca\n-----END CERTIFICATE-----"
+
+
+async def get_requirer_common_name(ops_test: OpsTest) -> str:
+    """Get the common name of the requirer charm."""
+    requirer_app = ops_test.model.applications[REQUIRER_NAME]
+    requirer_unit = requirer_app.units[0]
+
+    command = f'juju ssh {requirer_unit.name} "cat /var/lib/juju/agents/unit-{requirer_unit.name.replace("/", "-")}/charm/tmp/common_name.txt"'
+    result = subprocess.getoutput(command)
+    return result.strip()
+
+
+async def get_requirer_ca_chain(ops_test: OpsTest) -> str | None:
+    """Get the ca chain from the requirer TLS provider."""
+    requirer_tls_app = ops_test.model.applications[REQUIRER_TLS_NAME]
+    requirer_tls_unit = requirer_tls_app.units[0]
+
+    result = await requirer_tls_unit.run_action("get-ca-certificate")
+    result = await result.wait()
+    if result.status:
+        return result.results["ca-certificate"]
+
+    return None
 
 
 @pytest.fixture
@@ -56,15 +81,28 @@ async def test_build_and_deploy(ops_test: OpsTest, application_charm) -> None:
     """Build and deploy the charm-under-test and the requirer charm."""
     tls_config = {"ca-common-name": "etcd"}
     await asyncio.gather(
+        ops_test.model.deploy(application_charm, application_name=REQUIRER_NAME),
         ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS),
-        ops_test.model.deploy(application_charm),
         ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config),
+        ops_test.model.deploy(
+            TLS_NAME, application_name=REQUIRER_TLS_NAME, channel="edge", config=tls_config
+        ),
     )
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+    await ops_test.model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME])
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_get_common_name(ops_test: OpsTest) -> None:
+    """Get the common name of the requirer charm."""
+    common_name = await get_requirer_common_name(ops_test)
+    assert common_name == REQUIRER_NAME, "common name is not correct"
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -83,10 +121,11 @@ async def test_relate_client_charm(ops_test: OpsTest) -> None:
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # check if user and role are created for the common name and that the role is assigned to the user
-
+    common_name = await get_requirer_common_name(ops_test)
     user_roles = get_user(
         endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
     )
+    assert user_roles, f"failed to get user roles for {common_name}"
     assert common_name in user_roles, f"failed to get user roles for {common_name}"
 
     # check if the user can read and write to the key prefix
@@ -94,14 +133,16 @@ async def test_relate_client_charm(ops_test: OpsTest) -> None:
         endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
     )
 
+    assert permissions, f"failed to get permissions for {common_name}"
     for permission in permissions:
         assert permission["permType"] == 2, "permission is not read and write"
         assert permission["key"] == key_prefix, "permission is not for the key prefix"
 
     # get client ca from every unit and check if it includes the test_ca
+
     model = ops_test.model_full_name
-    assert ops_test.model
-    assert ops_test.model.applications[APP_NAME] is not None
+    ca_chain = await get_requirer_ca_chain(ops_test)
+    assert ca_chain, "failed to get ca chain from requirer TLS provider"
     for unit in ops_test.model.applications[APP_NAME].units:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
         assert client_cas, f"failed to get client CAs for {unit.name}"
@@ -120,7 +161,7 @@ async def test_update_common_name(ops_test: OpsTest) -> None:
     action = await action.wait()
 
     # wait for model to settle
-    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME])
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, REQUIRER_TLS_NAME])
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
@@ -177,6 +218,8 @@ async def test_update_ca(ops_test: OpsTest) -> None:
     model = ops_test.model_full_name
     assert ops_test.model
     assert ops_test.model.applications[APP_NAME] is not None
+    ca_chain = await get_requirer_ca_chain(ops_test)
+    assert ca_chain, "failed to get ca chain from requirer TLS provider"
     for unit in ops_test.model.applications[APP_NAME].units:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
         assert client_cas, f"failed to get client CAs for {unit.name}"

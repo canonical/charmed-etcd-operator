@@ -131,6 +131,9 @@ class ExternalClientsEvents(Object):
         server_ca = server_certs[0].ca.raw
         etcd_api_version = self.charm.cluster_manager.get_version()
         for relation in self.etcd_provides.relations:
+            if not self.charm.external_clients_manager.get_relation_managed_user(relation.id):
+                continue
+
             if set(relation.data[self.charm.app].get("endpoints", "").split(",")) != endpoints:
                 self.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
 

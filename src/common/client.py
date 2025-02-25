@@ -556,7 +556,7 @@ class EtcdClient:
             endpoints=self.client_url,
             output_format="simple",
         ):
-            # extract API version using regex from the output
-            return re.search(r"API version: ([\d.]+)", result).group(1)
+            # extract the binary version using regex from the output
+            return re.search(r"etcdctl version: ([\d.]+)", result).group(1)
 
         raise EtcdClusterManagementError("Failed to get etcd version.")
