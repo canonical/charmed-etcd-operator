@@ -34,7 +34,7 @@ TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 250
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
@@ -58,7 +58,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
@@ -106,7 +106,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_tls(ops_test: OpsTest) -> None:
@@ -164,7 +164,7 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_enable_tls(ops_test: OpsTest) -> None:
@@ -225,7 +225,7 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
@@ -350,7 +350,7 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
@@ -475,7 +475,7 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_certificate_expiration(ops_test: OpsTest) -> None:
