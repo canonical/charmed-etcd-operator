@@ -83,8 +83,13 @@ class EtcdWorkload(WorkloadBase):
 
     @override
     def exists(self, path: str) -> bool:
-        if Path(path).exists():
-            return len(os.listdir(path)) > 0
+        path_object = Path(path)
+
+        if path_object.exists():
+            if path_object.is_dir():
+                # consider it false if the directory is empty
+                return len(list(path_object.glob('*'))) > 0
+            return True
 
         return False
 
