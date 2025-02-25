@@ -152,6 +152,35 @@ async def test_relate_client_charm(ops_test: OpsTest) -> None:
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
+async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
+    """Write and read to the key prefix with the requirer charm."""
+    requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
+    requirer_unit: Unit = requirer_app.units[0]
+
+    # write to the key prefix
+    action = await requirer_unit.run_action("put", **{"key": TEST_KEY, "value": TEST_VALUE})
+    action = await action.wait()
+
+    assert action.status == "failed" and "permission denied" in action.results["stderr"], (
+        "Action should fail because user does not have permission to write to the key prefix"
+    )
+
+    # write to authorized key prefix
+    key = "/test/foo"
+    action = await requirer_unit.run_action("put", **{"key": key, "value": TEST_VALUE})
+    action = await action.wait()
+    assert action.status == "completed", "Action should succeed"
+
+    # read from the key prefix
+    action = await requirer_unit.run_action("get", **{"key": key})
+    action = await action.wait()
+    assert action.status == "completed", "Action should succeed"
+    assert action.results["message"] == f"{key}\n{TEST_VALUE}", "Action should return the value"
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_update_common_name(ops_test: OpsTest) -> None:
     """Update the common name used by the requirer app."""
     new_common_name = "new-common-name"
