@@ -105,7 +105,7 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     updated_endpoints = get_cluster_endpoints(ops_test, app)
     cluster_members = get_cluster_members(updated_endpoints)
     assert new_unit.name.replace("/", "") in (member["name"] for member in cluster_members), (
-        f"{new_unit.name} is not a cluster member"
+        f"{new_unit.name} is not in {cluster_members}"
     )
 
     assert len(cluster_members) == init_units_count, (
@@ -169,7 +169,7 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
 
     for unit in ops_test.model.applications[app].units:
         assert unit.name.replace("/", "") in (member["name"] for member in cluster_members), (
-            f"{unit.name} is not a cluster member"
+            f"{unit.name} is not in {cluster_members}"
         )
 
     assert len(cluster_members) == len(storage_ids), (

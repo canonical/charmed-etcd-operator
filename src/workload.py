@@ -5,7 +5,6 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
-import os
 import subprocess
 from pathlib import Path
 from shutil import rmtree
@@ -88,7 +87,7 @@ class EtcdWorkload(WorkloadBase):
         if path_object.exists():
             if path_object.is_dir():
                 # consider it false if the directory is empty
-                return len(list(path_object.glob('*'))) > 0
+                return len(list(path_object.glob("*"))) > 0
             return True
 
         return False
