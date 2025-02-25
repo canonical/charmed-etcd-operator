@@ -142,6 +142,9 @@ class EtcdEvents(Object):
             if not self.charm.cluster_manager.restart_member(move_leader=False):
                 raise HealthCheckFailedError("Failed to check health of the member after restart")
 
+            if self.charm.unit.is_leader():
+                self.charm.cluster_manager.update_cluster_member_state()
+
             # update tls certificates with new ip address
             if self.charm.state.unit_server.tls_client_state in (
                 TLSState.TO_TLS,
