@@ -122,6 +122,7 @@ class WorkloadBase(ABC):
         Args:
             directory (str): Path to the directory.
         """
+        pass
 
     @abstractmethod
     def exists(self, path: str) -> bool:

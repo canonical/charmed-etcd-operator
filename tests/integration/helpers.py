@@ -84,6 +84,21 @@ def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]
     return json.loads(result)["members"]
 
 
+def get_cluster_id(endpoints: str, tls_enabled: bool = False) -> str:
+    """Query the cluster id from etcd using `etcdctl`."""
+    etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
+
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+
+    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    members = json.loads(result)
+    return members[0]["Status"]["header"]["cluster_id"]
+
+
 def get_cluster_endpoints(
     ops_test: OpsTest, app_name: str = APP_NAME, tls_enabled: bool = False
 ) -> str:

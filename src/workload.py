@@ -5,6 +5,7 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
+import os
 import subprocess
 from pathlib import Path
 from shutil import rmtree
@@ -82,7 +83,10 @@ class EtcdWorkload(WorkloadBase):
 
     @override
     def exists(self, path: str) -> bool:
-        return Path(path).exists()
+        if Path(path).exists():
+            return len(os.listdir(path)) > 0
+
+        return False
 
     @override
     def exec(self, command: List[str]) -> None:
