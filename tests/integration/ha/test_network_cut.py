@@ -47,7 +47,7 @@ NUM_UNITS = 3
 TLS_NAME = "self-signed-certificates"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -61,7 +61,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -> None:
@@ -159,7 +159,7 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> None:
