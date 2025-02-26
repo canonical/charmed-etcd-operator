@@ -48,7 +48,7 @@ class ExternalClientsEvents(Object):
 
     def _on_common_name_updated(self, event: CommonNameUpdatedEvent):
         """Handle the common name updated event."""
-        if not event.common_name or not event.prefix or not event.ca_chain:
+        if not event.common_name or not event.prefix or not event.tls_ca:
             logger.error("Common name, keys prefix, or CA chain not provided")
             event.defer()
             return
@@ -75,7 +75,7 @@ class ExternalClientsEvents(Object):
 
     def _on_client_relation_updated(self, event: ClientRelationUpdatedEvent):
         """Handle the ca chain updated event."""
-        if not event.ca_chain or not event.prefix or not event.common_name:
+        if not event.tls_ca or not event.prefix or not event.common_name:
             logger.error("CA chain, keys prefix, or common name not provided")
             # TODO set blocked status based on DP blocked states
             event.defer()
@@ -102,7 +102,7 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
         if relation_managed_user and self.charm.tls_manager.is_new_ca(
-            event.ca_chain, TLSType.CLIENT
+            event.tls_ca, TLSType.CLIENT
         ):
             self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
 
@@ -129,7 +129,7 @@ class ExternalClientsEvents(Object):
         endpoints = {server.client_url for server in self.charm.state.servers}
         server_certs, _ = self.charm.tls_events.client_certificate.get_assigned_certificates()
         server_ca = server_certs[0].ca.raw
-        etcd_api_version = self.charm.cluster_manager.get_version()
+        etcd_version = self.charm.cluster_manager.get_version()
         for relation in self.etcd_provides.relations:
             if not self.charm.external_clients_manager.get_relation_managed_user(relation.id):
                 continue
@@ -137,11 +137,11 @@ class ExternalClientsEvents(Object):
             if set(relation.data[self.charm.app].get("endpoints", "").split(",")) != endpoints:
                 self.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
 
-            if relation.data[self.charm.app].get("ca-chain") != server_ca:
+            if relation.data[self.charm.app].get("tls-ca") != server_ca:
                 self.etcd_provides.set_tls_ca(relation.id, server_ca)
 
-            if relation.data[self.charm.app].get("version") != etcd_api_version:
-                self.etcd_provides.set_version(relation.id, etcd_api_version)
+            if relation.data[self.charm.app].get("version") != etcd_version:
+                self.etcd_provides.set_version(relation.id, etcd_version)
 
     def _on_relation_joined(self, _):
         """Add the provider side data to the relation."""
