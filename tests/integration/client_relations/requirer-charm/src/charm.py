@@ -15,7 +15,7 @@ import ops
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseEndpointsChangedEvent,
     EtcdRequires,
-    ServerCAUpdatedEvent,
+    TLSCAUpdatedEvent,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
@@ -55,14 +55,14 @@ class RequirerCharmCharm(ops.CharmBase):
         self.etcd_requires = EtcdRequires(
             self,
             relation_name="etcd-client",
-            keys_prefix="/test/",
+            prefix="/test/",
             ca_chain=self.ca_chain,
             common_name=self.common_name,
         )
 
         # EtcdRequires events
         framework.observe(self.etcd_requires.on.endpoints_changed, self._on_endpoints_changed)
-        framework.observe(self.etcd_requires.on.ca_chain_updated, self._on_ca_chain_updated)
+        framework.observe(self.etcd_requires.on.tls_ca_updated, self._on_tls_ca_updated)
 
         # TLSCertificatesRequiresV4 events
         framework.observe(
@@ -160,14 +160,14 @@ class RequirerCharmCharm(ops.CharmBase):
             self.etcd_requires.set_common_name(relation.id, self.common_name)
             self.etcd_requires.set_ca_chain(relation.id, cert.ca.raw)
 
-    def _on_ca_chain_updated(self, event: ServerCAUpdatedEvent):
+    def _on_tls_ca_updated(self, event: TLSCAUpdatedEvent):
         """Handle server CA updated event."""
         logger.info("Server CA updated")
-        if not event.ca_chain:
+        if not event.tls_ca:
             logger.error("No server CA chain available")
             return
         Path(WORK_DIR).mkdir(exist_ok=True)
-        Path(f"{WORK_DIR}/ca.pem").write_text(event.ca_chain)
+        Path(f"{WORK_DIR}/ca.pem").write_text(event.tls_ca)
 
     def _on_endpoints_changed(self, event: DatabaseEndpointsChangedEvent):
         """Handle etcd client relation data changed event."""

@@ -48,7 +48,7 @@ class ExternalClientsEvents(Object):
 
     def _on_common_name_updated(self, event: CommonNameUpdatedEvent):
         """Handle the common name updated event."""
-        if not event.common_name or not event.keys_prefix or not event.ca_chain:
+        if not event.common_name or not event.prefix or not event.ca_chain:
             logger.error("Common name, keys prefix, or CA chain not provided")
             event.defer()
             return
@@ -69,13 +69,13 @@ class ExternalClientsEvents(Object):
             self.charm.external_clients_manager.remove_managed_user(event.relation.id)
 
         logger.info("Creating new user")
-        self.charm.cluster_manager.add_managed_user(event.common_name, event.keys_prefix)
+        self.charm.cluster_manager.add_managed_user(event.common_name, event.prefix)
         self.charm.external_clients_manager.add_managed_user(event.relation.id, event.common_name)
         self.charm.external_clients_events.update_client_relations_data()
 
     def _on_client_relation_updated(self, event: ClientRelationUpdatedEvent):
         """Handle the ca chain updated event."""
-        if not event.ca_chain or not event.keys_prefix or not event.common_name:
+        if not event.ca_chain or not event.prefix or not event.common_name:
             logger.error("CA chain, keys prefix, or common name not provided")
             # TODO set blocked status based on DP blocked states
             event.defer()
@@ -138,7 +138,7 @@ class ExternalClientsEvents(Object):
                 self.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
 
             if relation.data[self.charm.app].get("ca-chain") != server_ca:
-                self.etcd_provides.set_ca_chain(relation.id, server_ca)
+                self.etcd_provides.set_tls_ca(relation.id, server_ca)
 
             if relation.data[self.charm.app].get("version") != etcd_api_version:
                 self.etcd_provides.set_version(relation.id, etcd_api_version)
