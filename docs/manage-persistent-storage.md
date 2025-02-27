@@ -5,7 +5,7 @@
 3. [Deploy with persistent storage](#deploy-with-persistent-storage)
 4. [Same Cluster Scenario](#same-cluster-scenario)
 5. [Different Cluster Scenario](#different-cluster-scenario)
-   - [Safe Scale down](#safe-scale-down)
+   - [Safe Removal](#safe-removal)
    - [Deploy new cluster with existing storage](#deploy-new-cluster-with-existing-storage)
 6. [Remove persistent storage](#remove-persistent-storage)
 
@@ -212,7 +212,7 @@ charmed-etcd/5  logs/8      filesystem  rootfs        /var/snap/charmed-etcd/com
 ## Different Cluster Scenario
 In this scenario, we want to reuse existing storage from another etcd cluster/database.
 
-### Safe scale-down
+### Safe Removal
 >**Attention - Before you remove your etcd cluster:**
 > - Safe the credentials for the admin-user
 > - or configure a user-defined password
