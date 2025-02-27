@@ -1,4 +1,16 @@
 # Manage persistent storage
+## Table of content
+1. [Introduction](#Introduction)
+2. [Prerequisites](#prerequisites)
+3. [Deploy with persistent storage](#deploy-with-persistent-storage)
+4. [Same Cluster Scenario](#same-cluster-scenario)
+5. [Different Cluster Scenario](#different-cluster-scenario)
+   - [Safe Scale down](#safe-scale-down)
+   - [Deploy new cluster with existing storage](#deploy-new-cluster-with-existing-storage)
+6. [Remove persistent storage](#remove-persistent-storage)
+
+
+## Introduction
 Like many other databases, etcd stores its state on disk. In a default deployment (as described in [deploy-etcd](./deploy-etcd.md)),
 the filesystem attached to charmed etcd will be removed when charmed etcd is removed. The content of the etcd database
 would then be lost.
