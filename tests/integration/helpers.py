@@ -71,6 +71,7 @@ def get_key(
     return subprocess.getoutput(etcd_command).split("\n")[1]
 
 
+@retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
 def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]:
     """Query all cluster members from etcd using `etcdctl`."""
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
@@ -80,9 +81,30 @@ def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]
             --cert client.pem \
             --key client.key"
 
-    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    try:
+        result = subprocess.getoutput(etcd_command).split("\n")[0]
+        return json.loads(result)["members"]
+    except KeyError:
+        raise
 
-    return json.loads(result)["members"]
+
+@retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
+def get_cluster_id(endpoints: str, tls_enabled: bool = False) -> str:
+    """Query the cluster id from etcd using `etcdctl`."""
+    etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
+
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+
+    try:
+        result = subprocess.getoutput(etcd_command).split("\n")[0]
+        members = json.loads(result)
+        return members[0]["Status"]["header"]["cluster_id"]
+    except KeyError:
+        raise
 
 
 def get_cluster_endpoints(
@@ -294,3 +316,18 @@ async def download_client_certificate_from_unit(
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
         await unit.scp_from(f"{tls_path}/{file}", file)
+
+
+def get_storage_id(ops_test: OpsTest, unit_name: str, storage_name: str) -> str:
+    """Retrieve the storage id associated with a unit."""
+    model_name = ops_test.model.info.name
+
+    storage_data = subprocess.check_output(f"juju storage --model={model_name}".split())
+    storage_data = storage_data.decode("utf-8")
+    for line in storage_data.splitlines():
+        # skip the header and irrelevant lines
+        if not line or "Storage" in line or "detached" in line:
+            continue
+
+        if line.split()[0] == unit_name and line.split()[1].startswith(storage_name):
+            return line.split()[1]

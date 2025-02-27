@@ -8,6 +8,7 @@ import secrets
 import string
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import List
 
 from literals import CONFIG_FILE, TLS_ROOT_DIR
 
@@ -112,4 +113,30 @@ class WorkloadBase(ABC):
         Args:
             file (str): Path to the file.
         """
+        pass
+
+    @abstractmethod
+    def remove_directory(self, directory: str) -> None:
+        """Remove a directory.
+
+        Args:
+            directory (str): Path to the directory.
+        """
+        pass
+
+    @abstractmethod
+    def exists(self, path: str) -> bool:
+        """Check if a file or directory exists.
+
+        Args:
+            path (str): Path to the file or directory.
+
+        Returns:
+            bool: True if the file or directory exists, False otherwise.
+        """
+        pass
+
+    @abstractmethod
+    def exec(self, command: List[str]) -> None:
+        """Run a command on the workload substrate."""
         pass

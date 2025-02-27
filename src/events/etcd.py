@@ -27,9 +27,13 @@ from common.exceptions import (
 from common.secrets import get_secret_from_id
 from literals import (
     DATA_STORAGE,
+    DATABASE_DIR,
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
+    SNAP_DATA_PATH,
+    SNAP_GROUP,
+    SNAP_USER,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
     Status,
@@ -72,6 +76,15 @@ class EtcdEvents(Object):
         self.framework.observe(
             self.charm.on[DATA_STORAGE].storage_detaching, self._on_storage_detaching
         )
+        self.framework.observe(
+            self.charm.on[DATA_STORAGE].storage_attached, self._on_storage_attached
+        )
+
+    def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
+        """Handle storage attachment."""
+        # fix the permissions of the data dir if re-attaching existing storage
+        self.charm.workload.exec(["chmod", "-R", "750", SNAP_DATA_PATH])
+        self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", SNAP_DATA_PATH])
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -94,7 +107,13 @@ class EtcdEvents(Object):
 
         self.charm.config_manager.set_config_properties()
 
-        if self.charm.unit.is_leader() and not self.charm.state.cluster.cluster_state:
+        if not self.charm.state.cluster.cluster_state and self.charm.workload.exists(DATABASE_DIR):
+            # this is a new application but storage is reused
+            self.charm.cluster_manager.start_member()
+            self.charm.state.cluster.update({"authentication": "enabled"})
+            # update cluster membership configuration after recovering existing data
+            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
+        elif not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
             # this is the very first cluster start, this unit starts without being added as member
             # all subsequent units will have to be added as member before starting the workload
             self.charm.cluster_manager.start_member()
@@ -112,6 +131,18 @@ class EtcdEvents(Object):
             in self.charm.state.cluster.cluster_members
         ):
             # this unit has been added to the etcd cluster
+            if self.charm.workload.exists(DATABASE_DIR):
+                logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
+                # storage cannot be reused on non-leader members
+                try:
+                    self.charm.workload.remove_directory(DATABASE_DIR)
+                    logger.warning(
+                        f"Removed database file from {DATABASE_DIR} to join existing cluster."
+                    )
+                except OSError:
+                    # if removing fails, we cannot start the workload or the member would crash
+                    raise
+
             self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster
@@ -183,9 +214,18 @@ class EtcdEvents(Object):
             return
 
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
-            self.charm.state.cluster.update(
-                {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
-            )
+            if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
+                try:
+                    password = get_secret_from_id(self.charm.model, admin_secret_id).get(
+                        INTERNAL_USER
+                    )
+                except (ModelError, SecretNotFoundError) as e:
+                    logger.error(f"Could not access secret {admin_secret_id}: {e}")
+                    raise
+            else:
+                password = self.charm.workload.generate_password()
+
+            self.charm.state.cluster.update({f"{INTERNAL_USER}-password": password})
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
