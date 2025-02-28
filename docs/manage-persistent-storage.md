@@ -94,7 +94,7 @@ As you can see, volumes from the `etcd-storage` pool have been attached as the `
 `logs` volume mount, non-persistent storage from `rootfs` has been used. The `logs` storage will be removed when the 
 respective unit gets removed, while the `data` storage will persist.
 
-## Same Cluster Scenario
+## Same cluster scenario
 In this scenario, we want to reuse storage from previous units but within the same etcd cluster/database. This could
 be useful when you want to scale down your etcd database temporarily without completely removing it.
 
