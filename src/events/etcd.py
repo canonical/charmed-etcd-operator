@@ -92,7 +92,7 @@ class EtcdEvents(Object):
             self.charm.set_status(Status.SERVICE_NOT_INSTALLED)
             return
 
-    def _on_start(self, event: ops.StartEvent) -> None:
+    def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
         tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
         if (
@@ -124,13 +124,24 @@ class EtcdEvents(Object):
                     self.charm.state.cluster.update({"authentication": "enabled"})
                 except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
                     logger.error(e)
-                    self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
-                    return
+                    raise
         elif (
             self.charm.state.unit_server.member_endpoint
             in self.charm.state.cluster.cluster_members
         ):
             # this unit has been added to the etcd cluster
+            if not self.charm.state.cluster.auth_enabled:
+                if self.charm.unit.is_leader():
+                    # if enabling auth failed on first cluster startup, we want to retry now
+                    try:
+                        self.charm.cluster_manager.enable_authentication()
+                        self.charm.state.cluster.update({"authentication": "enabled"})
+                    except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
+                        logger.error(e)
+                        raise
+                else:
+                    raise EtcdAuthNotEnabledError("Authentication not enabled.")
+
             if self.charm.workload.exists(DATABASE_DIR):
                 logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
                 # storage cannot be reused on non-leader members
