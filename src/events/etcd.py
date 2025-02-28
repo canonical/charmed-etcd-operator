@@ -92,7 +92,7 @@ class EtcdEvents(Object):
             self.charm.set_status(Status.SERVICE_NOT_INSTALLED)
             return
 
-    def _on_start(self, event: ops.StartEvent) -> None:
+    def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
         tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
         if (
@@ -130,6 +130,9 @@ class EtcdEvents(Object):
             in self.charm.state.cluster.cluster_members
         ):
             # this unit has been added to the etcd cluster
+            if not self.charm.state.cluster.auth_enabled:
+                raise EtcdAuthNotEnabledError("Authentication not enabled.")
+
             if self.charm.workload.exists(DATABASE_DIR):
                 logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
                 # storage cannot be reused on non-leader members
