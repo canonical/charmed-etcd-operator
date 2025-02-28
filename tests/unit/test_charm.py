@@ -13,7 +13,11 @@ from ops import testing
 from pytest import raises
 
 from charm import EtcdOperatorCharm
-from common.exceptions import EtcdAuthNotEnabledError, EtcdClusterManagementError, EtcdUserManagementError
+from common.exceptions import (
+    EtcdAuthNotEnabledError,
+    EtcdClusterManagementError,
+    EtcdUserManagementError,
+)
 from core.models import Member
 from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
