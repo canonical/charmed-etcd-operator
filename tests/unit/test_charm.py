@@ -13,7 +13,7 @@ from ops import testing
 from pytest import raises
 
 from charm import EtcdOperatorCharm
-from common.exceptions import EtcdClusterManagementError, EtcdUserManagementError
+from common.exceptions import EtcdAuthNotEnabledError, EtcdClusterManagementError, EtcdUserManagementError
 from core.models import Member
 from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
@@ -90,7 +90,8 @@ def test_start():
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
     ):
         with raises(testing.errors.UncaughtCharmError) as e:
-            ctx.run(ctx.on.start(), state_in)
+            state_out = ctx.run(ctx.on.start(), state_in)
+            assert not state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
 
         assert isinstance(e.value.__cause__, EtcdUserManagementError)
 
@@ -155,6 +156,7 @@ def test_start():
         local_app_data={
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
+            "authentication": "enabled",
         },
         local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
     )
@@ -168,6 +170,30 @@ def test_start():
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
         start.assert_called_once()
+
+    # leader started but could not enable auth -> raise
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://ip0:2380",
+        },
+        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.start") as start,
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.alive", return_value=True),
+    ):
+        with raises(testing.errors.UncaughtCharmError) as e:
+            state_out = ctx.run(ctx.on.start(), state_in)
+            assert state_out.unit_status == ops.ActiveStatus()
+            assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
+            start.assert_not_called()
+
+        assert isinstance(e.value.__cause__, EtcdAuthNotEnabledError)
 
 
 def test_update_status():
