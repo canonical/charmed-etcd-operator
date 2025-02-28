@@ -363,7 +363,6 @@ class EtcdClient:
         """Broadcast the peer URL to all units in the cluster.
 
         Args:
-            endpoints (str): The endpoints to run the command against.
             member_id (str): The member ID to broadcast the peer URL for.
             peer_urls (str): The peer URLs to broadcast.
         """
