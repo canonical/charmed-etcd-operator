@@ -108,7 +108,7 @@ class ClusterManager:
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
+            client_url=",".join(e for e in self.cluster_endpoints),
         )
 
         member_list = client.member_list()
@@ -134,7 +134,7 @@ class ClusterManager:
             password=self.admin_password,
             client_url=",".join(e for e in self.cluster_endpoints),
         )
-        client.broadcast_peer_url(self.state.unit_server.client_url, self.member.id, peer_urls)
+        client.broadcast_peer_url(self.member.id, peer_urls)
 
     def is_healthy(self, cluster: bool = True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
@@ -295,3 +295,19 @@ class ClusterManager:
         except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
             logger.warning(f"Could not transfer cluster leadership: {e}")
             return
+
+    def update_cluster_member_state(self) -> None:
+        """Get up-to-date member information and store in cluster state."""
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        try:
+            member_list = client.member_list()
+            cluster_members = ",".join(f"{k}={v.peer_urls[0]}" for k, v in member_list.items())
+            self.state.cluster.update({"cluster_members": cluster_members})
+        except Exception as e:
+            # we should not have errors here, but if we do, we don't want the error to raise
+            logger.warning(f"Error updating the cluster member state: {e}")
