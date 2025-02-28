@@ -124,8 +124,7 @@ class EtcdEvents(Object):
                     self.charm.state.cluster.update({"authentication": "enabled"})
                 except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
                     logger.error(e)
-                    self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
-                    return
+                    raise
         elif (
             self.charm.state.unit_server.member_endpoint
             in self.charm.state.cluster.cluster_members
