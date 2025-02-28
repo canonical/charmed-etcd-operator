@@ -8,7 +8,7 @@ import logging
 import socket
 from json import JSONDecodeError
 
-from tenacity import retry, stop_after_attempt, wait_random_exponential, wait_fixed
+from tenacity import retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
 from common.client import EtcdClient
 from common.exceptions import (
