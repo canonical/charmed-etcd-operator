@@ -13,7 +13,7 @@ from ops import testing
 from pytest import raises
 
 from charm import EtcdOperatorCharm
-from common.exceptions import EtcdClusterManagementError
+from common.exceptions import EtcdClusterManagementError, EtcdUserManagementError
 from core.models import Member
 from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
@@ -81,7 +81,7 @@ def test_start():
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status != ops.ActiveStatus()
 
-    # if authentication cannot be enabled, the charm should be blocked
+    # if authentication cannot be enabled, the charm should error out
     state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -89,10 +89,10 @@ def test_start():
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
     ):
-        state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status == ops.BlockedStatus(
-            "failed to enable authentication in etcd"
-        )
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.start(), state_in)
+
+        assert isinstance(e.value.__cause__, EtcdUserManagementError)
 
     # if the cluster is new, the leader should immediately start and enable auth
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
