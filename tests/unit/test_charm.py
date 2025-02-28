@@ -193,8 +193,8 @@ def test_start():
         with raises(testing.errors.UncaughtCharmError) as e:
             state_out = ctx.run(ctx.on.start(), state_in)
             assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
-            start.assert_not_called()
 
+        start.assert_not_called()
         assert isinstance(e.value.__cause__, EtcdAuthNotEnabledError)
 
 
