@@ -131,7 +131,16 @@ class EtcdEvents(Object):
         ):
             # this unit has been added to the etcd cluster
             if not self.charm.state.cluster.auth_enabled:
-                raise EtcdAuthNotEnabledError("Authentication not enabled.")
+                if self.charm.unit.is_leader():
+                    # if enabling auth failed on first cluster startup, we want to retry now
+                    try:
+                        self.charm.cluster_manager.enable_authentication()
+                        self.charm.state.cluster.update({"authentication": "enabled"})
+                    except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
+                        logger.error(e)
+                        raise
+                else:
+                    raise EtcdAuthNotEnabledError("Authentication not enabled.")
 
             if self.charm.workload.exists(DATABASE_DIR):
                 logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
