@@ -43,10 +43,10 @@ def continuous_writes(endpoints: str, user: str, password: str):
             for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(1)):
                 with attempt:
                     result = subprocess.getoutput(etcd_command).split("\n")
-                    if not result[0] == "OK":
+                    with open(LOG_FILE_PATH, "a") as log_file:
+                        log_file.write(f"{result}\n")
+                    if not any(r == "OK" for r in result):
                         raise ValueError
-            with open(LOG_FILE_PATH, "a") as log_file:
-                log_file.write(f"{result}\n")
         except RetryError:
             pass
 
