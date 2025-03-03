@@ -168,7 +168,7 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     cluster_members = get_cluster_members(endpoints)
 
     for unit in ops_test.model.applications[app].units:
-        assert unit.name.replace("/", "") in (member["name"] for member in cluster_members), (
+        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
             f"{unit.name} is not in {cluster_members}"
         )
 
@@ -270,8 +270,8 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
     cluster_members = get_cluster_members(endpoints)
 
     for unit in ops_test.model.applications[app].units:
-        assert unit.name.replace("/", "") in (member["name"] for member in cluster_members), (
-            f"{unit.name} is not a cluster member"
+        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
+            f"{unit.name} is not in {cluster_members}"
         )
 
     assert len(cluster_members) == NUM_UNITS, (
