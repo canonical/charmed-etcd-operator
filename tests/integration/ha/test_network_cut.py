@@ -61,6 +61,10 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
 
+# known-issue with self-hosted runners: `lxc config device set ... eth0 limits.priority=10`
+# command fails because of wrong kernel version
+# details see: https://warthogs.atlassian.net/browse/ISD-3026
+@pytest.mark.skip()
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
