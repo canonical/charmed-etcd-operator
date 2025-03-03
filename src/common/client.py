@@ -6,6 +6,7 @@
 
 import json
 import logging
+import os
 import subprocess
 from typing import Tuple
 
@@ -258,7 +259,8 @@ class EtcdClient:
                 args.append(f"-w={output_format}")
             if use_input:
                 args.append("--interactive=False")
-            if "https" in endpoints:
+            # we append the TLS params whenever we find a client certificate
+            if os.path.exists(f"{TLS_ROOT_DIR}/client.pem"):
                 args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
                 args.append(f"--key={TLS_ROOT_DIR}/client.key")
                 args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
