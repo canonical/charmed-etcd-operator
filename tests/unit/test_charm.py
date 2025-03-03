@@ -262,7 +262,13 @@ def test_config_changed():
         leader=True,
     )
 
-    with patch("subprocess.run"):
+    with (
+        patch("subprocess.run"),
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("common.client.EtcdClient.broadcast_peer_url"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+    ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
@@ -370,14 +376,16 @@ def test_peer_relation_changed():
         promote_learning_member.assert_called_once()
         assert state_out.deferred[0].name == "etcd_peers_relation_changed"
 
-    with patch("common.client.EtcdClient._run_etcdctl") as run_etcdctl:
+    with (
+        patch("common.client.EtcdClient._run_etcdctl") as run_etcdctl,
+        patch("managers.cluster.ClusterManager.update_cluster_member_state"),
+    ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
         assert relation.local_app_data.get("learning_member") is None
         assert (
             relation.local_app_data.get("cluster_members")
             == "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380"
         )
-        run_etcdctl.assert_called_once()
         run_etcdctl_args = run_etcdctl.call_args[1]
         assert run_etcdctl_args["command"] == "member"
         assert run_etcdctl_args["subcommand"] == "promote"

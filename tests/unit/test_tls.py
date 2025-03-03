@@ -730,6 +730,10 @@ def test_set_tls_private_key():
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("common.client.EtcdClient.broadcast_peer_url"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=True),
     ):
         # Configure peer private key configured
         state_in = testing.State(

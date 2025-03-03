@@ -22,6 +22,7 @@ from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
     EtcdUserManagementError,
+    HealthCheckFailedError,
     RaftLeaderNotFoundError,
 )
 from common.secrets import get_secret_from_id
@@ -157,6 +158,31 @@ class EtcdEvents(Object):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
+        # refresh the host information and cluster membership in case of ip change
+        ip_address = self.charm.cluster_manager.get_host_mapping().get("ip")
+        if ip_address != self.charm.state.unit_server.ip:
+            logger.info(f"New ip address: {ip_address}")
+            self.charm.state.unit_server.update({"ip": ip_address})
+
+            # update cluster configuration
+            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
+            self.charm.config_manager.set_config_properties()
+
+            # we need to update the client-urls by restarting etcd
+            # after ip change, this member is unavailable, no need to acquire restart lock
+            if not self.charm.cluster_manager.restart_member(move_leader=False):
+                raise HealthCheckFailedError("Failed to check health of the member after restart")
+
+            if self.charm.unit.is_leader():
+                self.charm.cluster_manager.update_cluster_member_state()
+
+            # update tls certificates with new ip address
+            if self.charm.state.unit_server.tls_client_state in (
+                TLSState.TO_TLS,
+                TLSState.TLS,
+            ) or self.charm.state.unit_server.tls_peer_state in (TLSState.TO_TLS, TLSState.TLS):
+                self.charm.tls_events.refresh_tls_certificates_event.emit()
+
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
             self.update_private_key(tls_peer_private_key_id)
 
@@ -175,14 +201,18 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
-        if self.charm.unit.is_leader() and self.charm.state.cluster.learning_member:
-            try:
-                # this will promote any learner, not only the unit that updated its relation data
-                self.charm.cluster_manager.promote_learning_member()
-            except EtcdClusterManagementError as e:
-                logger.warning(e)
-                event.defer()
-                return
+        if self.charm.unit.is_leader():
+            if self.charm.state.cluster.learning_member:
+                try:
+                    # this will promote any learner, not only the unit that updated its relation data
+                    self.charm.cluster_manager.promote_learning_member()
+                except EtcdClusterManagementError as e:
+                    logger.warning(e)
+                    event.defer()
+                    return
+
+            # reflect membership updates in the cluster state, e.g. ip change or tls switchover
+            self.charm.cluster_manager.update_cluster_member_state()
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
