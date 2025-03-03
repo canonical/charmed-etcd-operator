@@ -98,9 +98,14 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     cut_network_from_unit_without_ip_change(leader_hostname)
 
     # make sure the unit is not reachable from the other units
-    for unit in ops_test.model.applications[app].units:
-        hostname = await hostname_from_unit(ops_test, unit.name)
-        assert not is_unit_reachable(hostname, leader_hostname)
+    remaining_unit_names = (
+        unit.name for unit in ops_test.model.applications[app].units if unit.name != leader_unit
+    )
+    for unit_name in remaining_unit_names:
+        hostname = await hostname_from_unit(ops_test, unit_name)
+        assert not is_unit_reachable(hostname, leader_hostname), (
+            f"{leader_hostname} is reachable from {hostname}"
+        )
 
     # make sure the unit is not reachable from the controller
     controller_hostname = await get_controller_hostname(ops_test)
@@ -211,9 +216,14 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     cut_network_from_unit_with_ip_change(leader_hostname)
 
     # make sure the unit is not reachable from the other units
-    for unit in ops_test.model.applications[app].units:
-        hostname = await hostname_from_unit(ops_test, unit.name)
-        assert not is_unit_reachable(hostname, leader_hostname)
+    remaining_unit_names = (
+        unit.name for unit in ops_test.model.applications[app].units if unit.name != leader_unit
+    )
+    for unit_name in remaining_unit_names:
+        hostname = await hostname_from_unit(ops_test, unit_name)
+        assert not is_unit_reachable(hostname, leader_hostname), (
+            f"{leader_hostname} is reachable from {hostname}"
+        )
 
     # make sure the unit is not reachable from the controller
     controller_hostname = await get_controller_hostname(ops_test)
