@@ -104,7 +104,7 @@ def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
 def is_unit_reachable(from_host: str, to_host: str) -> bool:
     """Test network reachability between hosts."""
     try:
-        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5)):
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(10)):
             with attempt:
                 ping = subprocess.call(
                     f"lxc exec {from_host} -- ping -c 5 {to_host}".split(),
