@@ -80,6 +80,8 @@ def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress=1kbit"
     subprocess.check_call(limit_set_command.split())
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority=10"
+    subprocess.check_call(limit_set_command.split())
 
 
 def restore_network_for_unit_with_ip_change(machine_name: str) -> None:
@@ -101,7 +103,7 @@ def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
 def is_unit_reachable(from_host: str, to_host: str) -> bool:
     """Test network reachability between hosts."""
     ping = subprocess.call(
-        f"lxc exec {from_host} -- ping -c 5 {to_host}".split(),
+        f"lxc exec {from_host} -- ping -c 15 {to_host}".split(),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
