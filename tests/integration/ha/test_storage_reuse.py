@@ -158,7 +158,7 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
         return_code, _, _ = await ops_test.juju(*add_unit_cmd.split())
         assert return_code == 0, f"Failed to add unit with storage {storage_id}"
 
-    await wait_until(ops_test, apps=[app], wait_for_exact_units=len(storage_ids), idle_period=60)
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=len(storage_ids), idle_period=120)
 
     # check cluster formation after new cluster was forced
     endpoints = get_cluster_endpoints(ops_test, app)
@@ -260,7 +260,7 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
 
     # scale up
     await ops_test.model.applications[APP_NAME].add_unit(count=2)
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=60)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=120)
 
     # check cluster formation
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
