@@ -56,8 +56,8 @@ class RequirerCharmCharm(ops.CharmBase):
             self,
             relation_name="etcd-client",
             prefix="/test/",
-            tls_ca=self.ca_chain,
             common_name=self.common_name,
+            client_chain=self.ca_chain,
         )
 
         # EtcdRequires events
@@ -138,7 +138,7 @@ class RequirerCharmCharm(ops.CharmBase):
 
         if event.params.get("ca"):
             ca = event.params["ca"].replace("\\n", "\n")
-            self.etcd_requires.set_tls_ca(relation.id, ca)
+            self.etcd_requires.set_client_chain(relation.id, ca)
 
         event.set_results({"message": "databag updated"})
 
@@ -158,7 +158,7 @@ class RequirerCharmCharm(ops.CharmBase):
         relation = self.model.get_relation("etcd-client")
         if relation:
             self.etcd_requires.set_common_name(relation.id, self.common_name)
-            self.etcd_requires.set_tls_ca(relation.id, cert.ca.raw)
+            self.etcd_requires.set_client_chain(relation.id, cert.ca.raw)
 
     def _on_tls_ca_updated(self, event: TLSCAUpdatedEvent):
         """Handle server CA updated event."""

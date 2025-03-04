@@ -271,7 +271,9 @@ def get_user(
             --key client.key"
 
     try:
-        return json.loads(subprocess.getoutput(etcd_command))["roles"]
+        result = subprocess.getoutput(etcd_command)
+        logger.debug(f"User get result: {result}")
+        return json.loads(result)["roles"]
     except json.JSONDecodeError:
         return None
 

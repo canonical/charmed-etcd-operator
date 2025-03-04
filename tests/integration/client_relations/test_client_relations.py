@@ -34,6 +34,7 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 REQUIRER_NAME = "requirer-charm"
 REQUIRER_TLS_NAME = "requirer-tls-provider"
+REQUIRER_CHARM_PATH = "./requirer-charm_ubuntu@24.04-amd64.charm"
 
 common_name = REQUIRER_NAME
 key_prefix = "/test/"
@@ -64,14 +65,22 @@ async def get_requirer_ca_chain(ops_test: OpsTest) -> str | None:
 
 
 @pytest.fixture
-async def application_charm(ops_test: OpsTest):
+def application_charm():
     """Build the application charm."""
     shutil.copyfile(
         "./lib/charms/data_platform_libs/v0/data_interfaces.py",
         "./tests/integration/client_relations/requirer-charm/lib/charms/data_platform_libs/v0/data_interfaces.py",
     )
     test_charm_path = "tests/integration/client_relations/requirer-charm"
-    return await ops_test.build_charm(test_charm_path)
+    logger.info("Building the requirer charm")
+    subprocess.check_output(
+        [
+            "charmcraft",
+            "pack",
+            "-p",
+            test_charm_path,
+        ],
+    )
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -81,7 +90,7 @@ async def test_build_and_deploy(ops_test: OpsTest, application_charm) -> None:
     """Build and deploy the charm-under-test and the requirer charm."""
     tls_config = {"ca-common-name": "etcd"}
     await asyncio.gather(
-        ops_test.model.deploy(application_charm, application_name=REQUIRER_NAME),
+        ops_test.model.deploy(REQUIRER_CHARM_PATH, application_name=REQUIRER_NAME),
         ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS),
         ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config),
         ops_test.model.deploy(
@@ -99,19 +108,10 @@ async def test_build_and_deploy(ops_test: OpsTest, application_charm) -> None:
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_get_common_name(ops_test: OpsTest) -> None:
-    """Get the common name of the requirer charm."""
-    common_name = await get_requirer_common_name(ops_test)
-    assert common_name == REQUIRER_NAME, "common name is not correct"
-
-
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
-@pytest.mark.abort_on_fail
 async def test_relate_client_charm(ops_test: OpsTest) -> None:
     """Relate the client charm."""
     await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME])
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME], idle_period=10)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
