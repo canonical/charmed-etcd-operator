@@ -103,7 +103,7 @@ def get_cluster_id(endpoints: str, tls_enabled: bool = False) -> str:
     for r in result:
         member = json.loads(r)
         try:
-            return member["Status"]["header"]["cluster_id"]
+            return member[0]["Status"]["header"]["cluster_id"]
         except (TypeError, KeyError) as e:
             logger.warning(e)
 
