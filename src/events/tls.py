@@ -334,14 +334,15 @@ class TLSEvents(Object):
 
         # managed users cas
         for relation in self.charm.external_clients_events.etcd_provides.relations:
+            secret_id = relation.data[relation.app].get("secret-mtls", "")
+            if not secret_id:
+                continue
+            secret_content = get_secret_from_id(self.charm.model, secret_id)
+            ca_chain = secret_content["client-chain"]
             logger.debug(
-                f"Collecting CA from relation {relation.id} its CA: {relation.data[relation.app].get('ca-chain', '')}"
+                f"Collecting CA from relation {relation.id} its CA: {ca_chain} secret_id: {secret_id}"
             )
-            cas.extend(
-                self.charm.tls_manager.separate_certificates(
-                    relation.data[relation.app].get("ca-chain", "")
-                )
-            )
+            cas.extend(self.charm.tls_manager.separate_certificates(ca_chain))
 
         return cas
 

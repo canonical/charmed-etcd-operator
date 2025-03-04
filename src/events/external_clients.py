@@ -8,7 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
-    ClientRelationUpdatedEvent,
+    ClientChainUpdatedEvent,
     CommonNameUpdatedEvent,
     EtcdProvides,
 )
@@ -32,15 +32,11 @@ class ExternalClientsEvents(Object):
         self.etcd_provides = EtcdProvides(self.charm, EXTERNAL_CLIENTS_RELATION)
 
         self.framework.observe(
-            self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_joined, self._on_relation_joined
-        )
-
-        self.framework.observe(
             self.etcd_provides.on.common_name_updated, self._on_common_name_updated
         )
 
         self.framework.observe(
-            self.etcd_provides.on.client_relation_updated, self._on_client_relation_updated
+            self.etcd_provides.on.client_chain_updated, self._on_client_chain_updated
         )
         self.framework.observe(
             self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_broken, self._on_relation_broken
@@ -48,7 +44,7 @@ class ExternalClientsEvents(Object):
 
     def _on_common_name_updated(self, event: CommonNameUpdatedEvent):
         """Handle the common name updated event."""
-        if not event.common_name or not event.prefix or not event.tls_ca:
+        if not event.common_name or not event.prefix or not event.client_chain:
             logger.error("Common name, keys prefix, or CA chain not provided")
             event.defer()
             return
@@ -73,9 +69,9 @@ class ExternalClientsEvents(Object):
         self.charm.external_clients_manager.add_managed_user(event.relation.id, event.common_name)
         self.charm.external_clients_events.update_client_relations_data()
 
-    def _on_client_relation_updated(self, event: ClientRelationUpdatedEvent):
+    def _on_client_chain_updated(self, event: ClientChainUpdatedEvent):
         """Handle the ca chain updated event."""
-        if not event.tls_ca or not event.prefix or not event.common_name:
+        if not event.client_chain or not event.prefix or not event.common_name:
             logger.error("CA chain, keys prefix, or common name not provided")
             # TODO set blocked status based on DP blocked states
             event.defer()
@@ -102,7 +98,7 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
         if relation_managed_user and self.charm.tls_manager.is_new_ca(
-            event.tls_ca, TLSType.CLIENT
+            event.client_chain, TLSType.CLIENT
         ):
             self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
 
@@ -133,16 +129,15 @@ class ExternalClientsEvents(Object):
         for relation in self.etcd_provides.relations:
             if not self.charm.external_clients_manager.get_relation_managed_user(relation.id):
                 continue
+            relation_data = self.etcd_provides.fetch_relation_data(
+                [relation.id], ["endpoints", "tls-ca", "version"]
+            )[relation.id]
 
-            if set(relation.data[self.charm.app].get("endpoints", "").split(",")) != endpoints:
+            if set(relation_data.get("endpoints", "").split(",")) != endpoints:
                 self.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
 
-            if relation.data[self.charm.app].get("tls-ca") != server_ca:
+            if relation_data.get("tls-ca") != server_ca:
                 self.etcd_provides.set_tls_ca(relation.id, server_ca)
 
-            if relation.data[self.charm.app].get("version") != etcd_version:
+            if relation_data.get("version") != etcd_version:
                 self.etcd_provides.set_version(relation.id, etcd_version)
-
-    def _on_relation_joined(self, _):
-        """Add the provider side data to the relation."""
-        self.update_client_relations_data()
