@@ -463,7 +463,10 @@ def test_peer_relation_changed():
         assert run_etcdctl_args["command"] == "member"
         assert run_etcdctl_args["subcommand"] == "promote"
         assert run_etcdctl_args["member"] == "4477466968462020105"
-        assert run_etcdctl_args["endpoints"] == "http://ip0:2379"
+        assert (
+            run_etcdctl_args["endpoints"] == "http://ip0:2379,http://ip1:2379"
+            or run_etcdctl_args["endpoints"] == "http://ip1:2379,http://ip0:2379"
+        )
 
 
 def test_unit_removal():
