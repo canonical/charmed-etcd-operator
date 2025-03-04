@@ -40,7 +40,7 @@ def continuous_writes(endpoints: str, user: str, password: str):
                         """
 
         try:
-            for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(1)):
+            for attempt in Retrying(stop=stop_after_attempt(2), wait=wait_fixed(1)):
                 with attempt:
                     result = subprocess.getoutput(etcd_command).split("\n")
                     with open(LOG_FILE_PATH, "a") as log_file:
