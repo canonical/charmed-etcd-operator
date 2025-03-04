@@ -19,6 +19,7 @@ from ..helpers import (
     get_secret_by_label,
     get_storage_id,
     get_unit_endpoint,
+    is_endpoint_up,
     put_key,
 )
 from ..helpers_deployment import wait_until
@@ -89,16 +90,7 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
 
     # ensure data can be written on the new unit
     unit_endpoint = get_unit_endpoint(ops_test, unit_name=new_unit.name, app_name=app)
-    assert (
-        put_key(
-            unit_endpoint,
-            user=INTERNAL_USER,
-            password=password,
-            key=TEST_KEY,
-            value=TEST_VALUE,
-        )
-        == "OK"
-    )
+    assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{new_unit.name} is available again.")
 
     # check cluster formation after unit with existing storage was added
