@@ -108,16 +108,18 @@ class EtcdEvents(Object):
 
         self.charm.config_manager.set_config_properties()
 
-        if not self.charm.state.cluster.cluster_state and self.charm.workload.exists(DATABASE_DIR):
-            # this is a new application but storage is reused
-            self.charm.cluster_manager.start_member()
-            self.charm.state.cluster.update({"authentication": "enabled"})
-            # update cluster membership configuration after recovering existing data
-            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
-        elif not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
+        if not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
             # this is the very first cluster start, this unit starts without being added as member
             # all subsequent units will have to be added as member before starting the workload
             self.charm.cluster_manager.start_member()
+
+            if self.charm.workload.exists(DATABASE_DIR):
+                # this is a new application but storage is reused
+                self.charm.state.cluster.update({"authentication": "enabled"})
+                # update cluster membership configuration after recovering existing data
+                self.charm.cluster_manager.broadcast_peer_url(
+                    self.charm.state.unit_server.peer_url
+                )
 
             if not self.charm.state.cluster.auth_enabled:
                 try:
