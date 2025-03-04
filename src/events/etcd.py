@@ -232,13 +232,16 @@ class EtcdEvents(Object):
         if not self.charm.unit.is_leader():
             return
 
-        logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
-        cluster_members = self.charm.state.cluster.cluster_members.split(",")
-        # re-assemble the string without the departing unit
-        updated_cluster_members = ",".join(
-            m for m in cluster_members if event.unit.name.replace("/", "") not in m
-        )
-        self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
+        if self.charm.state.unit_server.is_started:
+            # this must not overwrite already cleaned up application databag
+            # it should only happen if at least this unit's workload is still running
+            logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
+            cluster_members = self.charm.state.cluster.cluster_members.split(",")
+            # re-assemble the string without the departing unit
+            updated_cluster_members = ",".join(
+                m for m in cluster_members if event.unit.name.replace("/", "") not in m
+            )
+            self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
