@@ -183,7 +183,7 @@ def test_start():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (
@@ -193,7 +193,7 @@ def test_start():
     ):
         with raises(testing.errors.UncaughtCharmError) as e:
             state_out = ctx.run(ctx.on.start(), state_in)
-            assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
+            assert not state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
 
         start.assert_not_called()
         assert isinstance(e.value.__cause__, EtcdUserManagementError)
@@ -206,7 +206,7 @@ def test_start():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (
@@ -218,7 +218,7 @@ def test_start():
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
-        start.assert_called_once()
+        start.assert_not_called()
 
     # non leader must not start if auth not enabled
     relation = testing.PeerRelation(
