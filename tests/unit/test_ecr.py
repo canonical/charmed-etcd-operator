@@ -5,6 +5,7 @@
 from unittest.mock import MagicMock, patch
 
 from ops import testing
+from scenario import Secret, State
 
 from charm import EtcdOperatorCharm
 from literals import EXTERNAL_CLIENTS_RELATION, TLSCARotationState
@@ -13,24 +14,33 @@ server_cert = MagicMock()
 server_cert.ca.raw = "test_ca_server"
 
 
+def _get_secret_from_state(state: State, secret_id: str) -> Secret:
+    for secret in state.secrets:
+        if secret.id == secret_id:
+            return secret
+    raise ValueError(f"Secret with id {secret_id} not found in state")
+
+
 def test_add_ecr_new_user_leader(cluster_tls_context):
     """Test adding an external client relation to the charm."""
     ctx, relations = cluster_tls_context
     peer_relation = relations[0]
+    secret = Secret({"client-chain": "test_ca"}, owner="app")
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
-            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
+            "prefix": "/test/keys",
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "client-chain"]',
         },
     )
 
     state_in = testing.State(
         relations=relations + [ecr_relation],
         leader=True,
+        secrets=[secret],
     )
 
     with (
@@ -42,32 +52,23 @@ def test_add_ecr_new_user_leader(cluster_tls_context):
             return_value=([server_cert], MagicMock()),
         ),
         patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("managers.tls.TLSManager.is_new_ca", return_value=True) as is_new_ca,
         patch("managers.cluster.ClusterManager.restart_member") as restart_member,
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         assert ecr_relation.id in charm.state.cluster.managed_users
         assert charm.state.cluster.managed_users[ecr_relation.id] == "test-common-name"
-        assert ecr_relation.local_app_data["ca-chain"] == "test_ca_server"
+        assert (
+            _get_secret_from_state(
+                state_out, ecr_relation.local_app_data["secret-tls"]
+            ).tracked_content.get("tls-ca")
+            == "test_ca_server"
+        )
         assert set(ecr_relation.local_app_data["endpoints"].split(",")) == set(
             "https://ip1:2379,https://ip2:2379,https://ip0:2379".split(",")
         )
-        assert "client_relation_updated" in [event.name for event in state_out.deferred]
-
-    with (
-        ctx(ctx.on.relation_changed(peer_relation), state_out) as manager,
-        patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
-        patch("managers.cluster.ClusterManager.restart_member") as restart_member,
-        patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
-            return_value=([server_cert], MagicMock()),
-        ),
-        patch("managers.tls.TLSManager.is_new_ca", return_value=True) as is_new_ca,
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
-    ):
-        charm: EtcdOperatorCharm = manager.charm
-        state_out = manager.run()
         is_new_ca.assert_called_once()
         restart_member.assert_called_once()
 
@@ -77,13 +78,17 @@ def test_add_ecr_new_user_not_leader(cluster_tls_context):
     ctx, relations = cluster_tls_context
 
     peer_relation = relations[0]
+
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
     )
@@ -91,26 +96,25 @@ def test_add_ecr_new_user_not_leader(cluster_tls_context):
     state_in = testing.State(
         relations=relations + [ecr_relation],
         leader=False,
+        secrets=[secret],
     )
 
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
         patch("managers.cluster.ClusterManager.add_managed_user") as add_managed_user,
-        patch("managers.cluster.ClusterManager.restart_member") as restart_member,
     ):
         state_out = manager.run()
         add_managed_user.assert_not_called()
-        assert "client_relation_updated" in [event.name for event in state_out.deferred]
+        assert "client_chain_updated" in [event.name for event in state_out.deferred]
 
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
         patch("managers.cluster.ClusterManager.add_managed_user") as add_managed_user,
-        patch("managers.cluster.ClusterManager.restart_member") as restart_member,
     ):
         peer_relation.local_app_data["managed_users"] = '{"5":"test-common-name"}'
         state_out = manager.run()
         add_managed_user.assert_not_called()
-        assert "client_relation_updated" not in [event.name for event in state_out.deferred]
+        assert "client_chain_updated" not in [event.name for event in state_out.deferred]
         # TODO add more assertions after checking custom event not being emitted in non leader setting
         # restart_member.assert_called_once()
 
@@ -118,13 +122,17 @@ def test_add_ecr_new_user_not_leader(cluster_tls_context):
 def test_add_ecr_new_user_no_tls_leader(cluster_no_tls_context):
     """Test adding an external client relation to the charm before TLS is enabled."""
     ctx, relations = cluster_no_tls_context
+
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
-        id=len(relations) + 1,
+        id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
     )
@@ -132,6 +140,7 @@ def test_add_ecr_new_user_no_tls_leader(cluster_no_tls_context):
     state_in = testing.State(
         relations=relations + [ecr_relation],
         leader=True,
+        secrets=[secret],
     )
 
     server_cert = MagicMock()
@@ -144,20 +153,24 @@ def test_add_ecr_new_user_no_tls_leader(cluster_no_tls_context):
         state_out = manager.run()
         defered_event_names = [event.name for event in state_out.deferred]
         assert "common_name_updated" in defered_event_names
-        assert "client_relation_updated" in defered_event_names
+        assert "client_chain_updated" in defered_event_names
         assert ecr_relation.id not in charm.state.cluster.managed_users
 
 
 def test_add_ecr_new_user_no_tls_not_leader(cluster_no_tls_context):
     """Test adding an external client relation to the charm before TLS is enabled."""
     ctx, relations = cluster_no_tls_context
+
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
-        id=len(relations) + 1,
+        id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
     )
@@ -165,6 +178,7 @@ def test_add_ecr_new_user_no_tls_not_leader(cluster_no_tls_context):
     state_in = testing.State(
         relations=relations + [ecr_relation],
         leader=True,
+        secrets=[secret],
     )
 
     server_cert = MagicMock()
@@ -176,20 +190,24 @@ def test_add_ecr_new_user_no_tls_not_leader(cluster_no_tls_context):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         defered_event_names = [event.name for event in state_out.deferred]
-        assert "client_relation_updated" in defered_event_names
+        assert "client_chain_updated" in defered_event_names
         assert ecr_relation.id not in charm.state.cluster.managed_users
 
 
 def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context):
     """Test adding an external client relation to the charm with missing data from requirer."""
     ctx, relations = cluster_no_tls_context
+
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
-        id=len(relations) + 1,
+        id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            # "keys-prefix": "/test/keys",
+            # "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
     )
@@ -197,6 +215,7 @@ def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context):
     state_in = testing.State(
         relations=relations + [ecr_relation],
         leader=True,
+        secrets=[secret],
     )
 
     server_cert = MagicMock()
@@ -209,20 +228,24 @@ def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context):
         state_out = manager.run()
         defered_event_names = [event.name for event in state_out.deferred]
         assert "common_name_updated" in defered_event_names
-        assert "client_relation_updated" in defered_event_names
+        assert "client_chain_updated" in defered_event_names
         assert ecr_relation.id not in charm.state.cluster.managed_users
 
 
 def test_add_ecr_existing_user_in_leader(cluster_tls_context):
     """Test adding an external client relation to the charm with the user already existing."""
     ctx, relations = cluster_tls_context
+
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
-        id=len(relations) + 1,
+        id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
     )
@@ -230,6 +253,7 @@ def test_add_ecr_existing_user_in_leader(cluster_tls_context):
     state_in = testing.State(
         relations=relations + [ecr_relation],
         leader=True,
+        secrets=[secret],
     )
 
     with (
@@ -242,10 +266,7 @@ def test_add_ecr_existing_user_in_leader(cluster_tls_context):
         assert ecr_relation.id not in charm.state.cluster.managed_users
         update_cas.assert_not_called()
 
-    state_in = testing.State(
-        relations=relations + [ecr_relation],
-        leader=False,
-    )
+    state_in = testing.State(relations=relations + [ecr_relation], leader=False, secrets=[secret])
 
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
@@ -255,28 +276,29 @@ def test_add_ecr_existing_user_in_leader(cluster_tls_context):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         assert ecr_relation.id not in charm.state.cluster.managed_users
-        assert "client_relation_updated" in [event.name for event in state_out.deferred]
+        assert "client_chain_updated" in [event.name for event in state_out.deferred]
         is_new_ca.assert_not_called()
 
 
 def test_add_ecr_existing_user_in_non_leader(cluster_tls_context):
     """Test adding an external client relation to the charm with the user already existing."""
     ctx, relations = cluster_tls_context
+
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
         id=len(relations) + 1,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
     )
 
-    state_in = testing.State(
-        relations=relations + [ecr_relation],
-        leader=False,
-    )
+    state_in = testing.State(relations=relations + [ecr_relation], leader=False, secrets=[secret])
 
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
@@ -285,7 +307,7 @@ def test_add_ecr_existing_user_in_non_leader(cluster_tls_context):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         assert ecr_relation.id not in charm.state.cluster.managed_users
-        assert "client_relation_updated" in [event.name for event in state_out.deferred]
+        assert "client_chain_updated" in [event.name for event in state_out.deferred]
         is_new_ca.assert_not_called()
 
 
@@ -297,23 +319,27 @@ def test_ecr_update_common_name_leader(cluster_tls_context):
     old_common_name = "test-common-name"
     peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
 
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "new-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
         local_app_data={
-            "data": f'{{"ca-chain": "test_ca","common-name": "{old_common_name}", "keys-prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}}'
+            "data": f'{{"secret-mtls": "{secret.id}","common-name": "{old_common_name}", "prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"uris\\", \\"tls\\", \\"tls-ca\\", \\"client-chain\\"]"}}'
         },
     )
 
     state_in = testing.State(
         relations=relations + [ecr_relation],
         leader=True,
+        secrets=[secret],
     )
 
     server_cert = MagicMock()
@@ -349,24 +375,24 @@ def test_ecr_update_common_name_non_leader(cluster_tls_context):
     old_common_name = "test-common-name"
     peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
 
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": """test_ca""",
+            "secret-mtls": secret.id,
             "common-name": "new-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
         local_app_data={
-            "data": f'{{"ca-chain": "test_ca","common-name": "{old_common_name}", "keys-prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}}'
+            "data": f'{{"secret-mtls": "{secret.id}","common-name": "{old_common_name}", "prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}}'
         },
     )
 
-    state_in = testing.State(
-        relations=relations + [ecr_relation],
-        leader=False,
-    )
+    state_in = testing.State(relations=relations + [ecr_relation], leader=False, secrets=[secret])
 
     server_cert = MagicMock()
     server_cert.ca.raw = "test_ca_server"
@@ -375,7 +401,7 @@ def test_ecr_update_common_name_non_leader(cluster_tls_context):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         assert ecr_relation.id in charm.state.cluster.managed_users
-        assert "client_relation_updated" in [event.name for event in state_out.deferred]
+        assert "client_chain_updated" in [event.name for event in state_out.deferred]
 
     with (
         ctx(ctx.on.relation_changed(peer_relation), state_out) as manager,
@@ -386,7 +412,7 @@ def test_ecr_update_common_name_non_leader(cluster_tls_context):
         state_out = manager.run()
         assert ecr_relation.id in charm.state.cluster.managed_users
         is_new_ca.assert_called_once()
-        assert "client_relation_updated" not in [event.name for event in state_out.deferred]
+        assert "client_chain_updated" not in [event.name for event in state_out.deferred]
 
 
 def test_ecr_update_ca_chain_while_rotation_happening(cluster_tls_context):
@@ -394,35 +420,40 @@ def test_ecr_update_ca_chain_while_rotation_happening(cluster_tls_context):
     ctx, relations = cluster_tls_context
 
     peer_relation = relations[0]
-    old_ca = "test_ca"
     peer_relation.local_app_data["managed_users"] = '{"5":"test-common-name"}'
 
     peer_relation.local_unit_data["tls_client_ca_rotation"] = TLSCARotationState.NEW_CA_ADDED.value
 
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": "new_ca",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
         local_app_data={
-            "data": f'{{"ca-chain": "{old_ca}","common-name": "test-common-name", "keys-prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}}'
+            "data": f'{{"secret-mtls": "{secret.id}","common-name": "test-common-name", "prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}}'
         },
     )
 
-    state_in = testing.State(
-        relations=relations + [ecr_relation],
-        leader=True,
-    )
+    state_in = testing.State(relations=relations + [ecr_relation], leader=True, secrets=[secret])
 
+    # register secret label
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
     ):
         state_out = manager.run()
-        assert "client_relation_updated" in [event.name for event in state_out.deferred]
+
+    with (
+        ctx(ctx.on.secret_changed(secret), state_out) as manager,
+    ):
+        state_out = manager.run()
+        assert "client_chain_updated" in [event.name for event in state_out.deferred]
 
 
 def test_ecr_relation_broken_leader(cluster_tls_context):
@@ -432,23 +463,27 @@ def test_ecr_relation_broken_leader(cluster_tls_context):
     peer_relation = relations[0]
     peer_relation.local_app_data["managed_users"] = '{"5":"test-common-name"}'
 
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": "new_ca",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
         local_app_data={
-            "data": '{"ca-chain": "test_ca","common-name": "test-common-name", "keys-prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}'
+            "data": '{"ca-chain": "test_ca","common-name": "test-common-name", "prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}'
         },
     )
 
     state_in = testing.State(
         relations=relations + [ecr_relation],
         leader=True,
+        secrets=[secret],
     )
 
     with (
@@ -476,22 +511,27 @@ def test_ecr_relation_broken_not_leader(cluster_tls_context):
     peer_relation = relations[0]
     peer_relation.local_app_data["managed_users"] = '{"5":"test-common-name"}'
 
+    secret = Secret(
+        {"client-chain": "test_ca"},
+    )
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "ca-chain": "new_ca",
+            "secret-mtls": secret.id,
             "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
+            "prefix": "/test/keys",
             "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
         },
         local_app_data={
-            "data": '{"ca-chain": "test_ca","common-name": "test-common-name", "keys-prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}'
+            "data": '{"ca-chain": "test_ca","common-name": "test-common-name", "prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"tls\\", \\"tls-ca\\", \\"uris\\"]"}'
         },
     )
 
     state_in = testing.State(
         relations=relations + [ecr_relation],
+        leader=False,
+        secrets=[secret],
     )
     with (
         ctx(ctx.on.relation_broken(ecr_relation), state_in) as manager,
@@ -501,38 +541,3 @@ def test_ecr_relation_broken_not_leader(cluster_tls_context):
         manager.run()
         remove_managed_user.assert_not_called()
         # TODO add more assertions after checking custom event not being emitted in non leader setting
-
-
-def test_ecr_relation_joined(cluster_tls_context):
-    """Test provider adding its data to the local app data bag on ecr joining."""
-    ctx, relations = cluster_tls_context
-
-    ecr_relation = testing.Relation(
-        id=len(relations) + 1,
-        endpoint=EXTERNAL_CLIENTS_RELATION,
-        remote_app_data={
-            "ca-chain": "new_ca",
-            "common-name": "test-common-name",
-            "keys-prefix": "/test/keys",
-            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
-        },
-    )
-
-    state_in = testing.State(
-        relations=relations + [ecr_relation],
-        leader=True,
-    )
-
-    with (
-        ctx(ctx.on.relation_joined(ecr_relation), state_in) as manager,
-        patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
-            return_value=([server_cert], MagicMock()),
-        ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
-    ):
-        manager.run()
-        assert ecr_relation.local_app_data["ca-chain"] == "test_ca_server"
-        assert set(ecr_relation.local_app_data["endpoints"].split(",")) == set(
-            "https://ip1:2379,https://ip2:2379,https://ip0:2379".split(",")
-        )
