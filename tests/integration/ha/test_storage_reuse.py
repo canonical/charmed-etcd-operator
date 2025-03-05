@@ -88,7 +88,7 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     new_unit = ops_test.model.applications[app].units[-1]
     await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count, idle_period=60)
 
-    # ensure data can be written on the new unit
+    # ensure the newly added endpoint is healthy
     unit_endpoint = get_unit_endpoint(ops_test, unit_name=new_unit.name, app_name=app)
     assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{new_unit.name} is available again.")

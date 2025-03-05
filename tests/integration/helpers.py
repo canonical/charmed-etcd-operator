@@ -107,7 +107,7 @@ def get_cluster_id(endpoints: str, tls_enabled: bool = False) -> str:
         except (TypeError, KeyError) as e:
             logger.warning(e)
 
-    return ""
+    raise KeyError("cluster_id not found")
 
 
 def get_cluster_endpoints(

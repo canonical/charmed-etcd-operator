@@ -260,6 +260,7 @@ class EtcdClient:
             if use_input:
                 args.append("--interactive=False")
             # we append the TLS params whenever we find a client certificate
+            # todo: this is not substrate-agnostic
             if os.path.exists(f"{TLS_ROOT_DIR}/client.pem"):
                 args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
                 args.append(f"--key={TLS_ROOT_DIR}/client.key")
