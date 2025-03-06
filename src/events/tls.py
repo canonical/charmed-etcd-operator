@@ -214,13 +214,14 @@ class TLSEvents(Object):
             self.charm.tls_manager.set_ca_rotation_state(
                 cert_type, TLSCARotationState.CERT_UPDATED
             )
+            # Update the CA for external clients
+            if cert_type == TLSType.CLIENT:
+                self.charm.external_clients_events.update_client_relations_data()
             self.clean_ca_event.emit(cert_type=cert_type)
             return
 
         # TLS enabled and no CA rotation -> Simple certificate rotation
         if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NO_ROTATION:
-            if cert_type == TLSType.CLIENT:
-                self.charm.external_clients_events.update_client_relations_data()
             logger.debug(f"Rotating {cert_type.value} certificates")
             return
 
@@ -338,11 +339,11 @@ class TLSEvents(Object):
             if not secret_id:
                 continue
             secret_content = get_secret_from_id(self.charm.model, secret_id)
-            ca_chain = secret_content["client-chain"]
+            mtls_chain = secret_content["mtls-chain"]
             logger.debug(
-                f"Collecting CA from relation {relation.id} its CA: {ca_chain} secret_id: {secret_id}"
+                f"Collecting CA from relation {relation.id} its mtls chain: {mtls_chain} secret_id: {secret_id}"
             )
-            cas.extend(self.charm.tls_manager.separate_certificates(ca_chain))
+            cas.extend(self.charm.tls_manager.separate_certificates(mtls_chain))
 
         return cas
 

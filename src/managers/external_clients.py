@@ -8,6 +8,8 @@ import json
 import logging
 from pathlib import Path
 
+from charms.tls_certificates_interface.v4.tls_certificates import Certificate
+
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import SUBSTRATES
@@ -70,3 +72,18 @@ class ExternalClientsManager:
             (str): The managed user.
         """
         return self.state.cluster.managed_users.get(relation_id)
+
+    def get_common_name_from_chain(self, mtls_chain: str) -> str:
+        """Get the common name from the mtls chain.
+
+        Args:
+            mtls_chain (str): The mtls chain.
+
+        Returns:
+            (str): The common name.
+        """
+        # split the certificates by the end of the certificate marker and keep the marker in the cert
+        raw_cas = mtls_chain.split("-----END CERTIFICATE-----")
+        # add the marker back to the certificate
+        cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
+        return Certificate.from_string(cert).common_name

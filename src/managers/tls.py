@@ -64,7 +64,7 @@ class TLSManager:
         self.set_cert_state(cert_type, is_ready=True)
 
     def is_new_ca(self, ca_chain: str, tls_type: TLSType) -> bool:
-        """Check if the CA chain is trusted.
+        """Check if all certificates in the CA chain are trusted.
 
         Args:
             ca_chain (str): The CA certificate.
@@ -74,10 +74,7 @@ class TLSManager:
             bool: True if the CA is new, False otherwise.
         """
         trusted_cas = self.load_trusted_ca(tls_type)
-        for ca_cert in self.separate_certificates(ca_chain):
-            if ca_cert not in trusted_cas:
-                return True
-        return False
+        return any(ca_cert not in trusted_cas for ca_cert in self.separate_certificates(ca_chain))
 
     def add_trusted_ca(self, ca_cert: str, tls_type: TLSType = TLSType.PEER) -> None:
         """Add trusted CA to the system.
@@ -183,7 +180,7 @@ class TLSManager:
         return True
 
     def separate_certificates(self, concatenated_certs: str) -> list[str]:
-        """Seperate certificates from the concatenated certificates.
+        """Separate certificates from the concatenated certificates.
 
         Args:
             concatenated_certs (str): The concatenated certificates.
