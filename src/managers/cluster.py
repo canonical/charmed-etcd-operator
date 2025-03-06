@@ -253,10 +253,7 @@ class ClusterManager:
                 password=self.admin_password,
                 client_url=",".join(e for e in self.cluster_endpoints),
             )
-            if self.is_healthy(cluster=True):
-                client.remove_member(self.member.id)
-            else:
-                raise EtcdClusterManagementError("Cluster not healthy.")
+            client.remove_member(self.member.id)
         except (EtcdClusterManagementError, RaftLeaderNotFoundError):
             raise
         except ValueError:
@@ -303,6 +300,9 @@ class ClusterManager:
 
     def update_cluster_member_state(self) -> None:
         """Get up-to-date member information and store in cluster state."""
+        if not self.state.cluster.cluster_state:
+            return
+
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,

@@ -99,12 +99,15 @@ def get_cluster_id(endpoints: str, tls_enabled: bool = False) -> str:
             --cert client.pem \
             --key client.key"
 
-    try:
-        result = subprocess.getoutput(etcd_command).split("\n")[0]
-        members = json.loads(result)
-        return members[0]["Status"]["header"]["cluster_id"]
-    except KeyError:
-        raise
+    result = subprocess.getoutput(etcd_command).split("\n")
+    for r in result:
+        member = json.loads(r)
+        try:
+            return member[0]["Status"]["header"]["cluster_id"]
+        except (TypeError, KeyError) as e:
+            logger.warning(e)
+
+    raise KeyError("cluster_id not found")
 
 
 def get_cluster_endpoints(

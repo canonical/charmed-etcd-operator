@@ -108,16 +108,18 @@ class EtcdEvents(Object):
 
         self.charm.config_manager.set_config_properties()
 
-        if not self.charm.state.cluster.cluster_state and self.charm.workload.exists(DATABASE_DIR):
-            # this is a new application but storage is reused
-            self.charm.cluster_manager.start_member()
-            self.charm.state.cluster.update({"authentication": "enabled"})
-            # update cluster membership configuration after recovering existing data
-            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
-        elif not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
+        if not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
             # this is the very first cluster start, this unit starts without being added as member
             # all subsequent units will have to be added as member before starting the workload
             self.charm.cluster_manager.start_member()
+
+            if self.charm.workload.exists(DATABASE_DIR):
+                # this is a new application but storage is reused
+                self.charm.state.cluster.update({"authentication": "enabled"})
+                # update cluster membership configuration after recovering existing data
+                self.charm.cluster_manager.broadcast_peer_url(
+                    self.charm.state.unit_server.peer_url
+                )
 
             if not self.charm.state.cluster.auth_enabled:
                 try:
@@ -132,8 +134,8 @@ class EtcdEvents(Object):
         ):
             # this unit has been added to the etcd cluster
             if not self.charm.state.cluster.auth_enabled:
+                # failed start hooks on cluster initialization will go here on retry
                 if self.charm.unit.is_leader():
-                    # if enabling auth failed on first cluster startup, we want to retry now
                     try:
                         self.charm.cluster_manager.enable_authentication()
                         self.charm.state.cluster.update({"authentication": "enabled"})
@@ -143,19 +145,21 @@ class EtcdEvents(Object):
                 else:
                     raise EtcdAuthNotEnabledError("Authentication not enabled.")
 
-            if self.charm.workload.exists(DATABASE_DIR):
-                logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
-                # storage cannot be reused on non-leader members
-                try:
-                    self.charm.workload.remove_directory(DATABASE_DIR)
-                    logger.warning(
-                        f"Removed database file from {DATABASE_DIR} to join existing cluster."
-                    )
-                except OSError:
-                    # if removing fails, we cannot start the workload or the member would crash
-                    raise
+            if not self.charm.state.unit_server.is_started:
+                # database files should not be deleted on running units
+                if self.charm.workload.exists(DATABASE_DIR):
+                    logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
+                    # storage cannot be reused on non-leader members
+                    try:
+                        self.charm.workload.remove_directory(DATABASE_DIR)
+                        logger.warning(
+                            f"Removed database file from {DATABASE_DIR} to join existing cluster."
+                        )
+                    except OSError:
+                        # if removing fails, we cannot start the workload or the member would crash
+                        raise
 
-            self.charm.cluster_manager.start_member()
+                self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
@@ -230,13 +234,16 @@ class EtcdEvents(Object):
         if not self.charm.unit.is_leader():
             return
 
-        logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
-        cluster_members = self.charm.state.cluster.cluster_members.split(",")
-        # re-assemble the string without the departing unit
-        updated_cluster_members = ",".join(
-            m for m in cluster_members if event.unit.name.replace("/", "") not in m
-        )
-        self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
+        if self.charm.state.unit_server.is_started:
+            # this must not overwrite already cleaned up application databag
+            # it should only happen if at least this unit's workload is still running
+            logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
+            cluster_members = self.charm.state.cluster.cluster_members.split(",")
+            # re-assemble the string without the departing unit
+            updated_cluster_members = ",".join(
+                m for m in cluster_members if event.unit.name.replace("/", "") not in m
+            )
+            self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
@@ -267,6 +274,9 @@ class EtcdEvents(Object):
                 password = self.charm.workload.generate_password()
 
             self.charm.state.cluster.update({f"{INTERNAL_USER}-password": password})
+
+        # reflect membership updates in the cluster state
+        self.charm.cluster_manager.update_cluster_member_state()
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""

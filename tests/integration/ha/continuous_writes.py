@@ -9,6 +9,8 @@ import subprocess
 import sys
 import time
 
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
+
 logger = logging.getLogger(__name__)
 
 WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
@@ -38,10 +40,14 @@ def continuous_writes(endpoints: str, user: str, password: str):
                         """
 
         try:
-            result = subprocess.getoutput(etcd_command).split("\n")
-            with open(LOG_FILE_PATH, "a") as log_file:
-                log_file.write(f"{result}\n")
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            for attempt in Retrying(stop=stop_after_attempt(2), wait=wait_fixed(1)):
+                with attempt:
+                    result = subprocess.getoutput(etcd_command).split("\n")
+                    with open(LOG_FILE_PATH, "a") as log_file:
+                        log_file.write(f"{result}\n")
+                    if not any(r == "OK" for r in result):
+                        raise ValueError
+        except RetryError:
             pass
 
         time.sleep(1)

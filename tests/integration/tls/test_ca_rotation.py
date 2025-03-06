@@ -54,7 +54,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], timeout=1000, idle_period=60)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)

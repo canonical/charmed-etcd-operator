@@ -63,7 +63,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=60)
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])

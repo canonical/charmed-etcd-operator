@@ -12,7 +12,7 @@ from typing import Tuple
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
-from literals import SNAP_NAME, SNAP_REVISION
+from literals import DATABASE_DIR, SNAP_NAME, SNAP_REVISION
 
 logger = logging.getLogger(__name__)
 
@@ -147,3 +147,14 @@ async def patch_restart_delay(ops_test: OpsTest, unit_name: str, delay: int) -> 
     # reload the daemon for systemd to reflect changes
     reload_cmd = f"exec --unit {unit_name} -- sudo systemctl daemon-reload"
     await ops_test.juju(*reload_cmd.split(), check=True)
+
+
+async def remove_database_file(ops_test: OpsTest, unit_name: str) -> None:
+    """Delete the database file of etcd on a unit."""
+    delete_db_cmd = f"exec --unit {unit_name} -- rm {DATABASE_DIR}/snap/db"
+    # we can delete the database file containing the data content
+    # but never the write-ahead-log file, which contains the committed Raft information
+    # otherwise the member would not be functional anymore
+    # see: https://etcd.io/docs/v3.5/learning/persistent-storage-files/#logical-content
+    await ops_test.juju(*delete_db_cmd.split(), check=True)
+    logger.info(f"etcd database file deleted on {unit_name}.")

@@ -12,6 +12,7 @@ import subprocess
 
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +103,17 @@ def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
 
 def is_unit_reachable(from_host: str, to_host: str) -> bool:
     """Test network reachability between hosts."""
-    ping = subprocess.call(
-        f"lxc exec {from_host} -- ping -c 5 {to_host}".split(),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    return ping == 0
+    try:
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(10)):
+            with attempt:
+                ping = subprocess.call(
+                    f"lxc exec {from_host} -- ping -c 5 {to_host}".split(),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                if ping == 0:
+                    return True
+                else:
+                    raise ValueError
+    except RetryError:
+        return False

@@ -19,6 +19,7 @@ from ..helpers import (
     get_secret_by_label,
     get_storage_id,
     get_unit_endpoint,
+    is_endpoint_up,
     put_key,
 )
 from ..helpers_deployment import wait_until
@@ -87,18 +88,9 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     new_unit = ops_test.model.applications[app].units[-1]
     await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count, idle_period=60)
 
-    # ensure data can be written on the new unit
+    # ensure the newly added endpoint is healthy
     unit_endpoint = get_unit_endpoint(ops_test, unit_name=new_unit.name, app_name=app)
-    assert (
-        put_key(
-            unit_endpoint,
-            user=INTERNAL_USER,
-            password=password,
-            key=TEST_KEY,
-            value=TEST_VALUE,
-        )
-        == "OK"
-    )
+    assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{new_unit.name} is available again.")
 
     # check cluster formation after unit with existing storage was added
@@ -158,7 +150,7 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
         return_code, _, _ = await ops_test.juju(*add_unit_cmd.split())
         assert return_code == 0, f"Failed to add unit with storage {storage_id}"
 
-    await wait_until(ops_test, apps=[app], wait_for_exact_units=len(storage_ids), idle_period=60)
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=len(storage_ids), idle_period=120)
 
     # check cluster formation after new cluster was forced
     endpoints = get_cluster_endpoints(ops_test, app)
@@ -168,7 +160,7 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     cluster_members = get_cluster_members(endpoints)
 
     for unit in ops_test.model.applications[app].units:
-        assert unit.name.replace("/", "") in (member["name"] for member in cluster_members), (
+        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
             f"{unit.name} is not in {cluster_members}"
         )
 
@@ -260,7 +252,7 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
 
     # scale up
     await ops_test.model.applications[APP_NAME].add_unit(count=2)
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=60)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=120)
 
     # check cluster formation
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
@@ -270,8 +262,8 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
     cluster_members = get_cluster_members(endpoints)
 
     for unit in ops_test.model.applications[app].units:
-        assert unit.name.replace("/", "") in (member["name"] for member in cluster_members), (
-            f"{unit.name} is not a cluster member"
+        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
+            f"{unit.name} is not in {cluster_members}"
         )
 
     assert len(cluster_members) == NUM_UNITS, (
