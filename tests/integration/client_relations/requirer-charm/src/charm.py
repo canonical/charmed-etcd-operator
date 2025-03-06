@@ -13,9 +13,9 @@ from urllib.request import urlretrieve
 
 import ops
 from charms.data_platform_libs.v0.data_interfaces import (
+    AuthenticationEvent,
     DatabaseEndpointsChangedEvent,
     EtcdRequires,
-    TLSCAUpdatedEvent,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
@@ -56,13 +56,14 @@ class RequirerCharmCharm(ops.CharmBase):
             self,
             relation_name="etcd-client",
             prefix="/test/",
-            common_name=self.common_name,
-            client_chain=self.ca_chain,
+            mtls_chain=self.ca_chain,
         )
 
         # EtcdRequires events
         framework.observe(self.etcd_requires.on.endpoints_changed, self._on_endpoints_changed)
-        framework.observe(self.etcd_requires.on.tls_ca_updated, self._on_tls_ca_updated)
+        framework.observe(
+            self.etcd_requires.on.authentication_updated, self._on_authentication_updated
+        )
 
         # TLSCertificatesRequiresV4 events
         framework.observe(
@@ -100,7 +101,7 @@ class RequirerCharmCharm(ops.CharmBase):
         certs, _ = self.certificates.get_assigned_certificates()
         if not certs:
             return None
-        return certs[0].ca.raw
+        return "\n".join(cert.raw for cert in certs[0].chain[::-1])
 
     def _on_start(self, event: ops.StartEvent):
         """Handle start event."""
@@ -138,7 +139,7 @@ class RequirerCharmCharm(ops.CharmBase):
 
         if event.params.get("ca"):
             ca = event.params["ca"].replace("\\n", "\n")
-            self.etcd_requires.set_client_chain(relation.id, ca)
+            self.etcd_requires.set_mtls_chain(relation.id, ca)
 
         event.set_results({"message": "databag updated"})
 
@@ -157,14 +158,16 @@ class RequirerCharmCharm(ops.CharmBase):
 
         relation = self.model.get_relation("etcd-client")
         if relation:
-            self.etcd_requires.set_common_name(relation.id, self.common_name)
-            self.etcd_requires.set_client_chain(relation.id, cert.ca.raw)
+            self.etcd_requires.set_mtls_chain(relation.id, self.ca_chain or cert.certificate.raw)
 
-    def _on_tls_ca_updated(self, event: TLSCAUpdatedEvent):
+    def _on_authentication_updated(self, event: AuthenticationEvent):
         """Handle server CA updated event."""
-        logger.info("Server CA updated")
+        logger.info("Authentication updated")
         if not event.tls_ca:
             logger.error("No server CA chain available")
+            return
+        if not event.username:
+            logger.error("No username available")
             return
         Path(WORK_DIR).mkdir(exist_ok=True)
         Path(f"{WORK_DIR}/ca.pem").write_text(event.tls_ca)
@@ -189,6 +192,13 @@ class RequirerCharmCharm(ops.CharmBase):
 
     def _on_get_action(self, event: ops.ActionEvent):
         """Handle get action."""
+        certs, _ = self.certificates.get_assigned_certificates()
+        if not certs:
+            return None
+        certs[0].chain
+        import pdb
+
+        pdb.set_trace()
         key = event.params["key"]
         result = _get(key)
         if result:

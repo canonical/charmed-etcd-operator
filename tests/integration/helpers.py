@@ -311,7 +311,7 @@ def get_role(
 
 
 def separate_certificates(ca_chain: str) -> list[str]:
-    """Seperate certificates from the concatenated certificates.
+    """Separate certificates from the concatenated certificates.
 
     Args:
         ca_chain (str): The concatenated certificates.
