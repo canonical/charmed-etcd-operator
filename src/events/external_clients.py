@@ -130,9 +130,7 @@ class ExternalClientsEvents(Object):
         server_ca = server_certs[0].ca.raw
         etcd_version = self.charm.cluster_manager.get_version()
         for relation in self.etcd_provides.relations:
-            if not self.charm.external_clients_manager.get_relation_managed_user(relation.id):
-                continue
-            relation_data = self.etcd_provides.fetch_relation_data(
+            relation_data = self.etcd_provides.fetch_my_relation_data(
                 [relation.id], ["endpoints", "tls-ca", "version"]
             )[relation.id]
 
