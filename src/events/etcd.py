@@ -275,6 +275,9 @@ class EtcdEvents(Object):
 
             self.charm.state.cluster.update({f"{INTERNAL_USER}-password": password})
 
+        # reflect membership updates in the cluster state
+        self.charm.cluster_manager.update_cluster_member_state()
+
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
         if not self.charm.workload.alive():
