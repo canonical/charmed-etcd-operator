@@ -83,7 +83,7 @@ def test_start():
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status != ops.ActiveStatus()
+        assert state_out.unit_status == ops.MaintenanceStatus("Waiting to join cluster")
         start.assert_not_called()
 
     # if authentication cannot be enabled, the charm should error out
