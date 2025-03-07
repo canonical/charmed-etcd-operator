@@ -345,8 +345,13 @@ class EtcdEvents(Object):
                         )
                     except EtcdUserManagementError as e:
                         logger.error(e)
+                        self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
+            else:
+                logger.error(f"Invalid username in secret {admin_secret_id}.")
+                self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
+            self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
 
     def update_private_key(self, private_key_id: str) -> None:
         """Update the private key in etcd."""
