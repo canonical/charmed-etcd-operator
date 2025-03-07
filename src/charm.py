@@ -38,6 +38,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         super().__init__(*args)
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
+        self.pending_inactive_statuses: list[Status] = []
 
         # --- MANAGERS ---
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
@@ -53,13 +54,16 @@ class EtcdOperatorCharm(ops.CharmBase):
         # --- LIB EVENT HANDLERS ---
         self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)
 
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
+        self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+
     def set_status(self, key: Status) -> None:
         """Set charm status."""
         status: StatusBase = key.value.status
         log_level: DebugLevel = key.value.log_level
 
         getattr(logger, log_level.lower())(status.message)
-        self.unit.status = status
+        self.pending_inactive_statuses.append(key)
 
     def _restart(self, _) -> None:
         """Restart callback for the rolling ips lib."""
@@ -208,6 +212,10 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NO_ROTATION)
 
         self._restart(None)
+
+    def _on_collect_status(self, event: ops.CollectStatusEvent):
+        for status in self.pending_inactive_statuses + [Status.ACTIVE]:
+            event.add_status(status.value.status)
 
 
 if __name__ == "__main__":  # pragma: nocover
