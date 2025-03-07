@@ -163,12 +163,11 @@ class EtcdEvents(Object):
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
+            self.charm.set_status(Status.CLUSTER_NOT_JOINED)
             event.defer()
             return
 
-        if self.charm.workload.alive():
-            self.charm.set_status(Status.ACTIVE)
-        else:
+        if not self.charm.workload.alive():
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
@@ -284,8 +283,6 @@ class EtcdEvents(Object):
             if not self.charm.cluster_manager.restart_member():
                 self.charm.set_status(Status.SERVICE_NOT_RUNNING)
                 return
-
-        self.charm.set_status(Status.ACTIVE)
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
