@@ -196,9 +196,6 @@ class RequirerCharmCharm(ops.CharmBase):
         if not certs:
             return None
         certs[0].chain
-        import pdb
-
-        pdb.set_trace()
         key = event.params["key"]
         result = _get(key)
         if result:
