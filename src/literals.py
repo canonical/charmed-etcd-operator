@@ -64,7 +64,9 @@ class Status(Enum):
     )
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
     CLUSTER_NOT_JOINED = StatusLevel(MaintenanceStatus("Waiting to join cluster"), "DEBUG")
-    CLUSTER_MEMBER_NOT_PROMOTED = StatusLevel(MaintenanceStatus("Waiting to promote learning member"), "DEBUG")
+    CLUSTER_MEMBER_NOT_PROMOTED = StatusLevel(
+        MaintenanceStatus("Waiting to promote learning member"), "DEBUG"
+    )
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
     PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
