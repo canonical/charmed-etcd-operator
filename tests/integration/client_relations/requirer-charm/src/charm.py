@@ -18,6 +18,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     EtcdRequires,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
+    Certificate,
     CertificateAvailableEvent,
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
@@ -75,6 +76,7 @@ class RequirerCharmCharm(ops.CharmBase):
         framework.observe(self.on.update_action, self._on_update_action)
         framework.observe(self.on.put_action, self._on_put_action)
         framework.observe(self.on.get_action, self._on_get_action)
+        self.framework.observe(self.on.get_credentials_action, self._on_get_credentials_action)
 
     @property
     def common_name(self):
@@ -103,6 +105,11 @@ class RequirerCharmCharm(ops.CharmBase):
             return None
         return "\n".join(cert.raw for cert in certs[0].chain[::-1])
 
+    @property
+    def etcd_relation(self) -> ops.Relation | None:
+        """Return the etcd relation if present."""
+        return self.etcd_requires.relations[0] if len(self.etcd_requires.relations) else None
+
     def _on_start(self, event: ops.StartEvent):
         """Handle start event."""
         self.unit.status = ops.ActiveStatus()
@@ -124,24 +131,13 @@ class RequirerCharmCharm(ops.CharmBase):
             event.fail("etcd-client relation not found")
             return
 
-        if event.params.get("common-name"):
-            common_name = event.params["common-name"]
+        if event.params.get("chain"):
+            ca = event.params["chain"].replace("\\n", "\n")
             Path(WORK_DIR).mkdir(exist_ok=True)
-            Path(f"{WORK_DIR}/common_name.txt").write_text(common_name)
-            self.certificates.certificate_requests = [
-                CertificateRequestAttributes(
-                    common_name=self.common_name,
-                    sans_ip=frozenset({socket.gethostbyname(socket.gethostname())}),
-                    sans_dns=frozenset({self.unit.name, socket.gethostname()}),
-                ),
-            ]
-            self.refresh_tls_certificates_event.emit()
-
-        if event.params.get("ca"):
-            ca = event.params["ca"].replace("\\n", "\n")
+            Path(f"{WORK_DIR}/common_name.txt").write_text(_get_common_name_from_chain(ca))
             self.etcd_requires.set_mtls_chain(relation.id, ca)
 
-        event.set_results({"message": "databag updated"})
+        event.set_results({"message": "chain updated on data bag"})
 
     def _on_certificate_available(self, event: CertificateAvailableEvent):
         """Handle certificate available event."""
@@ -202,6 +198,36 @@ class RequirerCharmCharm(ops.CharmBase):
             event.set_results({"message": result})
         else:
             event.fail("etcdctl get failed")
+
+    def _on_get_credentials_action(self, event: ops.ActionEvent) -> None:
+        """Return the credentials an action response."""
+        if not self.server_ca_chain:
+            event.fail(
+                "The server CA chain is not available. Please wait for the server to provide it."
+            )
+            event.set_results({"ok": False})
+            return
+
+        if not self.etcd_relation:
+            event.fail("The action can be run only after relation is created.")
+            event.set_results({"ok": False})
+            return
+
+        result: dict = {"ok": True}
+
+        result.update(
+            {
+                "username": self.etcd_requires.fetch_relation_field(
+                    self.etcd_relation.id, "username"
+                ),
+                "tls-ca": self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "tls-ca"),
+                "version": self.etcd_requires.fetch_relation_field(
+                    self.etcd_relation.id, "version"
+                ),
+            }
+        )
+
+        event.set_results(result)
 
 
 def _put(key: str, value: str):
@@ -277,6 +303,14 @@ def _get(key: str) -> str:
         return ""
 
     return output.decode("utf-8").strip()
+
+
+def _get_common_name_from_chain(mtls_chain: str) -> str:
+    """Get common name from chain."""
+    raw_cas = mtls_chain.split("-----END CERTIFICATE-----")
+    # add the marker back to the certificate
+    cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
+    return Certificate.from_string(cert).common_name
 
 
 if __name__ == "__main__":  # pragma: nocover

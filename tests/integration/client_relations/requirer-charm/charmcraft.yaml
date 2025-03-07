@@ -38,10 +38,7 @@ actions:
   update:
     description: Update the common name of the certificate
     params:
-      common-name:
-        description: The new common name for the certificate
-        type: string
-      ca:
+      chain:
         description: The CA certificate
         type: string
 
@@ -61,3 +58,6 @@ actions:
       key:
         description: The key to get from etcd
         type: string
+
+  get-credentials:
+    description: Action for fetching all available credentials from relations.
