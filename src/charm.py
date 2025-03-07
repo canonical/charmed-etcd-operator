@@ -72,7 +72,6 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member():
-            self.set_status(Status.HEALTH_CHECK_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def rolling_restart(self, callback_override: str | None = None) -> None:
@@ -102,7 +101,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # write config and restart workload
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member():
-            self.set_status(Status.TLS_CLIENT_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_enable_peer_tls(self, _) -> None:
@@ -128,7 +126,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # write config and restart workload
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member(move_leader=False):
-            self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_disable_client_tls(self, _) -> None:
@@ -154,7 +151,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # write config and restart workload
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member(move_leader=False):
-            self.set_status(Status.TLS_CLIENT_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_disable_peer_tls(self, _) -> None:
@@ -184,7 +180,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # write config and restart workload
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member(move_leader=False):
-            self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_ca_rotation(self, _) -> None:
