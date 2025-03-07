@@ -103,6 +103,7 @@ class EtcdEvents(Object):
             logger.info(
                 f"Deferring start because TLS is not ready for {self.charm.state.unit_server.member_name}."
             )
+            self.charm.set_status(Status.TLS_NOT_READY)
             event.defer()
             return
 
@@ -222,6 +223,7 @@ class EtcdEvents(Object):
                     self.charm.cluster_manager.promote_learning_member()
                 except EtcdClusterManagementError as e:
                     logger.warning(e)
+                    self.charm.set_status(Status.CLUSTER_MEMBER_NOT_PROMOTED)
                     event.defer()
                     return
 
