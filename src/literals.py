@@ -66,6 +66,7 @@ class Status(Enum):
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
+    CLUSTER_NOT_JOINED = StatusLevel(MaintenanceStatus("Waiting to join cluster"), "DEBUG")
     REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")

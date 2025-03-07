@@ -77,13 +77,14 @@ def test_start():
     # non-leader units should not start directly
     state_in = testing.State(leader=False)
     with (
-        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
-        patch("workload.EtcdWorkload.start"),
+        patch("workload.EtcdWorkload.start") as start,
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status != ops.ActiveStatus()
+        start.assert_not_called()
 
     # if authentication cannot be enabled, the charm should error out
     state_in = testing.State(relations={relation}, leader=True)
