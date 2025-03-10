@@ -45,7 +45,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     assert ops_test.model is not None, "Model is not set"
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
+    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
 
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")

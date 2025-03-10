@@ -176,7 +176,7 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
 
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
+    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
 
     # make sure we have at least two units so we can stop one of them
     if len(ops_test.model.applications[app].units) < 2:

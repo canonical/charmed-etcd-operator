@@ -38,7 +38,7 @@ async def test_deploy_with_peer_tls(ops_test: OpsTest) -> None:
     """Deploy a cluster with three units and peer-certificates."""
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
+    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
 
     if await existing_app(ops_test):
         return
