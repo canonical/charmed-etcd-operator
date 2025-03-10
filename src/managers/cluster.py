@@ -7,6 +7,7 @@
 import logging
 import socket
 from json import JSONDecodeError
+from typing import List
 
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
@@ -20,7 +21,7 @@ from common.exceptions import (
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, EtcdClusterState, TLSState
+from literals import INTERNAL_USER, EtcdClusterState, Status, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -316,3 +317,16 @@ class ClusterManager:
         except Exception as e:
             # we should not have errors here, but if we do, we don't want the error to raise
             logger.warning(f"Error updating the cluster member state: {e}")
+
+    def compute_component_status(self) -> List[Status]:
+        """Compute the Cluster manager's statuses."""
+        status_list = []
+
+        if self.state.unit_server.is_started:
+            if not self.state.cluster.cluster_state == EtcdClusterState.EXISTING.value:
+                status_list.append(Status.CLUSTER_NOT_INITIALIZED)
+
+            if not self.state.cluster.auth_enabled:
+                status_list.append(Status.AUTHENTICATION_NOT_ENABLED)
+
+        return status_list

@@ -18,7 +18,6 @@ from literals import (
     RESTART_RELATION,
     SUBSTRATE,
     DebugLevel,
-    EtcdClusterState,
     Status,
     TLSCARotationState,
     TLSState,
@@ -217,12 +216,8 @@ class EtcdOperatorCharm(ops.CharmBase):
         Component statuses should be computed in their respective priority.
         """
         # compute cluster status
-        if self.state.unit_server.is_started:
-            if not self.state.cluster.cluster_state == EtcdClusterState.EXISTING.value:
-                event.add_status(Status.CLUSTER_NOT_INITIALIZED.value.status)
-
-            if not self.state.cluster.auth_enabled:
-                event.add_status(Status.AUTHENTICATION_NOT_ENABLED.value.status)
+        for status in self.cluster_manager.compute_component_status():
+            event.add_status(status.value.status)
 
         # compute TLS status
         # todo: add compute logic here
