@@ -63,6 +63,9 @@ class Status(Enum):
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
+    CLUSTER_NOT_INITIALIZED = StatusLevel(
+        BlockedStatus("Waiting for cluster initialization"), "ERROR"
+    )
     CLUSTER_NOT_JOINED = StatusLevel(MaintenanceStatus("Waiting to join cluster"), "DEBUG")
     CLUSTER_MEMBER_NOT_PROMOTED = StatusLevel(
         MaintenanceStatus("Waiting to promote learning member"), "DEBUG"

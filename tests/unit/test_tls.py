@@ -707,6 +707,10 @@ def test_set_tls_private_key():
             "tls_peer_state": "tls",
             "state": "started",
         },
+        local_app_data={
+            "cluster_state": "existing",
+            "authentication": "enabled",
+        },
     )
     restart_peer_relation = testing.PeerRelation(id=4, endpoint=RESTART_RELATION)
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)

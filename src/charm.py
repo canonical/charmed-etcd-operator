@@ -18,6 +18,7 @@ from literals import (
     RESTART_RELATION,
     SUBSTRATE,
     DebugLevel,
+    EtcdClusterState,
     Status,
     TLSCARotationState,
     TLSState,
@@ -208,7 +209,28 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         self._restart(None)
 
-    def _on_collect_status(self, event: ops.CollectStatusEvent):
+    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
+        """Compute the current status for this unit.
+
+        Ops framework will choose the highest-priority status and set that as the status.
+        If there are multiple statuses with the same priority, the first one added wins.
+        Component statuses should be computed in their respective priority.
+        """
+        # compute cluster status
+        if self.state.unit_server.is_started:
+            if not self.state.cluster.cluster_state == EtcdClusterState.EXISTING.value:
+                event.add_status(Status.CLUSTER_NOT_INITIALIZED.value.status)
+
+            if not self.state.cluster.auth_enabled:
+                event.add_status(Status.AUTHENTICATION_NOT_ENABLED.value.status)
+
+        # compute TLS status
+        # todo: add compute logic here
+
+        # compute backup or other component's  status
+        # todo: add compute logic here
+
+        # add all other statuses collected during the current hook
         for status in self.pending_inactive_statuses + [Status.ACTIVE]:
             event.add_status(status.value.status)
 
