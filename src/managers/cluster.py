@@ -323,7 +323,7 @@ class ClusterManager:
         status_list = []
 
         if self.state.unit_server.is_started:
-            if not self.state.cluster.cluster_state == EtcdClusterState.EXISTING.value:
+            if self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value:
                 status_list.append(Status.CLUSTER_NOT_INITIALIZED)
 
             if not self.state.cluster.auth_enabled:
