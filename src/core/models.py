@@ -4,6 +4,7 @@
 
 """Collection of state objects for the Etcd relations, apps and units."""
 
+import json
 import logging
 from dataclasses import dataclass
 
@@ -214,6 +215,11 @@ class EtcdCluster(RelationState):
         will unset the `member_id` here.
         """
         return self.relation_data.get("learning_member", "")
+
+    @property
+    def s3_credentials(self) -> dict[str, str]:
+        """Get credentials and parameters to access s3 object storage."""
+        return json.loads(self.relation_data.get("s3-credentials", "{}"))
 
 
 @dataclass

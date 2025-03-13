@@ -23,3 +23,7 @@ class BackupManager:
         self.admin_user = INTERNAL_USER
         self.admin_password = self.state.cluster.internal_user_credentials.get(INTERNAL_USER, "")
         self.cluster_endpoints = [server.client_url for server in self.state.servers]
+
+    def create_bucket(self, s3_parameters: dict[str, str]) -> None:
+        """Create bucket if it does not exist yet."""
+        pass

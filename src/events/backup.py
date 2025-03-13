@@ -4,6 +4,7 @@
 
 """Event handlers for creating and restoring backups."""
 
+import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -14,7 +15,7 @@ from charms.data_platform_libs.v0.s3 import (
 )
 from ops import Object
 
-from literals import S3_RELATION_NAME
+from literals import S3_RELATION_NAME, Status
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -36,7 +37,25 @@ class BackupEvents(Object):
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credentials_gone)
 
     def _on_s3_credentials_changed(self, event: CredentialsChangedEvent):
-        pass
+        if not self.charm.unit.is_leader():
+            return
+
+        if not self.charm.state.peer_relation:
+            self.charm.set_status(Status.NO_PEER_RELATION)
+            event.defer()
+            return
+
+        required_parameters = ["bucket", "access-key", "secret-key"]
+        s3_parameters = self.s3_requirer.get_s3_connection_info()
+
+        if missing_parameters := [p for p in required_parameters if p not in s3_parameters]:
+            raise KeyError(f"Parameters missing from S3 integrator: {missing_parameters}")
+
+        self.charm.backup_manager.create_bucket(s3_parameters)
+        self.charm.state.cluster.update({"s3-credentials": json.dumps(s3_parameters)})
 
     def _on_s3_credentials_gone(self, event: CredentialsGoneEvent):
-        pass
+        if not self.charm.unit.is_leader():
+            return
+
+        self.charm.state.cluster.update({"s3-credentials": ""})
