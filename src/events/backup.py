@@ -45,7 +45,8 @@ class BackupEvents(Object):
             event.defer()
             return
 
-        required_parameters = ["bucket", "access-key", "secret-key"]
+        # make sure we have all required parameters for writing to the storage
+        required_parameters = ["bucket", "endpoint", "path", "access-key", "secret-key"]
         s3_parameters = self.s3_requirer.get_s3_connection_info()
 
         if missing_parameters := [p for p in required_parameters if p not in s3_parameters]:

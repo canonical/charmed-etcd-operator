@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 from ops import testing
@@ -23,12 +24,19 @@ def test_s3_relation():
         interface="s3",
         endpoint=S3_RELATION_NAME,
         remote_app_name="s3",
-        remote_app_data={"access-key": "mykey", "secret-key": "mysecret", "bucket": "mybucket"},
+        remote_app_data={
+            "access-key": "mykey",
+            "secret-key": "mysecret",
+            "bucket": "mybucket",
+            "endpoint": "myendpoint",
+            "path": "mypath",
+        },
     )
-    state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
-    state_out = ctx.run(ctx.on.relation_changed(s3_relation), state_in)
-    secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret_out.latest_content.get("s3-credentials")
+    with patch("managers.backup.BackupManager.create_bucket"):
+        state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
+        state_out = ctx.run(ctx.on.relation_changed(s3_relation), state_in)
+        secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
+        assert secret_out.latest_content.get("s3-credentials")
 
     # unhappy path - bucket name is missing in s3-integrator relation
     ctx = testing.Context(EtcdOperatorCharm)
@@ -42,7 +50,8 @@ def test_s3_relation():
     )
 
     state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.errors.UncaughtCharmError) as e:
-        ctx.run(ctx.on.relation_changed(s3_relation), state_in)
+    with patch("managers.backup.BackupManager.create_bucket"):
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.relation_changed(s3_relation), state_in)
 
-    assert isinstance(e.value.__cause__, KeyError)
+        assert isinstance(e.value.__cause__, KeyError)

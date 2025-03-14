@@ -6,6 +6,9 @@
 
 import logging
 
+import boto3
+from botocore.exceptions import ClientError
+
 # from common.client import EtcdClient
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
@@ -26,4 +29,25 @@ class BackupManager:
 
     def create_bucket(self, s3_parameters: dict[str, str]) -> None:
         """Create bucket if it does not exist yet."""
-        pass
+        logger.info(f"s3 parameters: {s3_parameters}")
+        bucket_name = s3_parameters["bucket"]
+        region = s3_parameters["region"]
+        s3_client = boto3.client(
+            "s3",
+            region_name=region,
+            endpoint_url=s3_parameters["endpoint"],
+            aws_access_key_id=s3_parameters["access-key"],
+            aws_secret_access_key=s3_parameters["secret-key"],
+        )
+
+        try:
+            if region:
+                location = {"LocationConstraint": region}
+                s3_client.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=location)
+            else:
+                s3_client.create_bucket(Bucket=bucket_name)
+        except ClientError:
+            # todo: do we want to raise to make the user aware of the error?
+            raise
+
+        logger.info(f"Created bucket {bucket_name}")
