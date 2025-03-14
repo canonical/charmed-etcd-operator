@@ -220,6 +220,7 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         assert "start" in [event.name for event in state_out.deferred]
+        assert state_out.app_status == Status.TLS_ENABLING_PEER_TLS.value.status
 
         peer_relation = testing.PeerRelation(
             id=1,
@@ -237,6 +238,7 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         assert "start" in [event.name for event in state_out.deferred]
+        assert state_out.app_status == Status.TLS_ENABLING_CLIENT_TLS.value.status
 
         peer_relation = testing.PeerRelation(
             id=1,
@@ -257,6 +259,7 @@ def test_enable_tls_on_start():
         assert state_out.unit_status == Status.ACTIVE.value.status
         assert peer_relation.local_unit_data["state"] == "started"
         assert peer_relation.local_app_data["cluster_state"] == "existing"
+        assert state_out.app_status == Status.ACTIVE.value.status
 
 
 def test_certificates_broken():
