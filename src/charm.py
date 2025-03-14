@@ -221,6 +221,8 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # compute TLS status
         # todo: add compute logic here
+        for status in self.tls_manager.compute_component_status():
+            event.add_status(status.value.status)
 
         # compute backup or other component's  status
         # todo: add compute logic here

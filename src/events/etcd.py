@@ -103,7 +103,6 @@ class EtcdEvents(Object):
             logger.info(
                 f"Deferring start because TLS is not ready for {self.charm.state.unit_server.member_name}."
             )
-            self.charm.set_status(Status.TLS_NOT_READY)
             event.defer()
             return
 
@@ -360,7 +359,7 @@ class EtcdEvents(Object):
         logger.debug("Updating TLS private key.")
 
         if self.charm.tls_events.read_and_validate_private_key(private_key_id) is None:
-            self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
+            self.charm.tls_manager.add_component_status(Status.TLS_INVALID_PRIVATE_KEY)
             return
 
         self.charm.tls_events.refresh_tls_certificates_event.emit()

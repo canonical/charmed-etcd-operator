@@ -96,13 +96,13 @@ class TLSEvents(Object):
             if (
                 peer_private_key := self.read_and_validate_private_key(peer_private_key_id)
             ) is None:
-                self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
+                self.charm.tls_manager.add_component_status(Status.TLS_INVALID_PRIVATE_KEY)
 
         if client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if (
                 client_private_key := self.read_and_validate_private_key(client_private_key_id)
             ) is None:
-                self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
+                self.charm.tls_manager.add_component_status(Status.TLS_INVALID_PRIVATE_KEY)
 
         self.peer_certificate = TLSCertificatesRequiresV4(
             self.charm,
@@ -156,10 +156,8 @@ class TLSEvents(Object):
         """
         if event.relation.name == PEER_TLS_RELATION_NAME:
             self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS, tls_type=TLSType.PEER)
-            self.charm.set_status(Status.TLS_ENABLING_PEER_TLS)
         else:
             self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS, tls_type=TLSType.CLIENT)
-            self.charm.set_status(Status.TLS_ENABLING_CLIENT_TLS)
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         """Handle the `certificates-available` event.
