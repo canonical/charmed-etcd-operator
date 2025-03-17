@@ -16,6 +16,7 @@ from charms.data_platform_libs.v0.s3 import (
 from ops import Object
 from ops.charm import ActionEvent
 
+from common.exceptions import EtcdBackupError
 from literals import S3_RELATION_NAME, Status
 
 if TYPE_CHECKING:
@@ -73,7 +74,14 @@ class BackupEvents(Object):
             event.fail(error)
             return
 
-        event.set_results({"result": "successful"})
+        try:
+            backup_id = self.charm.backup_manager.create_backup()
+        except EtcdBackupError as e:
+            event.set_results({"error": e})
+            event.fail(e)
+            return
+
+        event.set_results({"backup-id": backup_id})
 
     def _on_list_backups_action(self, event: ActionEvent) -> None:
         """List all created backups."""

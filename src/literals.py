@@ -19,6 +19,10 @@ SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
 DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
+BACKUP_FILE_PATH = (
+    "/var/snap/charmed-etcd/common/var/lib/etcd/member/snap/charmed-etcd_snapshot.db"
+)
+BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"

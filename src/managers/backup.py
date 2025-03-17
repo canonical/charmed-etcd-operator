@@ -5,14 +5,16 @@
 """Manager for all backup/restore related tasks."""
 
 import logging
+from datetime import datetime
 
 import boto3
 from botocore.exceptions import ClientError
 
-# from common.client import EtcdClient
+from common.client import EtcdClient
+from common.exceptions import EtcdBackupError
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER
+from literals import BACKUP_FILE_PATH, BACKUP_ID_FORMAT, INTERNAL_USER
 
 logger = logging.getLogger(__name__)
 
@@ -55,3 +57,38 @@ class BackupManager:
                 raise
 
         logger.info(f"Created bucket {bucket_name}")
+
+    def create_backup(self) -> str:
+        """Create a backup of etcd and upload it to object storage.
+
+        Returns:
+            str: the backup_id uploaded to object storage
+        """
+        backup_id = datetime.now().strftime(BACKUP_ID_FORMAT)
+        s3_parameters = self.state.cluster.s3_credentials
+        upload_target = f"{s3_parameters['path']}/{backup_id}/snapshot"
+
+        etcd_client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        if not etcd_client.create_database_snapshot():
+            raise EtcdBackupError("Failed to create database backup.")
+
+        s3_client = boto3.resource(
+            "s3",
+            region_name=s3_parameters.get("region"),
+            endpoint_url=s3_parameters["endpoint"],
+            aws_access_key_id=s3_parameters["access-key"],
+            aws_secret_access_key=s3_parameters["secret-key"],
+        )
+        bucket = s3_client.Bucket(s3_parameters["bucket"])
+
+        try:
+            bucket.upload_file(BACKUP_FILE_PATH, upload_target)
+        except ClientError as e:
+            raise EtcdBackupError(e)
+
+        return backup_id
