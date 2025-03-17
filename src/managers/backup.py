@@ -29,10 +29,9 @@ class BackupManager:
 
     def create_bucket(self, s3_parameters: dict[str, str]) -> None:
         """Create bucket if it does not exist yet."""
-        logger.info(f"s3 parameters: {s3_parameters}")
         bucket_name = s3_parameters["bucket"]
-        region = s3_parameters["region"]
-        s3_client = boto3.client(
+        region = s3_parameters.get("region")
+        s3_client = boto3.resource(
             "s3",
             region_name=region,
             endpoint_url=s3_parameters["endpoint"],
@@ -40,14 +39,19 @@ class BackupManager:
             aws_secret_access_key=s3_parameters["secret-key"],
         )
 
+        bucket = s3_client.Bucket(bucket_name)
         try:
             if region:
-                location = {"LocationConstraint": region}
-                s3_client.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=location)
+                bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
             else:
-                s3_client.create_bucket(Bucket=bucket_name)
-        except ClientError:
-            # todo: do we want to raise to make the user aware of the error?
-            raise
+                bucket.create()
+            bucket.wait_until_exists()
+        except ClientError as e:
+            if "BucketAlreadyOwnedByYou" in e.args[0] or "BucketAlreadyExists" in e.args[0]:
+                logger.info(f"Using existing bucket {bucket_name}")
+                return
+            else:
+                # todo: do we want to raise to make the user aware of the error?
+                raise
 
         logger.info(f"Created bucket {bucket_name}")
