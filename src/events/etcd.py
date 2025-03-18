@@ -103,7 +103,6 @@ class EtcdEvents(Object):
             logger.info(
                 f"Deferring start because TLS is not ready for {self.charm.state.unit_server.member_name}."
             )
-            self.charm.set_status(Status.TLS_NOT_READY)
             event.defer()
             return
 
