@@ -16,7 +16,7 @@ Charmed etcd uses two different storage volumes:
 - `data` containing the raw data files (the actual database) written and managed by etcd
 - `logs` for logfiles written by etcd
 
-The following document will explain how to use this feature in charmed etcd.
+The following document will explain how to reuse storage volumes in charmed etcd.
 
 ## Prerequisites
 The storage volumes that can be attached to charmed etcd depend on the storage providers available in the cloud where
@@ -141,8 +141,8 @@ When you want to scale up your etcd database again, attach the desired `data` vo
 juju add-unit charmed-etcd --attach-storage=data/0
 ```
 
-If you did not remove all previous units of charmed etcd at the same time, make sure to attach the volume with most 
-recent data (meaning: of the unit you removed last).
+In order to scale up and resume your cluster with the most up-to-date state and data, **make sure to attach the volume with most 
+recent data** (meaning: of the unit you removed last).
 
 You can track the progress by running `juju status --storage --watch=3s`:
 ```shell
@@ -168,11 +168,13 @@ charmed-etcd/3  logs/6      filesystem  rootfs        /var/snap/charmed-etcd/com
 As you can see, the new unit `charmed-etcd/3` has been deployed with the existing `data/0` volume and the new volume
 `logs/6` attached to it.
 
-In order to scale up to three units again, add execute two more `juju add-unit` commands with the other storage volumes:
+In order to scale up to three units again, add two more `juju add-unit` commands with the other storage volumes:
 ```shell
 juju add-unit charmed-etcd --attach-storage=data/2
 juju add-unit charmed-etcd --attach-storage=data/4
 ```
+
+The data of these volumes will not be taken into account though, they will receive a full data transfer from the leader.
 
 When the application is ready, you will see all three `data` volumes attached again:
 ```shell
@@ -211,7 +213,7 @@ In this scenario, we want to reuse existing storage from another etcd cluster/da
 
 ### Safe removal
 >**Attention - Before you remove your etcd cluster:**
-> - Safe the credentials for the admin-user
+> - Save the credentials for the admin-user
 > - or configure a user-defined password
 
 By default, charmed etcd enables authentication. That means you can not access an existing etcd database without 
@@ -277,7 +279,8 @@ Model "admin/etcd" is empty.
 
 ### Deploy new cluster with existing storage
 After you removed your charmed etcd application, deploy a new one attaching the `data` volume with most recent data and 
-configure the secret URI containing the admin user's password:
+configure the secret URI containing the admin user's password. In order to deploy your new cluster the most up-to-date 
+state and data, **make sure to attach the volume with most recent data** (meaning: of the unit you removed last):
 ```shell
 juju deploy charmed-etcd etcd --attach-storage=data/0 --config system-users=secret:cuvh9ggv7vbc46jefvjg
 ```
@@ -314,6 +317,8 @@ juju add-unit charmed-etcd --attach-storage=data/2
 juju add-unit charmed-etcd --attach-storage=data/4
 ```
 
+Again: The data of these volumes will not be taken into account, they will receive a full data transfer from the leader.
+
 When the deployment is complete, your new charmed etcd application is available with previously used data:
 ```shell
 juju status --storage --watch=3s
@@ -347,7 +352,7 @@ charmed-etcd/9   logs/13     filesystem  rootfs        /var/snap/charmed-etcd/co
 ```
 
 ## Remove persistent storage
-To remove all remaining volumes and their data, use the `--destroy-storage` parameter:
+To remove all remaining volumes and their data, use the `--destroy-storage` parameter when removing your application:
 ```shell
 juju remove-application charmed-etcd --destroy-storage
 ```
