@@ -83,9 +83,7 @@ class Status(Enum):
         BlockedStatus("The private key provided is not valid. Please provide a valid private key"),
         "ERROR",
     )
-    TLS_NOT_READY = StatusLevel(
-        MaintenanceStatus("Deferring start because TLS is not ready"), "DEBUG"
-    )
+    TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be ready"), "DEBUG")
     TLS_PEER_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating peer CA..."), "DEBUG")
     TLS_CLIENT_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating client CA..."), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
