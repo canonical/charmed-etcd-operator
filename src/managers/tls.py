@@ -26,7 +26,6 @@ class TLSManager:
         self.state = state
         self.workload = workload
         self.substrate = substrate
-        self._component_status_list: list[Status] = []
 
     def set_tls_state(self, state: TLSState, tls_type: TLSType) -> None:
         """Set the TLS state.
@@ -205,7 +204,7 @@ class TLSManager:
 
     def compute_component_status(self) -> list[Status]:
         """Compute the component status."""
-        status_list = list(self._component_status_list)
+        status_list = []
 
         if self.state.unit_server.tls_peer_state == TLSState.TO_TLS:
             status_list.append(Status.TLS_ENABLING_PEER_TLS)
@@ -226,11 +225,3 @@ class TLSManager:
             status_list.append(Status.TLS_CLIENT_CA_ROTATING)
 
         return status_list
-
-    def add_component_status(self, status: Status) -> None:
-        """Add a component status.
-
-        Args:
-            status (Status): The status to add.
-        """
-        self._component_status_list.append(status)

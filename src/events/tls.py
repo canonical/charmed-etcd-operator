@@ -96,13 +96,13 @@ class TLSEvents(Object):
             if (
                 peer_private_key := self.read_and_validate_private_key(peer_private_key_id)
             ) is None:
-                self.charm.tls_manager.add_component_status(Status.TLS_INVALID_PRIVATE_KEY)
+                self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
 
         if client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if (
                 client_private_key := self.read_and_validate_private_key(client_private_key_id)
             ) is None:
-                self.charm.tls_manager.add_component_status(Status.TLS_INVALID_PRIVATE_KEY)
+                self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
 
         self.peer_certificate = TLSCertificatesRequiresV4(
             self.charm,
