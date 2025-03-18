@@ -38,6 +38,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         super().__init__(*args)
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
+        self.pending_inactive_statuses: list[Status] = []
 
         # --- MANAGERS ---
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
@@ -53,13 +54,16 @@ class EtcdOperatorCharm(ops.CharmBase):
         # --- LIB EVENT HANDLERS ---
         self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)
 
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
+        self.framework.observe(self.on.collect_app_status, self._on_collect_status)
+
     def set_status(self, key: Status) -> None:
         """Set charm status."""
         status: StatusBase = key.value.status
         log_level: DebugLevel = key.value.log_level
 
         getattr(logger, log_level.lower())(status.message)
-        self.unit.status = status
+        self.pending_inactive_statuses.append(key)
 
     def _restart(self, _) -> None:
         """Restart callback for the rolling ips lib."""
@@ -68,7 +72,6 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member():
-            self.set_status(Status.HEALTH_CHECK_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def rolling_restart(self, callback_override: str | None = None) -> None:
@@ -98,7 +101,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # write config and restart workload
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member():
-            self.set_status(Status.TLS_CLIENT_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_enable_peer_tls(self, _) -> None:
@@ -124,7 +126,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # write config and restart workload
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member(move_leader=False):
-            self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_disable_client_tls(self, _) -> None:
@@ -150,7 +151,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # write config and restart workload
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member(move_leader=False):
-            self.set_status(Status.TLS_CLIENT_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_disable_peer_tls(self, _) -> None:
@@ -180,7 +180,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # write config and restart workload
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member(move_leader=False):
-            self.set_status(Status.TLS_PEER_TRANSITION_FAILED)
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
     def _restart_ca_rotation(self, _) -> None:
@@ -208,6 +207,28 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NO_ROTATION)
 
         self._restart(None)
+
+    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
+        """Compute the current status for this unit.
+
+        Ops framework will choose the highest-priority status and set that as the status.
+        If there are multiple statuses with the same priority, the first one added wins.
+        Component statuses should be computed in their respective priority.
+        """
+        # compute cluster status
+        for status in self.cluster_manager.compute_component_status():
+            event.add_status(status.value.status)
+
+        # compute TLS status
+        for status in self.tls_manager.compute_component_status():
+            event.add_status(status.value.status)
+
+        # compute backup or other component's  status
+        # todo: add compute logic here
+
+        # add all other statuses collected during the current hook
+        for status in self.pending_inactive_statuses + [Status.ACTIVE]:
+            event.add_status(status.value.status)
 
 
 if __name__ == "__main__":  # pragma: nocover
