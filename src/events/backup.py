@@ -90,6 +90,11 @@ class BackupEvents(Object):
             event.fail(error)
             return
 
+        backup_list = self.charm.backup_manager.list_backups()
+        # todo: format the list
+        # output: ['etcd-backups/2025-03-19T11:56:30Z/snapshot', 'etcd-backups/2025-03-19T11:57:52Z/snapshot']
+        logger.debug(backup_list)
+
         event.set_results({"result": "successful"})
 
     def _exists_preventing_reason(self) -> str:

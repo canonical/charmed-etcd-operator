@@ -170,7 +170,7 @@ def test_list_backups_action():
     secret_content = {"s3-credentials": json.dumps(s3_credentials)}
     secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
     state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with patch("managers.backup.BackupManager.create_backup", return_value="my_backup_id"):
+    with patch("managers.backup.BackupManager.list_backups", return_value="[my_backup_list]"):
         ctx.run(ctx.on.action("list-backups"), state_in)
 
     assert ctx.action_results == {"result": "successful"}
