@@ -65,7 +65,7 @@ class BackupManager:
         """
         backup_id = datetime.now().strftime(BACKUP_ID_FORMAT)
         s3_parameters = self.state.cluster.s3_credentials
-        upload_target = f"{s3_parameters['path']}/{backup_id}/snapshot"
+        upload_target = f"{s3_parameters['path']}/{backup_id}"
 
         etcd_client = EtcdClient(
             username=self.admin_user,
@@ -118,4 +118,19 @@ class BackupManager:
         except ClientError as e:
             raise EtcdBackupError(e)
 
+        # current format: ['etcd-backups/2025-03-19T11:56:30Z','etcd-backups/2025-03-19T11:57:52Z']
+        backup_list = [b.replace(f"{s3_parameters['path']}/", "") for b in backup_list]
+        backup_list.sort(reverse=True)
+
         return backup_list
+
+    @staticmethod
+    def format_backup_list(backup_list: list[str]) -> str:
+        """Format a list of backup_id's as a table and return the output."""
+        output = [f"{'backup-id':<21} | backup-status"]
+
+        output.append("-" * len(output[0]))
+        for backup_id in backup_list:
+            output.append(f"{backup_id:<21} | finished")
+
+        return "\n".join(output)

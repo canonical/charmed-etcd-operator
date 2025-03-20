@@ -169,8 +169,16 @@ def test_list_backups_action():
     )
     secret_content = {"s3-credentials": json.dumps(s3_credentials)}
     secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    backup_list = ["2025-03-19T11:56:30Z", "2025-03-19T11:57:52Z"]
+    expected_output = [
+        "backup-id             | backup-status",
+        "-------------------------------------",
+        "2025-03-19T11:56:30Z  | finished",
+        "2025-03-19T11:57:52Z  | finished",
+    ]
+
     state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with patch("managers.backup.BackupManager.list_backups", return_value="[my_backup_list]"):
+    with patch("managers.backup.BackupManager.list_backups", return_value=backup_list):
         ctx.run(ctx.on.action("list-backups"), state_in)
 
-    assert ctx.action_results == {"result": "successful"}
+    assert ctx.action_results == {"backups": "\n".join(expected_output)}
