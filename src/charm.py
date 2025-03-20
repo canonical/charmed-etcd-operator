@@ -59,10 +59,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         # cos agent
         self._grafana_agent = COSAgentProvider(
             self,
-            # metrics_rules_dir="./src/cos/alert_rules/prometheus",
-            # logs_rules_dir="./src/cos/alert_rules/loki",
             dashboard_dirs=["./src/cos/grafana_dashboards"],
-            # log_slots=["charmed-zookeeper:logs"],
             scrape_configs=[
                 {
                     "job_name": "etcd",
