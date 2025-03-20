@@ -9,6 +9,7 @@ from datetime import datetime
 
 import boto3
 from botocore.exceptions import ClientError
+from mypy_boto3_s3.service_resource import Bucket
 
 from common.client import EtcdClient
 from common.exceptions import EtcdBackupError
@@ -28,9 +29,12 @@ class BackupManager:
         self.admin_user = INTERNAL_USER
         self.admin_password = self.state.cluster.internal_user_credentials.get(INTERNAL_USER, "")
 
-    def create_bucket(self, s3_parameters: dict[str, str]) -> None:
-        """Create bucket if it does not exist yet."""
-        bucket_name = s3_parameters["bucket"]
+    def get_bucket_resource(self, s3_parameters: dict[str, str]) -> Bucket:
+        """Get the Bucket resource from the s3 connection.
+
+        Returns:
+            Bucket: the s3 bucket for uploading/downloading backups
+        """
         region = s3_parameters.get("region")
         s3_resource = boto3.resource(
             "s3",
@@ -43,7 +47,13 @@ class BackupManager:
             else True,
         )
 
-        bucket = s3_resource.Bucket(bucket_name)
+        return s3_resource.Bucket(s3_parameters["bucket"])
+
+    def create_bucket(self, s3_parameters: dict[str, str]) -> None:
+        """Create bucket if it does not exist yet."""
+        region = s3_parameters.get("region")
+        bucket = self.get_bucket_resource(s3_parameters)
+
         try:
             if region:
                 bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
@@ -52,13 +62,13 @@ class BackupManager:
             bucket.wait_until_exists()
         except ClientError as e:
             if "BucketAlreadyOwnedByYou" in e.args[0] or "BucketAlreadyExists" in e.args[0]:
-                logger.info(f"Using existing bucket {bucket_name}")
+                logger.info(f"Using existing bucket {s3_parameters['bucket']}")
                 return
             else:
                 # todo: do we want to raise to make the user aware of the error?
                 raise
 
-        logger.info(f"Created bucket {bucket_name}")
+        logger.info(f"Created bucket {s3_parameters['bucket']}")
 
     def create_backup(self) -> str:
         """Create a backup of etcd and upload it to object storage.
@@ -79,17 +89,7 @@ class BackupManager:
         if not etcd_client.create_database_snapshot():
             raise EtcdBackupError("Failed to create database backup.")
 
-        s3_resource = boto3.resource(
-            "s3",
-            region_name=s3_parameters.get("region"),
-            endpoint_url=s3_parameters["endpoint"],
-            aws_access_key_id=s3_parameters["access-key"],
-            aws_secret_access_key=s3_parameters["secret-key"],
-            verify=self.workload.paths.tls.backup_ca
-            if s3_parameters.get("tls-ca-chain")
-            else True,
-        )
-        bucket = s3_resource.Bucket(s3_parameters["bucket"])
+        bucket = self.get_bucket_resource(s3_parameters)
 
         try:
             bucket.upload_file(BACKUP_FILE_PATH, upload_target)
@@ -103,21 +103,15 @@ class BackupManager:
 
         return backup_id
 
-    def list_backups(self) -> list:
-        """Get the list of available backups in the configured object storage."""
+    def list_backups(self) -> list[str]:
+        """Get the list of available backups in the configured object storage.
+
+        Returns:
+            list: the available backup_id's in the bucket
+        """
         s3_parameters = self.state.cluster.s3_credentials
 
-        s3_resource = boto3.resource(
-            "s3",
-            region_name=s3_parameters.get("region"),
-            endpoint_url=s3_parameters["endpoint"],
-            aws_access_key_id=s3_parameters["access-key"],
-            aws_secret_access_key=s3_parameters["secret-key"],
-            verify=self.workload.paths.tls.backup_ca
-            if s3_parameters.get("tls-ca-chain")
-            else True,
-        )
-        bucket = s3_resource.Bucket(s3_parameters["bucket"])
+        bucket = self.get_bucket_resource(s3_parameters)
         backup_list = []
 
         try:
@@ -135,7 +129,11 @@ class BackupManager:
 
     @staticmethod
     def format_backup_list(backup_list: list[str]) -> str:
-        """Format a list of backup_id's as a table and return the output."""
+        """Format a list of backup_id's as a table and return the output.
+
+        Returns:
+            str: the backup_id's formatted as a table
+        """
         output = [f"{'backup-id':<21} | backup-status"]
 
         output.append("-" * len(output[0]))
