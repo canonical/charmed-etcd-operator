@@ -57,6 +57,16 @@ class BackupEvents(Object):
         if missing_parameters := [p for p in required_parameters if p not in s3_parameters]:
             raise KeyError(f"Parameters missing from S3 integrator: {missing_parameters}")
 
+        # Strip whitespaces from all parameters
+        for key, value in s3_parameters.items():
+            if isinstance(value, str):
+                s3_parameters[key] = value.strip()
+
+        # Clean up extra slash symbols to avoid issues on 3rd-party storages
+        s3_parameters["endpoint"] = s3_parameters["endpoint"].rstrip("/")
+        s3_parameters["path"] = s3_parameters["path"].strip("/")
+        s3_parameters["bucket"] = s3_parameters["bucket"].strip("/")
+
         self.charm.backup_manager.create_bucket(s3_parameters)
         self.charm.state.cluster.update({"s3-credentials": json.dumps(s3_parameters)})
 
