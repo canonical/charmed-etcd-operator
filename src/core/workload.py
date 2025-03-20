@@ -49,6 +49,11 @@ class TLSPaths:
         """Path to the server key."""
         return f"{self.root_dir}/client.key"
 
+    @property
+    def backup_ca(self) -> str:
+        """Path to the CA for backup/restore object storage."""
+        return f"{self.root_dir}/backup_ca.pem"
+
 
 @dataclass
 class EtcdPaths:

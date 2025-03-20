@@ -38,6 +38,9 @@ class BackupManager:
             endpoint_url=s3_parameters["endpoint"],
             aws_access_key_id=s3_parameters["access-key"],
             aws_secret_access_key=s3_parameters["secret-key"],
+            verify=self.workload.paths.tls.backup_ca
+            if s3_parameters.get("tls-ca-chain")
+            else True,
         )
 
         bucket = s3_resource.Bucket(bucket_name)
@@ -82,6 +85,9 @@ class BackupManager:
             endpoint_url=s3_parameters["endpoint"],
             aws_access_key_id=s3_parameters["access-key"],
             aws_secret_access_key=s3_parameters["secret-key"],
+            verify=self.workload.paths.tls.backup_ca
+            if s3_parameters.get("tls-ca-chain")
+            else True,
         )
         bucket = s3_resource.Bucket(s3_parameters["bucket"])
 
@@ -107,6 +113,9 @@ class BackupManager:
             endpoint_url=s3_parameters["endpoint"],
             aws_access_key_id=s3_parameters["access-key"],
             aws_secret_access_key=s3_parameters["secret-key"],
+            verify=self.workload.paths.tls.backup_ca
+            if s3_parameters.get("tls-ca-chain")
+            else True,
         )
         bucket = s3_resource.Bucket(s3_parameters["bucket"])
         backup_list = []
@@ -134,3 +143,12 @@ class BackupManager:
             output.append(f"{backup_id:<21} | finished")
 
         return "\n".join(output)
+
+    def store_tls_ca_chain(self, s3_parameters: dict[str, str]) -> None:
+        """Write the TLS CA chain provided by s3-integrator to the filesystem."""
+        if not (tls_ca_chain := s3_parameters.get("tls-ca-chain")):
+            return
+
+        raw_ca = "\n".join(cert for cert in tls_ca_chain)
+        self.workload.write_file(raw_ca, self.workload.paths.tls.backup_ca)
+        logger.debug(f"TLS CA chain stored in {self.workload.paths.tls.backup_ca}")

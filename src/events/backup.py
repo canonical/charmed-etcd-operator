@@ -67,6 +67,7 @@ class BackupEvents(Object):
         s3_parameters["path"] = s3_parameters["path"].strip("/")
         s3_parameters["bucket"] = s3_parameters["bucket"].strip("/")
 
+        self.charm.backup_manager.store_tls_ca_chain(s3_parameters)
         self.charm.backup_manager.create_bucket(s3_parameters)
         self.charm.state.cluster.update({"s3-credentials": json.dumps(s3_parameters)})
 
