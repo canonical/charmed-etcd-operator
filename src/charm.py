@@ -16,6 +16,7 @@ from core.cluster import ClusterState
 from events.etcd import EtcdEvents
 from events.tls import TLSEvents
 from literals import (
+    METRICS_PORT,
     RESTART_RELATION,
     SUBSTRATE,
     DebugLevel,
@@ -58,9 +59,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         # cos agent
         self._grafana_agent = COSAgentProvider(
             self,
-            # metrics_endpoints=[
-            #     {"path": "/metrics", "port": CLIENT_PORT},
-            # ],
             # metrics_rules_dir="./src/cos/alert_rules/prometheus",
             # logs_rules_dir="./src/cos/alert_rules/loki",
             dashboard_dirs=["./src/cos/grafana_dashboards"],
@@ -68,7 +66,9 @@ class EtcdOperatorCharm(ops.CharmBase):
             scrape_configs=[
                 {
                     "job_name": "etcd",
-                    "static_configs": [{"targets": [f"{self.state.unit_server.ip}:2379"]}],
+                    "static_configs": [
+                        {"targets": [f"{self.state.unit_server.ip}:{METRICS_PORT}"]}
+                    ],
                 }
             ],
         )
