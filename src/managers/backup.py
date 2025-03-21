@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 
 import boto3
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from mypy_boto3_s3.service_resource import Bucket
 
@@ -41,6 +42,11 @@ class BackupManager:
             endpoint_url=s3_parameters["endpoint"],
             aws_access_key_id=s3_parameters["access-key"],
             aws_secret_access_key=s3_parameters["secret-key"],
+            config=Config(
+                # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
             verify=self.workload.paths.tls.backup_ca
             if s3_parameters.get("tls-ca-chain")
             else True,
@@ -60,7 +66,13 @@ class BackupManager:
                 bucket.create()
             bucket.wait_until_exists()
         except ClientError as e:
-            if "BucketAlreadyOwnedByYou" in e.args[0] or "BucketAlreadyExists" in e.args[0]:
+            if (
+                # AWS returns these if the bucket was already created
+                "BucketAlreadyOwnedByYou" in e.args[0]
+                or "BucketAlreadyExists" in e.args[0]
+                # GCP returns this if the bucket was already created
+                or "BucketNameUnavailable" in e.args[0]
+            ):
                 logger.info(f"Using existing bucket {s3_parameters['bucket']}")
                 return
             else:
