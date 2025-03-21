@@ -39,9 +39,19 @@ class BackupEvents(Object):
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credentials_gone)
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
+        # When the leader unit is being removed, s3_client.on.credentials_gone is performed on it (and only on it).
+        # After a new leader is elected, the S3 connection must be reinitialized.
+        self.framework.observe(self.charm.on.leader_elected, self._on_s3_credentials_changed)
 
     def _on_s3_credentials_changed(self, event: CredentialsChangedEvent) -> None:
         """Handle an update of the s3 credentials from s3-integrator."""
+        if not (s3_parameters := self.s3_requirer.get_s3_connection_info()):
+            logger.debug(f"No relation {S3_RELATION_NAME}")
+            return
+
+        # the TLS chain needs to be stored on all units in case of Juju leadership changes
+        self.charm.backup_manager.store_tls_ca_chain(s3_parameters)
+
         if not self.charm.unit.is_leader():
             return
 
@@ -52,8 +62,6 @@ class BackupEvents(Object):
 
         # make sure we have all required parameters for writing to the storage
         required_parameters = ["bucket", "endpoint", "path", "access-key", "secret-key"]
-        s3_parameters = self.s3_requirer.get_s3_connection_info()
-
         if missing_parameters := [p for p in required_parameters if p not in s3_parameters]:
             raise KeyError(f"Parameters missing from S3 integrator: {missing_parameters}")
 
@@ -67,16 +75,15 @@ class BackupEvents(Object):
         s3_parameters["path"] = s3_parameters["path"].strip("/")
         s3_parameters["bucket"] = s3_parameters["bucket"].strip("/")
 
-        self.charm.backup_manager.store_tls_ca_chain(s3_parameters)
         self.charm.backup_manager.create_bucket(s3_parameters)
         self.charm.state.cluster.update({"s3-credentials": json.dumps(s3_parameters)})
 
     def _on_s3_credentials_gone(self, event: CredentialsGoneEvent) -> None:
         """Handle the removal of the relation with s3-integrator."""
-        if not self.charm.unit.is_leader():
-            return
+        self.charm.workload.remove_file(self.charm.workload.paths.tls.backup_ca)
 
-        self.charm.state.cluster.update({"s3-credentials": ""})
+        if self.charm.unit.is_leader():
+            self.charm.state.cluster.update({"s3-credentials": ""})
 
     def _on_create_backup_action(self, event: ActionEvent) -> None:
         """Create a backup and upload to object storage."""

@@ -35,10 +35,9 @@ class BackupManager:
         Returns:
             Bucket: the s3 bucket for uploading/downloading backups
         """
-        region = s3_parameters.get("region")
         s3_resource = boto3.resource(
             "s3",
-            region_name=region,
+            region_name=s3_parameters.get("region"),
             endpoint_url=s3_parameters["endpoint"],
             aws_access_key_id=s3_parameters["access-key"],
             aws_secret_access_key=s3_parameters["secret-key"],
@@ -94,6 +93,9 @@ class BackupManager:
         try:
             bucket.upload_file(BACKUP_FILE_PATH, upload_target)
         except ClientError as e:
+            # if we can't upload, we still need to clean up the backup file to free the disk space
+            self.workload.remove_file(BACKUP_FILE_PATH)
+            logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
             raise EtcdBackupError(e)
 
         logger.info(f"Backup uploaded to {upload_target}")
