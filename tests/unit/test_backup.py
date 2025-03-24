@@ -13,7 +13,7 @@ from pytest import raises
 from scenario import Secret
 
 from charm import EtcdOperatorCharm
-from literals import PEER_RELATION, S3_RELATION_NAME
+from literals import PEER_RELATION, S3_RELATION_NAME, RestoreStep
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -242,5 +242,38 @@ def test_restore_action():
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("restore"), state_in)
 
-        assert e.message == "Admin secret missing - configure `system-users` secret before restoring a backup."
+        assert (
+            e.message
+            == "Admin secret missing - configure `system-users` secret before restoring a backup."
+        )
 
+
+def test_restore_workflow_order():
+    ctx = testing.Context(EtcdOperatorCharm)
+    # dummy context for using the backup manager
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    state_in = testing.State(relations={relation})
+    with patch("workload.EtcdWorkload.install"):
+        with ctx(ctx.on.install(), state_in) as context:
+            assert (
+                context.charm.backup_manager.next_restore_step(
+                    current_step=RestoreStep.NOT_STARTED
+                )
+                == RestoreStep.DOWNLOAD
+            )
+            assert (
+                context.charm.backup_manager.next_restore_step(current_step=RestoreStep.DOWNLOAD)
+                == RestoreStep.STOP
+            )
+            assert (
+                context.charm.backup_manager.next_restore_step(current_step=RestoreStep.STOP)
+                == RestoreStep.RESTORE
+            )
+            assert (
+                context.charm.backup_manager.next_restore_step(current_step=RestoreStep.RESTORE)
+                == RestoreStep.RESTART
+            )
+            assert (
+                context.charm.backup_manager.next_restore_step(current_step=RestoreStep.RESTART)
+                == RestoreStep.NOT_STARTED
+            )

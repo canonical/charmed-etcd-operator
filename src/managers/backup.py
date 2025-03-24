@@ -16,7 +16,7 @@ from common.client import EtcdClient
 from common.exceptions import EtcdBackupError
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import BACKUP_FILE_PATH, BACKUP_ID_FORMAT, INTERNAL_USER
+from literals import BACKUP_FILE_PATH, BACKUP_ID_FORMAT, INTERNAL_USER, RestoreStep
 
 logger = logging.getLogger(__name__)
 
@@ -164,3 +164,18 @@ class BackupManager:
         raw_ca = "\n".join(cert for cert in tls_ca_chain)
         self.workload.write_file(raw_ca, self.workload.paths.tls.backup_ca)
         logger.debug(f"TLS CA chain stored in {self.workload.paths.tls.backup_ca}")
+
+    @staticmethod
+    def next_restore_step(current_step: RestoreStep) -> RestoreStep:
+        """Define the order of steps for the restore workflow."""
+        match current_step:
+            case RestoreStep.NOT_STARTED:
+                return RestoreStep.DOWNLOAD
+            case RestoreStep.DOWNLOAD:
+                return RestoreStep.STOP
+            case RestoreStep.STOP:
+                return RestoreStep.RESTORE
+            case RestoreStep.RESTORE:
+                return RestoreStep.RESTART
+            case RestoreStep.RESTART:
+                return RestoreStep.NOT_STARTED

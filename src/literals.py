@@ -115,3 +115,14 @@ class TLSCARotationState(Enum):
     NEW_CA_DETECTED = "new-ca-detected"
     NEW_CA_ADDED = "new-ca-added"
     CERT_UPDATED = "cert-updated"
+
+
+# enum for Backup state
+class RestoreStep(Enum):
+    """Backup / Restore workflow step representation."""
+
+    NOT_STARTED = ""
+    DOWNLOAD = "download_backup"
+    STOP = "stop_workload"
+    RESTORE = "restore_backup"
+    RESTART = "restart_workload"
