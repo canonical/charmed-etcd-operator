@@ -93,11 +93,13 @@ def test_create_backup_action():
         assert e.message == "No credentials for object storage available."
 
     # ensure backup cannot be created if unit not started
-    state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("create-backup"), state_in)
 
-        assert e.message == "No credentials for object storage available."
+        assert e.message == "Database is not started, cannot perform backup action."
 
     # ensure action fails if snapshot in etcd cannot be created
     peer_relation = testing.PeerRelation(
@@ -145,23 +147,28 @@ def test_list_backups_action():
         remote_app_data=s3_credentials,
     )
 
+    # ensure action fails on non-leader unit
     state_in = testing.State(relations={peer_relation, s3_relation}, leader=False)
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("list-backups"), state_in)
 
         assert e.message == "Action must be performed on the leader unit."
 
+    # ensure action fails if no s3 relation
     state_in = testing.State(relations={peer_relation}, leader=True)
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("list-backups"), state_in)
 
         assert e.message == "No credentials for object storage available."
 
-    state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
+    # ensure action fails if unit not started
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("list-backups"), state_in)
 
-        assert e.message == "No credentials for object storage available."
+        assert e.message == "Database is not started, cannot perform backup action."
 
     # happy path
     peer_relation = testing.PeerRelation(
@@ -182,3 +189,58 @@ def test_list_backups_action():
         ctx.run(ctx.on.action("list-backups"), state_in)
 
     assert ctx.action_results == {"backups": "\n".join(expected_output)}
+
+
+def test_restore_action():
+    ctx = testing.Context(EtcdOperatorCharm)
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    s3_credentials = {
+        "access-key": "mykey",
+        "secret-key": "mysecret",
+        "bucket": "mybucket",
+        "endpoint": "myendpoint",
+        "path": "mypath",
+    }
+    s3_relation = testing.Relation(
+        id=2,
+        interface="s3",
+        endpoint=S3_RELATION_NAME,
+        remote_app_name="s3",
+        remote_app_data=s3_credentials,
+    )
+
+    # ensure action fails on non-leader unit
+    state_in = testing.State(relations={peer_relation, s3_relation}, leader=False)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("restore"), state_in)
+
+        assert e.message == "Action must be performed on the leader unit."
+
+    # ensure action fails if no s3 relation
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("restore"), state_in)
+
+        assert e.message == "No credentials for object storage available."
+
+    # ensure action fails if unit not started
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("restore"), state_in)
+
+        assert e.message == "Database is not started, cannot perform backup action."
+
+    # ensure action fails if no admin-secret configured
+    peer_relation = testing.PeerRelation(
+        id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
+    )
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("restore"), state_in)
+
+        assert e.message == "Admin secret missing - configure `system-users` secret before restoring a backup."
+

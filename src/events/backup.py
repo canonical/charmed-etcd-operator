@@ -17,7 +17,7 @@ from ops import Object
 from ops.charm import ActionEvent
 
 from common.exceptions import EtcdBackupError
-from literals import S3_RELATION_NAME, Status
+from literals import INTERNAL_USER_PASSWORD_CONFIG, S3_RELATION_NAME, Status
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -39,7 +39,8 @@ class BackupEvents(Object):
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credentials_gone)
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
-        # When the leader unit is being removed, s3_client.on.credentials_gone is performed on it (and only on it).
+        self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
+        # When the leader unit is being removed, s3_requirer.on.credentials_gone is performed on it (and only on it).
         # After a new leader is elected, the S3 connection must be reinitialized.
         self.framework.observe(self.charm.on.leader_elected, self._on_s3_credentials_changed)
 
@@ -113,8 +114,22 @@ class BackupEvents(Object):
 
         event.set_results({"backups": self.charm.backup_manager.format_backup_list(backup_list)})
 
-    def _exists_preventing_reason(self) -> str:
-        """Check if an action can be executed, if not return error message."""
+    def _on_restore_action(self, event: ActionEvent) -> None:
+        """Download a backup from object storage and restore it to all units."""
+        if error := self._exists_preventing_reason(check_admin_secret=True):
+            event.set_results({"error": error})
+            event.fail(error)
+            return
+
+    def _exists_preventing_reason(self, check_admin_secret: bool = False) -> str:
+        """Check if an action can be executed, if not return error message.
+
+        Args:
+            check_admin_secret: option to check if system user secret is configured
+
+        Returns:
+            Error message in case a preventing reason for an action exists, otherwise empty str.
+        """
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
 
@@ -123,5 +138,9 @@ class BackupEvents(Object):
 
         if not self.charm.state.unit_server.is_started:
             return "Database is not started, cannot perform backup action."
+
+        if check_admin_secret:
+            if not self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
+                return "Admin secret missing - configure `system-users` secret before restoring a backup."
 
         return ""

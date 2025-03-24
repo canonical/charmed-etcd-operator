@@ -8,3 +8,7 @@ create-backup:
 list-backups:
   description: List database backups. 
     S3 credentials are retrieved from a relation with the S3 integrator charm.
+
+restore:
+  description: Restore a database backup from object storage.
+    S3 credentials are retrieved from a relation with the S3 integrator charm.
