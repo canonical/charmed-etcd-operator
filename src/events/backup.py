@@ -116,16 +116,26 @@ class BackupEvents(Object):
 
     def _on_restore_action(self, event: ActionEvent) -> None:
         """Download a backup from object storage and restore it to all units."""
-        if error := self._exists_preventing_reason(check_admin_secret=True):
+        if error := self._exists_preventing_reason(check_restore=True):
             event.set_results({"error": error})
             event.fail(error)
             return
 
-    def _exists_preventing_reason(self, check_admin_secret: bool = False) -> str:
+        if not (backup_id_to_restore := event.params.get("backup-id", "")):
+            event.fail("Must provide backup-id to restore.")
+
+        event.log(f"Initiating restore process for backup-id {backup_id_to_restore}")
+
+        if not self.charm.backup_manager.initiate_restore(backup_id_to_restore):
+            event.fail(f"Could not download backup-file {backup_id_to_restore}.")
+
+        event.set_results({"success": f"restore initiated for {backup_id_to_restore}"})
+
+    def _exists_preventing_reason(self, check_restore: bool = False) -> str:
         """Check if an action can be executed, if not return error message.
 
         Args:
-            check_admin_secret: option to check if system user secret is configured
+            check_restore: option to check if preconditions for restoring process are given
 
         Returns:
             Error message in case a preventing reason for an action exists, otherwise empty str.
@@ -139,8 +149,16 @@ class BackupEvents(Object):
         if not self.charm.state.unit_server.is_started:
             return "Database is not started, cannot perform backup action."
 
-        if check_admin_secret:
-            if not self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
-                return "Admin secret missing - configure `system-users` secret before restoring a backup."
+        # default checks end here, the following checks are only relevant for the restore process
+        if not check_restore:
+            return ""
+
+        if self.charm.state.cluster.is_restore_in_progress:
+            return "Restore is already in progress."
+
+        if not self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
+            return (
+                "Admin secret missing - configure `system-users` secret before restoring a backup."
+            )
 
         return ""

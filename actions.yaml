@@ -12,3 +12,7 @@ list-backups:
 restore:
   description: Restore a database backup from object storage.
     S3 credentials are retrieved from a relation with the S3 integrator charm.
+  params:
+    backup-id:
+      type: string
+      description: A backup-id to identify the backup to restore. Format of <%Y-%m-%dT%H:%M:%SZ>

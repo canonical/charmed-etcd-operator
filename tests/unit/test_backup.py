@@ -13,7 +13,7 @@ from pytest import raises
 from scenario import Secret
 
 from charm import EtcdOperatorCharm
-from literals import PEER_RELATION, S3_RELATION_NAME, RestoreStep
+from literals import INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, S3_RELATION_NAME, RestoreStep
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -246,6 +246,89 @@ def test_restore_action():
             e.message
             == "Admin secret missing - configure `system-users` secret before restoring a backup."
         )
+
+    # ensure action fails if another restore is already running
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started"},
+        local_app_data={"restore_id": "XYZ"},
+    )
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("restore"), state_in)
+
+        assert e.message == "Restore is already in progress."
+
+    # ensure action fails if no backup-id provided to restore
+    secret_key = "root"
+    secret_value = "123"
+    secret_content = {secret_key: secret_value}
+    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    peer_relation = testing.PeerRelation(
+        id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
+    )
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(
+        secrets=[secret],
+        relations={peer_relation, s3_relation},
+        leader=True,
+        config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
+    )
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("restore"), state_in)
+
+        assert e.message == "Must provide backup-id to restore."
+
+    # action should fail if download of backup-file fails
+    backup_id = "xyz"
+    secret_key = "root"
+    secret_value = "123"
+    secret_content = {secret_key: secret_value}
+    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    peer_relation = testing.PeerRelation(
+        id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
+    )
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(
+        secrets=[secret],
+        relations={peer_relation, s3_relation},
+        leader=True,
+        config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
+    )
+
+    with patch("managers.backup.BackupManager.initiate_restore", return_value=False):
+        with raises(testing.ActionFailed) as e:
+            ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
+
+            assert e.message == f"Could not download backup-file {backup_id}."
+
+    # happy path
+    backup_id = "xyz"
+    secret_key = "root"
+    secret_value = "123"
+    secret_content = {secret_key: secret_value}
+    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    peer_relation = testing.PeerRelation(
+        id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
+    )
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(
+        secrets=[secret],
+        relations={peer_relation, s3_relation},
+        leader=True,
+        config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
+    )
+
+    with patch("managers.backup.BackupManager.initiate_restore", return_value=True):
+        ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
+
+        assert ctx.action_results == {"success": f"restore initiated for {backup_id}"}
 
 
 def test_restore_workflow_order():

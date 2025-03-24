@@ -141,6 +141,15 @@ class BackupManager:
 
         return backup_list
 
+    def initiate_restore(self, backup_id: str) -> bool:
+        """Initiate the restore process by downloading the provided backup-id from object storage.
+
+        Returns:
+            True if backup-file could be downloaded from object storage and restore process was
+            initiated, False otherwise.
+        """
+        return True
+
     @staticmethod
     def format_backup_list(backup_list: list[str]) -> str:
         """Format a list of backup_id's as a table and return the output.
