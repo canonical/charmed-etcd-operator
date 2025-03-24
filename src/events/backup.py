@@ -14,10 +14,16 @@ from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
 from ops import Object
-from ops.charm import ActionEvent
+from ops.charm import ActionEvent, RelationChangedEvent
 
 from common.exceptions import EtcdBackupError
-from literals import INTERNAL_USER_PASSWORD_CONFIG, S3_RELATION_NAME, RestoreStep, Status
+from literals import (
+    INTERNAL_USER_PASSWORD_CONFIG,
+    PEER_RELATION,
+    S3_RELATION_NAME,
+    RestoreStep,
+    Status,
+)
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -43,6 +49,11 @@ class BackupEvents(Object):
         # When the leader unit is being removed, s3_requirer.on.credentials_gone is performed on it (and only on it).
         # After a new leader is elected, the S3 connection must be reinitialized.
         self.framework.observe(self.charm.on.leader_elected, self._on_s3_credentials_changed)
+        # The restore-workflow is synchronized across all units via the peer relation databag
+        # see for more information: https://github.com/canonical/charmed-etcd-operator/wiki/Backup-Restore:-Workflow
+        self.framework.observe(
+            self.charm.on[PEER_RELATION].relation_changed, self._on_peer_relation_changed
+        )
 
     def _on_s3_credentials_changed(self, event: CredentialsChangedEvent) -> None:
         """Handle an update of the s3 credentials from s3-integrator."""
@@ -137,6 +148,31 @@ class BackupEvents(Object):
         )
 
         event.set_results({"success": f"restore initiated for {backup_id_to_restore}"})
+
+    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
+        """Synchronize restore workflow across all units."""
+        if not self.charm.state.cluster.is_restore_in_progress:
+            return
+
+        match (
+            # compare the current restore instruction against the current restore progress
+            self.charm.state.cluster.restore_instruction,
+            self.charm.state.unit_server.restore_step
+        ):
+            case RestoreStep.DOWNLOAD, RestoreStep.NOT_STARTED:
+                self.charm.backup_manager.download_backup_file(self.charm.state.cluster.restore_id)
+            case RestoreStep.STOP, RestoreStep.DOWNLOAD:
+                # todo: add logic for stopping the workload
+                pass
+            case RestoreStep.RESTORE, RestoreStep.STOP:
+                # todo: add logic for restoring
+                pass
+            case RestoreStep.RESTART, RestoreStep.RESTORE:
+                # todo: add logic for starting the workload again
+                pass
+            case RestoreStep.COMPLETED, RestoreStep.RESTART:
+                # todo: add logic for cleaning up databag
+                pass
 
     def _exists_preventing_reason(self, check_restore: bool = False) -> str:
         """Check if an action can be executed, if not return error message.

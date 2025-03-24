@@ -68,6 +68,7 @@ class Status(Enum):
     AUTHENTICATION_NOT_ENABLED = StatusLevel(
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
+    BACKUP_RESTORE_FAILED = StatusLevel(BlockedStatus("failed to restore backup"), "ERROR")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
@@ -126,3 +127,4 @@ class RestoreStep(Enum):
     STOP = "stop_workload"
     RESTORE = "restore_backup"
     RESTART = "restart_workload"
+    COMPLETED = "completed"

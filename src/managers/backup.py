@@ -150,6 +150,7 @@ class BackupManager:
         """
         s3_parameters = self.state.cluster.s3_credentials
         download_source = f"{s3_parameters['path']}/{backup_id}"
+        logger.info(f"Initiating restore process for backup-id {backup_id}")
 
         bucket = self.get_bucket_resource(s3_parameters)
 
@@ -160,6 +161,7 @@ class BackupManager:
             logger.error(e)
             return False
 
+        self.state.unit_server.update({"restore_step": RestoreStep.DOWNLOAD.value})
         return True
 
     @staticmethod
@@ -199,4 +201,4 @@ class BackupManager:
             case RestoreStep.RESTORE:
                 return RestoreStep.RESTART
             case RestoreStep.RESTART:
-                return RestoreStep.NOT_STARTED
+                return RestoreStep.COMPLETED

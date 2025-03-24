@@ -363,5 +363,5 @@ def test_restore_workflow_order():
             )
             assert (
                 context.charm.backup_manager.next_restore_step(current_step=RestoreStep.RESTART)
-                == RestoreStep.NOT_STARTED
+                == RestoreStep.COMPLETED
             )
