@@ -340,9 +340,7 @@ class TLSEvents(Object):
                 continue
             secret_content = get_secret_from_id(self.charm.model, secret_id)
             mtls_chain = secret_content["mtls-chain"]
-            logger.debug(
-                f"Collecting CA from relation {relation.id} its mtls chain: {mtls_chain} secret_id: {secret_id}"
-            )
+            logger.debug(f"Collecting CA from relation {relation.id}, secret_id: {secret_id}")
             cas.extend(self.charm.tls_manager.separate_certificates(mtls_chain))
 
         return cas

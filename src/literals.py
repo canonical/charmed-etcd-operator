@@ -82,6 +82,12 @@ class Status(Enum):
         BlockedStatus("The private key provided is not valid. Please provide a valid private key"),
         "ERROR",
     )
+    EC_INVALID_CERTIFICATE = StatusLevel(
+        BlockedStatus(
+            "The certificate provided is a CA certificate. Please provide an end-entity certificate"
+        ),
+        "ERROR",
+    )
 
 
 # enum for TLS state

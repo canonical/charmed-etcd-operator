@@ -57,7 +57,7 @@ class RequirerCharmCharm(ops.CharmBase):
             self,
             relation_name="etcd-client",
             prefix="/test/",
-            mtls_chain=self.ca_chain,
+            mtls_chain=self.raw_certificate,
         )
 
         # EtcdRequires events
@@ -76,7 +76,8 @@ class RequirerCharmCharm(ops.CharmBase):
         framework.observe(self.on.update_action, self._on_update_action)
         framework.observe(self.on.put_action, self._on_put_action)
         framework.observe(self.on.get_action, self._on_get_action)
-        self.framework.observe(self.on.get_credentials_action, self._on_get_credentials_action)
+        framework.observe(self.on.get_credentials_action, self._on_get_credentials_action)
+        framework.observe(self.on.config_changed, self._on_certificate_available)
 
     @property
     def common_name(self):
@@ -106,9 +107,26 @@ class RequirerCharmCharm(ops.CharmBase):
         return "\n".join(cert.raw for cert in certs[0].chain[::-1])
 
     @property
+    def ca_cert(self):
+        certs, _ = self.certificates.get_assigned_certificates()
+        if not certs:
+            return None
+        return certs[0].ca.raw
+
+    @property
+    def raw_certificate(self):
+        raw_cert = self.ca_cert if self.send_ca_option else self.ca_chain
+        return raw_cert or ""
+
+    @property
     def etcd_relation(self) -> ops.Relation | None:
         """Return the etcd relation if present."""
         return self.etcd_requires.relations[0] if len(self.etcd_requires.relations) else None
+
+    @property
+    def send_ca_option(self) -> bool:
+        """Return True if the CA chain is available."""
+        return bool(self.config.get("send-ca-cert", False))
 
     def _on_start(self, event: ops.StartEvent):
         """Handle start event."""
@@ -154,7 +172,8 @@ class RequirerCharmCharm(ops.CharmBase):
 
         relation = self.model.get_relation("etcd-client")
         if relation:
-            self.etcd_requires.set_mtls_chain(relation.id, self.ca_chain or cert.certificate.raw)
+            raw_cert = self.raw_certificate or cert.certificate.raw
+            self.etcd_requires.set_mtls_chain(relation.id, raw_cert)
 
     def _on_authentication_updated(self, event: AuthenticationEvent):
         """Handle server CA updated event."""

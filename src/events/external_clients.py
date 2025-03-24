@@ -13,7 +13,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from ops import Object, RelationBrokenEvent
 
-from literals import EXTERNAL_CLIENTS_RELATION, TLSCARotationState, TLSState, TLSType
+from literals import EXTERNAL_CLIENTS_RELATION, Status, TLSCARotationState, TLSState, TLSType
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -59,14 +59,25 @@ class ExternalClientsEvents(Object):
             return
 
         # Get common name from mtls_chain
-        old_common_name = (
-            self.charm.external_clients_manager.get_common_name_from_chain(event.old_mtls_chain)
-            if event.old_mtls_chain
-            else None
-        )
+        old_common_name = None
+        if self.charm.state.cluster.managed_users.get(event.relation.id):
+            old_common_name = (
+                self.charm.external_clients_manager.get_common_name_from_chain(
+                    event.old_mtls_chain
+                )
+                if event.old_mtls_chain
+                else None
+            )
         common_name = self.charm.external_clients_manager.get_common_name_from_chain(
             event.mtls_chain
         )
+
+        # validate leaf certificate
+        if not self.charm.external_clients_manager.is_leaf_certificate_valid(event.mtls_chain):
+            logger.error("Invalid end-entity certificate")
+            # TODO set blocked status based on DP blocked states
+            self.charm.set_status(Status.EC_INVALID_CERTIFICATE)
+            return
 
         # if leader then create/update user
         if self.charm.unit.is_leader():
