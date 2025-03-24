@@ -301,7 +301,7 @@ def test_restore_action():
         config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
     )
 
-    with patch("managers.backup.BackupManager.initiate_restore", return_value=False):
+    with patch("managers.backup.BackupManager.download_backup_file", return_value=False):
         with raises(testing.ActionFailed) as e:
             ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
 
@@ -325,10 +325,15 @@ def test_restore_action():
         config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
     )
 
-    with patch("managers.backup.BackupManager.initiate_restore", return_value=True):
-        ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
+    with patch("managers.backup.BackupManager.download_backup_file", return_value=True):
+        state_out = ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
 
         assert ctx.action_results == {"success": f"restore initiated for {backup_id}"}
+    assert state_out.get_relation(1).local_app_data.get("restore_id") == backup_id
+    assert (
+        state_out.get_relation(1).local_app_data.get("restore_instruction")
+        == RestoreStep.DOWNLOAD.value
+    )
 
 
 def test_restore_workflow_order():

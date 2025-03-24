@@ -17,7 +17,7 @@ from ops import Object
 from ops.charm import ActionEvent
 
 from common.exceptions import EtcdBackupError
-from literals import INTERNAL_USER_PASSWORD_CONFIG, S3_RELATION_NAME, Status
+from literals import INTERNAL_USER_PASSWORD_CONFIG, S3_RELATION_NAME, RestoreStep, Status
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -123,11 +123,18 @@ class BackupEvents(Object):
 
         if not (backup_id_to_restore := event.params.get("backup-id", "")):
             event.fail("Must provide backup-id to restore.")
+            return
 
         event.log(f"Initiating restore process for backup-id {backup_id_to_restore}")
 
-        if not self.charm.backup_manager.initiate_restore(backup_id_to_restore):
+        if not self.charm.backup_manager.download_backup_file(backup_id_to_restore):
             event.fail(f"Could not download backup-file {backup_id_to_restore}.")
+            return
+
+        # initiate synced workflow on all other units by updating peer-relation app-data
+        self.charm.state.cluster.update(
+            {"restore_id": backup_id_to_restore, "restore_instruction": RestoreStep.DOWNLOAD.value}
+        )
 
         event.set_results({"success": f"restore initiated for {backup_id_to_restore}"})
 

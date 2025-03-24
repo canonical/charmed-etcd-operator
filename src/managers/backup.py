@@ -16,7 +16,7 @@ from common.client import EtcdClient
 from common.exceptions import EtcdBackupError
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import BACKUP_FILE_PATH, BACKUP_ID_FORMAT, INTERNAL_USER, RestoreStep
+from literals import BACKUP_FILE_PATH, BACKUP_ID_FORMAT, DATABASE_DIR, INTERNAL_USER, RestoreStep
 
 logger = logging.getLogger(__name__)
 
@@ -141,13 +141,25 @@ class BackupManager:
 
         return backup_list
 
-    def initiate_restore(self, backup_id: str) -> bool:
+    def download_backup_file(self, backup_id: str) -> bool:
         """Initiate the restore process by downloading the provided backup-id from object storage.
 
         Returns:
             True if backup-file could be downloaded from object storage and restore process was
             initiated, False otherwise.
         """
+        s3_parameters = self.state.cluster.s3_credentials
+        download_source = f"{s3_parameters['path']}/{backup_id}"
+
+        bucket = self.get_bucket_resource(s3_parameters)
+
+        try:
+            bucket.download_file(download_source, f"{DATABASE_DIR}/{backup_id}")
+            logger.info(f"Backup file {backup_id} downloaded to {DATABASE_DIR}")
+        except ClientError as e:
+            logger.error(e)
+            return False
+
         return True
 
     @staticmethod
