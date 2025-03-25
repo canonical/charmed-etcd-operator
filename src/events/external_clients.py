@@ -90,22 +90,25 @@ class ExternalClientsEvents(Object):
             logger.error("Invalid end-entity certificate")
             # TODO set blocked status based on DP blocked states
             self.charm.set_status(Status.EC_INVALID_CERTIFICATE)
-            return
+            # clean the old user if exists
+            if old_common_name:
+                self._on_relation_broken(event)  # type: ignore
+                return
 
         # if leader then create/update user
         if self.charm.unit.is_leader():
             if old_common_name != common_name:
                 logger.debug(f"Common name changed from {old_common_name} to {common_name}")
 
-                if self.charm.cluster_manager.get_user(common_name) is not None:
-                    logger.error("User already exists")
-                    # TODO set blocked status based on DP blocked states
-                    return
-
                 if old_common_name:
                     logger.warning("Removing relation's old user")
                     self.charm.cluster_manager.remove_managed_user(old_common_name)
                     self.charm.external_clients_manager.remove_managed_user(event.relation.id)
+
+                if self.charm.cluster_manager.get_user(common_name) is not None:
+                    logger.error("User already exists")
+                    # TODO set blocked status based on DP blocked states
+                    return
 
                 logger.info("Creating new user")
                 self.charm.cluster_manager.add_managed_user(common_name, event.prefix)
