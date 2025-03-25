@@ -333,13 +333,14 @@ class TLSEvents(Object):
 
         # managed users cas
         for relation in self.charm.external_clients_events.etcd_provides.relations:
-            secret_id = relation.data[relation.app].get("secret-mtls", "")
-            if not secret_id:
-                continue
-            secret_content = get_secret_from_id(self.charm.model, secret_id)
-            mtls_chain = secret_content["mtls-chain"]
-            logger.debug(f"Collecting CA from relation {relation.id}, secret_id: {secret_id}")
-            cas.extend(self.charm.tls_manager.separate_certificates(mtls_chain))
+            mtls_chain = self.charm.external_clients_events.etcd_provides.fetch_relation_field(
+                relation.id, "mtls-chain"
+            )
+            logger.debug(
+                f"Collecting CA from relation {relation.id}, chain exists: {bool(mtls_chain)}"
+            )
+            if mtls_chain:
+                cas.extend(self.charm.tls_manager.separate_certificates(mtls_chain))
 
         # certificate transfer cas
         cas.extend(self.charm.external_clients_events.certificate_transfer.get_all_certificates())
