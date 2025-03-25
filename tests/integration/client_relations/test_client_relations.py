@@ -114,8 +114,10 @@ async def test_build_and_deploy(ops_test: OpsTest, application_charm) -> None:
     await asyncio.gather(
         ops_test.model.deploy(REQUIRER_CHARM_PATH, application_name=REQUIRER_NAME),
         ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS),
-        ops_test.model.deploy(TLS_NAME, config=tls_config),
-        ops_test.model.deploy(TLS_NAME, application_name=REQUIRER_TLS_NAME, config=tls_config),
+        ops_test.model.deploy(TLS_NAME, channel="1/stable", config=tls_config),
+        ops_test.model.deploy(
+            TLS_NAME, channel="1/stable", application_name=REQUIRER_TLS_NAME, config=tls_config
+        ),
     )
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -311,6 +313,36 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
         assert client_cas, f"failed to get client CAs for {unit.name}"
         assert ca_chain not in client_cas, f"old CA chain still in trusted CAs for {unit.name}"
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_certificate_transfer(ops_test: OpsTest) -> None:
+    """Test if the requirer charm sends a ca certificate instead of an end-entity."""
+    # integrate etcd with requirer tls provider on certificate_transfer relation
+    await ops_test.model.integrate(f"{APP_NAME}:client-cas", REQUIRER_TLS_NAME)
+
+    # wait for model to settle
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_TLS_NAME])
+
+    # get ca from the REQURIER_TLS_NAME
+    requirer_tls_app: Application = ops_test.model.applications[REQUIRER_TLS_NAME]
+    requirer_tls_unit: Unit = requirer_tls_app.units[0]
+
+    action = await requirer_tls_unit.run_action("get-ca-certificate")
+    result = await action.wait()
+    ca_cert = result.results["ca-certificate"]
+    assert ca_cert, "failed to get ca certificate from requirer tls provider"
+
+    # get client ca from every unit and check if it includes the ca_cert
+    model = ops_test.model_full_name
+    assert ops_test.model
+    assert ops_test.model.applications[APP_NAME] is not None
+    for unit in ops_test.model.applications[APP_NAME].units:
+        client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
+        assert client_cas, f"failed to get client CAs for {unit.name}"
+        assert ca_cert in client_cas, f"CA chain not in trusted CAs for {unit.name}"
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])

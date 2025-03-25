@@ -18,7 +18,14 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from ops import Object, RelationBrokenEvent
 
-from literals import EXTERNAL_CLIENTS_RELATION, Status, TLSCARotationState, TLSState, TLSType
+from literals import (
+    CERTIFICATE_TRANSFER_INTERFACE,
+    EXTERNAL_CLIENTS_RELATION,
+    Status,
+    TLSCARotationState,
+    TLSState,
+    TLSType,
+)
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -35,7 +42,9 @@ class ExternalClientsEvents(Object):
 
         self.etcd_provides = EtcdProvides(self.charm, EXTERNAL_CLIENTS_RELATION)
 
-        self.certificate_transfer = CertificateTransferRequires(self.charm, "client-cas")
+        self.certificate_transfer = CertificateTransferRequires(
+            self.charm, CERTIFICATE_TRANSFER_INTERFACE
+        )
         self.framework.observe(
             self.certificate_transfer.on.certificate_set_updated, self._on_certificates_available
         )
@@ -171,6 +180,7 @@ class ExternalClientsEvents(Object):
 
     def _on_certificates_available(self, event: CertificatesAvailableEvent):
         """Handle the certificates available event."""
+        logger.debug("Certificates available event")
         cas = self.certificate_transfer.get_all_certificates()
         if self.certificate_transfer and self.charm.tls_manager.is_new_ca(
             "\n".join(cas), TLSType.CLIENT
