@@ -61,3 +61,10 @@ actions:
 
   get-credentials:
     description: Action for fetching all available credentials from relations.
+
+config:
+  options:
+    send-ca-cert:
+      description: Send the CA certificate instead of end-entity certificate
+      type: boolean
+      default: false
