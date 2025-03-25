@@ -88,8 +88,6 @@ class ExternalClientsEvents(Object):
         # validate leaf certificate
         if not self.charm.external_clients_manager.is_leaf_certificate_valid(event.mtls_chain):
             logger.error("Invalid end-entity certificate")
-            # TODO set blocked status based on DP blocked states
-            self.charm.set_status(Status.EC_INVALID_CERTIFICATE)
             # clean the old user if exists
             if old_common_name:
                 self._on_relation_broken(event)  # type: ignore
@@ -181,3 +179,16 @@ class ExternalClientsEvents(Object):
     def _on_certificates_removed(self, event: CertificatesRemovedEvent):
         """Handle the certificates removed event."""
         self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
+
+    def compute_component_status(self) -> list[Status]:
+        """Compute the component status."""
+        status_list = []
+
+        for relation in self.etcd_provides.relations:
+            mtls_chain = self.etcd_provides.fetch_relation_field(relation.id, "mtls-chain")
+            if not mtls_chain:
+                continue
+            if not self.charm.external_clients_manager.is_leaf_certificate_valid(mtls_chain):
+                status_list.append(Status.EC_INVALID_CERTIFICATE)
+
+        return status_list
