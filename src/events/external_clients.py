@@ -92,6 +92,7 @@ class ExternalClientsEvents(Object):
             if old_common_name:
                 self._on_relation_broken(event)  # type: ignore
                 return
+            return
 
         # if leader then create/update user
         if self.charm.unit.is_leader():
@@ -136,7 +137,7 @@ class ExternalClientsEvents(Object):
             event.relation.id
         )
 
-        if self.charm.unit.is_leader():
+        if self.charm.unit.is_leader() and relation_managed_user:
             self.charm.cluster_manager.remove_managed_user(relation_managed_user)
             self.charm.external_clients_manager.remove_managed_user(event.relation.id)
 

@@ -78,6 +78,7 @@ class RequirerCharmCharm(ops.CharmBase):
         framework.observe(self.on.get_action, self._on_get_action)
         framework.observe(self.on.get_credentials_action, self._on_get_credentials_action)
         framework.observe(self.on.config_changed, self._on_certificate_available)
+        framework.observe(self.on.get_certificate_action, self._on_get_certificate_action)
 
     @property
     def common_name(self):
@@ -247,6 +248,17 @@ class RequirerCharmCharm(ops.CharmBase):
         )
 
         event.set_results(result)
+
+    def _on_get_certificate_action(self, event: ops.ActionEvent) -> None:
+        """Return the certificate an action response."""
+        if self.send_ca_option:
+            event.set_results({"certificate": self.ca_cert})
+        else:
+            certs, _ = self.certificates.get_assigned_certificates()
+            if not certs:
+                event.fail("No certificates available")
+                return
+            event.set_results({"certificate": certs[0].certificate.raw})
 
 
 def _put(key: str, value: str):

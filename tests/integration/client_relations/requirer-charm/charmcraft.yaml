@@ -62,6 +62,9 @@ actions:
   get-credentials:
     description: Action for fetching all available credentials from relations.
 
+  get-certificate:
+    description: Get the certificate of the app
+
 config:
   options:
     send-ca-cert:

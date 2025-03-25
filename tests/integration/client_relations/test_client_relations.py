@@ -19,7 +19,7 @@ from juju.application import Application
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 
-from literals import EXTERNAL_CLIENTS_RELATION, INTERNAL_USER, PEER_RELATION, TLSType
+from literals import EXTERNAL_CLIENTS_RELATION, INTERNAL_USER, PEER_RELATION, Status, TLSType
 
 from ..helpers import (
     APP_NAME,
@@ -45,7 +45,6 @@ REQUIRER_CHARM_PATH = "./requirer-charm_ubuntu@24.04-amd64.charm"
 
 common_name = REQUIRER_NAME
 key_prefix = "/test/"
-# ca_chain = "-----BEGIN CERTIFICATE-----\ntest_ca\n-----END CERTIFICATE-----"
 
 
 def generate_mtls_chain(common_name: str) -> str:
@@ -74,15 +73,15 @@ async def get_requirer_common_name(ops_test: OpsTest) -> str:
     return result
 
 
-async def get_requirer_ca_chain(ops_test: OpsTest) -> str | None:
+async def get_requirer_leaf_certificate(ops_test: OpsTest) -> str | None:
     """Get the ca chain from the requirer TLS provider."""
-    requirer_tls_app = ops_test.model.applications[REQUIRER_TLS_NAME]
-    requirer_tls_unit = requirer_tls_app.units[0]
+    requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
+    requirer_unit: Unit = requirer_app.units[0]
 
-    result = await requirer_tls_unit.run_action("get-ca-certificate")
-    result = await result.wait()
+    action = await requirer_unit.run_action("get-certificate")
+    result = await action.wait()
     if result.status:
-        return result.results["ca-certificate"]
+        return result.results["certificate"]
 
     return None
 
@@ -115,10 +114,8 @@ async def test_build_and_deploy(ops_test: OpsTest, application_charm) -> None:
     await asyncio.gather(
         ops_test.model.deploy(REQUIRER_CHARM_PATH, application_name=REQUIRER_NAME),
         ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS),
-        ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config),
-        ops_test.model.deploy(
-            TLS_NAME, application_name=REQUIRER_TLS_NAME, channel="edge", config=tls_config
-        ),
+        ops_test.model.deploy(TLS_NAME, config=tls_config),
+        ops_test.model.deploy(TLS_NAME, application_name=REQUIRER_TLS_NAME, config=tls_config),
     )
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -165,7 +162,7 @@ async def test_relate_client_charm(ops_test: OpsTest) -> None:
     # get client ca from every unit and check if it includes the ca_chain
 
     model = ops_test.model_full_name
-    ca_chain = await get_requirer_ca_chain(ops_test)
+    ca_chain = await get_requirer_leaf_certificate(ops_test)
     assert ca_chain, "failed to get ca chain from requirer TLS provider"
     for unit in ops_test.model.applications[APP_NAME].units:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
@@ -226,7 +223,7 @@ async def test_update_chain(ops_test: OpsTest) -> None:
     common_name = await get_requirer_common_name(ops_test)
     assert common_name == "new-common-name", "common name not updated"
 
-    ca_chain = await get_requirer_ca_chain(ops_test)
+    ca_chain = await get_requirer_leaf_certificate(ops_test)
     assert ca_chain, "failed to get ca chain from requirer TLS provider"
     for unit in ops_test.model.applications[APP_NAME].units:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
@@ -276,8 +273,9 @@ async def test_etcd_updates_ca(ops_test: OpsTest) -> None:
 async def test_remove_client_relation(ops_test: OpsTest) -> None:
     """Remove the client relation and check if the user and role are removed."""
     common_name = "new-common-name"
-    ca_chain = "---BEGIN CERTIFICATE---\nnew_ca\n---END CERTIFICATE---"
-    etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
+    ca_chain = await get_requirer_leaf_certificate(ops_test)
+    assert ca_chain, "failed to get ca chain from requirer TLS provider"
+    etcd_app: Application = ops_test.model.applications[APP_NAME]
 
     logger.info("Removing client relation")
     await etcd_app.remove_relation(
@@ -313,3 +311,34 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
         assert client_cas, f"failed to get client CAs for {unit.name}"
         assert ca_chain not in client_cas, f"old CA chain still in trusted CAs for {unit.name}"
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_requirer_sends_ca(ops_test: OpsTest) -> None:
+    """Test if the requirer charm sends a ca certificate instead of an end-entity."""
+    # configure the requirer charm to send a ca certificate
+    requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
+    await requirer_app.set_config({"send-ca-cert": "True"})
+    # integrate the requirer charm
+    await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
+
+    # wait for model to settle
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME, REQUIRER_NAME],
+        # idle_period=10,
+        apps_full_statuses={
+            APP_NAME: {
+                "blocked": [Status.EC_INVALID_CERTIFICATE.value.status.message],
+            },
+            REQUIRER_NAME: {"active": []},
+            TLS_NAME: {"active": []},
+        },
+        units_full_statuses={
+            APP_NAME: {"units": {"blocked": [Status.EC_INVALID_CERTIFICATE.value.status.message]}},
+            REQUIRER_NAME: {"units": {"active": []}},
+            TLS_NAME: {"units": {"active": []}},
+        },
+    )
