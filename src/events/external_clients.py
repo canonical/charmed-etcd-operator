@@ -7,6 +7,11 @@
 import logging
 from typing import TYPE_CHECKING
 
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesAvailableEvent,
+    CertificatesRemovedEvent,
+    CertificateTransferRequires,
+)
 from charms.data_platform_libs.v0.data_interfaces import (
     EtcdProvides,
     MTLSChainUpdatedEvent,
@@ -30,6 +35,14 @@ class ExternalClientsEvents(Object):
 
         self.etcd_provides = EtcdProvides(self.charm, EXTERNAL_CLIENTS_RELATION)
 
+        self.certificate_transfer = CertificateTransferRequires(self.charm, "client-cas")
+        self.framework.observe(
+            self.certificate_transfer.on.certificate_set_updated, self._on_certificates_available
+        )
+        self.framework.observe(
+            self.certificate_transfer.on.certificates_removed, self._on_certificates_removed
+        )
+
         self.framework.observe(
             self.etcd_provides.on.mtls_chain_updated, self._on_mtls_chain_updated
         )
@@ -37,7 +50,7 @@ class ExternalClientsEvents(Object):
             self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_broken, self._on_relation_broken
         )
 
-    def _on_mtls_chain_updated(self, event: MTLSChainUpdatedEvent):
+    def _on_mtls_chain_updated(self, event: MTLSChainUpdatedEvent):  # noqa: C901
         """Handle the ca chain updated event."""
         if not event.mtls_chain or not event.prefix:
             logger.error("CA chain, keys prefix, or common name not provided")
@@ -153,3 +166,15 @@ class ExternalClientsEvents(Object):
 
             if relation_data.get("version") != etcd_version:
                 self.etcd_provides.set_version(relation.id, etcd_version)
+
+    def _on_certificates_available(self, event: CertificatesAvailableEvent):
+        """Handle the certificates available event."""
+        cas = self.certificate_transfer.get_all_certificates()
+        if self.certificate_transfer and self.charm.tls_manager.is_new_ca(
+            "\n".join(cas), TLSType.CLIENT
+        ):
+            self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
+
+    def _on_certificates_removed(self, event: CertificatesRemovedEvent):
+        """Handle the certificates removed event."""
+        self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)

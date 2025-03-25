@@ -343,6 +343,9 @@ class TLSEvents(Object):
             logger.debug(f"Collecting CA from relation {relation.id}, secret_id: {secret_id}")
             cas.extend(self.charm.tls_manager.separate_certificates(mtls_chain))
 
+        # certificate transfer cas
+        cas.extend(self.charm.external_clients_events.certificate_transfer.get_all_certificates())
+
         return cas
 
     def collect_peer_ca(self) -> str:

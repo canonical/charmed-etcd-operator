@@ -31,6 +31,10 @@ requires:
     interface: tls-certificates
     limit: 1
     optional: true
+  client-cas:
+    interface: certificate_transfer
+    limit: 1
+    optional: true
 
 storage:
   data:
