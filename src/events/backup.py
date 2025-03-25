@@ -80,6 +80,11 @@ class BackupEvents(Object):
 
     def _on_s3_credentials_gone(self, event: CredentialsGoneEvent) -> None:
         """Handle the removal of the relation with s3-integrator."""
+        if self.charm.state.cluster.is_backup_in_progress:
+            logger.debug("Backup in progress")
+            event.defer()
+            return
+
         self.charm.workload.remove_file(self.charm.workload.paths.tls.backup_ca)
 
         if self.charm.unit.is_leader():
@@ -92,11 +97,18 @@ class BackupEvents(Object):
             event.fail(error)
             return
 
+        if self.charm.state.cluster.is_backup_in_progress:
+            event.fail("There is currently a backup in progress, please wait.")
+            return
+
+        self.charm.set_status(Status.BACKUP_IN_PROGRESS)
+        event.log("Initiating backup process ...")
+
         try:
             backup_id = self.charm.backup_manager.create_backup()
         except EtcdBackupError as e:
             event.set_results({"error": e})
-            event.fail(e)
+            event.fail("Backup failed. Check the error logs for more details.")
             return
 
         event.set_results({"backup-id": backup_id})

@@ -221,6 +221,16 @@ class EtcdCluster(RelationState):
         """Get credentials and parameters to access s3 object storage."""
         return json.loads(self.relation_data.get("s3-credentials", "{}"))
 
+    @property
+    def backup_id(self) -> str:
+        """Id of the backup that is currently being created."""
+        return self.relation_data.get("backup_id", "")
+
+    @property
+    def is_backup_in_progress(self) -> bool:
+        """Flag to indicate if the cluster is creating a backup."""
+        return bool(self.backup_id)
+
 
 @dataclass
 class Member:
