@@ -18,6 +18,10 @@ peers:
   restart:
     interface: rolling_op
 
+provides:
+  cos-agent:
+    interface: cos_agent
+    
 requires:
   peer-certificates:
     interface: tls-certificates
