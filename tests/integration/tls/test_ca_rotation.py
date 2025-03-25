@@ -34,7 +34,7 @@ TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 90
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
@@ -44,7 +44,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     """
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
+    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
 
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
@@ -54,7 +54,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], timeout=1000, idle_period=60)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
@@ -92,7 +92,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_ca_rotation(ops_test: OpsTest) -> None:

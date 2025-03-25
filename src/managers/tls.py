@@ -14,7 +14,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import SUBSTRATES, TLSCARotationState, TLSState, TLSType
+from literals import SUBSTRATES, Status, TLSCARotationState, TLSState, TLSType
 
 logger = logging.getLogger(__name__)
 
@@ -206,3 +206,27 @@ class TLSManager:
             if tls_type == TLSType.PEER
             else self.workload.paths.tls.client_ca,
         )
+
+    def compute_component_status(self) -> list[Status]:
+        """Compute the component status."""
+        status_list = []
+
+        if self.state.unit_server.tls_peer_state == TLSState.TO_TLS:
+            status_list.append(Status.TLS_ENABLING_PEER_TLS)
+
+        if self.state.unit_server.tls_client_state == TLSState.TO_TLS:
+            status_list.append(Status.TLS_ENABLING_CLIENT_TLS)
+
+        if self.state.unit_server.tls_peer_state == TLSState.TO_NO_TLS:
+            status_list.append(Status.TLS_DISABLING_PEER_TLS)
+
+        if self.state.unit_server.tls_client_state == TLSState.TO_NO_TLS:
+            status_list.append(Status.TLS_DISABLING_CLIENT_TLS)
+
+        if self.state.unit_server.tls_peer_ca_rotation_state != TLSCARotationState.NO_ROTATION:
+            status_list.append(Status.TLS_PEER_CA_ROTATING)
+
+        if self.state.unit_server.tls_client_ca_rotation_state != TLSCARotationState.NO_ROTATION:
+            status_list.append(Status.TLS_CLIENT_CA_ROTATING)
+
+        return status_list

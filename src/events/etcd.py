@@ -22,14 +22,19 @@ from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
     EtcdUserManagementError,
+    HealthCheckFailedError,
     RaftLeaderNotFoundError,
 )
 from common.secrets import get_secret_from_id
 from literals import (
     DATA_STORAGE,
+    DATABASE_DIR,
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
+    SNAP_DATA_PATH,
+    SNAP_GROUP,
+    SNAP_USER,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
     Status,
@@ -72,6 +77,15 @@ class EtcdEvents(Object):
         self.framework.observe(
             self.charm.on[DATA_STORAGE].storage_detaching, self._on_storage_detaching
         )
+        self.framework.observe(
+            self.charm.on[DATA_STORAGE].storage_attached, self._on_storage_attached
+        )
+
+    def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
+        """Handle storage attachment."""
+        # fix the permissions of the data dir if re-attaching existing storage
+        self.charm.workload.exec(["chmod", "-R", "750", SNAP_DATA_PATH])
+        self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", SNAP_DATA_PATH])
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -79,7 +93,7 @@ class EtcdEvents(Object):
             self.charm.set_status(Status.SERVICE_NOT_INSTALLED)
             return
 
-    def _on_start(self, event: ops.StartEvent) -> None:
+    def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
         tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
         if (
@@ -94,10 +108,18 @@ class EtcdEvents(Object):
 
         self.charm.config_manager.set_config_properties()
 
-        if self.charm.unit.is_leader() and not self.charm.state.cluster.cluster_state:
+        if not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
             # this is the very first cluster start, this unit starts without being added as member
             # all subsequent units will have to be added as member before starting the workload
             self.charm.cluster_manager.start_member()
+
+            if self.charm.workload.exists(DATABASE_DIR):
+                # this is a new application but storage is reused
+                self.charm.state.cluster.update({"authentication": "enabled"})
+                # update cluster membership configuration after recovering existing data
+                self.charm.cluster_manager.broadcast_peer_url(
+                    self.charm.state.unit_server.peer_url
+                )
 
             if not self.charm.state.cluster.auth_enabled:
                 try:
@@ -105,27 +127,76 @@ class EtcdEvents(Object):
                     self.charm.state.cluster.update({"authentication": "enabled"})
                 except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
                     logger.error(e)
-                    self.charm.set_status(Status.AUTHENTICATION_NOT_ENABLED)
-                    return
+                    raise
         elif (
             self.charm.state.unit_server.member_endpoint
             in self.charm.state.cluster.cluster_members
         ):
             # this unit has been added to the etcd cluster
-            self.charm.cluster_manager.start_member()
+            if not self.charm.state.cluster.auth_enabled:
+                # failed start hooks on cluster initialization will go here on retry
+                if self.charm.unit.is_leader():
+                    try:
+                        self.charm.cluster_manager.enable_authentication()
+                        self.charm.state.cluster.update({"authentication": "enabled"})
+                    except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
+                        logger.error(e)
+                        raise
+                else:
+                    raise EtcdAuthNotEnabledError("Authentication not enabled.")
+
+            if not self.charm.state.unit_server.is_started:
+                # database files should not be deleted on running units
+                if self.charm.workload.exists(DATABASE_DIR):
+                    logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
+                    # storage cannot be reused on non-leader members
+                    try:
+                        self.charm.workload.remove_directory(DATABASE_DIR)
+                        logger.warning(
+                            f"Removed database file from {DATABASE_DIR} to join existing cluster."
+                        )
+                    except OSError:
+                        # if removing fails, we cannot start the workload or the member would crash
+                        raise
+
+                self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
+            self.charm.set_status(Status.CLUSTER_NOT_JOINED)
             event.defer()
             return
 
-        if self.charm.workload.alive():
-            self.charm.set_status(Status.ACTIVE)
-        else:
+        if not self.charm.workload.alive():
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
+        # refresh the host information and cluster membership in case of ip change
+        ip_address = self.charm.cluster_manager.get_host_mapping().get("ip")
+        if ip_address != self.charm.state.unit_server.ip:
+            logger.info(f"New ip address: {ip_address}")
+            self.charm.state.unit_server.update({"ip": ip_address})
+
+            # update cluster configuration
+            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
+            self.charm.config_manager.set_config_properties()
+
+            # we need to update the client-urls by restarting etcd
+            # after ip change, this member is unavailable, no need to acquire restart lock
+            if not self.charm.cluster_manager.restart_member(move_leader=False):
+                raise HealthCheckFailedError("Failed to check health of the member after restart")
+
+            if self.charm.unit.is_leader():
+                self.charm.cluster_manager.update_cluster_member_state()
+
+            # update tls certificates with new ip address
+            if self.charm.state.unit_server.tls_client_state in (
+                TLSState.TO_TLS,
+                TLSState.TLS,
+            ) or self.charm.state.unit_server.tls_peer_state in (TLSState.TO_TLS, TLSState.TLS):
+                self.charm.tls_events.refresh_tls_certificates_event.emit()
+
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
             self.update_private_key(tls_peer_private_key_id)
 
@@ -151,8 +222,12 @@ class EtcdEvents(Object):
                     self.charm.cluster_manager.promote_learning_member()
                 except EtcdClusterManagementError as e:
                     logger.warning(e)
+                    self.charm.set_status(Status.CLUSTER_MEMBER_NOT_PROMOTED)
                     event.defer()
                     return
+
+            # reflect membership updates in the cluster state, e.g. ip change or tls switchover
+            self.charm.cluster_manager.update_cluster_member_state()
 
             self.charm.external_clients_events.update_client_relations_data()
 
@@ -161,13 +236,16 @@ class EtcdEvents(Object):
         if not self.charm.unit.is_leader():
             return
 
-        logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
-        cluster_members = self.charm.state.cluster.cluster_members.split(",")
-        # re-assemble the string without the departing unit
-        updated_cluster_members = ",".join(
-            m for m in cluster_members if event.unit.name.replace("/", "") not in m
-        )
-        self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
+        if self.charm.state.unit_server.is_started:
+            # this must not overwrite already cleaned up application databag
+            # it should only happen if at least this unit's workload is still running
+            logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
+            cluster_members = self.charm.state.cluster.cluster_members.split(",")
+            # re-assemble the string without the departing unit
+            updated_cluster_members = ",".join(
+                m for m in cluster_members if event.unit.name.replace("/", "") not in m
+            )
+            self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
@@ -186,14 +264,28 @@ class EtcdEvents(Object):
             return
 
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
-            self.charm.state.cluster.update(
-                {f"{INTERNAL_USER}-password": self.charm.workload.generate_password()}
-            )
+            if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
+                try:
+                    password = get_secret_from_id(self.charm.model, admin_secret_id).get(
+                        INTERNAL_USER
+                    )
+                except (ModelError, SecretNotFoundError) as e:
+                    logger.error(f"Could not access secret {admin_secret_id}: {e}")
+                    raise
+            else:
+                password = self.charm.workload.generate_password()
+
+            self.charm.state.cluster.update({f"{INTERNAL_USER}-password": password})
+
+        # reflect membership updates in the cluster state
+        self.charm.cluster_manager.update_cluster_member_state()
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
         if not self.charm.workload.alive():
-            self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+            if not self.charm.cluster_manager.restart_member():
+                self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+                return
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
@@ -217,7 +309,7 @@ class EtcdEvents(Object):
         if self.charm.app.planned_units() > 0:
             try:
                 self.charm.cluster_manager.remove_member()
-            except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
+            except (EtcdClusterManagementError, RaftLeaderNotFoundError):
                 # We want this hook to error out if we cannot remove the cluster member
                 # otherwise the cluster could become unavailable because of quorum loss
                 raise
@@ -256,8 +348,13 @@ class EtcdEvents(Object):
                         )
                     except EtcdUserManagementError as e:
                         logger.error(e)
+                        self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
+            else:
+                logger.error(f"Invalid username in secret {admin_secret_id}.")
+                self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
+            self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
 
     def update_private_key(self, private_key_id: str) -> None:
         """Update the private key in etcd."""

@@ -9,6 +9,7 @@ __pycache__/
 .vscode/
 etcd-v3.4.35-linux-amd64*
 last_written_value
+log_file
 client.pem
 client.key
 client_ca.pem

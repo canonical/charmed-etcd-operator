@@ -7,6 +7,7 @@
 import base64
 import json
 import logging
+import os
 import re
 import subprocess
 from typing import Tuple
@@ -290,7 +291,9 @@ class EtcdClient:
                 args.append(f"-w={output_format}")
             if use_input:
                 args.append("--interactive=False")
-            if "https" in endpoints:
+            # we append the TLS params whenever we find a client certificate
+            # todo: this is not substrate-agnostic
+            if os.path.exists(f"{TLS_ROOT_DIR}/client.pem"):
                 args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
                 args.append(f"--key={TLS_ROOT_DIR}/client.key")
                 args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
@@ -397,18 +400,17 @@ class EtcdClient:
         logger.debug("Health check passed.")
         return True
 
-    def broadcast_peer_url(self, endpoints: str, member_id: str, peer_urls: str) -> None:
+    def broadcast_peer_url(self, member_id: str, peer_urls: str) -> None:
         """Broadcast the peer URL to all units in the cluster.
 
         Args:
-            endpoints (str): The endpoints to run the command against.
             member_id (str): The member ID to broadcast the peer URL for.
             peer_urls (str): The peer URLs to broadcast.
         """
         self._run_etcdctl(
             command="member",
             subcommand="update",
-            endpoints=endpoints,
+            endpoints=self.client_url,
             auth_username=self.user,
             auth_password=self.password,
             member=member_id,

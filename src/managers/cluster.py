@@ -7,8 +7,9 @@
 import logging
 import socket
 from json import JSONDecodeError
+from typing import List
 
-from tenacity import retry, stop_after_attempt, wait_random_exponential
+from tenacity import retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
 from common.client import EtcdClient
 from common.exceptions import (
@@ -20,7 +21,7 @@ from common.exceptions import (
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, EtcdClusterState, TLSState
+from literals import INTERNAL_USER, EtcdClusterState, Status, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,11 @@ class ClusterManager:
         except (KeyError, JSONDecodeError) as e:
             raise RaftLeaderNotFoundError(f"No raft leader found: {e}")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_fixed(1),
+        reraise=True,
+    )
     def enable_authentication(self) -> None:
         """Enable the etcd admin user and authentication."""
         try:
@@ -108,7 +114,7 @@ class ClusterManager:
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
+            client_url=",".join(e for e in self.cluster_endpoints),
         )
 
         member_list = client.member_list()
@@ -134,9 +140,9 @@ class ClusterManager:
             password=self.admin_password,
             client_url=",".join(e for e in self.cluster_endpoints),
         )
-        client.broadcast_peer_url(self.state.unit_server.client_url, self.member.id, peer_urls)
+        client.broadcast_peer_url(self.member.id, peer_urls)
 
-    def is_healthy(self, cluster=True) -> bool:
+    def is_healthy(self, cluster: bool = True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
 
         Args:
@@ -157,12 +163,15 @@ class ClusterManager:
         )
         return client.is_healthy(cluster=cluster)
 
-    def restart_member(self) -> bool:
+    def restart_member(self, move_leader: bool = True) -> bool:
         """Restart the workload.
 
         Returns:
             bool: True if the workload is running after restart.
         """
+        if move_leader:
+            self.move_leader_if_required()
+
         logger.debug("Restarting workload")
         self.workload.restart()
         return self.is_healthy(cluster=False)
@@ -238,21 +247,19 @@ class ClusterManager:
     )
     def remove_member(self) -> None:
         """Remove a cluster member and stop the workload."""
+        self.move_leader_if_required()
         try:
             client = EtcdClient(
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=",".join(e for e in self.cluster_endpoints),
             )
-            if self.member.id == self.leader:
-                new_leader_id = self.select_new_leader()
-                logger.debug(f"Next selected leader: {new_leader_id}")
-                client.move_leader(new_leader_id)
-            # by querying the member's id we make sure the cluster is available with quorum
-            # otherwise we raise and retry
             client.remove_member(self.member.id)
-        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError):
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError):
             raise
+        except ValueError:
+            # the unit is not a cluster member anymore, we just move on
+            return
 
     def select_new_leader(self) -> str:
         """Choose a new leader from the current cluster members.
@@ -271,6 +278,58 @@ class ClusterManager:
             raise ValueError("member list command failed")
         member_list.pop(self.state.unit_server.member_name, None)
         return next(iter(member_list.values())).id
+
+    def move_leader_if_required(self) -> None:
+        """Move the raft leadership of the cluster to the next available member if required."""
+        try:
+            if self.member.id == self.leader:
+                new_leader_id = self.select_new_leader()
+                logger.debug(f"Next selected leader: {new_leader_id}")
+
+                client = EtcdClient(
+                    username=self.admin_user,
+                    password=self.admin_password,
+                    client_url=",".join(e for e in self.cluster_endpoints),
+                )
+                client.move_leader(new_leader_id)
+                # wait for leadership to be moved before continuing operation
+                if self.is_healthy(cluster=True):
+                    logger.debug(f"Successfully moved leader to {new_leader_id}.")
+        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
+            logger.warning(f"Could not transfer cluster leadership: {e}")
+            return
+
+    def update_cluster_member_state(self) -> None:
+        """Get up-to-date member information and store in cluster state."""
+        if not self.state.cluster.cluster_state:
+            return
+
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        try:
+            member_list = client.member_list()
+            cluster_members = ",".join(f"{k}={v.peer_urls[0]}" for k, v in member_list.items())
+            self.state.cluster.update({"cluster_members": cluster_members})
+        except Exception as e:
+            # we should not have errors here, but if we do, we don't want the error to raise
+            logger.warning(f"Error updating the cluster member state: {e}")
+
+    def compute_component_status(self) -> List[Status]:
+        """Compute the Cluster manager's statuses."""
+        status_list = []
+
+        if self.state.unit_server.is_started:
+            if self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value:
+                status_list.append(Status.CLUSTER_NOT_INITIALIZED)
+
+            if not self.state.cluster.auth_enabled:
+                status_list.append(Status.AUTHENTICATION_NOT_ENABLED)
+
+        return status_list
 
     def get_user(self, username: str) -> dict | None:
         """Get the user information.

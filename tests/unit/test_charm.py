@@ -13,7 +13,11 @@ from ops import testing
 from pytest import raises
 
 from charm import EtcdOperatorCharm
-from common.exceptions import EtcdClusterManagementError
+from common.exceptions import (
+    EtcdAuthNotEnabledError,
+    EtcdClusterManagementError,
+    EtcdUserManagementError,
+)
 from core.models import Member
 from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
@@ -73,15 +77,16 @@ def test_start():
     # non-leader units should not start directly
     state_in = testing.State(leader=False)
     with (
-        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
-        patch("workload.EtcdWorkload.start"),
+        patch("workload.EtcdWorkload.start") as start,
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status != ops.ActiveStatus()
+        assert state_out.unit_status == ops.MaintenanceStatus("Waiting to join cluster")
+        start.assert_not_called()
 
-    # if authentication cannot be enabled, the charm should be blocked
+    # if authentication cannot be enabled, the charm should error out
     state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -89,16 +94,18 @@ def test_start():
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
     ):
-        state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status == ops.BlockedStatus(
-            "failed to enable authentication in etcd"
-        )
+        with raises(testing.errors.UncaughtCharmError) as e:
+            state_out = ctx.run(ctx.on.start(), state_in)
+            assert not state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
+
+        assert isinstance(e.value.__cause__, EtcdUserManagementError)
 
     # if the cluster is new, the leader should immediately start and enable auth
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
     state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.exists", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
@@ -106,6 +113,24 @@ def test_start():
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
+        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "existing"
+
+    # if the cluster is reusing storage, the workload should start and broadcast its peer URL
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.exists", return_value=True),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.start"),
+        patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
+        patch("managers.cluster.ClusterManager.broadcast_peer_url") as broadcast_peer_url,
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        broadcast_peer_url.assert_called()
+        assert state_out.unit_status == ops.ActiveStatus()
+        assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
+        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "existing"
 
     # if the cluster already exists, the leader should not start but wait for being added as member
     relation = testing.PeerRelation(
@@ -136,6 +161,7 @@ def test_start():
         local_app_data={
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
+            "authentication": "enabled",
         },
         local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
     )
@@ -150,12 +176,91 @@ def test_start():
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
         start.assert_called_once()
 
+    # leader started but auth not enabled -> retry -> fails -> raise
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://ip0:2380",
+        },
+        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.start") as start,
+        patch("workload.EtcdWorkload.write_file"),
+        patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
+    ):
+        with raises(testing.errors.UncaughtCharmError) as e:
+            state_out = ctx.run(ctx.on.start(), state_in)
+            assert not state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
+
+        start.assert_not_called()
+        assert isinstance(e.value.__cause__, EtcdUserManagementError)
+
+    # leader started but auth not enabled -> retry -> success
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://ip0:2380",
+        },
+        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.start") as start,
+        patch("workload.EtcdWorkload.write_file"),
+        patch("subprocess.run"),
+        patch("workload.EtcdWorkload.alive", return_value=True),
+    ):
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+        assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
+        start.assert_not_called()
+
+    # non leader must not start if auth not enabled
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
+        },
+        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.start") as start,
+        patch("workload.EtcdWorkload.write_file"),
+    ):
+        with raises(testing.errors.UncaughtCharmError) as e:
+            state_out = ctx.run(ctx.on.start(), state_in)
+            assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
+
+        start.assert_not_called()
+        assert isinstance(e.value.__cause__, EtcdAuthNotEnabledError)
+
 
 def test_update_status():
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State()
 
-    with patch("workload.EtcdWorkload.alive", return_value=False):
+    # restart workload if not running
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=False),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+
+    # failed restart should block status
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=False),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=False),
+    ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
 
@@ -231,10 +336,58 @@ def test_config_changed():
         leader=True,
     )
 
-    with patch("subprocess.run"):
+    with (
+        patch("subprocess.run"),
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("common.client.EtcdClient.broadcast_peer_url"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+    ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+
+def test_secret_changed():
+    secret_key = "root"
+    secret_value = "123"
+    secret_content = {secret_key: secret_value}
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    # test the happy path
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        secrets=[secret],
+        config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
+        relations={relation},
+        leader=True,
+    )
+    with patch("subprocess.run"):
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
+        secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
+        assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+    # unhappy path: if the password update fails in etcd, charm status has to be blocked
+    with patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="failed")):
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
+
+        assert state_out.unit_status == ops.BlockedStatus("failed to update password")
+
+    # no update should happen if the user-name is invalid, charm status has to be blocked
+    secret_key = "invalid-user-name"
+    secret_content = {secret_key: secret_value}
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    state_in = testing.State(
+        secrets=[secret],
+        config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
+        relations={relation},
+        leader=True,
+    )
+    with patch("subprocess.run") as run:
+        state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
+        run.assert_not_called()
+        assert state_out.unit_status == ops.BlockedStatus("failed to update password")
 
 
 def test_peer_relation_joined():
@@ -339,14 +492,16 @@ def test_peer_relation_changed():
         promote_learning_member.assert_called_once()
         assert state_out.deferred[0].name == "etcd_peers_relation_changed"
 
-    with patch("common.client.EtcdClient._run_etcdctl") as run_etcdctl:
+    with (
+        patch("common.client.EtcdClient._run_etcdctl") as run_etcdctl,
+        patch("managers.cluster.ClusterManager.update_cluster_member_state"),
+    ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
         assert relation.local_app_data.get("learning_member") is None
         assert (
             relation.local_app_data.get("cluster_members")
             == "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380"
         )
-        run_etcdctl.assert_called_once()
         run_etcdctl_args = run_etcdctl.call_args[1]
         assert run_etcdctl_args["command"] == "member"
         assert run_etcdctl_args["subcommand"] == "promote"
@@ -377,6 +532,7 @@ def test_unit_removal():
         patch("subprocess.run"),
         patch("workload.EtcdWorkload.stop"),
         patch("managers.cluster.ClusterManager.leader"),
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
@@ -392,6 +548,7 @@ def test_unit_removal():
         # mock the `wait` in tenacity.retry to avoid delay in retrying
         patch("tenacity.nap.time.sleep", MagicMock()),
         patch("workload.EtcdWorkload.stop"),
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         with raises(testing.errors.UncaughtCharmError) as e:
             ctx.run(ctx.on.storage_detaching(data_storage), state_in)

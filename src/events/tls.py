@@ -145,10 +145,8 @@ class TLSEvents(Object):
         """
         if event.relation.name == PEER_TLS_RELATION_NAME:
             self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS, tls_type=TLSType.PEER)
-            self.charm.set_status(Status.TLS_ENABLING_PEER_TLS)
         else:
             self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS, tls_type=TLSType.CLIENT)
-            self.charm.set_status(Status.TLS_ENABLING_CLIENT_TLS)
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         """Handle the `certificates-available` event.

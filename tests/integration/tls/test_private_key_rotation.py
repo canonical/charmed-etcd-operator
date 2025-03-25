@@ -43,7 +43,7 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
@@ -54,7 +54,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     assert ops_test.model is not None, "Model is not set"
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="edge", config=tls_config)
+    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
     await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
@@ -63,10 +63,10 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=60)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
@@ -117,7 +117,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_set_private_key(ops_test: OpsTest) -> None:

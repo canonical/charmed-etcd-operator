@@ -12,6 +12,7 @@ from typing import Any, Dict
 
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from literals import CLIENT_PORT, PEER_RELATION, TLSType
 
@@ -72,6 +73,7 @@ def get_key(
     return subprocess.getoutput(etcd_command).split("\n")[1]
 
 
+@retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
 def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]:
     """Query all cluster members from etcd using `etcdctl`."""
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
@@ -81,9 +83,33 @@ def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]
             --cert client.pem \
             --key client.key"
 
-    result = subprocess.getoutput(etcd_command).split("\n")[0]
+    try:
+        result = subprocess.getoutput(etcd_command).split("\n")[0]
+        return json.loads(result)["members"]
+    except KeyError:
+        raise
 
-    return json.loads(result)["members"]
+
+@retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
+def get_cluster_id(endpoints: str, tls_enabled: bool = False) -> str:
+    """Query the cluster id from etcd using `etcdctl`."""
+    etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
+
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+
+    result = subprocess.getoutput(etcd_command).split("\n")
+    for r in result:
+        member = json.loads(r)
+        try:
+            return member[0]["Status"]["header"]["cluster_id"]
+        except (TypeError, KeyError) as e:
+            logger.warning(e)
+
+    raise KeyError("cluster_id not found")
 
 
 def get_cluster_endpoints(
@@ -98,6 +124,49 @@ def get_cluster_endpoints(
     )
 
 
+def get_unit_endpoint(
+    ops_test: OpsTest, unit_name: str, app_name: str = APP_NAME, tls_enabled: bool = False
+) -> str:
+    """Resolve the etcd endpoint for a given unit name."""
+    for unit in ops_test.model.applications[app_name].units:
+        if unit.name == unit_name:
+            return f"{'https' if tls_enabled else 'http'}://{unit.public_address}:{CLIENT_PORT}"
+
+
+def get_remaining_endpoints(all_endpoints: str, endpoints_to_subtract: str) -> str:
+    """Subtract one comma-delimited list of endpoints from another."""
+    remaining_endpoints = all_endpoints.split(",")
+    remaining_endpoints.remove(endpoints_to_subtract)
+    return ",".join(remaining_endpoints)
+
+
+def is_endpoint_up(
+    endpoint: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> bool:
+    """Check health of an etcd endpoint."""
+    etcd_command = f"etcdctl endpoint health --endpoints={endpoint} -w=json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+
+    try:
+        result = subprocess.getoutput(etcd_command).split("\n")[0]
+        status = json.loads(result)[0]
+        return status["health"]
+    except Exception:
+        return False
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
 def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
     """Query the Raft leader via the `endpoint status` and `member list` commands.
 
@@ -112,9 +181,12 @@ def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
                 --key client.key"
 
     # query leader id
-    result = subprocess.getoutput(etcd_command).split("\n")[0]
-    members = json.loads(result)
-    leader_id = members[0]["Status"]["leader"]
+    try:
+        result = subprocess.getoutput(etcd_command).split("\n")[0]
+        members = json.loads(result)
+        leader_id = members[0]["Status"]["leader"]
+    except KeyError:
+        raise
 
     # query member name for leader id
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
@@ -249,6 +321,21 @@ async def download_client_certificate_from_unit(
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
         await unit.scp_from(f"{tls_path}/{file}", file)
+
+
+def get_storage_id(ops_test: OpsTest, unit_name: str, storage_name: str) -> str:
+    """Retrieve the storage id associated with a unit."""
+    model_name = ops_test.model.info.name
+
+    storage_data = subprocess.check_output(f"juju storage --model={model_name}".split())
+    storage_data = storage_data.decode("utf-8")
+    for line in storage_data.splitlines():
+        # skip the header and irrelevant lines
+        if not line or "Storage" in line or "detached" in line:
+            continue
+
+        if line.split()[0] == unit_name and line.split()[1].startswith(storage_name):
+            return line.split()[1]
 
 
 def get_user(

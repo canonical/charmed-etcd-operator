@@ -5,7 +5,10 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
+import subprocess
 from pathlib import Path
+from shutil import rmtree
+from typing import List
 
 from charms.operator_libs_linux.v2 import snap
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
@@ -72,3 +75,34 @@ class EtcdWorkload(WorkloadBase):
     def remove_file(self, file) -> None:
         path = Path(file)
         path.unlink(missing_ok=True)
+
+    @override
+    def remove_directory(self, directory: str) -> None:
+        rmtree(directory)
+
+    @override
+    def exists(self, path: str) -> bool:
+        path_object = Path(path)
+
+        if path_object.exists():
+            if path_object.is_dir():
+                # consider it false if the directory is empty
+                return len(list(path_object.glob("*"))) > 0
+            return True
+
+        return False
+
+    @override
+    def exec(self, command: List[str]) -> None:
+        try:
+            output = subprocess.run(
+                command,
+                check=True,
+                text=True,
+                capture_output=True,
+                timeout=10,
+            ).stdout.strip()
+            logger.debug(output)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            logger.error(e)
+            raise

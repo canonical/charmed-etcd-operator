@@ -12,7 +12,7 @@ from ops.model import ConfigData
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import TLSState
+from literals import DATABASE_DIR, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,10 @@ class ConfigManager:
         if self.state.cluster.cluster_state:
             config_properties["initial-cluster-state"] = self.state.cluster.cluster_state
             config_properties["initial-cluster"] = self.state.cluster.cluster_members
+        elif self.workload.exists(DATABASE_DIR):
+            # if no cluster state is available, but we find a database file
+            # we force a new one-cluster-member with existing data
+            config_properties["force-new-cluster"] = True
         else:
             config_properties["initial-cluster-state"] = "new"
             # on very first cluster initialization, only the leader should be cluster member

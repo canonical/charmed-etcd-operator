@@ -13,10 +13,12 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 SNAP_NAME = "charmed-etcd"
 SNAP_REVISION = 2
 SNAP_SERVICE = "etcd"
-# this path will be updated when we switch to charmed-etcd snap
-# it's the current config path for the legacy-etcd snap
+SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
+SNAP_USER = 584788
+SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
+DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
@@ -61,27 +63,32 @@ class Status(Enum):
     AUTHENTICATION_NOT_ENABLED = StatusLevel(
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
-    SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
-    SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
-    NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
-    REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
+    CLUSTER_NOT_INITIALIZED = StatusLevel(
+        BlockedStatus("Waiting for cluster initialization"), "ERROR"
+    )
+    CLUSTER_NOT_JOINED = StatusLevel(MaintenanceStatus("Waiting to join cluster"), "DEBUG")
+    CLUSTER_MEMBER_NOT_PROMOTED = StatusLevel(
+        MaintenanceStatus("Waiting to promote learning member"), "DEBUG"
+    )
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
+    NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
+    PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
-    TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")
-    TLS_ENABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Enabling client TLS..."), "DEBUG")
+    REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
     TLS_DISABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Disabling peer TLS..."), "DEBUG")
     TLS_DISABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Disabling client TLS..."), "DEBUG")
-    TLS_CLIENT_TRANSITION_FAILED = StatusLevel(
-        BlockedStatus("Failed to transition to/from client tls"), "ERROR"
-    )
-    TLS_PEER_TRANSITION_FAILED = StatusLevel(
-        BlockedStatus("Failed to transition to/from peer tls"), "ERROR"
-    )
+    TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")
+    TLS_ENABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Enabling client TLS..."), "DEBUG")
     TLS_INVALID_PRIVATE_KEY = StatusLevel(
         BlockedStatus("The private key provided is not valid. Please provide a valid private key"),
         "ERROR",
     )
+    TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be ready"), "DEBUG")
+    TLS_PEER_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating peer CA..."), "DEBUG")
+    TLS_CLIENT_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating client CA..."), "DEBUG")
+    SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
+    SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     EC_INVALID_CERTIFICATE = StatusLevel(
         BlockedStatus(
             "The certificate provided is a CA certificate. Please provide an end-entity certificate"
