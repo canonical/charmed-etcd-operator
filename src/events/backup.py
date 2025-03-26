@@ -154,6 +154,7 @@ class BackupEvents(Object):
         if not self.charm.state.cluster.is_restore_in_progress:
             return
 
+        # execute the restore-workflow
         match (
             # compare the current restore instruction against the current restore progress
             self.charm.state.cluster.restore_instruction,
@@ -162,12 +163,10 @@ class BackupEvents(Object):
             case RestoreStep.DOWNLOAD, RestoreStep.NOT_STARTED:
                 self.charm.backup_manager.download_backup_file(self.charm.state.cluster.restore_id)
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
-                # disable the service to avoid restart while the backup is restored
-                self.charm.workload.disable_service()
-                self.charm.workload.stop()
+                self.charm.set_status(Status.RESTORE_IN_PROGRESS)
+                self.charm.backup_manager.stop_database_workload()
             case RestoreStep.RESTORE, RestoreStep.STOP:
-                # todo: add logic for restoring
-                pass
+                self.charm.backup_manager.restore_backup()
             case RestoreStep.RESTART, RestoreStep.RESTORE:
                 # todo: add logic for starting the workload again
                 pass

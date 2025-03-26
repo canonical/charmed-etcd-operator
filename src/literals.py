@@ -74,6 +74,7 @@ class Status(Enum):
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
     REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
+    RESTORE_IN_PROGRESS = StatusLevel(BlockedStatus("Database restore is in progress"), "ERROR")
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")

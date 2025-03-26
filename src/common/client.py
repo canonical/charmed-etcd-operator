@@ -186,111 +186,6 @@ class EtcdClient:
         else:
             raise EtcdClusterManagementError(f"Failed to transfer leadership to {new_leader_id}.")
 
-    def _run_etcdctl(  # noqa: C901
-        self,
-        command: str,
-        endpoints: str,
-        subcommand: str | None = None,
-        # We need to be able to run `etcdctl` without user/pw
-        # otherwise it will error if auth is not yet enabled
-        # this is relevant for `user add` and `auth enable` commands
-        auth_username: str | None = None,
-        auth_password: str | None = None,
-        user: str | None = None,
-        user_password: str | None = None,
-        member: str | None = None,
-        peer_url: str | None = None,
-        learner: bool = False,
-        snapshot_path: str | None = None,
-        output_format: str = "simple",
-        use_input: str | None = None,
-        cluster_arg: bool = False,
-    ) -> str | None:
-        """Execute `etcdctl` command via subprocess.
-
-        This method aims to provide a very clear interface for executing `etcdctl` and minimize
-        the margin of error on cluster operations. The following arguments can be passed to the
-        `etcdctl` command as parameters.
-
-        Args:
-            command: command to execute with etcdctl, e.g. `elect`, `member` or `endpoint`
-            subcommand: subcommand to add to the previous command, e.g. `add` or `status`
-            endpoints: str-formatted list of endpoints to run the command against
-            auth_username: username used for authentication
-            auth_password: password used for authentication
-            user: username to be added or updated in etcd
-            user_password: password to be set for the user that is added to etcd
-            member: member name or id, required for commands `member add/update/promote/remove`
-            peer_url: url of a member to be used for cluster-internal communication
-            learner: flag for adding a new cluster member as not-voting member
-            snapshot_path: filepath for the snapshot output
-            output_format: set the output format (fields, json, protobuf, simple, table)
-            use_input: supply text input to be passed to the `etcdctl` command (e.g. for
-                        non-interactive password change)
-            cluster_arg: set to `True` if the command requires the `--cluster` argument
-
-        Returns:
-            The output of the subprocess-command as a string. In case of error, this will
-            return `None`. It will not raise an error in order to leave error handling up
-            to the caller. Depending on what command is executed, the ways of handling errors
-            might differ.
-        """
-        try:
-            args = [f"{SNAP_NAME}.etcdctl", command]
-            if subcommand:
-                args.append(subcommand)
-            if user:
-                args.append(user)
-            if user_password == "":
-                args.append("--no-password=True")
-            elif user_password:
-                args.append(f"--new-user-password={user_password}")
-            if endpoints:
-                args.append(f"--endpoints={endpoints}")
-            if auth_username:
-                args.append(f"--user={auth_username}")
-            if auth_password:
-                args.append(f"--password={auth_password}")
-            if member:
-                args.append(member)
-            if peer_url:
-                args.append(f"--peer-urls={peer_url}")
-            if learner:
-                args.append("--learner=True")
-            if snapshot_path:
-                args.append(snapshot_path)
-            if output_format:
-                args.append(f"-w={output_format}")
-            if use_input:
-                args.append("--interactive=False")
-            # we append the TLS params whenever we find a client certificate
-            # todo: this is not substrate-agnostic
-            if os.path.exists(f"{TLS_ROOT_DIR}/client.pem"):
-                args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
-                args.append(f"--key={TLS_ROOT_DIR}/client.key")
-                args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
-            if cluster_arg:
-                args.append("--cluster")
-
-            result = subprocess.run(
-                args,
-                check=True,
-                text=True,
-                capture_output=True,
-                input=use_input,
-                timeout=10,
-            ).stdout.strip()
-        except subprocess.CalledProcessError as e:
-            logger.error(
-                f"etcdctl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"
-            )
-            return None
-        except subprocess.TimeoutExpired as e:
-            logger.error(f"Timed out running etcdctl: {e.stderr}")
-            return None
-
-        return result
-
     def member_list(self) -> dict[str, Member] | None:
         """Run the `member list` command in etcd.
 
@@ -397,3 +292,199 @@ class EtcdClient:
             return True
 
         return False
+
+    def restore_database_snapshot(
+        self,
+        snapshot_filename: str,
+        data_directory: str,
+        cluster_config: str,
+        peer_url: str,
+        member_name: str,
+    ) -> bool:
+        """Run the `snapshot restore` command and return if successful."""
+        if result := self._run_etcdutl(
+            command="snapshot",
+            subcommand="restore",
+            snapshot_filename=snapshot_filename,
+            data_directory=data_directory,
+            cluster_config=cluster_config,
+            peer_url=peer_url,
+            member_name=member_name,
+        ):
+            logger.debug(result)
+            return True
+
+        return False
+
+    def _run_etcdctl(  # noqa: C901
+        self,
+        command: str,
+        endpoints: str,
+        subcommand: str | None = None,
+        # We need to be able to run `etcdctl` without user/pw
+        # otherwise it will error if auth is not yet enabled
+        # this is relevant for `user add` and `auth enable` commands
+        auth_username: str | None = None,
+        auth_password: str | None = None,
+        user: str | None = None,
+        user_password: str | None = None,
+        member: str | None = None,
+        peer_url: str | None = None,
+        learner: bool = False,
+        snapshot_path: str | None = None,
+        output_format: str = "simple",
+        use_input: str | None = None,
+        cluster_arg: bool = False,
+    ) -> str | None:
+        """Execute `etcdctl` command via subprocess to perform online cluster admin tasks.
+
+        This method aims to provide a very clear interface for executing `etcdctl` and minimize
+        the margin of error on cluster operations. The following arguments can be passed to the
+        `etcdctl` command as parameters.
+
+        Args:
+            command: command to execute with etcdctl, e.g. `elect`, `member` or `endpoint`
+            subcommand: subcommand to add to the previous command, e.g. `add` or `status`
+            endpoints: str-formatted list of endpoints to run the command against
+            auth_username: username used for authentication
+            auth_password: password used for authentication
+            user: username to be added or updated in etcd
+            user_password: password to be set for the user that is added to etcd
+            member: member name or id, required for commands `member add/update/promote/remove`
+            peer_url: url of a member to be used for cluster-internal communication
+            learner: flag for adding a new cluster member as not-voting member
+            snapshot_path: filepath for the snapshot output
+            output_format: set the output format (fields, json, protobuf, simple, table)
+            use_input: supply text input to be passed to the `etcdctl` command (e.g. for
+                        non-interactive password change)
+            cluster_arg: set to `True` if the command requires the `--cluster` argument
+
+        Returns:
+            The output of the subprocess-command as a string. In case of error, this will
+            return `None`. It will not raise an error in order to leave error handling up
+            to the caller. Depending on what command is executed, the ways of handling errors
+            might differ.
+        """
+        try:
+            args = [f"{SNAP_NAME}.etcdctl", command]
+            if subcommand:
+                args.append(subcommand)
+            if user:
+                args.append(user)
+            if user_password == "":
+                args.append("--no-password=True")
+            elif user_password:
+                args.append(f"--new-user-password={user_password}")
+            if endpoints:
+                args.append(f"--endpoints={endpoints}")
+            if auth_username:
+                args.append(f"--user={auth_username}")
+            if auth_password:
+                args.append(f"--password={auth_password}")
+            if member:
+                args.append(member)
+            if peer_url:
+                args.append(f"--peer-urls={peer_url}")
+            if learner:
+                args.append("--learner=True")
+            if snapshot_path:
+                args.append(snapshot_path)
+            if output_format:
+                args.append(f"-w={output_format}")
+            if use_input:
+                args.append("--interactive=False")
+            # we append the TLS params whenever we find a client certificate
+            # todo: this is not substrate-agnostic
+            if os.path.exists(f"{TLS_ROOT_DIR}/client.pem"):
+                args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
+                args.append(f"--key={TLS_ROOT_DIR}/client.key")
+                args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
+            if cluster_arg:
+                args.append("--cluster")
+
+            result = subprocess.run(
+                args,
+                check=True,
+                text=True,
+                capture_output=True,
+                input=use_input,
+                timeout=10,
+            ).stdout.strip()
+        except subprocess.CalledProcessError as e:
+            logger.error(
+                f"etcdctl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"
+            )
+            return None
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"Timed out running etcdctl: {e.stderr}")
+            return None
+
+        return result
+
+    def _run_etcdutl(
+        self,
+        command: str,
+        subcommand: str | None = None,
+        snapshot_filename: str | None = None,
+        data_directory: str | None = None,
+        cluster_config: str | None = None,
+        peer_url: str | None = None,
+        member_name: str | None = None,
+    ) -> str | None:
+        """Execute `etcdutl` command via subprocess to perform offline cluster admin tasks.
+
+        This method aims to provide a very clear interface for executing `etcdutl` and minimize
+        the margin of error on cluster operations. The following arguments can be passed to the
+        `etcdutl` command as parameters.
+
+        Args:
+            command: command to execute with etcdutl, e.g. `snapshot`, `defrag`
+            subcommand: subcommand to add to the previous command, e.g. `restore`
+            snapshot_filename: the database snapshot file to be restored
+            data_directory: the directory where to store the etcd database files after restoring
+            cluster_config: cluster membership configuration for the restored etcd cluster
+            peer_url: url of a member to be used for cluster-internal communication after restoring
+            member_name: name for this member to be set after restoring the cluster
+
+        Returns:
+            The output of the subprocess-command as a string. In case of error, this will
+            return `None`. It will not raise an error in order to leave error handling up
+            to the caller. Depending on what command is executed, the ways of handling errors
+            might differ.
+        """
+        try:
+            args = [f"{SNAP_NAME}.etcdutl", command]
+            if subcommand:
+                args.append(subcommand)
+            if snapshot_filename:
+                args.append(snapshot_filename)
+                # by default restore snapshots with revision bump
+                # see: https://etcd.io/docs/v3.6/op-guide/recovery/#restoring-with-revision-bump
+                args.append("--bump-revision 1000000000")
+                args.append("--mark-compacted")
+            if data_directory:
+                args.append(f"--data-dir {data_directory}")
+            if cluster_config:
+                args.append(f"--initial-cluster {cluster_config}")
+            if peer_url:
+                args.append(f"--initial-advertise-peer-urls {peer_url}")
+            if member_name:
+                args.append(f"--name {member_name}")
+
+            result = subprocess.run(
+                args,
+                check=True,
+                text=True,
+                capture_output=True,
+                timeout=10,
+            ).stdout.strip()
+        except subprocess.CalledProcessError as e:
+            logger.error(
+                f"etcdutl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"
+            )
+            return None
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"Timed out running etcdutl: {e.stderr}")
+            return None
+
+        return result

@@ -30,7 +30,7 @@ class BackupManager:
         self.admin_user = INTERNAL_USER
         self.admin_password = self.state.cluster.internal_user_credentials.get(INTERNAL_USER, "")
 
-    def get_bucket_resource(self, s3_parameters: dict[str, str]) -> Bucket:
+    def _get_bucket_resource(self, s3_parameters: dict[str, str]) -> Bucket:
         """Get the Bucket resource from the s3 connection.
 
         Returns:
@@ -54,10 +54,18 @@ class BackupManager:
 
         return s3_resource.Bucket(s3_parameters["bucket"])
 
+    def _get_etcd_client(self) -> EtcdClient:
+        """Get a client connection to etcd."""
+        return EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
     def create_bucket(self, s3_parameters: dict[str, str]) -> None:
         """Create bucket if it does not exist yet."""
         region = s3_parameters.get("region")
-        bucket = self.get_bucket_resource(s3_parameters)
+        bucket = self._get_bucket_resource(s3_parameters)
 
         try:
             if region:
@@ -91,16 +99,12 @@ class BackupManager:
         s3_parameters = self.state.cluster.s3_credentials
         upload_target = f"{s3_parameters['path']}/{backup_id}"
 
-        etcd_client = EtcdClient(
-            username=self.admin_user,
-            password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
-        )
+        etcd_client = self._get_etcd_client()
 
         if not etcd_client.create_database_snapshot():
             raise EtcdBackupError("Failed to create database backup.")
 
-        bucket = self.get_bucket_resource(s3_parameters)
+        bucket = self._get_bucket_resource(s3_parameters)
 
         try:
             bucket.upload_file(BACKUP_FILE_PATH, upload_target)
@@ -125,7 +129,7 @@ class BackupManager:
         """
         s3_parameters = self.state.cluster.s3_credentials
 
-        bucket = self.get_bucket_resource(s3_parameters)
+        bucket = self._get_bucket_resource(s3_parameters)
         backup_list = []
 
         try:
@@ -152,7 +156,7 @@ class BackupManager:
         download_source = f"{s3_parameters['path']}/{backup_id}"
         logger.info(f"Initiating restore process for backup-id {backup_id}")
 
-        bucket = self.get_bucket_resource(s3_parameters)
+        bucket = self._get_bucket_resource(s3_parameters)
 
         try:
             bucket.download_file(download_source, f"{DATABASE_DIR}/{backup_id}")
@@ -163,6 +167,37 @@ class BackupManager:
 
         self.state.unit_server.update({"restore_step": RestoreStep.DOWNLOAD.value})
         return True
+
+    def stop_database_workload(self) -> None:
+        """Shutdown and disable the etcd database before restoring."""
+        logger.info("Stopping and disabling etcd workload.")
+        # disable the service to avoid restart while the backup is restored
+        self.workload.disable_service()
+        self.workload.stop()
+
+        self.state.unit_server.update({"restore_step": RestoreStep.STOP.value})
+
+    def restore_backup(self) -> None:
+        """Perform the actual restore-operation on the etcd database."""
+        backup_id_to_restore = self.state.cluster.restore_id
+        logger.info(f"Restoring database backup {backup_id_to_restore}")
+
+        # existing data directory has to be purged, otherwise restore will fail
+        self.workload.remove_directory(DATABASE_DIR)
+        logger.info(f"Removed previous database files from {DATABASE_DIR} before restoring.")
+
+        etcd_client = self._get_etcd_client()
+
+        if not etcd_client.restore_database_snapshot(
+            snapshot_filename=f"{DATABASE_DIR}/{backup_id_to_restore}",
+            data_directory=DATABASE_DIR,
+            cluster_config=self.state.cluster.cluster_members,
+            peer_url=self.state.unit_server.peer_url,
+            member_name=self.state.unit_server.member_name,
+        ):
+            raise EtcdBackupError("Failed to restore database backup.")
+
+        self.state.unit_server.update({"restore_step": RestoreStep.RESTORE.value})
 
     @staticmethod
     def format_backup_list(backup_list: list[str]) -> str:
