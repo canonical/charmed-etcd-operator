@@ -2,6 +2,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
@@ -17,7 +18,13 @@ from ops import testing
 from scenario import Secret, State
 
 from charm import EtcdOperatorCharm
-from literals import EXTERNAL_CLIENTS_RELATION, TLSCARotationState, TLSType
+from literals import (
+    CERTIFICATE_TRANSFER_RELATION,
+    EXTERNAL_CLIENTS_RELATION,
+    Status,
+    TLSCARotationState,
+    TLSType,
+)
 
 CLIENT_COMMON_NAME = "test-common-name"
 server_cert = MagicMock()
@@ -52,6 +59,15 @@ def mtls_chain_same_common_name():
         client_csr, ca_cert, ca_private_key, validity=timedelta(days=365)
     )
     return "\n".join([client_cert.raw, ca_cert.raw])
+
+
+@pytest.fixture
+def ca_cert():
+    ca_private_key = generate_private_key()
+    ca_cert = generate_ca(
+        private_key=ca_private_key, validity=timedelta(days=365), common_name="ca_common_name"
+    )
+    return "\n".join([ca_cert.raw])
 
 
 @pytest.fixture
@@ -936,3 +952,238 @@ def test_update_client_relations_data_no_external_clients(cluster_tls_context):
     ):
         manager.run()
         get_assigned_certificates.assert_not_called()
+
+
+def test_add_ecr_invalid_cert(cluster_tls_context, mtls_chain):
+    """Test adding an external client relation to the charm."""
+    ctx, relations = cluster_tls_context
+    secret = Secret({"mtls-chain": mtls_chain}, owner="app")
+    ecr_relation = testing.Relation(
+        id=5,
+        endpoint=EXTERNAL_CLIENTS_RELATION,
+        remote_app_data={
+            "secret-mtls": secret.id,
+            "prefix": "/test/keys",
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
+            "provided-secrets": '["mtls-chain"]',
+        },
+    )
+
+    state_in = testing.State(
+        relations=relations + [ecr_relation],
+        leader=True,
+        secrets=[secret],
+    )
+
+    with (
+        ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
+        # patch("common.client.EtcdClient.get_user", return_value=None),
+        patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+            return_value=([server_cert], MagicMock()),
+        ),
+        patch(
+            "managers.external_clients.ExternalClientsManager.is_leaf_certificate_valid",
+            return_value=False,
+        ),
+        # patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        # patch("workload.EtcdWorkload.write_file"),
+        # patch("managers.tls.TLSManager.is_new_ca", return_value=True) as is_new_ca,
+        # patch("managers.cluster.ClusterManager.restart_member") as restart_member,
+    ):
+        charm: EtcdOperatorCharm = manager.charm
+        state_out = manager.run()
+        assert ecr_relation.id not in charm.state.cluster.managed_users
+        assert state_out.app_status == Status.EC_INVALID_CERTIFICATE.value.status
+
+
+def test_ecr_update_chain_invalid_new_value(cluster_tls_context, mtls_chain, ca_cert):
+    """Test updating the common name for an external client relation."""
+    ctx, relations = cluster_tls_context
+
+    peer_relation = relations[0]
+    old_common_name = CLIENT_COMMON_NAME
+    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+
+    secret = Secret(
+        tracked_content={"mtls-chain": mtls_chain},
+    )
+    ecr_relation = testing.Relation(
+        id=5,
+        endpoint=EXTERNAL_CLIENTS_RELATION,
+        remote_app_data={
+            "secret-mtls": secret.id,
+            "prefix": "/test/keys",
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
+            "provided-secrets": '["mtls-chain"]',
+        },
+        local_app_data={
+            "data": f'{{"secret-mtls": "{secret.id}","prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"uris\\", \\"tls\\", \\"tls-ca\\"], "provided-secrets": "[\\"mtls-chain\\"]"}}'
+        },
+    )
+
+    state_in = testing.State(
+        relations=relations + [ecr_relation],
+        leader=True,
+        secrets=[secret],
+    )
+
+    with (
+        patch("common.client.EtcdClient.get_user", return_value=None),
+        patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+            return_value=([server_cert], MagicMock()),
+        ),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.restart_member"),
+        patch("managers.cluster.ClusterManager.remove_role") as remove_role,
+        patch("managers.cluster.ClusterManager.remove_user") as remove_user,
+    ):
+        with (
+            ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
+        ):
+            manager.run()
+            remove_role.assert_not_called()
+            remove_user.assert_not_called()
+
+        secret = Secret(
+            tracked_content={"mtls-chain": mtls_chain},
+            latest_content={"mtls-chain": ca_cert},
+            label=secret.label,
+        )
+        ecr_relation = testing.Relation(
+            id=5,
+            endpoint=EXTERNAL_CLIENTS_RELATION,
+            remote_app_data={
+                "secret-mtls": secret.id,
+                "prefix": "/test/keys",
+                "requested-secrets": '["username", "password", "tls", "tls-ca", "uris"]',
+                "provided-secrets": '["mtls-chain"]',
+            },
+            local_app_data={
+                "data": f'{{"secret-mtls": "{secret.id}","prefix":"/test/", "requested-secrets": "[\\"username\\",\\"password\\", \\"uris\\", \\"tls\\", \\"tls-ca\\"], "provided-secrets": "[\\"mtls-chain\\"]"}}'
+            },
+        )
+        state_in = testing.State(
+            relations=relations + [ecr_relation],
+            leader=True,
+            secrets=[secret],
+        )
+
+        with (
+            ctx(ctx.on.secret_changed(secret), state_in) as manager,
+            patch("managers.tls.TLSManager.is_new_ca", return_value=True) as is_new_ca,
+        ):
+            charm: EtcdOperatorCharm = manager.charm
+            state_out = manager.run()
+            assert ecr_relation.id not in charm.state.cluster.managed_users
+            remove_role.assert_called_once_with(old_common_name)
+            remove_user.assert_called_once_with(old_common_name)
+            assert state_out.app_status == Status.EC_INVALID_CERTIFICATE.value.status
+
+
+def test_certificate_transfer_new_ca(cluster_tls_context, ca_cert):
+    ctx, relations = cluster_tls_context
+
+    peer_relation = relations[0]
+    old_common_name = CLIENT_COMMON_NAME
+    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+
+    certificate_transfer_relation = testing.Relation(
+        id=5,
+        endpoint=CERTIFICATE_TRANSFER_RELATION,
+        remote_app_data={
+            "certificates": json.dumps([ca_cert]),
+        },
+    )
+
+    state_in = testing.State(
+        relations=relations + [certificate_transfer_relation],
+        leader=True,
+    )
+
+    with (
+        patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.cluster.ClusterManager.restart_member"),
+        patch("managers.tls.TLSManager.update_cas") as update_cas,
+    ):
+        with (
+            ctx(ctx.on.relation_changed(certificate_transfer_relation), state_in) as manager,
+        ):
+            manager.run()
+            update_cas.assert_called_once()
+
+
+def test_certificate_transfer_old_ca(cluster_tls_context, ca_cert):
+    ctx, relations = cluster_tls_context
+
+    peer_relation = relations[0]
+    old_common_name = CLIENT_COMMON_NAME
+    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+
+    certificate_transfer_relation = testing.Relation(
+        id=5,
+        endpoint=CERTIFICATE_TRANSFER_RELATION,
+        remote_app_data={
+            "certificates": json.dumps([ca_cert]),
+        },
+    )
+
+    state_in = testing.State(
+        relations=relations + [certificate_transfer_relation],
+        leader=True,
+    )
+
+    with (
+        patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.cluster.ClusterManager.restart_member"),
+        patch("managers.tls.TLSManager.update_cas") as update_cas,
+        patch("managers.tls.TLSManager.is_new_ca", return_value=False),
+    ):
+        with (
+            ctx(ctx.on.relation_changed(certificate_transfer_relation), state_in) as manager,
+        ):
+            manager.run()
+            update_cas.assert_not_called()
+
+
+def test_certificate_transfer_removed(cluster_tls_context, ca_cert):
+    ctx, relations = cluster_tls_context
+
+    peer_relation = relations[0]
+    old_common_name = CLIENT_COMMON_NAME
+    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+
+    certificate_transfer_relation = testing.Relation(
+        id=5,
+        endpoint=CERTIFICATE_TRANSFER_RELATION,
+        remote_app_data={
+            "certificates": json.dumps([ca_cert]),
+        },
+    )
+
+    state_in = testing.State(
+        relations=relations + [certificate_transfer_relation],
+        leader=True,
+    )
+
+    with (
+        # patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.cluster.ClusterManager.restart_member"),
+        patch("managers.tls.TLSManager.update_cas") as update_cas,
+    ):
+        with (
+            ctx(ctx.on.relation_broken(certificate_transfer_relation), state_in) as manager,
+        ):
+            manager.run()
+            update_cas.assert_called_once()

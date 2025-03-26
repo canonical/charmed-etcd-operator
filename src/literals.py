@@ -24,7 +24,7 @@ DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
 RESTART_RELATION = "restart"
 EXTERNAL_CLIENTS_RELATION = "etcd-client"
-CERTIFICATE_TRANSFER_INTERFACE = "client-cas"
+CERTIFICATE_TRANSFER_RELATION = "client-cas"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
 
@@ -91,10 +91,19 @@ class Status(Enum):
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     EC_INVALID_CERTIFICATE = StatusLevel(
-        BlockedStatus(
+        MaintenanceStatus(
             "The certificate provided is a CA certificate. Please provide an end-entity certificate"
         ),
         "ERROR",
+    )
+    EC_USERNAME_EXISTS = StatusLevel(
+        MaintenanceStatus(
+            "The username provided already exists. Please provide a unique username"
+        ),
+        "ERROR",
+    )
+    EC_MISSING_CREDENTIALS = StatusLevel(
+        MaintenanceStatus("Missing certificate or prefix."), "ERROR"
     )
 
 

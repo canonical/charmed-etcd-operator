@@ -19,7 +19,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from ops import Object, RelationBrokenEvent
 
 from literals import (
-    CERTIFICATE_TRANSFER_INTERFACE,
+    CERTIFICATE_TRANSFER_RELATION,
     EXTERNAL_CLIENTS_RELATION,
     Status,
     TLSCARotationState,
@@ -43,7 +43,7 @@ class ExternalClientsEvents(Object):
         self.etcd_provides = EtcdProvides(self.charm, EXTERNAL_CLIENTS_RELATION)
 
         self.certificate_transfer = CertificateTransferRequires(
-            self.charm, CERTIFICATE_TRANSFER_INTERFACE
+            self.charm, CERTIFICATE_TRANSFER_RELATION
         )
         self.framework.observe(
             self.certificate_transfer.on.certificate_set_updated, self._on_certificates_available
@@ -63,12 +63,13 @@ class ExternalClientsEvents(Object):
         """Handle the ca chain updated event."""
         if not event.mtls_chain or not event.prefix:
             logger.error("CA chain, keys prefix, or common name not provided")
-            # TODO set blocked status based on DP blocked states
+            self.charm.set_status(Status.EC_MISSING_CREDENTIALS)
             event.defer()
             return
 
         if not self.charm.state.unit_server.tls_client_state == TLSState.TLS:
             logger.error("TLS is not enabled")
+            self.charm.set_status(Status.TLS_NOT_READY)
             event.defer()
             return
 
@@ -77,6 +78,7 @@ class ExternalClientsEvents(Object):
             != TLSCARotationState.NO_ROTATION
         ):
             logger.debug("CA rotation is in progress")
+            self.charm.set_status(Status.TLS_CLIENT_CA_ROTATING)
             event.defer()
             return
 
@@ -115,7 +117,7 @@ class ExternalClientsEvents(Object):
 
                 if self.charm.cluster_manager.get_user(common_name) is not None:
                     logger.error("User already exists")
-                    # TODO set blocked status based on DP blocked states
+                    self.charm.set_status(Status.EC_USERNAME_EXISTS)
                     return
 
                 logger.info("Creating new user")
