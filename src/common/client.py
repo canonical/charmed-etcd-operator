@@ -458,10 +458,10 @@ class EtcdClient:
                 args.append(subcommand)
             if snapshot_filename:
                 args.append(snapshot_filename)
-                # starting with etcd 3.6: by default restore snapshots with revision bump
+                # by default restore snapshots with revision bump
                 # see: https://etcd.io/docs/v3.6/op-guide/recovery/#restoring-with-revision-bump
-                # args.append("--bump-revision 1000000000")
-                # args.append("--mark-compacted")
+                args.append("--bump-revision 1000000000")
+                args.append("--mark-compacted")
             if data_directory:
                 args.append(f"--data-dir {data_directory}")
             if cluster_config:
