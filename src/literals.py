@@ -23,6 +23,7 @@ BACKUP_FILE_PATH = (
     "/var/snap/charmed-etcd/common/var/lib/etcd/member/snap/charmed-etcd_snapshot.db"
 )
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+RESTORE_FILE_NAME = "backup_to_restore.db"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"

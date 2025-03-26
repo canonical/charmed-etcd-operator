@@ -21,6 +21,7 @@ from literals import (
     BACKUP_ID_FORMAT,
     DATABASE_DIR,
     INTERNAL_USER,
+    RESTORE_FILE_NAME,
     SNAP_DATA_PATH,
     RestoreStep,
 )
@@ -166,8 +167,8 @@ class BackupManager:
         bucket = self._get_bucket_resource(s3_parameters)
 
         try:
-            bucket.download_file(download_source, f"{SNAP_DATA_PATH}/{backup_id}")
-            logger.info(f"Backup file {backup_id} downloaded to {SNAP_DATA_PATH}")
+            bucket.download_file(download_source, f"{SNAP_DATA_PATH}/{RESTORE_FILE_NAME}")
+            logger.info(f"Backup {backup_id} downloaded to {SNAP_DATA_PATH}/{RESTORE_FILE_NAME}")
         except ClientError as e:
             logger.error(e)
             return False
@@ -196,7 +197,7 @@ class BackupManager:
         etcd_client = self._get_etcd_client()
 
         if not etcd_client.restore_database_snapshot(
-            snapshot_filename=f"{SNAP_DATA_PATH}/{backup_id_to_restore}",
+            snapshot_filename=f"{SNAP_DATA_PATH}/{RESTORE_FILE_NAME}",
             data_directory=DATABASE_DIR,
             cluster_config=self.state.cluster.cluster_members,
             peer_url=self.state.unit_server.peer_url,
@@ -217,9 +218,9 @@ class BackupManager:
     def clean_up_after_restore(self) -> None:
         """Remove backup files and state from unit."""
         backup_id_to_restore = self.state.cluster.restore_id
-        logger.info(f"Removing backup file {backup_id_to_restore} after restore completed")
+        logger.info(f"Removing backup file after restore completed")
 
-        self.workload.remove_file(f"{SNAP_DATA_PATH}/{backup_id_to_restore}")
+        self.workload.remove_file(f"{SNAP_DATA_PATH}/{RESTORE_FILE_NAME}")
         self.state.unit_server.update({"restore_step": ""})
 
     @staticmethod
