@@ -21,7 +21,6 @@ from literals import (
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
     S3_RELATION_NAME,
-    SNAP_DATA_PATH,
     RestoreStep,
     Status,
 )
@@ -159,7 +158,7 @@ class BackupEvents(Object):
         match (
             # compare the current restore instruction against the current restore progress
             self.charm.state.cluster.restore_instruction,
-            self.charm.state.unit_server.restore_step
+            self.charm.state.unit_server.restore_step,
         ):
             case RestoreStep.DOWNLOAD, RestoreStep.NOT_STARTED:
                 self.charm.backup_manager.download_backup_file(self.charm.state.cluster.restore_id)

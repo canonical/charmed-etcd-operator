@@ -7,12 +7,14 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from unittest.mock import patch
 
+import ops
 import yaml
 from ops import testing
 from pytest import raises
 from scenario import Secret
 
 from charm import EtcdOperatorCharm
+from common.exceptions import EtcdBackupError
 from literals import INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, S3_RELATION_NAME, RestoreStep
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -365,3 +367,199 @@ def test_restore_workflow_order():
                 context.charm.backup_manager.next_restore_step(current_step=RestoreStep.RESTART)
                 == RestoreStep.COMPLETED
             )
+
+
+def test_restore_workflow_synchronization():
+    ctx = testing.Context(EtcdOperatorCharm)
+
+    # restore step: stop (non-leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.DOWNLOAD.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.STOP.value},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.stop"),
+        patch("workload.EtcdWorkload.disable_service"),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert state_out.unit_status == ops.BlockedStatus("Database restore is in progress")
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
+        )
+
+    # restore step: stop (leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.DOWNLOAD.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.STOP.value},
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.stop"),
+        patch("workload.EtcdWorkload.disable_service"),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert state_out.unit_status == ops.BlockedStatus("Database restore is in progress")
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
+        )
+        assert (
+            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            == RestoreStep.RESTORE.value
+        )
+
+    # restore step: restore (non-leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTORE.value},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.remove_directory"),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step")
+            == RestoreStep.RESTORE.value
+        )
+
+    # restore step: restore (leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTORE.value},
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.remove_directory"),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step")
+            == RestoreStep.RESTORE.value
+        )
+        assert (
+            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            == RestoreStep.RESTART.value
+        )
+
+    # restore step: restore -> failed
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTORE.value},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.remove_directory"),
+        patch(
+            "subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="snapshot restore")
+        ),
+    ):
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert isinstance(e.value.__cause__, EtcdBackupError)
+
+    # restore step: restart (non-leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTORE.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTART.value},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.write_file") as write_config,
+        patch("workload.EtcdWorkload.start"),
+        patch("workload.EtcdWorkload.enable_service"),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        write_config.assert_called_once()
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step")
+            == RestoreStep.RESTART.value
+        )
+
+    # restore step: restart (leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTORE.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTART.value},
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.write_file") as write_config,
+        patch("workload.EtcdWorkload.start"),
+        patch("workload.EtcdWorkload.enable_service"),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        write_config.assert_called_once()
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step")
+            == RestoreStep.RESTART.value
+        )
+        assert (
+            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            == RestoreStep.COMPLETED.value
+        )
+
+    # restore step: clean up (non-leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.COMPLETED.value},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.remove_file") as remove_backup,
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        remove_backup.assert_called_once()
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step", "")
+            == RestoreStep.NOT_STARTED.value
+        )
+
+    # restore step: clean up (leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.COMPLETED.value},
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.remove_file") as remove_backup,
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        remove_backup.assert_called_once()
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step", "")
+            == RestoreStep.NOT_STARTED.value
+        )
+        assert (
+            state_out.get_relation(1).local_app_data.get("restore_instruction", "")
+            == RestoreStep.NOT_STARTED.value
+        )
+        assert state_out.get_relation(1).local_app_data.get("restore_id", "") == ""
