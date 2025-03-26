@@ -190,7 +190,7 @@ A default dashboard for etcd is available in Grafana. To access the etcd dashboa
 
 The etcd dashboard should display the metrics collected by the Grafana agent from the etcd charm. It should look similar to the following:
 
-<!-- Screenshot of the etcd dashboard -->
+![etcd dashboard](./images/grafana-dashboard.jpg)
 
 ## The metrics collected by the Grafana agent
 The metrics exposed by etcd are detailed in the [etcd documentation](https://etcd.io/docs/v3.5/metrics/). 
