@@ -21,6 +21,7 @@ from literals import (
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
     S3_RELATION_NAME,
+    SNAP_DATA_PATH,
     RestoreStep,
     Status,
 )
@@ -168,11 +169,14 @@ class BackupEvents(Object):
             case RestoreStep.RESTORE, RestoreStep.STOP:
                 self.charm.backup_manager.restore_backup()
             case RestoreStep.RESTART, RestoreStep.RESTORE:
-                # todo: add logic for starting the workload again
-                pass
+                self.charm.config_manager.set_config_properties()
+                self.charm.backup_manager.start_database_workload()
             case RestoreStep.COMPLETED, RestoreStep.RESTART:
-                # todo: add logic for cleaning up databag
-                pass
+                self.charm.backup_manager.clean_up_after_restore()
+
+        # continue to next workflow step if possible
+        if self.charm.unit.is_leader():
+            self.charm.backup_manager.proceed_restore_workflow_if_possible()
 
     def _exists_preventing_reason(self, check_restore: bool = False) -> str:
         """Check if an action can be executed, if not return error message.
