@@ -10,6 +10,7 @@ from pathlib import Path
 from shutil import rmtree
 from typing import List
 
+from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
 from charms.operator_libs_linux.v2 import snap
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
 from typing_extensions import override
@@ -106,3 +107,11 @@ class EtcdWorkload(WorkloadBase):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             logger.error(e)
             raise
+
+    @override
+    def disable_service(self) -> None:
+        service_disable(f"snap.{SNAP_NAME}.{SNAP_SERVICE}")
+
+    @override
+    def enable_service(self) -> None:
+        service_enable(f"snap.{SNAP_NAME}.{SNAP_SERVICE}")

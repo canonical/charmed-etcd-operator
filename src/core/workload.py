@@ -145,3 +145,13 @@ class WorkloadBase(ABC):
     def exec(self, command: List[str]) -> None:
         """Run a command on the workload substrate."""
         pass
+
+    @abstractmethod
+    def disable_service(self) -> None:
+        """Disable the systemd service."""
+        pass
+
+    @abstractmethod
+    def enable_service(self) -> None:
+        """Enable the systemd service."""
+        pass

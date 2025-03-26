@@ -162,8 +162,9 @@ class BackupEvents(Object):
             case RestoreStep.DOWNLOAD, RestoreStep.NOT_STARTED:
                 self.charm.backup_manager.download_backup_file(self.charm.state.cluster.restore_id)
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
-                # todo: add logic for stopping the workload
-                pass
+                # disable the service to avoid restart while the backup is restored
+                self.charm.workload.disable_service()
+                self.charm.workload.stop()
             case RestoreStep.RESTORE, RestoreStep.STOP:
                 # todo: add logic for restoring
                 pass
