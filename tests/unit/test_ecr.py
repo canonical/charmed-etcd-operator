@@ -767,8 +767,8 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_chain):
         ),
         patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("managers.tls.TLSManager.is_new_ca", return_value=True) as is_new_ca,
-        patch("managers.cluster.ClusterManager.restart_member") as restart_member,
+        patch("managers.tls.TLSManager.is_new_ca", return_value=True),
+        patch("managers.cluster.ClusterManager.restart_member"),
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
@@ -1076,7 +1076,7 @@ def test_ecr_update_chain_invalid_new_value(cluster_tls_context, mtls_chain, ca_
 
         with (
             ctx(ctx.on.secret_changed(secret), state_in) as manager,
-            patch("managers.tls.TLSManager.is_new_ca", return_value=True) as is_new_ca,
+            patch("managers.tls.TLSManager.is_new_ca", return_value=True),
         ):
             charm: EtcdOperatorCharm = manager.charm
             state_out = manager.run()
