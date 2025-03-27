@@ -14,7 +14,6 @@ from pytest import raises
 from scenario import Secret
 
 from charm import EtcdOperatorCharm
-from common.exceptions import EtcdBackupError
 from literals import (
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,

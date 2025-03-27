@@ -173,6 +173,11 @@ class EtcdEvents(Object):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot update config while database restore is in progress.")
+            event.defer()
+            return
+
         # refresh the host information and cluster membership in case of ip change
         ip_address = self.charm.cluster_manager.get_host_mapping().get("ip")
         if ip_address != self.charm.state.unit_server.ip:
@@ -216,6 +221,9 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            return
+
         if self.charm.unit.is_leader():
             if self.charm.state.cluster.learning_member:
                 try:
@@ -247,6 +255,11 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot add cluster member while database restore is in progress.")
+            event.defer()
+            return
+
         if self.charm.unit.is_leader():
             try:
                 self.charm.cluster_manager.add_member(event.unit.name)
@@ -280,6 +293,9 @@ class EtcdEvents(Object):
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            return
+
         if not self.charm.workload.alive():
             if not self.charm.cluster_manager.restart_member():
                 self.charm.set_status(Status.SERVICE_NOT_RUNNING)
@@ -300,6 +316,11 @@ class EtcdEvents(Object):
         if not self.charm.unit.is_leader():
             return
 
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot update credentials while database restore is in progress.")
+            event.defer()
+            return
+
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
             if admin_secret_id == event.secret.id:
                 self.update_admin_password(admin_secret_id)
@@ -307,12 +328,14 @@ class EtcdEvents(Object):
     def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
         """Handle removal of the data storage mount, e.g. when removing a unit."""
         if self.charm.app.planned_units() > 0:
-            try:
-                self.charm.cluster_manager.remove_member()
-            except (EtcdClusterManagementError, RaftLeaderNotFoundError):
-                # We want this hook to error out if we cannot remove the cluster member
-                # otherwise the cluster could become unavailable because of quorum loss
-                raise
+            if not self.charm.state.cluster.is_restore_in_progress:
+                # allow for unit removal when restore is in progress
+                try:
+                    self.charm.cluster_manager.remove_member()
+                except (EtcdClusterManagementError, RaftLeaderNotFoundError):
+                    # We want this hook to error out if we cannot remove the cluster member
+                    # otherwise the cluster could become unavailable because of quorum loss
+                    raise
         else:
             logger.info("Removing last unit from etcd cluster.")
             if self.charm.unit.is_leader():

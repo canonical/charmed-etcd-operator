@@ -92,6 +92,11 @@ class BackupEvents(Object):
 
     def _on_s3_credentials_gone(self, event: CredentialsGoneEvent) -> None:
         """Handle the removal of the relation with s3-integrator."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot s3-credentials while database restore is in progress.")
+            event.defer()
+            return
+
         self.charm.workload.remove_file(self.charm.workload.paths.tls.backup_ca)
 
         if self.charm.unit.is_leader():
@@ -203,12 +208,12 @@ class BackupEvents(Object):
         if not self.charm.state.unit_server.is_started:
             return "Database is not started, cannot perform backup action."
 
+        if self.charm.state.cluster.is_restore_in_progress:
+            return "Restore is already in progress."
+
         # default checks end here, the following checks are only relevant for the restore process
         if not check_restore:
             return ""
-
-        if self.charm.state.cluster.is_restore_in_progress:
-            return "Restore is already in progress."
 
         if not self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
             return (
