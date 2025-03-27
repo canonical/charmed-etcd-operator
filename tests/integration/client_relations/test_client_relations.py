@@ -4,7 +4,6 @@
 
 import asyncio
 import logging
-import shutil
 import subprocess
 from datetime import timedelta
 
@@ -86,29 +85,10 @@ async def get_requirer_leaf_certificate(ops_test: OpsTest) -> str | None:
     return None
 
 
-@pytest.fixture
-def application_charm():
-    """Build the application charm."""
-    shutil.copyfile(
-        "./lib/charms/data_platform_libs/v0/data_interfaces.py",
-        "./tests/integration/client_relations/requirer-charm/lib/charms/data_platform_libs/v0/data_interfaces.py",
-    )
-    test_charm_path = "tests/integration/client_relations/requirer-charm"
-    logger.info("Building the requirer charm")
-    subprocess.check_output(
-        [
-            "charmcraft",
-            "pack",
-            "-p",
-            test_charm_path,
-        ],
-    )
-
-
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, application_charm) -> None:
+async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy the charm-under-test and the requirer charm."""
     tls_config = {"ca-common-name": "etcd"}
     await asyncio.gather(

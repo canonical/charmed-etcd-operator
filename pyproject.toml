@@ -97,6 +97,7 @@ lint.extend-ignore = [
 lint.ignore = ["E501", "D107"]
 extend-exclude = ["__pycache__", "*.egg_info"]
 lint.per-file-ignores = { "tests/*" = ["D100", "D101", "D102", "D103", "D104"] }
+exclude = ["tests/integration/client_relations/requirer-charm/lib"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
