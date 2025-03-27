@@ -116,7 +116,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +243,7 @@ class CertificateTransferProvides(Object):
             None
         """
         if not self.charm.unit.is_leader():
-            logger.error("Only the leader unit can add certificates to this relation")
+            logger.warning("Only the leader unit can add certificates to this relation")
             return
         relations = self._get_relevant_relations(relation_id)
         if not relations:
@@ -257,6 +257,31 @@ class CertificateTransferProvides(Object):
             existing_data = self._get_relation_data(relation)
             existing_data.update(certificates)
             self._set_relation_data(relation, existing_data)
+
+    def remove_all_certificates(self, relation_id: Optional[int] = None) -> None:
+        """Remove all certificates from relation data.
+
+        Removes all certificates from all relations if relation_id not given
+
+        Args:
+            relation_id (int): Relation ID
+
+        Returns:
+            None
+        """
+        if not self.charm.unit.is_leader():
+            logger.warning("Only the leader unit can add certificates to this relation")
+            return
+        relations = self._get_relevant_relations(relation_id)
+        if not relations:
+            logger.error(
+                "At least 1 matching relation ID not found with the relation name '%s'",
+                self.relationship_name,
+            )
+            return
+
+        for relation in relations:
+            self._set_relation_data(relation, set())
 
     def remove_certificate(
         self,
@@ -275,7 +300,7 @@ class CertificateTransferProvides(Object):
             None
         """
         if not self.charm.unit.is_leader():
-            logger.error("Only the leader unit can add certificates to this relation")
+            logger.warning("Only the leader unit can add certificates to this relation")
             return
         relations = self._get_relevant_relations(relation_id)
         if not relations:
