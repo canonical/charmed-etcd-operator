@@ -302,7 +302,7 @@ class EtcdClient:
         member_name: str,
     ) -> bool:
         """Run the `snapshot restore` command and return if successful."""
-        if result := self._run_etcdutl(
+        return self._run_etcdutl(
             command="snapshot",
             subcommand="restore",
             snapshot_filename=snapshot_filename,
@@ -310,11 +310,7 @@ class EtcdClient:
             cluster_config=cluster_config,
             peer_url=peer_url,
             member_name=member_name,
-        ):
-            logger.debug(result)
-            return True
-
-        return False
+        )
 
     def _run_etcdctl(  # noqa: C901
         self,
@@ -430,7 +426,7 @@ class EtcdClient:
         cluster_config: str | None = None,
         peer_url: str | None = None,
         member_name: str | None = None,
-    ) -> str | None:
+    ) -> bool:
         """Execute `etcdutl` command via subprocess to perform offline cluster admin tasks.
 
         This method aims to provide a very clear interface for executing `etcdutl` and minimize
@@ -445,12 +441,6 @@ class EtcdClient:
             cluster_config: cluster membership configuration for the restored etcd cluster
             peer_url: url of a member to be used for cluster-internal communication after restoring
             member_name: name for this member to be set after restoring the cluster
-
-        Returns:
-            The output of the subprocess-command as a string. In case of error, this will
-            return `None`. It will not raise an error in order to leave error handling up
-            to the caller. Depending on what command is executed, the ways of handling errors
-            might differ.
         """
         try:
             args = [f"{SNAP_NAME}.etcdutl", command]
@@ -458,33 +448,39 @@ class EtcdClient:
                 args.append(subcommand)
             if snapshot_filename:
                 args.append(snapshot_filename)
+            if data_directory:
+                args.append("--data-dir")
+                args.append(data_directory)
                 # by default restore snapshots with revision bump
                 # see: https://etcd.io/docs/v3.6/op-guide/recovery/#restoring-with-revision-bump
-                args.append("--bump-revision 1000000000")
+                args.append("--bump-revision")
+                args.append("1000000000")
                 args.append("--mark-compacted")
-            if data_directory:
-                args.append(f"--data-dir {data_directory}")
             if cluster_config:
-                args.append(f"--initial-cluster {cluster_config}")
+                args.append("--initial-cluster")
+                args.append(cluster_config)
             if peer_url:
-                args.append(f"--initial-advertise-peer-urls {peer_url}")
+                args.append("--initial-advertise-peer-urls")
+                args.append(peer_url)
             if member_name:
-                args.append(f"--name {member_name}")
+                args.append("--name")
+                args.append(member_name)
 
+            # `etcdutl` commands do not return in stdout, only the return code shows if successful
             result = subprocess.run(
                 args,
                 check=True,
                 text=True,
                 capture_output=True,
                 timeout=10,
-            ).stdout.strip()
+            ).returncode
         except subprocess.CalledProcessError as e:
             logger.error(
                 f"etcdutl {command} command failed: returncode: {e.returncode}, error: {e.stderr}"
             )
-            return None
+            return False
         except subprocess.TimeoutExpired as e:
             logger.error(f"Timed out running etcdutl: {e.stderr}")
-            return None
+            return False
 
-        return result
+        return True if result == 0 else False

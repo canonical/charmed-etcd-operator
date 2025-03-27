@@ -22,7 +22,8 @@ from literals import (
     DATABASE_DIR,
     INTERNAL_USER,
     RESTORE_FILE_NAME,
-    SNAP_DATA_PATH,
+    SNAP_CONFIG_PATH,
+    EtcdClusterState,
     RestoreStep,
 )
 
@@ -167,8 +168,8 @@ class BackupManager:
         bucket = self._get_bucket_resource(s3_parameters)
 
         try:
-            bucket.download_file(download_source, f"{SNAP_DATA_PATH}/{RESTORE_FILE_NAME}")
-            logger.info(f"Backup {backup_id} downloaded to {SNAP_DATA_PATH}/{RESTORE_FILE_NAME}")
+            bucket.download_file(download_source, f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+            logger.info(f"Backup {backup_id} downloaded to {SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
         except ClientError as e:
             logger.error(e)
             return False
@@ -197,7 +198,7 @@ class BackupManager:
         etcd_client = self._get_etcd_client()
 
         if not etcd_client.restore_database_snapshot(
-            snapshot_filename=f"{SNAP_DATA_PATH}/{RESTORE_FILE_NAME}",
+            snapshot_filename=f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}",
             data_directory=DATABASE_DIR,
             cluster_config=self.state.cluster.cluster_members,
             peer_url=self.state.unit_server.peer_url,
@@ -205,6 +206,7 @@ class BackupManager:
         ):
             raise EtcdBackupError("Failed to restore database backup.")
 
+        logger.info("Restored backup successfully.")
         self.state.unit_server.update({"restore_step": RestoreStep.RESTORE.value})
 
     def start_database_workload(self) -> None:
@@ -217,10 +219,9 @@ class BackupManager:
 
     def clean_up_after_restore(self) -> None:
         """Remove backup files and state from unit."""
-        backup_id_to_restore = self.state.cluster.restore_id
-        logger.info(f"Removing backup file after restore completed")
+        logger.info("Removing backup file after restore completed.")
 
-        self.workload.remove_file(f"{SNAP_DATA_PATH}/{RESTORE_FILE_NAME}")
+        self.workload.remove_file(f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
         self.state.unit_server.update({"restore_step": ""})
 
     @staticmethod
@@ -266,9 +267,19 @@ class BackupManager:
         """Check workflow progress for all units and proceed to next step if possible."""
         current_step = self.state.cluster.restore_instruction
 
+        # `cluster_state` must be reset before starting a restored cluster
+        if current_step == RestoreStep.RESTORE:
+            self.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
+
         # clean up peer relation app data after restore workflow is done
         if current_step == RestoreStep.COMPLETED:
-            self.state.cluster.update({"restore_instruction": "", "restore_id": ""})
+            self.state.cluster.update(
+                {
+                    "restore_instruction": "",
+                    "restore_id": "",
+                    "cluster_state": EtcdClusterState.EXISTING.value,
+                }
+            )
             return
 
         if self.state.can_restore_workflow_proceed:
