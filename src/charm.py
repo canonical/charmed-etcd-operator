@@ -12,6 +12,7 @@ from ops import StatusBase
 
 from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
+from events.backup import BackupEvents
 from events.etcd import EtcdEvents
 from events.tls import TLSEvents
 from literals import (
@@ -23,6 +24,7 @@ from literals import (
     TLSState,
     TLSType,
 )
+from managers.backup import BackupManager
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.tls import TLSManager
@@ -45,10 +47,12 @@ class EtcdOperatorCharm(ops.CharmBase):
             state=self.state, workload=self.workload, config=self.config
         )
         self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
+        self.backup_manager = BackupManager(state=self.state, workload=self.workload)
 
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
         self.tls_events = TLSEvents(self)
+        self.backup_events = BackupEvents(self)
 
         # --- LIB EVENT HANDLERS ---
         self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)

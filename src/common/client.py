@@ -19,7 +19,7 @@ from common.exceptions import (
     HealthCheckFailedError,
 )
 from core.models import Member
-from literals import INTERNAL_USER, SNAP_NAME, TLS_ROOT_DIR
+from literals import BACKUP_FILE_PATH, INTERNAL_USER, SNAP_NAME, TLS_ROOT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +201,7 @@ class EtcdClient:
         member: str | None = None,
         peer_url: str | None = None,
         learner: bool = False,
+        snapshot_path: str | None = None,
         output_format: str = "simple",
         use_input: str | None = None,
         cluster_arg: bool = False,
@@ -222,6 +223,7 @@ class EtcdClient:
             member: member name or id, required for commands `member add/update/promote/remove`
             peer_url: url of a member to be used for cluster-internal communication
             learner: flag for adding a new cluster member as not-voting member
+            snapshot_path: filepath for the snapshot output
             output_format: set the output format (fields, json, protobuf, simple, table)
             use_input: supply text input to be passed to the `etcdctl` command (e.g. for
                         non-interactive password change)
@@ -255,6 +257,8 @@ class EtcdClient:
                 args.append(f"--peer-urls={peer_url}")
             if learner:
                 args.append("--learner=True")
+            if snapshot_path:
+                args.append(snapshot_path)
             if output_format:
                 args.append(f"-w={output_format}")
             if use_input:
@@ -378,3 +382,18 @@ class EtcdClient:
             member=member_id,
             peer_url=peer_urls,
         )
+
+    def create_database_snapshot(self) -> bool:
+        """Run the `snapshot save` command and return if successful."""
+        if result := self._run_etcdctl(
+            command="snapshot",
+            subcommand="save",
+            snapshot_path=BACKUP_FILE_PATH,
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+        ):
+            logger.debug(result)
+            return True
+
+        return False
