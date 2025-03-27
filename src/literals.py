@@ -14,6 +14,7 @@ SNAP_NAME = "charmed-etcd"
 SNAP_REVISION = 2
 SNAP_SERVICE = "etcd"
 SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
+SNAP_CONFIG_PATH = "/var/snap/charmed-etcd/current"
 SNAP_USER = 584788
 SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"

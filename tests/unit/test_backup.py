@@ -4,7 +4,7 @@
 
 import json
 from pathlib import Path
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, CompletedProcess
 from unittest.mock import patch
 
 import ops
@@ -15,7 +15,13 @@ from scenario import Secret
 
 from charm import EtcdOperatorCharm
 from common.exceptions import EtcdBackupError
-from literals import INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION, S3_RELATION_NAME, RestoreStep
+from literals import (
+    INTERNAL_USER_PASSWORD_CONFIG,
+    PEER_RELATION,
+    S3_RELATION_NAME,
+    EtcdClusterState,
+    RestoreStep,
+)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -424,7 +430,7 @@ def test_restore_workflow_synchronization():
     state_in = testing.State(relations={relation})
     with (
         patch("workload.EtcdWorkload.remove_directory"),
-        patch("subprocess.run"),
+        patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="")),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
@@ -443,7 +449,7 @@ def test_restore_workflow_synchronization():
     state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.remove_directory"),
-        patch("subprocess.run"),
+        patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="")),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
@@ -454,6 +460,10 @@ def test_restore_workflow_synchronization():
         assert (
             state_out.get_relation(1).local_app_data.get("restore_instruction")
             == RestoreStep.RESTART.value
+        )
+        assert (
+            state_out.get_relation(1).local_app_data.get("cluster_state")
+            == EtcdClusterState.NEW.value
         )
 
     # restore step: restore -> failed
@@ -470,10 +480,12 @@ def test_restore_workflow_synchronization():
             "subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="snapshot restore")
         ),
     ):
-        with raises(testing.errors.UncaughtCharmError) as e:
-            ctx.run(ctx.on.relation_changed(relation=relation), state_in)
-
-        assert isinstance(e.value.__cause__, EtcdBackupError)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        assert not (
+            state_out.get_relation(1).local_app_data.get("cluster_state")
+            == EtcdClusterState.NEW.value
+        )
+        assert state_out.unit_status == ops.BlockedStatus("failed to restore backup")
 
     # restore step: restart (non-leader)
     relation = testing.PeerRelation(
@@ -531,6 +543,7 @@ def test_restore_workflow_synchronization():
     state_in = testing.State(relations={relation})
     with (
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
@@ -539,6 +552,22 @@ def test_restore_workflow_synchronization():
             state_out.get_relation(1).local_unit_data.get("restore_step", "")
             == RestoreStep.NOT_STARTED.value
         )
+
+    # restore step: clean up (non-leader) -> unhealthy
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.COMPLETED.value},
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.remove_file") as remove_backup,
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=False),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert state_out.unit_status == ops.BlockedStatus("failed to restore backup")
 
     # restore step: clean up (leader)
     relation = testing.PeerRelation(
@@ -550,6 +579,7 @@ def test_restore_workflow_synchronization():
     state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
@@ -563,3 +593,23 @@ def test_restore_workflow_synchronization():
             == RestoreStep.NOT_STARTED.value
         )
         assert state_out.get_relation(1).local_app_data.get("restore_id", "") == ""
+        assert (
+            state_out.get_relation(1).local_app_data.get("cluster_state")
+            == EtcdClusterState.EXISTING.value
+        )
+
+    # restore step: clean up (leader) -> unhealthy
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
+        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.COMPLETED.value},
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.remove_file") as remove_backup,
+        patch("managers.cluster.ClusterManager.is_healthy", return_value=False),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert state_out.unit_status == ops.BlockedStatus("failed to restore backup")

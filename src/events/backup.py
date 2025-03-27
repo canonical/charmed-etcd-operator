@@ -149,7 +149,7 @@ class BackupEvents(Object):
 
         event.set_results({"success": f"restore initiated for {backup_id_to_restore}"})
 
-    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:  # noqa: C901
         """Synchronize restore workflow across all units."""
         if not self.charm.state.cluster.is_restore_in_progress:
             return
@@ -161,17 +161,25 @@ class BackupEvents(Object):
             self.charm.state.unit_server.restore_step,
         ):
             case RestoreStep.DOWNLOAD, RestoreStep.NOT_STARTED:
-                self.charm.backup_manager.download_backup_file(self.charm.state.cluster.restore_id)
+                if not self.charm.backup_manager.download_backup_file(
+                    self.charm.state.cluster.restore_id
+                ):
+                    self.charm.set_status(Status.BACKUP_RESTORE_FAILED)
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
                 self.charm.set_status(Status.RESTORE_IN_PROGRESS)
                 self.charm.backup_manager.stop_database_workload()
             case RestoreStep.RESTORE, RestoreStep.STOP:
-                self.charm.backup_manager.restore_backup()
+                try:
+                    self.charm.backup_manager.restore_backup()
+                except EtcdBackupError:
+                    self.charm.set_status(Status.BACKUP_RESTORE_FAILED)
             case RestoreStep.RESTART, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
                 self.charm.backup_manager.start_database_workload()
             case RestoreStep.COMPLETED, RestoreStep.RESTART:
                 self.charm.backup_manager.clean_up_after_restore()
+                if not self.charm.cluster_manager.is_healthy(cluster=False):
+                    self.charm.set_status(Status.BACKUP_RESTORE_FAILED)
 
         # continue to next workflow step if possible
         if self.charm.unit.is_leader():
