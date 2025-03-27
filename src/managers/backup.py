@@ -6,6 +6,7 @@
 
 import logging
 from datetime import datetime
+from typing import List
 
 import boto3
 from botocore.client import Config
@@ -26,6 +27,7 @@ from literals import (
     SNAP_CONFIG_PATH,
     EtcdClusterState,
     RestoreStep,
+    Status,
 )
 
 logger = logging.getLogger(__name__)
@@ -295,3 +297,12 @@ class BackupManager:
             next_step = self.next_restore_step(current_step)
             logger.info(f"Next restore step: {next_step.value}")
             self.state.cluster.update({"restore_instruction": next_step.value})
+
+    def compute_component_status(self) -> List[Status]:
+        """Compute the Backup manager's statuses."""
+        status_list = []
+
+        if self.state.cluster.is_restore_in_progress:
+            status_list.append(Status.RESTORE_IN_PROGRESS)
+
+        return status_list

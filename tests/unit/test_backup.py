@@ -398,7 +398,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.DOWNLOAD.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.STOP.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.STOP.value,
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation})
     with (
@@ -407,7 +412,7 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus("Database restore is in progress")
+        assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
         )
@@ -417,7 +422,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.DOWNLOAD.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.STOP.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.STOP.value,
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (
@@ -426,7 +436,7 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus("Database restore is in progress")
+        assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
         )
@@ -440,7 +450,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTORE.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.RESTORE.value,
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation})
     with (
@@ -459,7 +474,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTORE.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.RESTORE.value,
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (
@@ -486,7 +506,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTORE.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.RESTORE.value,
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation})
     with (
@@ -507,7 +532,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.RESTORE.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTART.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.RESTART.value,
+            "cluster_state": EtcdClusterState.NEW.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation})
     with (
@@ -528,7 +558,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.RESTORE.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.RESTART.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.RESTART.value,
+            "cluster_state": EtcdClusterState.NEW.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (
@@ -553,7 +588,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.COMPLETED.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.COMPLETED.value,
+            "cluster_state": EtcdClusterState.NEW.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation})
     with (
@@ -573,7 +613,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.COMPLETED.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.COMPLETED.value,
+            "cluster_state": EtcdClusterState.NEW.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation})
     with (
@@ -589,7 +634,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.COMPLETED.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.COMPLETED.value,
+            "cluster_state": EtcdClusterState.NEW.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (
@@ -618,7 +668,12 @@ def test_restore_workflow_synchronization():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
-        local_app_data={"restore_id": "xyz", "restore_instruction": RestoreStep.COMPLETED.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.COMPLETED.value,
+            "cluster_state": EtcdClusterState.NEW.value,
+            "authentication": "enabled",
+        },
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (

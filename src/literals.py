@@ -85,8 +85,10 @@ class Status(Enum):
     PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
-    BACKUP_RESTORE_FAILED = StatusLevel(BlockedStatus("failed to restore backup"), "ERROR")
-    RESTORE_IN_PROGRESS = StatusLevel(BlockedStatus("Database restore is in progress"), "ERROR")
+    RESTORE_FAILED = StatusLevel(BlockedStatus("failed to restore backup"), "ERROR")
+    RESTORE_IN_PROGRESS = StatusLevel(
+        MaintenanceStatus("Database restore is in progress"), "ERROR"
+    )
     TLS_DISABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Disabling peer TLS..."), "DEBUG")
     TLS_DISABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Disabling client TLS..."), "DEBUG")
     TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")

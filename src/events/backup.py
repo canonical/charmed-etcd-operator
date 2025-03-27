@@ -92,7 +92,10 @@ class BackupEvents(Object):
 
     def _on_s3_credentials_gone(self, event: CredentialsGoneEvent) -> None:
         """Handle the removal of the relation with s3-integrator."""
-        if self.charm.state.cluster.is_restore_in_progress or self.charm.state.cluster.is_backup_in_progress:
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.is_backup_in_progress
+        ):
             logger.warning("Cannot s3-credentials while database backup/restore is in progress.")
             event.defer()
             return
@@ -176,22 +179,21 @@ class BackupEvents(Object):
                 if not self.charm.backup_manager.download_backup_file(
                     self.charm.state.cluster.restore_id
                 ):
-                    self.charm.set_status(Status.BACKUP_RESTORE_FAILED)
+                    self.charm.set_status(Status.RESTORE_FAILED)
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
-                self.charm.set_status(Status.RESTORE_IN_PROGRESS)
                 self.charm.backup_manager.stop_database_workload()
             case RestoreStep.RESTORE, RestoreStep.STOP:
                 try:
                     self.charm.backup_manager.restore_backup()
                 except EtcdBackupError:
-                    self.charm.set_status(Status.BACKUP_RESTORE_FAILED)
+                    self.charm.set_status(Status.RESTORE_FAILED)
             case RestoreStep.RESTART, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
                 self.charm.backup_manager.start_database_workload()
             case RestoreStep.COMPLETED, RestoreStep.RESTART:
                 self.charm.backup_manager.clean_up_after_restore()
                 if not self.charm.cluster_manager.is_healthy(cluster=False):
-                    self.charm.set_status(Status.BACKUP_RESTORE_FAILED)
+                    self.charm.set_status(Status.RESTORE_FAILED)
 
         # continue to next workflow step if possible
         if self.charm.unit.is_leader():
