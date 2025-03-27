@@ -21,6 +21,7 @@ poetry-core = "*"
 # tls_certificates_interface/v4/tls_certificates.py
 cryptography = "==43.0.1"
 pydantic = "==2.9.1"
+cosl = ">= 0.0.50"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
@@ -43,7 +44,7 @@ shellcheck-py = "*"
 pytest = "*"
 pytest-asyncio = "*"
 pytest-mock = "*"
-coverage = {extras = ["toml"], version = "*"}
+coverage = { extras = ["toml"], version = "*" }
 parameterized = "*"
 ops-scenario = "*"
 ops = "^2.17.0"
@@ -51,14 +52,14 @@ ops = "^2.17.0"
 [tool.poetry.group.integration.dependencies]
 ops = "^2.17.0"
 pytest = "*"
-pytest-github-secrets = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/github_secrets"}
+pytest-github-secrets = { git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/github_secrets" }
 pytest-asyncio = "*"
 pytest-operator = "^0.28.0"
-pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/pytest_operator_cache"}
-pytest-operator-groups = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/pytest_operator_groups"}
+pytest-operator-cache = { git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/pytest_operator_cache" }
+pytest-operator-groups = { git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/pytest_operator_groups" }
 juju = "==3.6.0"
 allure-pytest = "*"
-allure-pytest-collection-report = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/allure_pytest_collection_report"}
+allure-pytest-collection-report = { git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/allure_pytest_collection_report" }
 # pin websockets to <14.0 because of breaking changes in this version
 # see also: https://github.com/juju/python-libjuju/issues/1184
 websockets = "<14.0"
@@ -70,10 +71,7 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:",
-    ]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -100,7 +98,7 @@ lint.extend-ignore = [
 ]
 lint.ignore = ["E501", "D107"]
 extend-exclude = ["__pycache__", "*.egg_info"]
-lint.per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
+lint.per-file-ignores = { "tests/*" = ["D100", "D101", "D102", "D103", "D104"] }
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

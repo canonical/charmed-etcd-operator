@@ -11,6 +11,7 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from mypy_boto3_s3.service_resource import Bucket
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from common.client import EtcdClient
 from common.exceptions import EtcdBackupError
@@ -93,10 +94,10 @@ class BackupManager:
                 logger.info(f"Using existing bucket {s3_parameters['bucket']}")
                 return
             else:
-                # todo: do we want to raise to make the user aware of the error?
-                raise
+                logger.error(e)
+                raise EtcdBackupError(e)
 
-        logger.info(f"Created bucket {s3_parameters['bucket']}")
+        logger.info(f"Bucket {s3_parameters['bucket']} is ready")
 
     def create_backup(self) -> str:
         """Create a backup of etcd and upload it to object storage.
@@ -105,19 +106,26 @@ class BackupManager:
             str: the backup_id uploaded to object storage
         """
         backup_id = datetime.now().strftime(BACKUP_ID_FORMAT)
+        # set flag in peer relation data to avoid concurring actions/events
+        self.state.cluster.update({"backup_id": backup_id})
+
         s3_parameters = self.state.cluster.s3_credentials
         upload_target = f"{s3_parameters['path']}/{backup_id}"
 
         etcd_client = self._get_etcd_client()
 
         if not etcd_client.create_database_snapshot():
+            self.state.cluster.update({"backup_id": ""})
             raise EtcdBackupError("Failed to create database backup.")
 
         bucket = self._get_bucket_resource(s3_parameters)
 
         try:
-            bucket.upload_file(BACKUP_FILE_PATH, upload_target)
+            for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
+                with attempt:
+                    bucket.upload_file(BACKUP_FILE_PATH, upload_target)
         except ClientError as e:
+            self.state.cluster.update({"backup_id": ""})
             # if we can't upload, we still need to clean up the backup file to free the disk space
             self.workload.remove_file(BACKUP_FILE_PATH)
             logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
@@ -125,6 +133,7 @@ class BackupManager:
 
         logger.info(f"Backup uploaded to {upload_target}")
 
+        self.state.cluster.update({"backup_id": ""})
         self.workload.remove_file(BACKUP_FILE_PATH)
         logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
 

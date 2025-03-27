@@ -163,12 +163,11 @@ class EtcdEvents(Object):
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
+            self.charm.set_status(Status.CLUSTER_NOT_JOINED)
             event.defer()
             return
 
-        if self.charm.workload.alive():
-            self.charm.set_status(Status.ACTIVE)
-        else:
+        if not self.charm.workload.alive():
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
@@ -231,6 +230,7 @@ class EtcdEvents(Object):
                     self.charm.cluster_manager.promote_learning_member()
                 except EtcdClusterManagementError as e:
                     logger.warning(e)
+                    self.charm.set_status(Status.CLUSTER_MEMBER_NOT_PROMOTED)
                     event.defer()
                     return
 
@@ -301,8 +301,6 @@ class EtcdEvents(Object):
                 self.charm.set_status(Status.SERVICE_NOT_RUNNING)
                 return
 
-        self.charm.set_status(Status.ACTIVE)
-
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
@@ -371,8 +369,13 @@ class EtcdEvents(Object):
                         )
                     except EtcdUserManagementError as e:
                         logger.error(e)
+                        self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
+            else:
+                logger.error(f"Invalid username in secret {admin_secret_id}.")
+                self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
+            self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
 
     def update_private_key(self, private_key_id: str) -> None:
         """Update the private key in etcd."""

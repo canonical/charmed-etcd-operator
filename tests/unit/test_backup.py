@@ -123,6 +123,22 @@ def test_create_backup_action():
 
             assert e.message == "Failed to create database backup."
 
+    # ensure action fails if backup already in progress
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started"},
+        local_app_data={"backup_id": "xyz"},
+    )
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
+    with patch("subprocess.run"):
+        with raises(testing.ActionFailed) as e:
+            ctx.run(ctx.on.action("create-backup"), state_in)
+
+            assert e.message == "There is currently a backup in progress, please wait."
+
     # happy path
     peer_relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}

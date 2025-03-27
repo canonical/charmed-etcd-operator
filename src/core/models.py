@@ -228,6 +228,16 @@ class EtcdCluster(RelationState):
         return json.loads(self.relation_data.get("s3-credentials", "{}"))
 
     @property
+    def backup_id(self) -> str:
+        """Id of the backup that is currently being created."""
+        return self.relation_data.get("backup_id", "")
+
+    @property
+    def is_backup_in_progress(self) -> bool:
+        """Flag to indicate if the cluster is creating a backup."""
+        return bool(self.backup_id)
+
+    @property
     def restore_id(self) -> str:
         """Backup id to restore."""
         return self.relation_data.get("restore_id", "")
