@@ -12,7 +12,7 @@ from ops.model import ConfigData
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import DATABASE_DIR, TLSState
+from literals import DATABASE_DIR, METRICS_PORT, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,9 @@ class ConfigManager:
         config_properties["listen-peer-urls"] = self.state.unit_server.peer_url
         config_properties["listen-client-urls"] = self.state.unit_server.client_url
         config_properties["advertise-client-urls"] = self.state.unit_server.client_url
+        config_properties["listen-metrics-urls"] = (
+            f"http://{self.state.unit_server.ip}:{METRICS_PORT}"
+        )
 
         if self.state.unit_server.tls_client_state in [TLSState.TO_TLS, TLSState.TLS]:
             # replace http with https in listen-client-urls and advertise-client-urls

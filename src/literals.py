@@ -29,6 +29,7 @@ PEER_RELATION = "etcd-peers"
 RESTART_RELATION = "restart"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
+METRICS_PORT = 9100
 
 INTERNAL_USER = "root"
 INTERNAL_USER_PASSWORD_CONFIG = "system-users"
@@ -69,27 +70,32 @@ class Status(Enum):
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
     BACKUP_IN_PROGRESS = StatusLevel(MaintenanceStatus("Creating database backup..."), "DEBUG")
-    SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
-    SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
-    NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
-    REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
+    CLUSTER_NOT_INITIALIZED = StatusLevel(
+        BlockedStatus("Waiting for cluster initialization"), "ERROR"
+    )
+    CLUSTER_NOT_JOINED = StatusLevel(MaintenanceStatus("Waiting to join cluster"), "DEBUG")
+    CLUSTER_MEMBER_NOT_PROMOTED = StatusLevel(
+        MaintenanceStatus("Waiting to promote learning member"), "DEBUG"
+    )
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
+    NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
+    PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
-    TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")
-    TLS_ENABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Enabling client TLS..."), "DEBUG")
+    REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
     TLS_DISABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Disabling peer TLS..."), "DEBUG")
     TLS_DISABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Disabling client TLS..."), "DEBUG")
-    TLS_CLIENT_TRANSITION_FAILED = StatusLevel(
-        BlockedStatus("Failed to transition to/from client tls"), "ERROR"
-    )
-    TLS_PEER_TRANSITION_FAILED = StatusLevel(
-        BlockedStatus("Failed to transition to/from peer tls"), "ERROR"
-    )
+    TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")
+    TLS_ENABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Enabling client TLS..."), "DEBUG")
     TLS_INVALID_PRIVATE_KEY = StatusLevel(
         BlockedStatus("The private key provided is not valid. Please provide a valid private key"),
         "ERROR",
     )
+    TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be ready"), "DEBUG")
+    TLS_PEER_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating peer CA..."), "DEBUG")
+    TLS_CLIENT_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating client CA..."), "DEBUG")
+    SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
+    SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
 
 
 # enum for TLS state
