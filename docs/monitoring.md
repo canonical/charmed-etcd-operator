@@ -199,10 +199,6 @@ The metrics exposed by etcd are detailed in the [etcd documentation](https://etc
 The etcd charm comes with default alerts that are set up in Grafana. These alerts are based on the metrics collected by the Grafana agent. The default alerts are detailed in the [etcd documentation](https://etcd.io/docs/v3.5/op-guide/monitoring/#alerting). 
 
 They include alerts for:
-Certainly, here's a breakdown of each alert within the "etcd" group, detailing their purpose and conditions:
-
-**etcd Alert Details:**
-
 * **etcdMembersDown:**
     * **Description:** Alerts when etcd cluster members are down.
     * **Trigger:** Triggers if any etcd member is down or if there are excessive network peer sent failures.
