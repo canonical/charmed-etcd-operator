@@ -40,7 +40,9 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 REQUIRER_NAME = "requirer-charm"
 REQUIRER_TLS_NAME = "requirer-tls-provider"
-REQUIRER_CHARM_PATH = "./requirer-charm_ubuntu@24.04-amd64.charm"
+REQUIRER_CHARM_PATH = (
+    "./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-amd64.charm"
+)
 
 common_name = REQUIRER_NAME
 key_prefix = "/test/"
