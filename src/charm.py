@@ -7,6 +7,7 @@
 import logging
 
 import ops
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops import StatusBase
 
@@ -16,6 +17,7 @@ from events.etcd import EtcdEvents
 from events.external_clients import ExternalClientsEvents
 from events.tls import TLSEvents
 from literals import (
+    METRICS_PORT,
     RESTART_RELATION,
     SUBSTRATE,
     DebugLevel,
@@ -59,6 +61,21 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # --- LIB EVENT HANDLERS ---
         self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)
+
+        # cos agent
+        self._grafana_agent = COSAgentProvider(
+            self,
+            metrics_rules_dir="./src/cos/alert_rules/prometheus",
+            dashboard_dirs=["./src/cos/grafana_dashboards"],
+            scrape_configs=[
+                {
+                    "job_name": "etcd",
+                    "static_configs": [
+                        {"targets": [f"{self.state.unit_server.ip}:{METRICS_PORT}"]}
+                    ],
+                }
+            ],
+        )
 
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.collect_app_status, self._on_collect_status)

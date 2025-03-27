@@ -21,6 +21,8 @@ peers:
 provides:
   etcd-client:
     interface: etcd_client
+  cos-agent:
+    interface: cos_agent
 
 requires:
   peer-certificates:
