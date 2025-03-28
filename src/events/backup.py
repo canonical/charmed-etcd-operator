@@ -16,7 +16,7 @@ from charms.data_platform_libs.v0.s3 import (
 from ops import Object
 from ops.charm import ActionEvent, RelationChangedEvent
 
-from common.exceptions import EtcdBackupError
+from common.exceptions import EtcdBackupError, EtcdUserManagementError
 from literals import (
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
@@ -189,6 +189,12 @@ class BackupEvents(Object):
             case RestoreStep.RESTART, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
                 self.charm.backup_manager.start_database_workload()
+                if self.charm.unit.is_leader():
+                    try:
+                        # always enable auth in case a backup without auth was restored
+                        self.charm.cluster_manager.enable_authentication()
+                    except EtcdUserManagementError:
+                        logger.info("Auth already enabled")
             case RestoreStep.COMPLETED, RestoreStep.RESTART:
                 self.charm.backup_manager.clean_up_after_restore()
                 if not self.charm.cluster_manager.is_healthy(cluster=False):

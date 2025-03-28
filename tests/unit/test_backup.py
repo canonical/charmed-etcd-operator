@@ -570,6 +570,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.write_file") as write_config,
         patch("workload.EtcdWorkload.start"),
         patch("workload.EtcdWorkload.enable_service"),
+        patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="user add")),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
