@@ -25,6 +25,7 @@ from literals import (
     INTERNAL_USER,
     RESTORE_FILE_NAME,
     SNAP_CONFIG_PATH,
+    SNAP_DATA_PATH,
     EtcdClusterState,
     RestoreStep,
     Status,
@@ -210,7 +211,7 @@ class BackupManager:
 
         if not etcd_client.restore_database_snapshot(
             snapshot_filename=f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}",
-            data_directory=DATABASE_DIR,
+            data_directory=SNAP_DATA_PATH,
             cluster_config=self.state.cluster.cluster_members,
             peer_url=self.state.unit_server.peer_url,
             member_name=self.state.unit_server.member_name,
