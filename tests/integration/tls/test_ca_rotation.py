@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 import logging
-from time import sleep
 
 import pytest
 from juju.application import Application
@@ -129,9 +128,7 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
 
-    # TODO - change it to wait_until test when the TLS cert bug is fixed: https://github.com/canonical/tls-certificates-interface/issues/303
-    # await wait_until(ops_test, apps=[TLS_NAME])
-    sleep(60)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     logger.info("Checking if the CA certificates are rotated")
     new_peer_ca = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER, is_ca=True)
