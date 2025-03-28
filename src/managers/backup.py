@@ -302,6 +302,9 @@ class BackupManager:
         """Compute the Backup manager's statuses."""
         status_list = []
 
+        if self.state.cluster.is_backup_in_progress:
+            status_list.append(Status.BACKUP_IN_PROGRESS)
+
         if self.state.cluster.is_restore_in_progress:
             status_list.append(Status.RESTORE_IN_PROGRESS)
 

@@ -116,7 +116,6 @@ class BackupEvents(Object):
             event.fail("There is currently a backup in progress, please wait.")
             return
 
-        self.charm.set_status(Status.BACKUP_IN_PROGRESS)
         event.log("Initiating backup process ...")
 
         try:
