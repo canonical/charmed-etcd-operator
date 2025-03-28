@@ -3,8 +3,8 @@ The Canonical Observability Stack (COS) is a set of tools that facilitates gathe
 
 The etcd charm can use COS to connect to Grafana and Prometheus to use monitoring, alert rules, and log features.
 
-## Deploying COS
-Deploy the [`cos-lite`](https://charmhub.io/topics/canonical-observability-stack) bundle in a Kubernetes environment following the [MicroK8s guide](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s). Since the etcd charm is deployed directly on a cloud infrastructure environment, it is needed to offer the endpoints of the COS relations. The [offers-overlay](https://github.com/canonical/cos-lite-bundle/blob/main/overlays/offers-overlay.yaml) can be used, and this step is shown in the [COS tutorial](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s#heading--deploy-the-cos-lite-bundle-with-overlays).
+## Deploy COS
+Deploy the [`cos-lite`](https://charmhub.io/topics/canonical-observability-stack) bundle in a Kubernetes environment following the [MicroK8s guide](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s). Since the etcd charm is deployed directly on a cloud infrastructure environment, it requires offering the endpoints of the COS relations. The [offers-overlay](https://github.com/canonical/cos-lite-bundle/blob/main/overlays/offers-overlay.yaml) can be used, and this step is shown in the [COS tutorial](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s#heading--deploy-the-cos-lite-bundle-with-overlays).
 
 Once the COS bundle is deployed, you should have Grafana and Prometheus running in your Kubernetes cluster. Run `juju status` to see the status of the COS model. The output should look similar to the following:
 
@@ -29,7 +29,7 @@ prometheus/0*    active    idle   10.1.153.190
 traefik/0*       active    idle   10.1.153.186         Serving at 125.121.179.159
 ```
 
-## Integrating etcd with COS
+## Integrate etcd with COS
 
 ### Offer interfaces via the COS controller
 Switch to COS environment and offer COS interfaces to be cross-model related with VM model that you are using to deploy the etcd charm:
@@ -42,7 +42,7 @@ juju offer loki:logging
 juju offer prometheus:receive-remote-write
 ```
 
-### Consuming the COS offers on the etcd model
+### Consume the COS offers on the etcd model
 Switch back to the etcd model and run the following commands to consume the COS offers:
 
 ```shell
@@ -53,9 +53,9 @@ juju consume k8s:admin/cos.loki-logging
 juju consume k8s:admin/cos.grafana-dashboards
 ```
 
-> In the previous commands, `k8s` is the name of the controller where the COS model is deployed, and `cos` is the name of the model where the COS model is deployed.
+> In the commands above, `k8s` refers to the controller where the COS-lite bundle is deployed, and `cos` refers to the COS model.
 
-### Deploying grafana-agent
+### Deploy `grafana-agent`
 The [Grafana agent](https://charmhub.io/grafana-agent) is a lightweight, open-source agent that runs on your host and sends metrics and logs to Grafana Cloud. The Grafana agent is deployed as a sidecar container in the etcd charm. To deploy the Grafana agent, run the following command:
 
 ```shell
@@ -132,7 +132,7 @@ Machine  State    Address       Inst id        Base          AZ  Message
 2        started  10.8.159.235  juju-604e01-2  ubuntu@24.04      Running
 ```
 
-### Accessing Grafana dashboard
+### Access Grafana dashboard
 
 To get the Grafana dashboard URL, run the following command:
 
@@ -181,7 +181,7 @@ url: http://125.121.179.159/cos-grafana
 
 You can now access the Grafana dashboard using the URL and admin password.
 
-### Accessing the etcd dashboard
+### Access the etcd dashboard
 
 A default dashboard for etcd is available in Grafana. To access the etcd dashboard, follow these steps:
 - Head to the Grafana dashboard URL.
@@ -192,10 +192,10 @@ The etcd dashboard should display the metrics collected by the Grafana agent fro
 
 ![etcd dashboard](./images/grafana-dashboard.jpg)
 
-## The metrics collected by the Grafana agent
-The metrics exposed by etcd are detailed in the [etcd documentation](https://etcd.io/docs/v3.5/metrics/). 
+## Metrics collected by the Grafana agent
+The metrics exposed by etcd are detailed in the [upstream etcd documentation](https://etcd.io/docs/v3.5/metrics/). 
 
-## The default alerts for the etcd charm
+## Default alerts for the etcd charm
 The etcd charm comes with default alerts that are set up in Grafana. These alerts are based on the metrics collected by the Grafana agent. The default alerts are detailed in the [etcd documentation](https://etcd.io/docs/v3.5/op-guide/monitoring/#alerting). 
 
 They include alerts for:
