@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+import json
+import logging
+
+import pytest
+from pytest_operator.plugin import OpsTest
+
+from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG
+
+from ..helpers import (
+    APP_NAME,
+    CHARM_PATH,
+    get_cluster_endpoints,
+    get_juju_leader_unit_name,
+    get_key,
+    put_key,
+)
+from ..helpers_deployment import wait_until
+
+logger = logging.getLogger(__name__)
+
+NUM_UNITS = 3
+S3_INTEGRATOR = "s3-integrator"
+TEST_KEY = "test_key"
+TEST_VALUE = "42"
+PASSWORD = "some-password"
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_build_and_deploy(ops_test: OpsTest, storage_credentials, storage_config) -> None:
+    """Deploy and configure the charm and s3-integrator."""
+    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(S3_INTEGRATOR, channel="latest/stable", num_units=1)
+    await wait_until(ops_test, apps=[S3_INTEGRATOR], apps_statuses=["blocked"])
+
+    logger.info(f"Configure {S3_INTEGRATOR}")
+    await ops_test.model.applications[S3_INTEGRATOR].set_config(storage_config)
+
+    s3_unit = ops_test.model.applications[S3_INTEGRATOR].units[0]
+    provide_credentials_action = await s3_unit.run_action(
+        "sync-s3-credentials",
+        **storage_credentials,
+    )
+    await provide_credentials_action.wait()
+    await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
+
+    logger.info("Configure admin credentials in etcd")
+    secret_name = "test_secret"
+
+    secret_id = await ops_test.model.add_secret(
+        name=secret_name, data_args=[f"{INTERNAL_USER}={PASSWORD}"]
+    )
+    await ops_test.model.grant_secret(secret_name=secret_name, application=APP_NAME)
+
+    # update the application config to include the secret
+    await ops_test.model.applications[APP_NAME].set_config(
+        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
+    )
+    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["active"])
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_s3_integration(ops_test: OpsTest, s3_bucket):
+    """Integrate charm and s3-integrator."""
+    await ops_test.model.add_relation(APP_NAME, S3_INTEGRATOR)
+    await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
+
+    # bucket should be created when integrating both
+    assert s3_bucket.meta.client.head_bucket(Bucket=s3_bucket.name)
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_create_backup(ops_test: OpsTest):
+    """Create a backup and upload to s3-storage."""
+    # Before creating a backup, enter some data
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    assert (
+        put_key(
+            endpoints,
+            user=INTERNAL_USER,
+            password=PASSWORD,
+            key=TEST_KEY,
+            value=TEST_VALUE,
+        )
+        == "OK"
+    )
+    assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE
+
+    leader_unit_name = get_juju_leader_unit_name(ops_test, APP_NAME)
+    leader_unit = ops_test.model.units.get(leader_unit_name)
+    create_action = await leader_unit.run_action("create-backup")
+    await create_action.wait()
+
+    list_action = await leader_unit.run_action("list-backups")
+    response = await list_action.wait()
+
+    backups = json.loads(response.results.get("backups", "[]"))
+    assert len(backups) == 1
