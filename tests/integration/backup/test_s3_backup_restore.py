@@ -69,7 +69,12 @@ async def test_build_and_deploy(ops_test: OpsTest, storage_credentials, storage_
 async def test_s3_integration(ops_test: OpsTest, s3_bucket):
     """Integrate charm and s3-integrator."""
     await ops_test.model.add_relation(APP_NAME, S3_INTEGRATOR)
-    await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME, S3_INTEGRATOR],
+        apps_statuses=["active"],
+        units_statuses=["active"],
+    )
 
     # bucket should be created when integrating both
     assert s3_bucket.meta.client.head_bucket(Bucket=s3_bucket.name)
