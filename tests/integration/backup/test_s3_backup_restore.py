@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import time
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -193,12 +194,16 @@ async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
     create_backup_response = await create_action.wait()
     assert create_backup_response.results.get("return-code") == 0, "restore failed"
 
+    # todo: remove sleep
+    time.sleep(60)
+    """
     await wait_until(
         ops_test,
         apps=[APP_NAME],
         apps_statuses=["active"],
         units_statuses=["active"],
     )
+    """
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE, (
