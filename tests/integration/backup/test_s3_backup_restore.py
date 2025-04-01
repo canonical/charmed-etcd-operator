@@ -2,7 +2,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import json
 import logging
 
 import pytest
@@ -102,13 +101,18 @@ async def test_create_backup(ops_test: OpsTest):
     for unit in ops_test.model.applications[APP_NAME].units:
         if await unit.is_leader_from_status():
             leader_unit = unit
+
+    # `create-backup` will upload the backup to storage
     create_action = await leader_unit.run_action("create-backup")
     create_backup_response = await create_action.wait()
-    logger.info(create_backup_response.results)
+    backup_id = create_backup_response.get("backup-id", "")
+    assert backup_id, "No backup-id in response"
 
+    # `list-backups` will download the backup from storage
     list_action = await leader_unit.run_action("list-backups")
     list_backups_response = await list_action.wait()
-    logger.info(list_backups_response.results)
-
-    backups = json.loads(list_backups_response.results.get("backups", "[]"))
-    assert len(backups) == 1
+    backups = list_backups_response.results.get("backups", "")
+    # example: 'backup-id | backup-status\n--------------------\n2025-04-01T08:40:45Z  | finished'
+    assert backups.split("\n")[2].startswith(backup_id), (
+        "previously created backup not in backups-list"
+    )
