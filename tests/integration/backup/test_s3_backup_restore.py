@@ -105,7 +105,7 @@ async def test_create_backup(ops_test: OpsTest):
     # `create-backup` will upload the backup to storage
     create_action = await leader_unit.run_action("create-backup")
     create_backup_response = await create_action.wait()
-    backup_id = create_backup_response.get("backup-id", "")
+    backup_id = create_backup_response.results.get("backup-id", "")
     assert backup_id, "No backup-id in response"
 
     # `list-backups` will download the backup from storage
