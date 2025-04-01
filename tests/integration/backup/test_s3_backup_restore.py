@@ -95,8 +95,9 @@ async def test_create_backup(ops_test: OpsTest):
     )
     assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE
 
-    leader_unit_name = get_juju_leader_unit_name(ops_test, APP_NAME)
-    leader_unit = ops_test.model.units.get(leader_unit_name)
+    for unit in ops_test.model.applications[APP_NAME].units:
+        if await unit.is_leader_from_status():
+            leader_unit = unit
     create_action = await leader_unit.run_action("create-backup")
     await create_action.wait()
 
