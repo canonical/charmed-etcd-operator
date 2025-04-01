@@ -14,7 +14,6 @@ from ..helpers import (
     APP_NAME,
     CHARM_PATH,
     get_cluster_endpoints,
-    get_juju_leader_unit_name,
     get_key,
     put_key,
 )
