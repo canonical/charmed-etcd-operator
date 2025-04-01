@@ -160,7 +160,7 @@ async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
     logger.info("Remove existing etcd cluster and deploy a new one.")
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
     await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["active"])
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=60)
 
     logger.info("Configure admin credentials in etcd")
     secret_name = "new_test_secret"
