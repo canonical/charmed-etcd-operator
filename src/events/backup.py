@@ -18,7 +18,6 @@ from ops.charm import ActionEvent, RelationChangedEvent
 
 from common.exceptions import EtcdBackupError, EtcdUserManagementError
 from literals import (
-    INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
     S3_RELATION_NAME,
     RestoreStep,
@@ -141,7 +140,7 @@ class BackupEvents(Object):
 
     def _on_restore_action(self, event: ActionEvent) -> None:
         """Download a backup from object storage and restore it to all units."""
-        if error := self._exists_preventing_reason(check_restore=True):
+        if error := self._exists_preventing_reason():
             event.set_results({"error": error})
             event.fail(error)
             return
@@ -196,19 +195,18 @@ class BackupEvents(Object):
                     except EtcdUserManagementError:
                         logger.info("Auth already enabled")
             case RestoreStep.COMPLETED, RestoreStep.RESTART:
-                self.charm.backup_manager.clean_up_after_restore()
                 if not self.charm.cluster_manager.is_healthy(cluster=False):
-                    self.charm.set_status(Status.RESTORE_FAILED)
+                    # if the member is not healthy, we do not complete the restore process
+                    self.charm.set_status(Status.RESTORE_UNHEALTHY)
+                    return
+                self.charm.backup_manager.clean_up_after_restore()
 
         # continue to next workflow step if possible
         if self.charm.unit.is_leader():
             self.charm.backup_manager.proceed_restore_workflow_if_possible()
 
-    def _exists_preventing_reason(self, check_restore: bool = False) -> str:
+    def _exists_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.
-
-        Args:
-            check_restore: option to check if preconditions for restoring process are given
 
         Returns:
             Error message in case a preventing reason for an action exists, otherwise empty str.
@@ -224,14 +222,5 @@ class BackupEvents(Object):
 
         if self.charm.state.cluster.is_restore_in_progress:
             return "Restore is already in progress."
-
-        # default checks end here, the following checks are only relevant for the restore process
-        if not check_restore:
-            return ""
-
-        if not self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
-            return (
-                "Admin secret missing - configure `system-users` secret before restoring a backup."
-            )
 
         return ""

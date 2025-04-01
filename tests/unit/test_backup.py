@@ -255,21 +255,6 @@ def test_restore_action():
 
         assert e.message == "Database is not started, cannot perform backup action."
 
-    # ensure action fails if no admin-secret configured
-    peer_relation = testing.PeerRelation(
-        id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
-    )
-    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
-    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("restore"), state_in)
-
-        assert (
-            e.message
-            == "Admin secret missing - configure `system-users` secret before restoring a backup."
-        )
-
     # ensure action fails if another restore is already running
     peer_relation = testing.PeerRelation(
         id=1,
@@ -628,7 +613,9 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus("failed to restore backup")
+        assert state_out.unit_status == ops.BlockedStatus(
+            "cluster unhealthy after restoring backup - check credentials"
+        )
 
     # restore step: clean up (leader)
     relation = testing.PeerRelation(
@@ -683,4 +670,6 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus("failed to restore backup")
+        assert state_out.unit_status == ops.BlockedStatus(
+            "cluster unhealthy after restoring backup - check credentials"
+        )

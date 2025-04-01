@@ -89,6 +89,9 @@ class Status(Enum):
     RESTORE_IN_PROGRESS = StatusLevel(
         MaintenanceStatus("Database restore is in progress"), "ERROR"
     )
+    RESTORE_UNHEALTHY = StatusLevel(
+        BlockedStatus("cluster unhealthy after restoring backup - check credentials"), "ERROR"
+    )
     TLS_DISABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Disabling peer TLS..."), "DEBUG")
     TLS_DISABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Disabling client TLS..."), "DEBUG")
     TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")
