@@ -99,11 +99,11 @@ async def test_create_backup(ops_test: OpsTest):
             leader_unit = unit
     create_action = await leader_unit.run_action("create-backup")
     create_backup_response = await create_action.wait()
-    logger.info(create_backup_response)
+    logger.info(create_backup_response.results)
 
     list_action = await leader_unit.run_action("list-backups")
     list_backups_response = await list_action.wait()
-    logger.info(list_backups_response)
+    logger.info(list_backups_response.results)
 
     backups = json.loads(list_backups_response.results.get("backups", "[]"))
     assert len(backups) == 1
