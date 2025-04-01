@@ -134,7 +134,7 @@ async def test_restore_backup_on_same_cluster(ops_test: OpsTest):
     # download the backup from storage and restore it
     create_action = await leader_unit.run_action("restore", params={"backup-id": backup_id})
     create_backup_response = await create_action.wait()
-    assert create_backup_response.results.get("success", ""), "restore failed"
+    assert create_backup_response.results.get("return-code") == 0, "restore failed"
 
     await wait_until(
         ops_test,
@@ -191,7 +191,7 @@ async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
     # download the backup from storage and restore it
     create_action = await leader_unit.run_action("restore", params={"backup-id": backup_id})
     create_backup_response = await create_action.wait()
-    assert create_backup_response.results.get("success", ""), "restore failed"
+    assert create_backup_response.results.get("return-code") == 0, "restore failed"
 
     await wait_until(
         ops_test,
