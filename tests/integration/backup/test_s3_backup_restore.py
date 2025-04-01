@@ -60,7 +60,7 @@ async def test_build_and_deploy(ops_test: OpsTest, storage_credentials, storage_
     await ops_test.model.applications[APP_NAME].set_config(
         {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
     )
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["active"])
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
@@ -133,7 +133,7 @@ async def test_restore_backup_on_same_cluster(ops_test: OpsTest):
 
     # download the backup from storage and restore it
     logger.info(f"Restoring backup {backup_id}")
-    restore_action = await leader_unit.run_action("restore", params={"backup-id": backup_id})
+    restore_action = await leader_unit.run_action("restore", **{"backup-id": backup_id})
     restore_backup_response = await restore_action.wait()
     assert restore_backup_response.results.get("return-code") == 0, "restore failed"
 
@@ -191,7 +191,7 @@ async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
 
     # download the backup from storage and restore it
     logger.info(f"Restoring backup {backup_id}")
-    restore_action = await leader_unit.run_action("restore", params={"backup-id": backup_id})
+    restore_action = await leader_unit.run_action("restore", **{"backup-id": backup_id})
     restore_backup_response = await restore_action.wait()
     assert restore_backup_response.results.get("return-code") == 0, "restore failed"
 
