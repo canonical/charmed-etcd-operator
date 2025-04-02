@@ -63,7 +63,7 @@ def test_internal_user_creation():
 def test_start():
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
-    state_in = testing.State(leader=True)
+    state_in = testing.State(leader=True, relations={relation})
 
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -75,7 +75,15 @@ def test_start():
         assert state_out.unit_status == ops.ActiveStatus()
 
     # non-leader units should not start directly
-    state_in = testing.State(leader=False)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+    )
+    state_in = testing.State(leader=False, relations={relation})
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
@@ -87,6 +95,10 @@ def test_start():
         start.assert_not_called()
 
     # if authentication cannot be enabled, the charm should error out
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+    )
     state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -246,7 +258,15 @@ def test_start():
 
 def test_update_status():
     ctx = testing.Context(EtcdOperatorCharm)
-    state_in = testing.State()
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+    )
+    state_in = testing.State(relations={relation})
 
     # restart workload if not running
     with (

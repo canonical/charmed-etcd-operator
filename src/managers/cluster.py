@@ -329,4 +329,10 @@ class ClusterManager:
             if not self.state.cluster.auth_enabled:
                 status_list.append(Status.AUTHENTICATION_NOT_ENABLED)
 
+        if not self.state.peer_relation:
+            status_list.append(Status.SERVICE_INSTALLING)
+
+        if not self.state.cluster.cluster_state:
+            status_list.append(Status.CLUSTER_INITIALIZING)
+
         return status_list
