@@ -31,7 +31,9 @@ backup_id = ""
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, storage_credentials, storage_config) -> None:
+async def test_deploy_and_configure(
+    ops_test: OpsTest, storage_credentials, storage_config
+) -> None:
     """Deploy and configure the charm and s3-integrator."""
     await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
     await ops_test.model.deploy(S3_INTEGRATOR, channel="latest/stable", num_units=1)
@@ -41,11 +43,11 @@ async def test_build_and_deploy(ops_test: OpsTest, storage_credentials, storage_
     await ops_test.model.applications[S3_INTEGRATOR].set_config(storage_config)
 
     s3_unit = ops_test.model.applications[S3_INTEGRATOR].units[0]
-    provide_credentials_action = await s3_unit.run_action(
+    set_credentials_action = await s3_unit.run_action(
         "sync-s3-credentials",
         **storage_credentials,
     )
-    await provide_credentials_action.wait()
+    await set_credentials_action.wait()
     await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
 
     logger.info("Configure admin credentials in etcd")
@@ -66,7 +68,7 @@ async def test_build_and_deploy(ops_test: OpsTest, storage_credentials, storage_
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_s3_integration(ops_test: OpsTest, s3_bucket):
+async def test_s3_integration(ops_test: OpsTest, s3_bucket) -> None:
     """Integrate charm and s3-integrator."""
     await ops_test.model.integrate(APP_NAME, S3_INTEGRATOR)
     await wait_until(
@@ -83,8 +85,10 @@ async def test_s3_integration(ops_test: OpsTest, s3_bucket):
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_create_backup(ops_test: OpsTest):
+async def test_create_backup(ops_test: OpsTest) -> None:
     """Create a backup and upload to s3-storage."""
+    global backup_id
+
     # Before creating a backup, enter some data
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     assert (
@@ -102,11 +106,12 @@ async def test_create_backup(ops_test: OpsTest):
     for unit in ops_test.model.applications[APP_NAME].units:
         if await unit.is_leader_from_status():
             leader_unit = unit
+    logger.info(f"Creating backup on unit {leader_unit.name}")
 
     # `create-backup` will upload the backup to storage
     create_action = await leader_unit.run_action("create-backup")
     create_backup_response = await create_action.wait()
-    global backup_id
+
     backup_id = create_backup_response.results.get("backup-id", "")
     assert backup_id, "No backup-id in response"
 
@@ -116,17 +121,20 @@ async def test_create_backup(ops_test: OpsTest):
     backups = list_backups_response.results.get("backups", "")
     # example: 'backup-id | backup-status\n--------------------\n2025-04-01T08:40:45Z  | finished'
     assert backups.split("\n")[2].startswith(backup_id), (
-        "previously created backup not in backups-list"
+        "previously created backup not on top of backups-list"
+    )
+
+    # update test data to later check if it was restored
+    assert (
+        put_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY, value="0") == "OK"
     )
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_restore_backup_on_same_cluster(ops_test: OpsTest):
+async def test_restore_backup_on_same_cluster(ops_test: OpsTest) -> None:
     """Restore a backup and check if data is recovered."""
-    global backup_id
-
     for unit in ops_test.model.applications[APP_NAME].units:
         if await unit.is_leader_from_status():
             leader_unit = unit
@@ -137,12 +145,8 @@ async def test_restore_backup_on_same_cluster(ops_test: OpsTest):
     restore_backup_response = await restore_action.wait()
     assert restore_backup_response.results.get("return-code") == 0, "restore failed"
 
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME],
-        apps_statuses=["active"],
-        units_statuses=["active"],
-    )
+    # wait for the restore to be performed across all units and check the restored data
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE, (
@@ -155,8 +159,6 @@ async def test_restore_backup_on_same_cluster(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
     """Restore a backup and check if data is recovered."""
-    global backup_id
-
     logger.info("Remove existing etcd cluster and deploy a new one.")
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
     await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
@@ -174,9 +176,9 @@ async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
     await ops_test.model.applications[APP_NAME].set_config(
         {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
     )
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["active"])
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
-    logger.info(f"Integrate with {S3_INTEGRATOR}")
+    logger.info(f"Integrate the newly deployed application with {S3_INTEGRATOR}")
     await ops_test.model.integrate(APP_NAME, S3_INTEGRATOR)
     await wait_until(
         ops_test,
@@ -195,6 +197,7 @@ async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
     restore_backup_response = await restore_action.wait()
     assert restore_backup_response.results.get("return-code") == 0, "restore failed"
 
+    # wait for the restore to be performed across all units and check the restored data
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)

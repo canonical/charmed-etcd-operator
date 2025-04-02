@@ -19,7 +19,8 @@ class ConnectionInformation:
 
 
 @pytest.fixture(scope="session")
-def microceph():
+def microceph() -> ConnectionInformation:
+    """Deploy microceph with rados-gateway and provide the credentials to access it."""
     if not os.environ.get("CI") == "true":
         raise Exception("Not running on CI. Skipping microceph installation. ")
     logger.info("Setting up microceph")
@@ -71,7 +72,8 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="session")
-def storage_config(microceph: ConnectionInformation):
+def storage_config(microceph: ConnectionInformation) -> dict[str, str]:
+    """Provide the configuration required by s3-integrator."""
     host_ip = socket.gethostbyname(socket.gethostname())
     return {
         "endpoint": f"http://{host_ip}",
@@ -83,6 +85,7 @@ def storage_config(microceph: ConnectionInformation):
 
 @pytest.fixture(scope="session")
 def storage_credentials(microceph: ConnectionInformation) -> dict[str, str]:
+    """Provide the access-credentials required by s3-integrator."""
     return {
         "access-key": microceph.access_key_id,
         "secret-key": microceph.secret_access_key,
@@ -90,7 +93,8 @@ def storage_credentials(microceph: ConnectionInformation) -> dict[str, str]:
 
 
 @pytest.fixture(scope="function")
-def s3_bucket(storage_credentials, storage_config):
+def s3_bucket(storage_credentials, storage_config) -> None:
+    """Provide a storage bucket on the deployed microceph instance."""
     session = boto3.Session(
         aws_access_key_id=storage_credentials["access-key"],
         aws_secret_access_key=storage_credentials["secret-key"],
