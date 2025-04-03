@@ -14,7 +14,6 @@ from pytest import raises
 
 from charm import EtcdOperatorCharm
 from common.exceptions import (
-    EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
     EtcdUserManagementError,
 )
