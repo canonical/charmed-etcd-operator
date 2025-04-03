@@ -126,6 +126,11 @@ class ClusterManager:
         logger.debug(f"Member: {member_list[self.state.unit_server.member_name].id}")
         return member_list[self.state.unit_server.member_name]
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_fixed(2),
+        reraise=True,
+    )
     def broadcast_peer_url(self, peer_urls: str) -> None:
         """Broadcast the peer URL to all units in the cluster.
 
