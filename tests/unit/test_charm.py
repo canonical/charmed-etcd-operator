@@ -204,12 +204,10 @@ def test_start():
         patch("workload.EtcdWorkload.write_file"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
     ):
-        with raises(testing.errors.UncaughtCharmError) as e:
-            state_out = ctx.run(ctx.on.start(), state_in)
-            assert not state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert not state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
 
         start.assert_not_called()
-        assert isinstance(e.value.__cause__, EtcdUserManagementError)
 
     # leader started but auth not enabled -> retry -> success
     relation = testing.PeerRelation(
@@ -248,12 +246,10 @@ def test_start():
         patch("workload.EtcdWorkload.start") as start,
         patch("workload.EtcdWorkload.write_file"),
     ):
-        with raises(testing.errors.UncaughtCharmError) as e:
-            state_out = ctx.run(ctx.on.start(), state_in)
-            assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
 
         start.assert_not_called()
-        assert isinstance(e.value.__cause__, EtcdAuthNotEnabledError)
 
 
 def test_update_status():

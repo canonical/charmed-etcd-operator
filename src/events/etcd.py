@@ -95,6 +95,9 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
+        # check if data exists before doing any operation
+        storage_reuse = self.charm.workload.exists(DATABASE_DIR)
+
         tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
         if (
             self.charm.state.unit_server.tls_client_state in tls_transition_states
@@ -113,13 +116,18 @@ class EtcdEvents(Object):
             # all subsequent units will have to be added as member before starting the workload
             self.charm.cluster_manager.start_member()
 
-            if self.charm.workload.exists(DATABASE_DIR):
+            if storage_reuse:
                 # this is a new application but storage is reused
-                self.charm.state.cluster.update({"authentication": "enabled"})
                 # update cluster membership configuration after recovering existing data
-                self.charm.cluster_manager.broadcast_peer_url(
-                    self.charm.state.unit_server.peer_url
-                )
+                try:
+                    self.charm.cluster_manager.broadcast_peer_url(
+                        self.charm.state.unit_server.peer_url
+                    )
+                    self.charm.state.cluster.update({"authentication": "enabled"})
+                except ValueError:
+                    logger.error("Failed to update member configuration")
+                    event.defer()
+                    return
 
             if not self.charm.state.cluster.auth_enabled:
                 try:
@@ -141,13 +149,16 @@ class EtcdEvents(Object):
                         self.charm.state.cluster.update({"authentication": "enabled"})
                     except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
                         logger.error(e)
-                        raise
+                        event.defer()
+                        return
                 else:
-                    raise EtcdAuthNotEnabledError("Authentication not enabled.")
+                    logger.error("Authentication not enabled.")
+                    event.defer()
+                    return
 
             if not self.charm.state.unit_server.is_started:
                 # database files should not be deleted on running units
-                if self.charm.workload.exists(DATABASE_DIR):
+                if storage_reuse:
                     logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
                     # storage cannot be reused on non-leader members
                     try:
