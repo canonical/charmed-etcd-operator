@@ -170,6 +170,7 @@ class EtcdEvents(Object):
                         # if removing fails, we cannot start the workload or the member would crash
                         raise
 
+                self.charm.set_status(Status.SERVICE_STARTING)
                 self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster

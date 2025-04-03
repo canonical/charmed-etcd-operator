@@ -183,7 +183,7 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status == ops.ActiveStatus()
+        assert state_out.unit_status == ops.MaintenanceStatus("Waiting for etcd to start...")
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
         start.assert_called_once()
 
