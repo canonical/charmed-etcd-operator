@@ -58,9 +58,6 @@ pytest-operator-groups = { git = "https://github.com/canonical/data-platform-wor
 juju = "==3.6.0"
 allure-pytest = "*"
 allure-pytest-collection-report = { git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/allure_pytest_collection_report" }
-# pin websockets to <14.0 because of breaking changes in this version
-# see also: https://github.com/juju/python-libjuju/issues/1184
-websockets = "<14.0"
 tenacity = "*"
 pydantic = "==2.9.1"
 
