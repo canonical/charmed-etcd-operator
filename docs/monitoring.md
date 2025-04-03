@@ -46,7 +46,7 @@ juju offer prometheus:receive-remote-write
 Switch back to the etcd model and run the following commands to consume the COS offers:
 
 ```shell
-juju switch cos
+juju switch test
 
 juju consume k8s:admin/cos.prometheus-receive-remote-write
 juju consume k8s:admin/cos.loki-logging
@@ -59,7 +59,7 @@ juju consume k8s:admin/cos.grafana-dashboards
 The [Grafana agent](https://charmhub.io/grafana-agent) is a lightweight, open-source agent that runs on your host and sends metrics and logs to Grafana Cloud. The Grafana agent is deployed as a sidecar container in the etcd charm. To deploy the Grafana agent, run the following command:
 
 ```shell
-juju deploy grafana-agent --channel stable --base ubuntu@24.04
+juju deploy grafana-agent --base ubuntu@24.04
 ```
 
 Once the Grafana agent is deployed, integrate it with the etcd charm by running the following command:
