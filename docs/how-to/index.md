@@ -1,3 +1,4 @@
+(how-to)=
 # How-to guides
 
 ```{toctree}

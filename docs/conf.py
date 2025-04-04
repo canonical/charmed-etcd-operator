@@ -154,7 +154,6 @@ html_theme_options = {
 
 # slug = ''
 
-
 # Template and asset locations
 
 html_static_path = ["_static"]
