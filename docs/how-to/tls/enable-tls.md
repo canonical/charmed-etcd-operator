@@ -1,68 +1,71 @@
-# How to enable encryption
+# How to enable TLS
 
 Transport Layer Security (TLS) plays a crucial role in securing database communications.  Just as it protects web traffic, TLS encrypts the data transmitted between database clients and servers, preventing unauthorized access and ensuring confidentiality.
 
+etcd provides a secure transport layer for **peer-to-peer** and **client-server** communication, and the charm provides a simmple way of enabling TLS encryption for both types.
 
-etcd provides a secure transport layer for client-server and peer-to-peer communication. The etcd operator charm provides a simple way to enable TLS encryption for both:
-- Peer-to-peer (internal to the cluster): All communication between members in the cluster will be encrypted and authenticated using the client certificates. 
-- Client-to-server: the etcd client can verify the server identity and provide transport security
+Peer-to-peer
+: All communication between members in the cluster will be encrypted and authenticated using the client certificates. 
 
-etcd also supports mutual TLS authentication, which provides an additional layer of security by requiring clients to present a certificate to the server for authentication. The server then checks whether a trusted CA signed the certificate and decide whether to serve the request.
+Client-to-server
+: The etcd client can verify the server identity and provide transport security.
 
-## Enabling Encryption in Transit
+etcd also supports mutual TLS authentication, which provides an additional layer of security by requiring clients to present a certificate to the server for authentication. The server then checks whether a trusted {abbr}`CA (Certificate Authority)` signed the certificate and decide whether to serve the request.
+
+## Deploy a TLS provider
+
 Charmed etcd provides the option of using different CA certificates for client-server and peer-to-peer communication. This allows you to have different levels of trust for the two types of communication. You can also use the same CA certificate for both types of communication.
-
-To enable encryption in transit between etcd members, all you need to do is integrate with a TLS provider such as [Self-Signed Certificates charm](https://charmhub.io/self-signed-certificates) or [Vault](https://charmhub.io/vault) to generate the required certificates and keys.
 
 You can enable peer-to-peer encryption alone, client-to-server encryption alone, or both at the same time.
 
-> **[Self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) are not recommended for a production environment.**  
-> Check [this guide](https://charmhub.io/topics/security-with-x-509-certificates) for an overview of the TLS certificates charms available. 
+This guide will use the [Self-signed Certificates](https://charmhub.io/self-signed-certificates) charm as an example for al cases.
+
+```{caution}
+**[Self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) are not recommended for a production environment.**
+
+Check [this guide](https://charmhub.io/topics/security-with-x-509-certificates) for an overview of all the TLS certificates charms available. 
+```
+
+Deploy the `self-signed-certificates` charm. etcd uses `v4` of the [tls-certificates library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates), which is currently only supported in the `edge` channel.
 
 ```shell
 juju deploy self-signed-certificates --channel edge
 ```
-> etcd uses `v4` of the [tls-certificates library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates). This version is currently only supported in the `edge` channel of the self-signed-certificates charm.
 
-Wait until `self-signed-certificates` is `active`. Use `juju status --watch 1s` to monitor the progress.
+Wait until `self-signed-certificates` is `active` by monitoring it with {command}`juju status`.
 
-```shell
-Model  Controller  Cloud/Region         Version  SLA          Timestamp
-test   dev         localhost/localhost  3.6.1    unsupported  07:04:32Z
-
+```{terminal}
+:input: juju status --watch 1s
+:scroll:
+...
 App                       Version  Status  Scale  Charm                     Channel      Rev  Exposed  Message
 charmed-etcd                       active      3  charmed-etcd                             0  no
 self-signed-certificates           active      1  self-signed-certificates  latest/edge  238  no
-
-Unit                         Workload  Agent  Machine  Public address  Ports  Message
-charmed-etcd/0*              active    idle   1        10.73.32.122
-charmed-etcd/1               active    idle   2        10.73.32.131
-charmed-etcd/2               active    idle   3        10.73.32.193
-self-signed-certificates/0*  active    idle   0        10.73.32.179
-
-Machine  State    Address       Inst id        Base          AZ  Message
-0        started  10.73.32.179  juju-5620b5-0  ubuntu@22.04      Running
-1        started  10.73.32.122  juju-5620b5-1  ubuntu@24.04      Running
-2        started  10.73.32.131  juju-5620b5-2  ubuntu@24.04      Running
-3        started  10.73.32.193  juju-5620b5-3  ubuntu@24.04      Running
-
-Integration provider     Requirer                 Interface   Type  Message
-charmed-etcd:etcd-peers  charmed-etcd:etcd-peers  etcd_peers  peer
-charmed-etcd:restart     charmed-etcd:restart     rolling_op  peer
+...
 ```
 
-Once the `self-signed-certificates` charm is active, integrate it to the `charmed-etcd` application on the `peer-certificates` endpoint. This will generate the required certificates and keys for peer-to-peer communication.
+## Enable encryption in transit
 
-```shell
+To enable encryption in transit between etcd members, all you need to do is integrate with the TLS provider charm to generate the required certificates and keys.
+
+### Integrate on `peer-certificates` endpoint
+
+Integrate the certificates charm with the `charmed-etcd` application on the `peer-certificates` endpoint. This will generate the required certificates and keys for peer-to-peer communication.
+
+```text
 juju integrate self-signed-certificates:certificates charmed-etcd:peer-certificates
 ```
 
+### Check certificates in use 
+
 To check that etcd is using the certificates generated by the `self-signed-certificates` charm, run the `etcdctl` command shown below. You can replace the endpoint with the IP address corresponding to the unit you choose to run the command in. 
 
-> The command below uses the `etcdctl` command to list the members of the etcd cluster. If you do not have the `etcdctl` command installed on your local machine, you can install it from the [etcd install page](https://etcd.io/docs/v3.5/install/).
+If you do not have the `etcdctl` command installed on your local machine, see the official [etcd installation instructions](https://etcd.io/docs/v3.5/install/).
 
-```shell
-etcdctl member list --endpoints http://10.73.32.122:2379 -w table
+```{terminal}
+:scroll:
+:input: etcdctl member list --endpoints http://10.73.32.122:2379 -w table
+
 +------------------+---------+---------------+---------------------------+--------------------------+------------+
 |        ID        | STATUS  |     NAME      |        PEER ADDRS         |       CLIENT ADDRS       | IS LEARNER |
 +------------------+---------+---------------+---------------------------+--------------------------+------------+
@@ -74,23 +77,25 @@ etcdctl member list --endpoints http://10.73.32.122:2379 -w table
 
 You can see that etcd is running with the peer addresses using `https` and the client addresses using `http`. This indicates that the peer-to-peer communication is encrypted using the certificates generated by the `self-signed-certificates` charm.
 
-## Enabling client-to-server encryption and authentication
+## Enable client-to-server encryption and authentication
 
-To enable client-to-server encryption and authentication, you need to generate the required certificates and keys for the clients. You can use the same `self-signed-certificates` charm to generate the certificates and keys for the clients.
+To enable client-to-server encryption and authentication, you need to generate the required certificates and keys for the clients.
+
+### Integrate on `client-certificates` endpoint
 
 Just like with peer-to-peer communication, integrate the `self-signed-certificates` charm to the `charmed-etcd` application but this time on the `client-certificates` endpoint. 
-
-> This guide is using the same `self-signed-certificates` charm to generate the certificates and keys for the clients. You can also use a different charm to generate the certificates and keys for the clients.
-
 
 ```shell
 juju integrate self-signed-certificates:certificates charmed-etcd:client-certificates
 ```
 
+### Check certificates in use
+
 To check that the etcd server is using the certificates generated by the `self-signed-certificates` charm, run the following command:
 
-```shell
-etcdctl member list --endpoints http://10.73.32.122:2379 -w table
+```{terminal}
+:scroll:
+:input: etcdctl member list --endpoints http://10.73.32.122:2379 -w table
 
 {"level":"warn","ts":"2025-02-14T07:14:39.578082Z","logger":"etcd-client","caller":"v3@v3.5.18/retry_interceptor.go:63","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0xc0004a4000/10.73.32.122:2379","attempt":0,"error":"rpc error: code = DeadlineExceeded desc = latest balancer error: last connection error: connection error: desc = \"error reading server preface: EOF\""}
 Error: context deadline exceeded
@@ -98,17 +103,22 @@ Error: context deadline exceeded
 
 You can see that the request failed because `etcdctl` is trying to connect to the server using `http` instead of `https`. This indicates that the client-to-server communication is not encrypted. Let's try to connect using the `https` endpoint.
 
-```shell
-etcdctl member list --endpoints https://10.73.32.122:2379 -w table
+```{terminal}
+:scroll:
+:input: etcdctl member list --endpoints https://10.73.32.122:2379 -w table
+
 {"level":"warn","ts":"2025-02-14T07:15:56.051291Z","logger":"etcd-client","caller":"v3@v3.5.18/retry_interceptor.go:63","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0xc000142000/10.73.32.122:2379","attempt":0,"error":"rpc error: code = DeadlineExceeded desc = latest balancer error: last connection error: connection error: desc = \"transport: authentication handshake failed: tls: failed to verify certificate: x509: certificate signed by unknown authority\""}
 Error: context deadline exceeded
 ```
 
 <!-- TODO update getting the CA through etcd charm -->
-The request failed because the client is trying to connect to the server using `https` but the server is using a certificate that is not signed by a trusted CA. First, get the certificate authority (CA) certificate from the `self-signed-certificates` charm using the following command:
+The request failed because the client is trying to connect to the server using `https` but the server is using a certificate that is not signed by a trusted CA. 
 
-```shell
-juju run self-signed-certificates/0 get-ca-certificate
+First, get the certificate authority (CA) certificate from the `self-signed-certificates` charm using the following command:
+
+```{terminal}
+:input: juju run self-signed-certificates/0 get-ca-certificate
+
 Running operation 1 with 1 task
   - task 2 on unit-self-signed-certificates-0
 
@@ -119,30 +129,38 @@ ca-certificate: |-
   -----END CERTIFICATE-----
 ```
 
-Save the CA certificate to a file on your local machine. You can use the following command to save the CA certificate to a file.
+Save the CA certificate to a file on your local machine. You can use the following command to save the CA certificate to a file (**Note**: the command below requires the [`yq`](https://mikefarah.gitbook.io/yq) CLI tool)
 
 ```shell
-# You need the yq tool to run this command
 juju run self-signed-certificates/0 get-ca-certificate --format yaml | yq e '.self-signed-certificates/0.results.ca-certificate' > ca.crt
 ```
 
-Now that you have the CA certificate, you can use it to verify the server certificate. Use the `etcdctl` command to connect to the server using the `https` endpoint and provide the CA certificate to verify the server certificate through the `--cacert` flag.
+Now that you have the CA certificate, you can use it to verify the server certificate. 
 
-```shell
-etcdctl member list --endpoints https://10.73.32.122:2379 -w table --cacert ca.crt
+Use the `etcdctl` command to connect to the server using the `https` endpoint and provide the CA certificate to verify the server certificate through the `--cacert` flag.
+
+```{terminal}
+:scroll:
+:input: etcdctl member list --endpoints https://10.73.32.122:2379 -w table --cacert ca.crt
+
 {"level":"warn","ts":"2025-02-14T07:36:32.220229Z","caller":"clientv3/retry_interceptor.go:63","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0xc0000361e0/10.73.32.122:2379","attempt":0,"error":"rpc error: code = DeadlineExceeded desc = latest balancer error: last connection error: connection error: desc = \"error reading server preface: remote error: tls: certificate required\""}
 Error: context deadline exceeded
 ```
 
-Remember that the server is configured to also require client authentication. You need to provide the client certificate and key to authenticate the client. You can use the `etcdctl` command to connect to the server using the `https` endpoint and provide the client certificate and key through the `--cert` and `--key` flags.
+Remember that the server is configured to also require client authentication. You need to provide the client certificate and key to authenticate the client. 
+
+You can use the `etcdctl` command to connect to the server using the `https` endpoint and provide the client certificate and key through the `--cert` and `--key` flags.
 
 <!-- TODO change when we are done with mTLS -->
-```shell
-# Let's grab the client certificate and key from one of the units 
-juju ssh charmed-etcd/0 "cat /var/snap/charmed-etcd/common/tls/client.key" > ./client.key
-juju ssh charmed-etcd/0 "cat /var/snap/charmed-etcd/common/tls/client.pem" > ./client.pem
+Let's grab the client certificate and key from one of the units and provide them to the server via `etcdctl`:
+```{terminal}
+:scroll:
+:input: juju ssh charmed-etcd/0 "cat /var/snap/charmed-etcd/common/tls/client.key" > ./client.key
 
-etcdctl member list --endpoints https://10.73.32.122:2379 -w table --cacert ca.crt --cert ./client.pem --key ./client.key
+:input: juju ssh charmed-etcd/0 "cat /var/snap/charmed-etcd/common/tls/client.pem" > ./client.pem
+
+:input: etcdctl member list --endpoints https://10.73.32.122:2379 -w table --cacert ca.crt --cert ./client.pem --key ./client.key
+
 +------------------+---------+---------------+---------------------------+---------------------------+------------+
 |        ID        | STATUS  |     NAME      |        PEER ADDRS         |       CLIENT ADDRS        | IS LEARNER |
 +------------------+---------+---------------+---------------------------+---------------------------+------------+
@@ -154,20 +172,22 @@ etcdctl member list --endpoints https://10.73.32.122:2379 -w table --cacert ca.c
 
 You can now successfully connect to the server using the `https` endpoint and provide the CA certificate, client certificate, and key to verify the server certificate and authenticate the client. You can also see that `etcd` is running with the client addresses using `https`. This indicates that the client-to-server communication is encrypted.
 
-## Enable peer-to-peer, client-to-server, and mutual TLS authentication at once
+## Enable peer-to-peer, client-to-server, and mutual TLS authentication
 
-To enable peer-to-peer, client-to-server, and mutual TLS authentication at once, you can integrate the `charmed-etcd` application with the TLS certificates provider charm on both the `peer-certificates` and `client-certificates` endpoints at the same time.
+You can integrate the `charmed-etcd` application with the TLS certificates provider charm on both the `peer-certificates` and `client-certificates` endpoints at the same time.
 
-```shell
-juju integrate self-signed-certificates:certificates charmed-etcd:peer-certificates && juju integrate self-signed-certificates:certificates charmed-etcd:client-certificates
+```text
+juju integrate self-signed-certificates:certificates charmed-etcd:peer-certificates
+juju integrate self-signed-certificates:certificates charmed-etcd:client-certificates
 ```
 
 ## Enable encryption at deployment time
 
-You can also enable encryption at deployment time by integrating the `charmed-etcd` application with the TLS certificates provider charm at deployment charm. The cluster will be deployed with encryption enabled from the start.
+You can also deploy the cluster with encryption enabled from the start by integrating the `charmed-etcd` application with the TLS certificates provider charm at deployment time.
 
-```shell
+```text
 juju deploy self-signed-certificates --channel edge
 juju deploy charmed-etcd -n 3 --channel 3.5/edge
-juju integrate self-signed-certificates:certificates charmed-etcd:client-certificates && juju integrate self-signed-certificates:certificates charmed-etcd:peer-certificates
+juju integrate self-signed-certificates:certificates charmed-etcd:client-certificates
+juju integrate self-signed-certificates:certificates charmed-etcd:peer-certificates
 ```
