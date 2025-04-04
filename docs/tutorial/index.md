@@ -114,8 +114,7 @@ Set up a unique model for this tutorial named `etcd`:
 juju add-model etcd
 ```
 
-You can now view the model you created above by entering the command `juju status`
-into the command line. You should see the following:
+You can now view the model you created above by entering the [`juju status` command](https://juju.is/docs/juju/juju-status). You should see the following:
 
 ```text
 juju status
@@ -146,9 +145,7 @@ You can track the progress by running:
 
 ```text
 juju status --watch 1s
-```
-
-> See also: [`juju status` command](https://juju.is/docs/juju/juju-status) 
+``` 
 
 When the application is ready, `juju status` will show something similar to the sample output below: 
 
