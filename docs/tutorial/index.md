@@ -5,7 +5,7 @@ Whether you have experience with Etcd databases, Juju orchestration, or neither,
 
 **What you'll need**
 
-* A computer that fulfils the [minimum system requirements](#system-requirements)
+<!--* A computer that fulfils the [minimum system requirements](#system-requirements)-->
 * Some experience using a Linux-based CLI
 * A basic understanding of the [Juju orchestration engine](https://documentation.ubuntu.com/juju/latest/)
 
@@ -174,9 +174,17 @@ To exit the `juju status` screen, enter `Ctrl + C`.
 
 You can access etcd with a command line client like `etcdctl` or via REST API.
 
-In this tutorial, we will use `curl` with the REST API. Get the IP of an etcd node from the output of juju status (any of the nodes should work fine), and run the following command to connect to the etcd cluster:
+To confirm that the API is reachable, we can use `curl` to make a request to one of the nodes. If it returns a JSON string with the etcd server version, it is healthy.
 
-```text
-curl -L http://10.86.196.143:2379/version
+```{terminal}
+:input: curl -L http://10.86.196.143:2379/version
+
+
 {"etcdserver":"3.5.16","etcdcluster":"3.5.0"}
 ```
+
+## Next steps
+Now that your cluster is set up, you can check [how-to guides](#how-to) such as:
+* [How to scale your cluster](#scale-horizontally)
+* [How to manage TLS encryption](#tls)
+* [How to manage passwords](#manage-passwords)

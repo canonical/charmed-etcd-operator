@@ -10,5 +10,5 @@ tls/index
 Scale horizontally <scale-horizontally>
 Manage passwords <manage-passwords>
 Manage persistent storage <manage-persistent-storage>
-Enable monitoring <monitoring>
+Enable monitoring <enable-monitoring>
 ```

@@ -1,6 +1,7 @@
+(manage-persistent-storage)=
 # How to manage persistent storage
 
-Like many other databases, etcd stores its state on disk. In a default deployment (as described in [deploy-etcd](./deploy-etcd.md)),
+Like many other databases, etcd stores its state on disk. In a default deployment (as described in [deploy-etcd](#deploy-etcd)),
 the filesystem attached to charmed etcd will be removed when charmed etcd is removed. The content of the etcd database
 would then be lost.
 
@@ -95,6 +96,7 @@ As you can see, volumes from the `etcd-storage` pool have been attached as the `
 `logs` volume mount, non-persistent storage from `rootfs` has been used. The `logs` storage will be removed when the 
 respective unit gets removed, while the `data` storage will persist.
 
+(same-cluster-scenario)=
 ## Same cluster scenario
 In this scenario, we want to reuse storage from previous units but within the same etcd cluster/database. This could
 be useful when you want to scale down your etcd database temporarily without completely removing it.
@@ -209,41 +211,27 @@ charmed-etcd/5  data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/com
 charmed-etcd/5  logs/8      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
 ```
 
+(different-cluster-scenario)=
 ## Different cluster scenario
+
 In this scenario, we want to reuse existing storage from another etcd cluster/database.
 
 ### Safe removal
->**Attention - Before you remove your etcd cluster:**
-> - Save the credentials for the admin-user
-> - or configure a user-defined password
+
+```{caution}
+Before you remove your etcd cluster, either:
+ - save the credentials for the admin-user
+ - or configure a user-defined password
+```
 
 By default, charmed etcd enables authentication. That means you can not access an existing etcd database without 
 providing credentials. This is also valid for the admin-user charmed etcd uses to operate the cluster.
 
-At any time before removing your existing etcd cluster, you can provide a user-defined password for the admin user and 
-configure it to charmed etcd. Please refer to [manage-passwords](./manage-passwords.md) or the following steps:
+At any time before removing your existing etcd cluster, you can provide a user-defined password for the admin user and configure it to charmed etcd. 
 
-Create a juju secret with your desired password and make note of the secret's URI:
-```shell
-juju add-secret mysecret root=changeme
-```
+For instructions on how to configure credentials to etcd, refer to the guide [How to manage passwords](#manage-passwords). 
 
-Example output:
-```shell
-secret:cuvh9ggv7vbc46jefvjg
-```
-
-Allow the charmed etcd application to access this secret:
-```shell
-juju grant-secret mysecret charmed-etcd
-```
-
-Configure the secret's URI as `system-users` credentials to charmed etcd:
-```shell
-juju config charmed-etcd system-users=secret:cuvh9ggv7vbc46jefvjg
-```
-
-Now it is safe to remove your existing charmed etcd application:
+With a password now configured, it is safe to remove your existing charmed etcd application:
 ```shell
 juju remove-application charmed-etcd
 ```
