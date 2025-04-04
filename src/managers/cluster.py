@@ -126,6 +126,11 @@ class ClusterManager:
         logger.debug(f"Member: {member_list[self.state.unit_server.member_name].id}")
         return member_list[self.state.unit_server.member_name]
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_fixed(2),
+        reraise=True,
+    )
     def broadcast_peer_url(self, peer_urls: str) -> None:
         """Broadcast the peer URL to all units in the cluster.
 
@@ -328,5 +333,11 @@ class ClusterManager:
 
             if not self.state.cluster.auth_enabled:
                 status_list.append(Status.AUTHENTICATION_NOT_ENABLED)
+
+        if not self.state.peer_relation:
+            status_list.append(Status.SERVICE_INSTALLING)
+
+        if not self.state.cluster.cluster_state:
+            status_list.append(Status.CLUSTER_INITIALIZING)
 
         return status_list

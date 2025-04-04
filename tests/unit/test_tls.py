@@ -211,6 +211,10 @@ def test_enable_tls_on_start():
                 "ip": "localhost",
                 "tls_peer_state": TLSState.TO_TLS.value,
             },
+            local_app_data={
+                "authentication": "enabled",
+                "cluster_state": "existing",
+            },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
         client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
@@ -228,6 +232,10 @@ def test_enable_tls_on_start():
             local_unit_data={
                 "ip": "localhost",
                 "tls_client_state": TLSState.TO_TLS.value,
+            },
+            local_app_data={
+                "authentication": "enabled",
+                "cluster_state": "existing",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -610,7 +618,14 @@ def test_enabling_tls_one_restart(certificate_available_context):
 def test_certificates_relation_created():
     """Test TLS certificates relation created."""
     ctx = testing.Context(EtcdOperatorCharm)
-    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+    )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
 
     state_in = testing.State(
@@ -625,7 +640,14 @@ def test_certificates_relation_created():
             == TLSState.TO_TLS.value
         )
 
-    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+    )
     client_tls_relation = testing.Relation(id=2, endpoint=CLIENT_TLS_RELATION_NAME)
 
     state_in = testing.State(
