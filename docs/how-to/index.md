@@ -7,6 +7,7 @@
 
 tls/index
 Scale horizontally <scale-horizontally>
-manage-passwords
-manage-persistent-storage
+Manage passwords <manage-passwords>
+Manage persistent storage <manage-persistent-storage>
+Enable monitoring <monitoring>
 ```

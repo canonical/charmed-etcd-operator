@@ -1,4 +1,4 @@
-# Manage private keys in TLS
+# How to manage private keys
 
 You can manage private keys used by the charm to generate the certificate signing requests (CSR) by storing the private key in a [juju secret](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/secret/) and then referencing the secret in the [charm configuration](https://canonical-juju.readthedocs-hosted.com/en/latest/user/howto/manage-applications/#configure-an-application).
 

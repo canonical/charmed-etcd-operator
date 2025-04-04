@@ -1,14 +1,17 @@
+(deploy-etcd)=
 # Deploy etcd
 
 To deploy charmed etcd, all you need to do is run the following command:
 
-```shell
+```text
 juju deploy charmed-etcd -n 3 --channel 3.5/edge
 ```
 
->**Note:** The `-n` flag is optional and specifies the number of units to
-> deploy. In this case, we are deploying three units of charmed etcd. We
-> recommend deploying at least three units for high availability.
+```{note}
+The `-n` flag is optional and specifies the number of units to deploy. In this case, we are deploying three units of charmed etcd. 
+
+We recommend deploying at least three units for high availability.
+```
 
 The command will fetch the charm from [Charmhub](https://charmhub.io/charmed-etcd?channel=3.5/edge)
 and deploy 3 units to the LXD cloud. This process can take several minutes
@@ -16,7 +19,7 @@ depending on your machine.
 
 You can track the progress by running:
 
-```shell
+```text
 juju status --watch 1s
 ```
 
@@ -24,7 +27,7 @@ juju status --watch 1s
 
 When the application is ready, `juju status` will show something similar to the sample output below: 
 
-```shell
+```text
 Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.0    unsupported  17:26:19Z
 
@@ -44,15 +47,14 @@ Machine  State    Address        Inst id         Base          AZ  Message
 
 To exit the `juju status` screen, enter `Ctrl + C`.
 
+(access-etcd)=
 ## Access etcd
 
 You can access etcd with a command line client like `etcdctl` or via REST API.
 
-In this tutorial, we will use `curl` with the REST API. Get the IP of an etcd node
-from the output of juju status (any of the nodes should work fine), and run the
-following command to connect to the etcd cluster:
+In this tutorial, we will use `curl` with the REST API. Get the IP of an etcd node from the output of juju status (any of the nodes should work fine), and run the following command to connect to the etcd cluster:
 
-```shell
+```text
 curl -L http://10.86.196.143:2379/version
 {"etcdserver":"3.5.16","etcdcluster":"3.5.0"}
 ```
