@@ -5,7 +5,6 @@
 
 This guide will walk you through integrating your charm with etcd via the `etcd_client` interface or the [`data-integrator`](https://charmhub.io/data-integrator) charm.
 
-
 ```{caution}
 charmed etcd only accepts client relations when TLS is enabled.
 ```
@@ -13,7 +12,6 @@ charmed etcd only accepts client relations when TLS is enabled.
 ## Integrate a different charm with etcd
 
 To integrate a different charm with etcd, you need to add the `etcd_client` interface to your charm. This interface allows your charm to communicate with etcd.
-
 
 First, add the `etcd_client` interface to your charm in the `metadata.yaml` file. This file is located in the root directory of your charm.
 
@@ -78,10 +76,12 @@ class MyCharm(CharmBase):
 ```
 
 The `authentication_updated` event provides the following attributes:
+
 - `username`: The username of the user created in etcd. This matches the common name of the client certificate.
 - `tls_ca`: The CA certificate used to sign the server certificate.
 
 The `EtcdRequires` class also emit:
+
 - `endpoints_changed` event when the endpoints of etcd change.
 - `etcd_version_updated` event when the version of etcd changes.
 
@@ -98,6 +98,7 @@ To remove the relation, you can use the `juju remove-relation` command:
 ```
 
 If at any point in the charm code you need to access any field you can do the following:
+
 ```python
 credentials = {
     "prefix": self.etcd.fetch_my_relation_field(relation.id, "prefix"),
