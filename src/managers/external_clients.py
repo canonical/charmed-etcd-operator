@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 from charms.tls_certificates_interface.v4.tls_certificates import Certificate
+from cryptography import x509
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
@@ -32,7 +33,7 @@ class ExternalClientsManager:
         self.workload = workload
         self.substrate = substrate
 
-    def remove_managed_user(self, relation_id: int):
+    def remove_managed_user(self, relation_id: int) -> None:
         """Remove the user.
 
         Args:
@@ -46,7 +47,7 @@ class ExternalClientsManager:
             }
         )
 
-    def add_managed_user(self, relation_id: int, common_name: str):
+    def add_managed_user(self, relation_id: int, common_name: str) -> None:
         """Add the user.
 
         Args:
@@ -73,33 +74,48 @@ class ExternalClientsManager:
         """
         return self.state.cluster.managed_users.get(relation_id)
 
-    def get_common_name_from_chain(self, mtls_chain: str) -> str:
+    def get_common_name_from_chain(self, mtls_cert: str) -> str:
         """Get the common name from the mtls chain.
 
         Args:
-            mtls_chain (str): The mtls chain.
+            mtls_cert (str): The mtls chain.
 
         Returns:
             (str): The common name.
         """
         # split the certificates by the end of the certificate marker and keep the marker in the cert
-        raw_cas = mtls_chain.split("-----END CERTIFICATE-----")
+        raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
         # add the marker back to the certificate
         cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
         return Certificate.from_string(cert).common_name
 
-    def is_leaf_certificate_valid(self, mtls_chain: str) -> bool:
+    def is_leaf_certificate_valid(self, mtls_cert: str) -> bool:
         """Validate the leaf certificate.
 
         Args:
-            mtls_chain (str): The mtls chain.
+            mtls_cert (str): The mtls chain.
 
         Returns:
             (bool): True if the certificate is not a CA.
         """
         # split the certificates by the end of the certificate marker and keep the marker in the cert
-        raw_cas = mtls_chain.split("-----END CERTIFICATE-----")
+        raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
         # add the marker back to the certificate
         leaf_cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
         logger.debug(f"Leaf certificate is a CA? {Certificate.from_string(leaf_cert).is_ca}")
-        return not Certificate.from_string(leaf_cert).is_ca
+        certificate = x509.load_pem_x509_certificate(data=leaf_cert.encode())
+        # check if the certificate is a CA
+        try:
+            basic_constraints = certificate.extensions.get_extension_for_class(
+                x509.BasicConstraints
+            ).value
+        except x509.ExtensionNotFound:
+            return False
+        # check if the certificate can sign other certificates
+        try:
+            key_usage = certificate.extensions.get_extension_for_class(x509.KeyUsage).value
+        except x509.ExtensionNotFound:
+            # return False
+            return not basic_constraints.ca
+
+        return not (key_usage.key_cert_sign or key_usage.crl_sign or basic_constraints.ca)

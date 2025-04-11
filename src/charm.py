@@ -97,7 +97,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.cluster_manager.restart_member():
             raise HealthCheckFailedError("Failed to check health of the member after restart")
 
-    def rolling_restart(self, callback_override: str | None = None) -> None:
+    def rolling_restart(self, callback_override: str = "_restart") -> None:
         """Initiate a rolling restart."""
         logger.info(
             f"Initiating a rolling restart in unit {self.unit.name} with callback {callback_override}"
@@ -231,10 +231,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         if self.state.unit_server.tls_client_ca_rotation_state == TLSCARotationState.CERT_UPDATED:
             self.tls_manager.update_cas(self.tls_events.collect_client_cas(), TLSType.CLIENT)
             self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NO_ROTATION)
-
-        # Event emitted by ECR
-        if self.state.unit_server.tls_client_ca_rotation_state == TLSCARotationState.NO_ROTATION:
-            self.tls_manager.update_cas(self.tls_events.collect_client_cas(), TLSType.CLIENT)
 
         self._restart(None)
 

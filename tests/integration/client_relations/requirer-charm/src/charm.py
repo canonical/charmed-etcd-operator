@@ -7,26 +7,27 @@
 import logging
 import socket
 import subprocess
-import tarfile
 from pathlib import Path
-from urllib.request import urlretrieve
 
 import ops
 from charms.data_platform_libs.v0.data_interfaces import (
-    AuthenticationEvent,
     DatabaseEndpointsChangedEvent,
+    EtcdReadyEvent,
     EtcdRequires,
 )
+from charms.operator_libs_linux.v2 import snap
 from charms.tls_certificates_interface.v4.tls_certificates import (
     Certificate,
     CertificateAvailableEvent,
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
 )
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
 
-WORK_DIR = "./tmp"
+SNAP_NAME = "charmed-etcd"
+SNAP_DIR = "/var/snap/charmed-etcd/common"
 
 
 class RefreshTLSCertificatesEvent(ops.EventBase):
@@ -40,6 +41,7 @@ class RequirerCharmCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
+        self.etcd_snap = snap.SnapCache()[SNAP_NAME]
         self.certificates = TLSCertificatesRequiresV4(
             self,
             "certificates",
@@ -57,14 +59,12 @@ class RequirerCharmCharm(ops.CharmBase):
             self,
             relation_name="etcd-client",
             prefix="/test/",
-            mtls_chain=self.raw_certificate,
+            mtls_cert=self.raw_certificate,
         )
 
         # EtcdRequires events
         framework.observe(self.etcd_requires.on.endpoints_changed, self._on_endpoints_changed)
-        framework.observe(
-            self.etcd_requires.on.authentication_updated, self._on_authentication_updated
-        )
+        framework.observe(self.etcd_requires.on.etcd_ready, self._on_etcd_ready)
 
         # TLSCertificatesRequiresV4 events
         framework.observe(
@@ -73,7 +73,8 @@ class RequirerCharmCharm(ops.CharmBase):
 
         # Charm events
         framework.observe(self.on.start, self._on_start)
-        framework.observe(self.on.update_action, self._on_update_action)
+        framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.update_common_name_action, self._on_update_action)
         framework.observe(self.on.put_action, self._on_put_action)
         framework.observe(self.on.get_action, self._on_get_action)
         framework.observe(self.on.get_credentials_action, self._on_get_credentials_action)
@@ -81,47 +82,52 @@ class RequirerCharmCharm(ops.CharmBase):
         framework.observe(self.on.get_certificate_action, self._on_get_certificate_action)
 
     @property
-    def common_name(self):
-        try:
-            common_name = Path(f"{WORK_DIR}/common_name.txt").read_text().strip()
-        except FileNotFoundError:
-            common_name = ""
-        if not common_name:
-            common_name = "requirer-charm"
-            Path(WORK_DIR).mkdir(exist_ok=True)
-            Path(f"{WORK_DIR}/common_name.txt").write_text(common_name)
-        return common_name
+    def common_name(self) -> str:
+        """Return the common name for the certificate."""
+        if not self.etcd_relation:
+            return "requirer-charm"
+        mtls_cert = self.etcd_requires.fetch_my_relation_field(self.etcd_relation.id, "mtls-cert")
+        if not mtls_cert:
+            return "requirer-charm"
+
+        return _get_common_name_from_chain(mtls_cert)
 
     @property
-    def server_ca_chain(self):
+    def server_ca_chain(self) -> str | None:
+        """Return the server CA chain."""
         try:
-            ca_chain = Path(f"{WORK_DIR}/ca.pem").read_text().strip()
+            ca_chain = Path(f"{SNAP_DIR}/ca.pem").read_text().strip()
         except FileNotFoundError:
             return None
         return ca_chain
 
     @property
-    def ca_chain(self):
+    def ca_chain(self) -> str | None:
+        """Return the CA chain."""
         certs, _ = self.certificates.get_assigned_certificates()
         if not certs:
             return None
         return "\n".join(cert.raw for cert in certs[0].chain[::-1])
 
     @property
-    def ca_cert(self):
+    def ca_cert(self) -> str | None:
+        """Return the CA certificate."""
         certs, _ = self.certificates.get_assigned_certificates()
         if not certs:
             return None
         return certs[0].ca.raw
 
     @property
-    def raw_certificate(self):
+    def raw_certificate(self) -> str | None:
+        """Return the raw certificate."""
         raw_cert = self.ca_cert if self.send_ca_option else self.ca_chain
         return raw_cert or ""
 
     @property
     def etcd_relation(self) -> ops.Relation | None:
         """Return the etcd relation if present."""
+        if not hasattr(self, "etcd_requires"):
+            return None
         return self.etcd_requires.relations[0] if len(self.etcd_requires.relations) else None
 
     @property
@@ -129,36 +135,31 @@ class RequirerCharmCharm(ops.CharmBase):
         """Return True if the CA chain is available."""
         return bool(self.config.get("send-ca-cert", False))
 
-    def _on_start(self, event: ops.StartEvent):
+    def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
         self.unit.status = ops.ActiveStatus()
-        # download etcdctl binary
-        urlretrieve(
-            "https://github.com/etcd-io/etcd/releases/download/v3.5.18/etcd-v3.5.18-linux-amd64.tar.gz",
-            "etcd-v3.5.18-linux-amd64.tar.gz",
-        )
-        # extract etcdctl binary
-        with tarfile.open("etcd-v3.5.18-linux-amd64.tar.gz", "r:gz") as tar:
-            tar.extractall()
-        Path("etcd-v3.5.18-linux-amd64/etcdctl").rename("etcdctl")
 
-    def _on_update_action(self, event: ops.ActionEvent):
+    def _on_install(self, event: ops.InstallEvent) -> None:
+        """Handle install event."""
+        # install the etcd snap
+        if not self._install_etcd_snap():
+            self.unit.status = ops.BlockedStatus("Failed to install etcd snap")
+            return
+
+    def _on_update_action(self, event: ops.ActionEvent) -> None:
         """Handle update common name action."""
         # client relation
-        relation = self.model.get_relation("etcd-client")
-        if not relation:
+        if not (relation := self.model.get_relation("etcd-client")):
             event.fail("etcd-client relation not found")
             return
 
         if event.params.get("chain"):
             ca = event.params["chain"].replace("\\n", "\n")
-            Path(WORK_DIR).mkdir(exist_ok=True)
-            Path(f"{WORK_DIR}/common_name.txt").write_text(_get_common_name_from_chain(ca))
-            self.etcd_requires.set_mtls_chain(relation.id, ca)
+            self.etcd_requires.set_mtls_cert(relation.id, ca)
 
         event.set_results({"message": "chain updated on data bag"})
 
-    def _on_certificate_available(self, event: CertificateAvailableEvent):
+    def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         """Handle certificate available event."""
         logger.info("Certificate available")
         certs, private_key = self.certificates.get_assigned_certificates()
@@ -167,53 +168,69 @@ class RequirerCharmCharm(ops.CharmBase):
             return
 
         cert = certs[0]
-        Path(WORK_DIR).mkdir(exist_ok=True)
-        Path(f"{WORK_DIR}/client.pem").write_text(cert.certificate.raw)
-        Path(f"{WORK_DIR}/client.key").write_text(private_key.raw)
+        Path(SNAP_DIR).mkdir(exist_ok=True)
+        Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
+        Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
 
-        relation = self.model.get_relation("etcd-client")
-        if relation:
+        if relation := self.model.get_relation("etcd-client"):
             raw_cert = self.raw_certificate or cert.certificate.raw
-            self.etcd_requires.set_mtls_chain(relation.id, raw_cert)
+            self.etcd_requires.set_mtls_cert(relation.id, raw_cert)
 
-    def _on_authentication_updated(self, event: AuthenticationEvent):
-        """Handle server CA updated event."""
-        logger.info("Authentication updated")
+    def _on_etcd_ready(self, event: EtcdReadyEvent) -> None:
+        """Handle etcd ready event."""
+        logger.info("etcd ready")
         if not event.tls_ca:
             logger.error("No server CA chain available")
             return
         if not event.username:
             logger.error("No username available")
             return
-        Path(WORK_DIR).mkdir(exist_ok=True)
-        Path(f"{WORK_DIR}/ca.pem").write_text(event.tls_ca)
+        Path(SNAP_DIR).mkdir(exist_ok=True)
+        Path(f"{SNAP_DIR}/ca.pem").write_text(event.tls_ca)
 
-    def _on_endpoints_changed(self, event: DatabaseEndpointsChangedEvent):
+    def _on_endpoints_changed(self, event: DatabaseEndpointsChangedEvent) -> None:
         """Handle etcd client relation data changed event."""
         logger.info("Endpoints changed: %s", event.endpoints)
         if not event.endpoints:
             logger.error("No endpoints available")
             return
-        Path(WORK_DIR).mkdir(exist_ok=True)
-        Path(f"{WORK_DIR}/endpoints.txt").write_text(event.endpoints)
 
-    def _on_put_action(self, event: ops.ActionEvent):
+    def _on_put_action(self, event: ops.ActionEvent) -> None:
         """Handle put action."""
+        if not self.etcd_relation:
+            event.fail("The action can be run only after relation is created.")
+            event.set_results({"ok": False})
+            return
         key = event.params["key"]
         value = event.params["value"]
-        if result := _put(key, value):
+        uris = self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "uris")
+        if not uris:
+            event.fail("No uris available")
+            event.set_results({"ok": False})
+            return
+        if result := _put(uris, key, value):
             event.set_results({"message": result})
         else:
             event.fail("etcdctl put failed")
 
-    def _on_get_action(self, event: ops.ActionEvent):
+    def _on_get_action(self, event: ops.ActionEvent) -> None:
         """Handle get action."""
         certs, _ = self.certificates.get_assigned_certificates()
         if not certs:
-            return None
+            event.fail("No certificates available")
+            return
+        if not self.etcd_relation:
+            event.fail("The action can be run only after relation is created.")
+            event.set_results({"ok": False})
+            return
+        uris = self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "uris")
+        if not uris:
+            event.fail("No uris available")
+            event.set_results({"ok": False})
+            return
         certs[0].chain
         key = event.params["key"]
-        result = _get(key)
+        result = _get(uris, key)
         if result:
             event.set_results({"message": result})
         else:
@@ -240,10 +257,14 @@ class RequirerCharmCharm(ops.CharmBase):
                 "username": self.etcd_requires.fetch_relation_field(
                     self.etcd_relation.id, "username"
                 ),
-                "tls-ca": self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "tls-ca"),
+                "uris": self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "uris"),
+                "endpoints": self.etcd_requires.fetch_relation_field(
+                    self.etcd_relation.id, "endpoints"
+                ),
                 "version": self.etcd_requires.fetch_relation_field(
                     self.etcd_relation.id, "version"
                 ),
+                "tls-ca": self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "tls-ca"),
             }
         )
 
@@ -260,17 +281,24 @@ class RequirerCharmCharm(ops.CharmBase):
                 return
             event.set_results({"certificate": certs[0].certificate.raw})
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True)
+    def _install_etcd_snap(self) -> bool:
+        """Install the etcd snap."""
+        try:
+            self.etcd_snap.ensure(snap.SnapState.Present, channel="3.5/edge")
+            self.etcd_snap.hold()
+            return True
+        except snap.SnapError as e:
+            logger.error(str(e))
+            return False
 
-def _put(key: str, value: str):
+
+def _put(endpoints: str, key: str, value: str) -> str | None:
     """Put a key value pair in etcd."""
-    endpoints = Path(f"{WORK_DIR}/endpoints.txt").read_text().strip()
-    if not endpoints:
-        logger.error("No endpoints available")
-        return
     if (
-        not Path(f"{WORK_DIR}/client.pem").exists()
-        or not Path(f"{WORK_DIR}/client.key").exists()
-        or not Path(f"{WORK_DIR}/ca.pem").exists()
+        not Path(f"{SNAP_DIR}/client.pem").exists()
+        or not Path(f"{SNAP_DIR}/client.key").exists()
+        or not Path(f"{SNAP_DIR}/ca.pem").exists()
     ):
         logger.error("No client certificates available")
         return
@@ -278,15 +306,15 @@ def _put(key: str, value: str):
     try:
         output = subprocess.check_output(
             [
-                "./etcdctl",
+                "charmed-etcd.etcdctl",
                 "--endpoints",
                 endpoints,
                 "--cert",
-                f"{WORK_DIR}/client.pem",
+                f"{SNAP_DIR}/client.pem",
                 "--key",
-                f"{WORK_DIR}/client.key",
+                f"{SNAP_DIR}/client.key",
                 "--cacert",
-                f"{WORK_DIR}/ca.pem",
+                f"{SNAP_DIR}/ca.pem",
                 "put",
                 key,
                 value,
@@ -299,46 +327,42 @@ def _put(key: str, value: str):
     return output.decode("utf-8").strip()
 
 
-def _get(key: str) -> str:
+def _get(endpoints: str, key: str) -> str | None:
     """Get a key value pair from etcd."""
-    endpoints = Path(f"{WORK_DIR}/endpoints.txt").read_text().strip()
-    if not endpoints:
-        logger.error("No endpoints available")
-        return ""
     if (
-        not Path(f"{WORK_DIR}/client.pem").exists()
-        or not Path(f"{WORK_DIR}/client.key").exists()
-        or not Path(f"{WORK_DIR}/ca.pem").exists()
+        not Path(f"{SNAP_DIR}/client.pem").exists()
+        or not Path(f"{SNAP_DIR}/client.key").exists()
+        or not Path(f"{SNAP_DIR}/ca.pem").exists()
     ):
         logger.error("No client certificates available")
-        return ""
+        return
 
     try:
         output = subprocess.check_output(
             [
-                "./etcdctl",
+                "charmed-etcd.etcdctl",
                 "--endpoints",
                 endpoints,
                 "--cert",
-                f"{WORK_DIR}/client.pem",
+                f"{SNAP_DIR}/client.pem",
                 "--key",
-                f"{WORK_DIR}/client.key",
+                f"{SNAP_DIR}/client.key",
                 "--cacert",
-                f"{WORK_DIR}/ca.pem",
+                f"{SNAP_DIR}/ca.pem",
                 "get",
                 key,
             ],
         )
     except subprocess.CalledProcessError:
         logger.error("etcdctl get failed")
-        return ""
+        return
 
     return output.decode("utf-8").strip()
 
 
-def _get_common_name_from_chain(mtls_chain: str) -> str:
+def _get_common_name_from_chain(mtls_cert: str) -> str:
     """Get common name from chain."""
-    raw_cas = mtls_chain.split("-----END CERTIFICATE-----")
+    raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
     # add the marker back to the certificate
     cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
     return Certificate.from_string(cert).common_name

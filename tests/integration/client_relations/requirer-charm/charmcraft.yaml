@@ -35,7 +35,7 @@ parts:
       # cp requirements.txt "$CRAFT_PART_INSTALL/requirements.txt"
 
 actions:
-  update:
+  update-common-name:
     description: Update the common name of the certificate
     params:
       chain:

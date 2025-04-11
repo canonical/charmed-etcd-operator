@@ -4,11 +4,9 @@
 
 """EtcdClient utility class to connect to etcd server and execute commands with etcdctl."""
 
-import base64
 import json
 import logging
 import os
-import re
 import subprocess
 from typing import Tuple
 
@@ -417,42 +415,6 @@ class EtcdClient:
             peer_url=peer_urls,
         )
 
-    def get_role(self, rolename: str) -> list[dict] | None:
-        """Get role information from etcd.
-
-        Args:
-            rolename (str): The role name to get information for.
-
-        Returns:
-            dict: The role information as a dictionary.
-        """
-        if result := self._run_etcdctl(
-            command="role",
-            subcommand="get",
-            endpoints=self.client_url,
-            auth_username=self.user,
-            auth_password=self.password,
-            user=rolename,
-            output_format="json",
-        ):
-            try:
-                result = json.loads(result)
-                if "perm" not in result:
-                    return None
-                return [
-                    {
-                        # convert from base64 to string
-                        "key": base64.b64decode(perm["key"]).decode("utf-8"),
-                        "range_end": base64.b64decode(perm["range_end"]).decode("utf-8"),
-                        "perm": perm["perm"],
-                    }
-                    for perm in result["perm"]
-                ]
-
-            except json.JSONDecodeError:
-                raise
-        return None
-
     def add_role(self, rolename: str) -> None:
         """Add a role to etcd.
 
@@ -553,12 +515,24 @@ class EtcdClient:
         Returns:
             str: The etcd version.
         """
-        if result := self._run_etcdctl(
-            command="version",
-            endpoints=self.client_url,
-            output_format="simple",
-        ):
-            # extract the binary version using regex from the output
-            return re.search(r"etcdctl version: ([\d.]+)", result).group(1)
+        return self.get_endpoint_status()["Status"]["version"]
 
-        raise EtcdClusterManagementError("Failed to get etcd version.")
+    def list_users(self) -> list[str]:
+        """List users in etcd.
+
+        Args:
+            username (str): The username to get information for.
+
+        Returns:
+            list[str]: A list of users in etcd.
+        """
+        if result := self._run_etcdctl(
+            command="user",
+            subcommand="list",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            output_format="json",
+        ):
+            return json.loads(result)["users"]
+        return []

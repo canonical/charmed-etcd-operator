@@ -11,7 +11,7 @@ from typing import Literal
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 SNAP_NAME = "charmed-etcd"
-SNAP_REVISION = 2
+SNAP_REVISION = 10
 SNAP_SERVICE = "etcd"
 SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
 SNAP_USER = 584788
@@ -65,6 +65,7 @@ class Status(Enum):
     AUTHENTICATION_NOT_ENABLED = StatusLevel(
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
+    CLUSTER_INITIALIZING = StatusLevel(MaintenanceStatus("Initializing etcd cluster..."), "DEBUG")
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
     CLUSTER_NOT_INITIALIZED = StatusLevel(
         BlockedStatus("Waiting for cluster initialization"), "ERROR"
@@ -89,22 +90,27 @@ class Status(Enum):
     TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be ready"), "DEBUG")
     TLS_PEER_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating peer CA..."), "DEBUG")
     TLS_CLIENT_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating client CA..."), "DEBUG")
+    SERVICE_INSTALLING = StatusLevel(MaintenanceStatus("Installing etcd..."), "DEBUG")
+    SERVICE_STARTING = StatusLevel(MaintenanceStatus("Waiting for etcd to start..."), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
     EC_INVALID_CERTIFICATE = StatusLevel(
         MaintenanceStatus(
-            "The certificate provided is a CA certificate. Please provide an end-entity certificate"
-        ),
-        "ERROR",
-    )
-    EC_USERNAME_EXISTS = StatusLevel(
-        MaintenanceStatus(
-            "The username provided already exists. Please provide a unique username"
+            "Client relation: The certificate provided is a CA certificate. Please provide an end-entity certificate"
         ),
         "ERROR",
     )
     EC_MISSING_CREDENTIALS = StatusLevel(
-        MaintenanceStatus("Missing certificate or prefix."), "ERROR"
+        MaintenanceStatus("Client relation: Missing certificate or prefix."), "ERROR"
+    )
+    EC_USERNAME_EXISTS = StatusLevel(
+        MaintenanceStatus(
+            "Client relation: The username provided already exists. Please provide a unique username"
+        ),
+        "ERROR",
+    )
+    EC_TLS_IS_DISABLED = StatusLevel(
+        MaintenanceStatus("Client relation: TLS is disabled. Please enable TLS"), "ERROR"
     )
 
 

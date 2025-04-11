@@ -14,12 +14,14 @@ from charms.certificate_transfer_interface.v1.certificate_transfer import (
 )
 from charms.data_platform_libs.v0.data_interfaces import (
     EtcdProvides,
-    MTLSChainUpdatedEvent,
+    MTLSCertUpdatedEvent,
 )
 from ops import Object, RelationBrokenEvent
 
+from common.exceptions import EtcdUserManagementError
 from literals import (
     CERTIFICATE_TRANSFER_RELATION,
+    CLIENT_PORT,
     EXTERNAL_CLIENTS_RELATION,
     Status,
     TLSCARotationState,
@@ -52,23 +54,24 @@ class ExternalClientsEvents(Object):
             self.certificate_transfer.on.certificates_removed, self._on_certificates_removed
         )
 
-        self.framework.observe(
-            self.etcd_provides.on.mtls_chain_updated, self._on_mtls_chain_updated
-        )
+        self.framework.observe(self.etcd_provides.on.mtls_cert_updated, self._on_mtls_cert_updated)
         self.framework.observe(
             self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_broken, self._on_relation_broken
         )
 
-    def _on_mtls_chain_updated(self, event: MTLSChainUpdatedEvent):  # noqa: C901
+    def _on_mtls_cert_updated(self, event: MTLSCertUpdatedEvent) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
-        if not event.mtls_chain or not event.prefix:
+        if not event.mtls_cert or not event.prefix:
             logger.error("CA chain, keys prefix, or common name not provided")
             self.charm.set_status(Status.EC_MISSING_CREDENTIALS)
+            return
+        if self.charm.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
+            logger.error("TLS is not enabled")
+            self.charm.set_status(Status.EC_TLS_IS_DISABLED)
             event.defer()
             return
-
-        if not self.charm.state.unit_server.tls_client_state == TLSState.TLS:
-            logger.error("TLS is not enabled")
+        if self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS:
+            logger.error("TLS is not ready")
             self.charm.set_status(Status.TLS_NOT_READY)
             event.defer()
             return
@@ -82,22 +85,20 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
 
-        # Get common name from mtls_chain
+        # Get common name from mtls_cert
         old_common_name = None
         if self.charm.state.cluster.managed_users.get(event.relation.id):
             old_common_name = (
-                self.charm.external_clients_manager.get_common_name_from_chain(
-                    event.old_mtls_chain
-                )
-                if event.old_mtls_chain
+                self.charm.external_clients_manager.get_common_name_from_chain(event.old_mtls_cert)
+                if event.old_mtls_cert
                 else None
             )
         common_name = self.charm.external_clients_manager.get_common_name_from_chain(
-            event.mtls_chain
+            event.mtls_cert
         )
 
         # validate leaf certificate
-        if not self.charm.external_clients_manager.is_leaf_certificate_valid(event.mtls_chain):
+        if not self.charm.external_clients_manager.is_leaf_certificate_valid(event.mtls_cert):
             logger.error("Invalid end-entity certificate")
             # clean the old user if exists
             if old_common_name:
@@ -110,9 +111,13 @@ class ExternalClientsEvents(Object):
             if old_common_name != common_name:
                 logger.debug(f"Common name changed from {old_common_name} to {common_name}")
 
+                # The old username is deleted even if creating the new user fails
                 if old_common_name:
                     logger.warning("Removing relation's old user")
-                    self.charm.cluster_manager.remove_managed_user(old_common_name)
+                    try:
+                        self.charm.cluster_manager.remove_managed_user(old_common_name)
+                    except EtcdUserManagementError as e:
+                        logger.error(f"Failed to remove old user from etcd: {e}")
                     self.charm.external_clients_manager.remove_managed_user(event.relation.id)
 
                 if self.charm.cluster_manager.get_user(common_name) is not None:
@@ -137,24 +142,59 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
 
-        if relation_managed_user and self.charm.tls_manager.is_new_ca(
-            event.mtls_chain, TLSType.CLIENT
-        ):
-            self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
+        self._update_client_truststore()
 
-    def _on_relation_broken(self, event: RelationBrokenEvent):
+    def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle the relation broken event."""
         relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
             event.relation.id
         )
 
         if self.charm.unit.is_leader() and relation_managed_user:
-            self.charm.cluster_manager.remove_managed_user(relation_managed_user)
+            try:
+                self.charm.cluster_manager.remove_managed_user(relation_managed_user)
+            except EtcdUserManagementError as e:
+                logger.error(f"Failed to remove user from etcd: {e}")
             self.charm.external_clients_manager.remove_managed_user(event.relation.id)
 
-        self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
+        self._update_client_truststore()
 
-    def update_client_relations_data(self):
+    def _on_certificates_available(self, event: CertificatesAvailableEvent) -> None:
+        """Handle the certificates available event."""
+        logger.debug("Certificates available event")
+        if (
+            self.charm.state.unit_server.tls_client_ca_rotation_state
+            != TLSCARotationState.NO_ROTATION
+        ):
+            logger.debug("CA rotation is in progress")
+            event.defer()
+            return
+
+        cas = self.certificate_transfer.get_all_certificates()
+        if self.certificate_transfer and self.charm.tls_manager.is_new_ca(
+            "\n".join(cas), TLSType.CLIENT
+        ):
+            self._update_client_truststore()
+
+    def _on_certificates_removed(self, event: CertificatesRemovedEvent) -> None:
+        """Handle the certificates removed event."""
+        if (
+            self.charm.state.unit_server.tls_client_ca_rotation_state
+            != TLSCARotationState.NO_ROTATION
+        ):
+            logger.debug("CA rotation is in progress")
+            event.defer()
+            return
+        self._update_client_truststore()
+
+    def _update_client_truststore(self) -> None:
+        """Update the client truststore and Initiate a rolling restart of the cluster."""
+        self.charm.tls_manager.update_cas(
+            self.charm.tls_events.collect_client_cas(), TLSType.CLIENT
+        )
+        self.charm.rolling_restart()
+
+    def update_client_relations_data(self) -> None:
         """Update the ECR data."""
         if not self.charm.unit.is_leader():
             return
@@ -162,14 +202,18 @@ class ExternalClientsEvents(Object):
         if not self.etcd_provides.relations:
             return
 
-        endpoints = {server.client_url for server in self.charm.state.servers}
+        uris = {server.client_url for server in self.charm.state.servers}
+        endpoints = {f"{server.ip}:{CLIENT_PORT}" for server in self.charm.state.servers}
         server_certs, _ = self.charm.tls_events.client_certificate.get_assigned_certificates()
         server_ca = server_certs[0].ca.raw
         etcd_version = self.charm.cluster_manager.get_version()
         for relation in self.etcd_provides.relations:
             relation_data = self.etcd_provides.fetch_my_relation_data(
-                [relation.id], ["endpoints", "tls-ca", "version"]
+                [relation.id], ["uris", "endpoints", "tls-ca", "version"]
             )[relation.id]
+
+            if set(relation_data.get("uris", "").split(",")) != uris:
+                self.etcd_provides.set_uris(relation.id, ",".join(uris))
 
             if set(relation_data.get("endpoints", "").split(",")) != endpoints:
                 self.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
@@ -180,28 +224,16 @@ class ExternalClientsEvents(Object):
             if relation_data.get("version") != etcd_version:
                 self.etcd_provides.set_version(relation.id, etcd_version)
 
-    def _on_certificates_available(self, event: CertificatesAvailableEvent):
-        """Handle the certificates available event."""
-        logger.debug("Certificates available event")
-        cas = self.certificate_transfer.get_all_certificates()
-        if self.certificate_transfer and self.charm.tls_manager.is_new_ca(
-            "\n".join(cas), TLSType.CLIENT
-        ):
-            self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
-
-    def _on_certificates_removed(self, event: CertificatesRemovedEvent):
-        """Handle the certificates removed event."""
-        self.charm.tls_events.clean_ca_event.emit(cert_type=TLSType.CLIENT)
-
     def compute_component_status(self) -> list[Status]:
         """Compute the component status."""
         status_list = []
 
         for relation in self.etcd_provides.relations:
-            mtls_chain = self.etcd_provides.fetch_relation_field(relation.id, "mtls-chain")
-            if not mtls_chain:
+            mtls_cert = self.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
+            # for client relation created hook
+            if not mtls_cert:
                 continue
-            if not self.charm.external_clients_manager.is_leaf_certificate_valid(mtls_chain):
+            if not self.charm.external_clients_manager.is_leaf_certificate_valid(mtls_cert):
                 status_list.append(Status.EC_INVALID_CERTIFICATE)
 
         return status_list

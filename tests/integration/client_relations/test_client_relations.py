@@ -4,7 +4,6 @@
 
 import asyncio
 import logging
-import subprocess
 from datetime import timedelta
 
 import pytest
@@ -67,11 +66,12 @@ async def get_requirer_common_name(ops_test: OpsTest) -> str:
     requirer_app = ops_test.model.applications[REQUIRER_NAME]
     requirer_unit = requirer_app.units[0]
 
-    command = f'juju ssh {requirer_unit.name} "cat /var/lib/juju/agents/unit-{requirer_unit.name.replace("/", "-")}/charm/tmp/common_name.txt"'
-    result = subprocess.getoutput(command).strip()
-    if "Connection" in result:
-        return result.split("Connection")[0].strip()
-    return result
+    action = await requirer_unit.run_action("get-credentials")
+    result = await action.wait()
+    if result.status == "completed":
+        return result.results["username"]
+
+    raise ValueError("Failed to get common name from requirer charm")
 
 
 async def get_requirer_leaf_certificate(ops_test: OpsTest) -> str | None:
@@ -81,7 +81,7 @@ async def get_requirer_leaf_certificate(ops_test: OpsTest) -> str | None:
 
     action = await requirer_unit.run_action("get-certificate")
     result = await action.wait()
-    if result.status:
+    if result.status == "completed":
         return result.results["certificate"]
 
     return None
@@ -192,7 +192,7 @@ async def test_update_chain(ops_test: OpsTest) -> None:
     new_ca = generate_mtls_chain("new-common-name")
     # run juju action to update the common name
     requirer_unit: Unit = ops_test.model.applications[REQUIRER_NAME].units[0]
-    action = await requirer_unit.run_action("update", **{"chain": new_ca})
+    action = await requirer_unit.run_action("update-common-name", **{"chain": new_ca})
     action = await action.wait()
 
     # wait for model to settle
