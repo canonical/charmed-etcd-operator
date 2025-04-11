@@ -57,7 +57,7 @@ class MyCharm(CharmBase):
         )
 ```
 
-Finally, define a callback function to handle the `authentication_updated` event. This function will be called when the relation is established and the authentication information is available. You can use this information to connect to etcd and perform any necessary operations.
+Finally, define a callback function to handle the `etcd-ready` event. This function will be called when the relation is established and the authentication information is available. You can use this information to connect to etcd and perform any necessary operations.
 
 ```python
 class MyCharm(CharmBase):
@@ -69,23 +69,26 @@ class MyCharm(CharmBase):
             prefix="/my-charm/",
             mtls_chain=self.model.config["mtls_chain"],
         )
-        self.etcd.on.authentication_updated.connect(self._on_authentication_updated)
+        self.etcd.on.etcd_ready(self._on_etcd_ready)
 
-    def _on_authentication_updated(self, event):
+    def _on_etcd_ready(self, event):
         pass
 ```
 
-The `authentication_updated` event provides the following attributes:
+The `etcd_ready` event provides the following attributes:
 
 - `username`: The username of the user created in etcd. This matches the common name of the client certificate.
+- `endpoints`: The endpoints of the etcd cluster. This is a comma-separated list of IP addresses and ports (`ip:port`).
+- `uris`: The URIs of the etcd cluster. This is a comma-separated list of URIs (`scheme://ip:port`).
+- `version`: The version of etcd that is being used.
+- `tls`: Whether TLS is enabled. This is `True` if TLS is enabled and `False` otherwise. 
 - `tls_ca`: The CA certificate used to sign the server certificate.
 
 The `EtcdRequires` class also emit:
 
 - `endpoints_changed` event when the endpoints of etcd change.
-- `etcd_version_updated` event when the version of etcd changes.
 
-To integrate your charm with etcd, you need to establish a relation between your charm and the etcd charm. This can be done using the `juju integrate` command:
+To establish a relation between your charm and etcd, use the `juju integrate` command:
 
 ```{terminal}
 :input: juju integrate charmed-etcd <your-charm>
@@ -102,16 +105,18 @@ If at any point in the charm code you need to access any field you can do the fo
 ```python
 credentials = {
     "prefix": self.etcd.fetch_my_relation_field(relation.id, "prefix"),
-    "endpoints": self.etcd.fetch_relation_field(self.etcd_relation.id, "endpoints"),
     "username": self.etcd.fetch_relation_field(self.etcd_relation.id, "username"),
-    "tls-ca": self.etcd.fetch_relation_field(self.etcd_relation.id, "tls-ca"),
+    "endpoints": self.etcd.fetch_relation_field(self.etcd_relation.id, "endpoints"),
+    "uris": self.etcd.fetch_relation_field(self.etcd_relation.id, "uris"),
     "version": self.etcd.fetch_relation_field(self.etcd_relation.id, "version"),
+    "tls": self.etcd.fetch_relation_field(self.etcd_relation.id, "tls"),
+    "tls-ca": self.etcd.fetch_relation_field(self.etcd_relation.id, "tls-ca"),
 }
 ```
 
 ## Integrate an application outside of Juju with etcd using data-integrator
 
-The [`data-integrator`](https://charmhub.io/data-integrator) charm is a bare-bones charm that allows for central management of database users, providing support for different kinds of data platform products (e.g. MongoDB, MySQL, PostgreSQL, Kafka, etc) with a consistent, opinionated and robust user experience.
+[`data-integrator`](https://charmhub.io/data-integrator) is a bare-bones charm that allows for central management of database users.  
 
 The `data-integrator` charm can be used to integrate an application outside of Juju with etcd. This is done by creating a relation between the `data-integrator` charm and the etcd charm.
 
@@ -143,7 +148,8 @@ Running operation 1 with 1 task
 
 Waiting for task 2...
 etcd:
-  endpoints: https://10.0.59.172:2379,https://10.0.59.201:2379,https://10.0.59.209:2379
+  endpoints: 10.0.59.172:2379,10.0.59.201:2379,10.0.59.209:2379
+  uris: https://10.0.59.172:2379,https://10.0.59.201:2379,https://10.0.59.209:2379
   prefix: /my-charm/
   tls-ca: |-
     -----BEGIN CERTIFICATE-----
