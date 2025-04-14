@@ -17,7 +17,6 @@ Charmed Etd is equipped with several features to securely store and scale compli
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:glob:
 :hidden:
 
 Home <self>
