@@ -14,14 +14,17 @@ First, create a secret in `Juju` containing your password. You will get the `sec
 
 secret:ctbirhuutr9sr8mgrmpg
 ```
+
 Make note of the string following `secret:`.
 
 Grant the secret to charmed etcd:
+
 ```{terminal}
 :input: juju grant-secret mysecret charmed-etcd
 ```
 
 Configure the secret's URI as `system-users` credentials to charmed etcd:
+
 ```{terminal}
 :input: juju config charmed-etcd system-users=secret:ctbirhuutr9sr8mgrmpg
 ```

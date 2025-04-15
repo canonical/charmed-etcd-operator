@@ -207,91 +207,91 @@ The metrics exposed by etcd are detailed in the [upstream etcd documentation](ht
 The etcd charm comes with default alerts that are set up in Grafana. These alerts are based on the metrics collected by the Grafana agent. The default alerts are detailed in the [etcd documentation](https://etcd.io/docs/v3.5/op-guide/monitoring/#alerting). 
 
 They include alerts for:
-* ``etcdMembersDown``:
+* `etcdMembersDown`:
     * **Description:** Alerts when etcd cluster members are down.
     * **Trigger:** Triggers if any etcd member is down or if there are excessive network peer sent failures.
     * **Severity:** warning.
     * **Duration:** 20 minutes.
     * **Details:** Detects if the count of running etcd instances is zero or if the rate of network peer sent failures exceeds a threshold, indicating communication issues.
-  * ``etcdInsufficientMembers``:
+  * `etcdInsufficientMembers`:
     * **Description:** Alerts when the etcd cluster has an insufficient number of members.
     * **Trigger:** Triggers if the number of running etcd members is less than the quorum needed.
     * **Severity:** critical.
     * **Duration:** 3 minutes.
     * **Details:** Checks if the alive members are less than the majority required for the etcd cluster to function correctly.
-  * ``etcdNoLeader``:
+  * `etcdNoLeader`:
     * **Description:** Alerts when an etcd cluster member has no leader.
     * **Trigger:** Triggers when an etcd member reports that it has no leader.
     * **Severity:** critical.
     * **Duration:** 1 minute.
     * **Details:** Indicates a critical issue where an etcd instance is unable to find a leader, signifying cluster instability.
-  * ``etcdHighNumberOfLeaderChanges``:
+  * `etcdHighNumberOfLeaderChanges`:
     * **Description:** Alerts when the etcd cluster has a high number of leader changes.
     * **Trigger:** Triggers if the number of leader changes exceeds a threshold within a specified time frame.
     * **Severity:** warning.
     * **Duration:** 5 minutes.
     * **Details:** Detects frequent leader elections, which can indicate performance or stability issues.
-  * ``etcdHighNumberOfFailedGRPCRequests``:
+  * `etcdHighNumberOfFailedGRPCRequests`:
     * **Description:** Alerts when a high percentage of gRPC requests fail on an etcd instance.
     * **Trigger:** Triggers if the failure rate of gRPC requests exceeds 1%.
     * **Severity:** warning.
     * **Duration:** 10 minutes.
     * **Details:** Monitors gRPC request failures, indicating potential communication or processing problems.
-  * ``etcdHighNumberOfFailedGRPCRequests``:
+  * `etcdHighNumberOfFailedGRPCRequests`:
     * **Description:** Alerts when a high percentage of gRPC requests fail on an etcd instance.
     * **Trigger:** Triggers if the failure rate of gRPC requests exceeds 5%.
     * **Severity:** critical.
     * **Duration:** 5 minutes.
     * **Details:** A more severe version of the previous alert, indicating a significant and urgent problem with gRPC request handling.
-  * ``etcdGRPCRequestsSlow``:
+  * `etcdGRPCRequestsSlow`:
     * **Description:** Alerts when etcd gRPC requests are slow.
     * **Trigger:** Triggers if the 99th percentile of gRPC request latency exceeds a threshold.
     * **Severity:** critical.
     * **Duration:** 10 minutes.
     * **Details:** Detects high latency in gRPC requests, impacting performance.
-  * ``etcdMemberCommunicationSlow``:
+  * `etcdMemberCommunicationSlow`:
     * **Description:** Alerts when etcd cluster member communication is slow.
     * **Trigger:** Triggers if the 99th percentile of member communication latency exceeds a threshold.
     * **Severity:** warning.
     * **Duration:** 10 minutes.
     * **Details:** Indicates slow communication between etcd members, which can affect cluster performance.
-  * ``etcdHighNumberOfFailedProposals``:
+  * `etcdHighNumberOfFailedProposals`:
     * **Description:** Alerts when the etcd cluster has a high number of proposal failures.
     * **Trigger:** Triggers if the rate of failed proposals exceeds a threshold.
     * **Severity:** warning.
     * **Duration:** 15 minutes.
     * **Details:** Monitors failures in proposing changes to the etcd cluster, indicating potential issues with consensus.
-  * ``etcdHighFsyncDurations``:
+  * `etcdHighFsyncDurations`:
     * **Description:** Alerts when etcd cluster 99th percentile fsync durations are too high.
     * **Trigger:** Triggers if the 99th percentile of fsync durations exceeds a threshold.
     * **Severity:** warning.
     * **Duration:** 10 minutes.
     * **Details:** Indicates high latency in writing data to disk, potentially impacting performance and data durability. Threshold of 0.5 seconds.
-  * ``etcdHighFsyncDurations``:
+  * `etcdHighFsyncDurations`:
     * **Description:** Alerts when etcd cluster 99th percentile fsync durations are too high.
     * **Trigger:** Triggers if the 99th percentile of fsync durations exceeds a higher threshold.
     * **Severity:** critical.
     * **Duration:** 10 minutes.
     * **Details:** A more severe version of the previous alert, indicating a more critical issue with disk write latency. Threshold of 1 second.
-  * ``etcdHighCommitDurations``:
+  * `etcdHighCommitDurations`:
     * **Description:** Alerts when etcd cluster 99th percentile commit durations are too high.
     * **Trigger:** Triggers if the 99th percentile of commit durations exceeds a threshold.
     * **Severity:** warning.
     * **Duration:** 10 minutes.
     * **Details:** Monitors latency in committing transactions to the etcd backend, impacting performance.
-  * ``etcdDatabaseQuotaLowSpace``:
+  * `etcdDatabaseQuotaLowSpace`:
     * **Description:** Alerts when the etcd cluster database is running full.
     * **Trigger:** Triggers if the database size exceeds a percentage of the defined quota.
     * **Severity:** critical.
     * **Duration:** 10 minutes.
     * **Details:** Indicates that the etcd database is approaching its storage limit, which can lead to write failures.
-  * ``etcdExcessiveDatabaseGrowth``:
+  * `etcdExcessiveDatabaseGrowth`:
     * **Description:** Alerts when the etcd cluster database is growing very fast.
     * **Trigger:** Triggers if the predicted database size exceeds the quota within a specified time frame.
     * **Severity:** warning.
     * **Duration:** 10 minutes.
     * **Details:** Predicts potential disk space exhaustion based on recent database growth.
-  * ``etcdDatabaseHighFragmentationRatio``:
+  * `etcdDatabaseHighFragmentationRatio`:
     * **Description:** Alerts when the etcd database size in use is less than 50% of the actual allocated storage.
     * **Trigger:** Triggers when the in use database size is less than 50% of the total database size and the in use database size is over 100MB.
     * **Severity:** warning.
