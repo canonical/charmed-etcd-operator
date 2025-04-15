@@ -23,8 +23,9 @@ You can disable **peer-to-peer** encryption alone, **client-to-server** encrypti
 
 To disable peer-to-peer communication, run:
 
-```bash
-juju remove-relation self-signed-certificates charmed-etcd:peer-certificates
+```{terminal}
+:scroll:
+:input: juju remove-relation self-signed-certificates charmed-etcd:peer-certificates
 ```
 
 After some time, you'll see that the relation between `self-signed-certificates` and `charmed-etcd` for the peer-to-peer communication has been removed.
@@ -45,8 +46,9 @@ self-signed-certificates:certificates  charmed-etcd:client-certificates  tls-cer
 
 To disable the client-to-server communication, run:
 
-```shell
-juju remove-relation self-signed-certificates charmed-etcd:client-certificates
+```{terminal}
+:scroll:
+:input: juju remove-relation self-signed-certificates charmed-etcd:client-certificates
 ```
 
 After some time, you'll see that the relation between `self-signed-certificates` and `charmed-etcd` for the client-to-server communication has been removed.
@@ -85,9 +87,11 @@ Notice that the cluster is running without encryption. Both the `PEER ADDRS` and
 
 You can disable both peer-to-peer and client-to-server communication at the same time by removing both relations.
 
-```shell
-juju remove-relation self-signed-certificates charmed-etcd:peer-certificates
-juju remove-relation self-signed-certificates charmed-etcd:client-certificates
+```{terminal}
+:scroll:
+:input: juju remove-relation self-signed-certificates charmed-etcd:peer-certificates
+
+:input: juju remove-relation self-signed-certificates charmed-etcd:client-certificates
 ```
 
 ## Rotate the TLS certificates
