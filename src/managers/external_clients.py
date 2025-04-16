@@ -115,7 +115,6 @@ class ExternalClientsManager:
         try:
             key_usage = certificate.extensions.get_extension_for_class(x509.KeyUsage).value
         except x509.ExtensionNotFound:
-            # return False
             return not basic_constraints.ca
 
         return not (key_usage.key_cert_sign or key_usage.crl_sign or basic_constraints.ca)
