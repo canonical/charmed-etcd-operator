@@ -214,7 +214,10 @@ class TLSEvents(Object):
             )
             # Update the CA for external clients
             if cert_type == TLSType.CLIENT:
-                self.charm.external_clients_events.update_client_relations_data()
+                if self.charm.unit.is_leader():
+                    self.charm.external_clients_manager.update_client_relations_data(
+                        etcd_version=self.charm.cluster_manager.get_version()
+                    )
             self.clean_ca_event.emit(cert_type=cert_type)
             return
 

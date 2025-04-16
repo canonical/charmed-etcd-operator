@@ -8,7 +8,11 @@ import json
 import logging
 from dataclasses import dataclass
 
-from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
+from charms.data_platform_libs.v0.data_interfaces import (
+    Data,
+    DataPeerData,
+    DataPeerUnitData,
+)
 from ops.model import Application, Relation, Unit
 
 from literals import (

@@ -236,9 +236,10 @@ def test_add_ecr_new_user_not_leader(cluster_tls_context, mtls_cert):
     data = peer_relation.local_app_data.copy()
     data["managed_users"] = f'{{"5":"{CLIENT_COMMON_NAME}"}}'
     relations[0] = dataclasses.replace(peer_relation, local_app_data=data)
-    state_in = dataclasses.replace(
-        state_in,
+    state_in = testing.State(
         relations=relations + [ecr_relation],
+        leader=False,
+        secrets=[secret],
     )
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
@@ -1147,7 +1148,7 @@ def test_update_client_relations_data_non_leader(cluster_tls_context):
         ) as get_assigned_certificates,
     ):
         charm: EtcdOperatorCharm = manager.charm
-        charm.external_clients_events.update_client_relations_data()
+        charm.external_clients_manager.update_client_relations_data("3.5.18")
         get_assigned_certificates.assert_not_called()
 
 
@@ -1158,6 +1159,7 @@ def test_update_client_relations_data_no_external_clients(cluster_tls_context):
     state_in = testing.State(relations=relations, leader=True)
     with (
         ctx(ctx.on.relation_changed(relations[0]), state_in) as manager,
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.5.18"),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
         ) as get_assigned_certificates,

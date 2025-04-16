@@ -21,7 +21,6 @@ from ops import Object, RelationBrokenEvent
 from common.exceptions import EtcdUserManagementError
 from literals import (
     CERTIFICATE_TRANSFER_RELATION,
-    CLIENT_PORT,
     EXTERNAL_CLIENTS_RELATION,
     Status,
     TLSCARotationState,
@@ -131,7 +130,9 @@ class ExternalClientsEvents(Object):
                     event.relation.id, common_name
                 )
                 self.etcd_provides.set_credentials(event.relation.id, common_name, "")
-                self.charm.external_clients_events.update_client_relations_data()
+                self.charm.external_clients_manager.update_client_relations_data(
+                    etcd_version=self.charm.cluster_manager.get_version()
+                )
 
         relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
             event.relation.id
@@ -193,47 +194,3 @@ class ExternalClientsEvents(Object):
             self.charm.tls_events.collect_client_cas(), TLSType.CLIENT
         )
         self.charm.rolling_restart()
-
-    def update_client_relations_data(self) -> None:
-        """Update the ECR data."""
-        if not self.charm.unit.is_leader():
-            return
-
-        if not self.etcd_provides.relations:
-            return
-
-        uris = {server.client_url for server in self.charm.state.servers}
-        endpoints = {f"{server.ip}:{CLIENT_PORT}" for server in self.charm.state.servers}
-        server_certs, _ = self.charm.tls_events.client_certificate.get_assigned_certificates()
-        server_ca = server_certs[0].ca.raw
-        etcd_version = self.charm.cluster_manager.get_version()
-        for relation in self.etcd_provides.relations:
-            relation_data = self.etcd_provides.fetch_my_relation_data(
-                [relation.id], ["uris", "endpoints", "tls-ca", "version"]
-            )[relation.id]
-
-            if set(relation_data.get("uris", "").split(",")) != uris:
-                self.etcd_provides.set_uris(relation.id, ",".join(uris))
-
-            if set(relation_data.get("endpoints", "").split(",")) != endpoints:
-                self.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
-
-            if relation_data.get("tls-ca") != server_ca:
-                self.etcd_provides.set_tls_ca(relation.id, server_ca)
-
-            if relation_data.get("version") != etcd_version:
-                self.etcd_provides.set_version(relation.id, etcd_version)
-
-    def compute_component_status(self) -> list[Status]:
-        """Compute the component status."""
-        status_list = []
-
-        for relation in self.etcd_provides.relations:
-            mtls_cert = self.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
-            # for client relation created hook
-            if not mtls_cert:
-                continue
-            if not self.charm.external_clients_manager.is_leaf_certificate_valid(mtls_cert):
-                status_list.append(Status.EC_INVALID_CERTIFICATE)
-
-        return status_list

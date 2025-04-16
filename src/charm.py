@@ -249,7 +249,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         for status in self.tls_manager.compute_component_status():
             event.add_status(status.value.status)
 
-        for status in self.external_clients_events.compute_component_status():
+        for status in self.external_clients_manager.compute_component_status():
             event.add_status(status.value.status)
 
         # compute backup or other component's  status

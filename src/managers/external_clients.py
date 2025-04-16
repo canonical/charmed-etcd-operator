@@ -13,7 +13,7 @@ from cryptography import x509
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import SUBSTRATES
+from literals import CLIENT_PORT, SUBSTRATES, Status
 
 logger = logging.getLogger(__name__)
 
@@ -118,3 +118,44 @@ class ExternalClientsManager:
             return not basic_constraints.ca
 
         return not (key_usage.key_cert_sign or key_usage.crl_sign or basic_constraints.ca)
+
+    def update_client_relations_data(self, etcd_version: str) -> None:
+        """Update the ECR data."""
+        if not self.state.etcd_provides.relations:
+            return
+
+        uris = {server.client_url for server in self.state.servers}
+        endpoints = {f"{server.ip}:{CLIENT_PORT}" for server in self.state.servers}
+
+        server_ca = self.state.tls_client_certificate.ca.raw
+
+        for relation in self.state.etcd_provides.relations:
+            relation_data = self.state.etcd_provides.fetch_my_relation_data(
+                [relation.id], ["uris", "endpoints", "tls-ca", "version"]
+            )[relation.id]
+
+            if set(relation_data.get("uris", "").split(",")) != uris:
+                self.state.etcd_provides.set_uris(relation.id, ",".join(uris))
+
+            if set(relation_data.get("endpoints", "").split(",")) != endpoints:
+                self.state.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
+
+            if relation_data.get("tls-ca") != server_ca:
+                self.state.etcd_provides.set_tls_ca(relation.id, server_ca)
+
+            if relation_data.get("version") != etcd_version:
+                self.state.etcd_provides.set_version(relation.id, etcd_version)
+
+    def compute_component_status(self) -> list[Status]:
+        """Compute the component status."""
+        status_list = []
+
+        for relation in self.state.etcd_provides.relations:
+            mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
+            # for client relation created hook
+            if not mtls_cert:
+                continue
+            if not self.is_leaf_certificate_valid(mtls_cert):
+                status_list.append(Status.EC_INVALID_CERTIFICATE)
+
+        return status_list
