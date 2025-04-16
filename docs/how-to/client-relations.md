@@ -43,7 +43,7 @@ Then, create an instance of the `EtcdRequires` class in your charm's `__init__` 
 - `charm`: The charm instance.
 - `relation_name`: The name of the relation. This should match the name you defined in the `metadata.yaml` file.
 - `prefix`: The range of keys that your charm will use in etcd.
-- `mtls_chain`: The client certificate for mutual TLS authentication.
+- `mtls_cert`: The client certificate for mutual TLS authentication.
 
 ```python
 class MyCharm(CharmBase):
@@ -53,7 +53,7 @@ class MyCharm(CharmBase):
             self,
             relation_name="etcd",
             prefix="/my-charm/",
-            mtls_chain=self.model.config["mtls_chain"],
+            mtls_cert=self.model.config["mtls_cert"],
         )
 ```
 
@@ -67,7 +67,7 @@ class MyCharm(CharmBase):
             self,
             relation_name="etcd",
             prefix="/my-charm/",
-            mtls_chain=self.model.config["mtls_chain"],
+            mtls_cert=self.model.config["mtls_cert"],
         )
         self.etcd.on.etcd_ready(self._on_etcd_ready)
 
@@ -81,7 +81,7 @@ The `etcd_ready` event provides the following attributes:
 - `endpoints`: The endpoints of the etcd cluster. This is a comma-separated list of IP addresses and ports (`ip:port`).
 - `uris`: The URIs of the etcd cluster. This is a comma-separated list of URIs (`scheme://ip:port`).
 - `version`: The version of etcd that is being used.
-- `tls`: Whether TLS is enabled. This is `True` if TLS is enabled and `False` otherwise. 
+- `tls`: Whether TLS is enabled. This is `True` if TLS is enabled and `False` otherwise.
 - `tls_ca`: The CA certificate used to sign the server certificate.
 
 The `EtcdRequires` class also emit:
@@ -126,10 +126,10 @@ First, deploy the `data-integrator` charm:
 :input: juju deploy data-integrator
 ```
 
-Next, configure the `data-integrator` charm with the `prefix-name` and `mtls-chain` options. The `prefix-name` option specifies the prefix for the keys that will be used in etcd, and the `mtls-chain` option specifies the client certificate for mutual TLS authentication.
+Next, configure the `data-integrator` charm with the `prefix-name` and `mtls-cert` options. The `prefix-name` option specifies the prefix for the keys that will be used in etcd, and the `mtls-cert` option specifies the client certificate for mutual TLS authentication.
 
 ```{terminal}
-:input: juju config data-integrator prefix-name=/my-charm/ mtls-chain="-----BEGIN CERTIFICATE-----...--------END CERTIFICATE-----"
+:input: juju config data-integrator prefix-name=/my-charm/ mtls-cert="-----BEGIN CERTIFICATE-----...--------END CERTIFICATE-----"
 ```
 
 Then, create a relation between the `data-integrator` charm and the etcd charm:
