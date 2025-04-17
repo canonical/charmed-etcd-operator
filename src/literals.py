@@ -47,6 +47,7 @@ TLS_PEER_PRIVATE_KEY_CONFIG = "tls-peer-private-key"
 TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 
 S3_RELATION_NAME = "s3-credentials"
+AZURE_RELATION_NAME = "azure-credentials"
 
 
 @dataclass
