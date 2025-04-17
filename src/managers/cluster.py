@@ -421,6 +421,7 @@ class ClusterManager:
     def clean_users(self) -> None:
         """Clean up users that errored on deletion."""
         etcd_users = set(self.list_users())
+        etcd_users.discard(INTERNAL_USER)
         active_users = set(self.state.cluster.managed_users.values())
 
         for inactive_user in etcd_users - active_users:

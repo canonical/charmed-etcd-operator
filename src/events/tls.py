@@ -322,6 +322,7 @@ class TLSEvents(Object):
 
         return private_key
 
+    # TODO migrate to TLS manager
     def collect_client_cas(self) -> list[str]:
         """Collect client CAs.
 

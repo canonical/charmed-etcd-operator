@@ -345,7 +345,7 @@ def get_user(
     password: str | None = None,
     tls_enabled: bool = False,
 ) -> dict[str, Any] | None:
-    """Write data to etcd using `etcdctl`."""
+    """Get user details using `etcdctl`."""
     etcd_command = f"etcdctl user get {username} --endpoints={endpoints} -w json"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
@@ -372,7 +372,7 @@ def get_role(
     password: str | None = None,
     tls_enabled: bool = False,
 ) -> list[dict[str, str]] | None:
-    """Write data to etcd using `etcdctl`."""
+    """Get role details using `etcdctl`."""
     etcd_command = f"etcdctl role get {rolename} --endpoints={endpoints} -w json"
     if user:
         etcd_command = f"{etcd_command} --user={user}"
@@ -395,18 +395,3 @@ def get_role(
         ]
     except json.JSONDecodeError:
         return None
-
-
-def separate_certificates(ca_chain: str) -> list[str]:
-    """Separate certificates from the concatenated certificates.
-
-    Args:
-        ca_chain (str): The concatenated certificates.
-
-    Returns:
-        list[str]: The list of certificates.
-    """
-    # split the certificates by the end of the certificate marker and keep the marker in the cert
-    raw_cas = ca_chain.split("-----END CERTIFICATE-----")
-    # add the marker back to the certificate
-    return [cert.strip() + "\n-----END CERTIFICATE-----" for cert in raw_cas if cert.strip()]
