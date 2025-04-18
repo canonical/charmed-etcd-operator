@@ -11,19 +11,19 @@ from literals import CLIENT_TLS_RELATION_NAME, PEER_RELATION, PEER_TLS_RELATION_
 
 MEMBER_LIST_DICT = {
     "charmed-etcd0": Member(
-        id="1",
+        id="0",
         name="charmed-etcd0",
         peer_urls=["http://ip0:2380"],
         client_urls=["http://ip0:2379"],
     ),
     "charmed-etcd1": Member(
-        id="2",
+        id="1",
         name="charmed-etcd1",
         peer_urls=["http://ip1:2380"],
         client_urls=["http://ip1:2379"],
     ),
     "charmed-etcd2": Member(
-        id="3",
+        id="2",
         name="charmed-etcd2",
         peer_urls=["http://ip2:2380"],
         client_urls=["http://ip2:2379"],
@@ -45,7 +45,7 @@ def cluster_tls_context():
             "cluster_state": "existing",
             "cluster_members": ",".join(
                 [
-                    member.peer_urls[0].replace("http://", "https://")
+                    f"{member.name}={member.peer_urls[0].replace('http://', 'https://')}"
                     for member in MEMBER_LIST_DICT.values()
                 ]
             ),

@@ -124,8 +124,15 @@ class ExternalClientsManager:
         if not self.state.etcd_provides.relations:
             return
 
-        uris = {server.client_url for server in self.state.servers}
-        endpoints = {f"{server.ip}:{CLIENT_PORT}" for server in self.state.servers}
+        cluster_server_names = {
+            uri.split("=")[0] for uri in self.state.cluster.cluster_members.split(",")
+        }
+        cluster_servers = {
+            server for server in self.state.servers if server.member_name in cluster_server_names
+        }
+
+        uris = {server.client_url for server in cluster_servers}
+        endpoints = {f"{server.ip}:{CLIENT_PORT}" for server in cluster_servers}
 
         server_ca = self.state.tls_client_certificate.ca.raw
 
