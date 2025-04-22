@@ -145,7 +145,7 @@ class BackupEvents(Object):
         azure_parameters["path"] = azure_parameters["path"].strip("/")
         azure_parameters["container"] = azure_parameters["container"].strip("/")
 
-        # self.charm.backup_manager.create_container(azure_parameters)
+        self.charm.backup_manager.create_container(azure_parameters)
         self.charm.state.cluster.update({"azure-credentials": json.dumps(azure_parameters)})
 
     def _on_azure_credentials_gone(self, event: StorageConnectionInfoGoneEvent):

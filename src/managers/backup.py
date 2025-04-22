@@ -9,6 +9,8 @@ from datetime import datetime
 from typing import List
 
 import boto3
+from azure.core.exceptions import ResourceExistsError
+from azure.storage.blob import ContainerClient
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from mypy_boto3_s3.service_resource import Bucket
@@ -67,6 +69,18 @@ class BackupManager:
 
         return s3_resource.Bucket(s3_parameters["bucket"])
 
+    def _get_container_client(self, azure_parameters: dict[str, str]) -> ContainerClient:
+        """Get the Container client from the Azure connection.
+
+        Returns:
+            ContainerClient: the Azure container for uploading/downloading backups
+        """
+        return ContainerClient(
+            account_url=f"https://{azure_parameters['storage-account']}.blob.core.windows.net",
+            container_name=azure_parameters["container"],
+            credential=azure_parameters["secret-key"],
+        )
+
     def _get_etcd_client(self) -> EtcdClient:
         """Get a client connection to etcd."""
         return EtcdClient(
@@ -101,6 +115,15 @@ class BackupManager:
                 raise EtcdBackupError(e)
 
         logger.info(f"Bucket {s3_parameters['bucket']} is ready")
+
+    def create_container(self, azure_parameters: dict[str, str]) -> None:
+        """Create container if it does not exist yet."""
+        container_client = self._get_container_client(azure_parameters)
+        try:
+            container_client.create_container()
+            logger.info(f"Container {azure_parameters['container']} created")
+        except ResourceExistsError:
+            logger.info(f"Container {azure_parameters['container']} already exists")
 
     def create_backup(self) -> str:
         """Create a backup of etcd and upload it to object storage.
