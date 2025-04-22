@@ -8,6 +8,11 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
+from charms.data_platform_libs.v0.azure_storage import (
+    AzureStorageRequires,
+    StorageConnectionInfoChangedEvent,
+    StorageConnectionInfoGoneEvent,
+)
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
     CredentialsGoneEvent,
@@ -18,6 +23,7 @@ from ops.charm import ActionEvent, RelationChangedEvent
 
 from common.exceptions import EtcdBackupError, EtcdUserManagementError
 from literals import (
+    AZURE_RELATION_NAME,
     PEER_RELATION,
     S3_RELATION_NAME,
     RestoreStep,
@@ -37,11 +43,20 @@ class BackupEvents(Object):
         super().__init__(charm, key="backup")
         self.charm = charm
         self.s3_requirer = S3Requirer(self.charm, S3_RELATION_NAME)
+        self.azure_requirer = AzureStorageRequires(self.charm, AZURE_RELATION_NAME)
 
         self.framework.observe(
             self.s3_requirer.on.credentials_changed, self._on_s3_credentials_changed
         )
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credentials_gone)
+        self.framework.observe(
+            self.azure_requirer.on.storage_connection_info_changed,
+            self._on_azure_credentials_changed,
+        )
+        self.framework.observe(
+            self.azure_requirer.on.storage_connection_info_gone,
+            self._on_azure_credentials_gone,
+        )
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
         self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
@@ -103,6 +118,14 @@ class BackupEvents(Object):
 
         if self.charm.unit.is_leader():
             self.charm.state.cluster.update({"s3-credentials": ""})
+
+    def _on_azure_credentials_changed(self, event: StorageConnectionInfoChangedEvent):
+        """Handle an update of the azure credentials from azure-storage-integrator."""
+        pass
+
+    def _on_azure_credentials_gone(self, event: StorageConnectionInfoGoneEvent):
+        """Handle the removal of the relation with the azure-storage-integrator."""
+        pass
 
     def _on_create_backup_action(self, event: ActionEvent) -> None:
         """Create a backup and upload to object storage."""
