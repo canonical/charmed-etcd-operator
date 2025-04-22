@@ -14,7 +14,7 @@ from azure.storage.blob import ContainerClient
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from mypy_boto3_s3.service_resource import Bucket
-from tenacity import Retrying, stop_after_attempt, wait_fixed
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from common.client import EtcdClient
 from common.exceptions import EtcdBackupError
@@ -135,27 +135,51 @@ class BackupManager:
         # set flag in peer relation data to avoid concurring actions/events
         self.state.cluster.update({"backup_id": backup_id})
 
-        s3_parameters = self.state.cluster.s3_credentials
-        upload_target = f"{s3_parameters['path']}/{backup_id}"
-
         etcd_client = self._get_etcd_client()
 
         if not etcd_client.create_database_snapshot():
             self.state.cluster.update({"backup_id": ""})
             raise EtcdBackupError("Failed to create database backup.")
 
-        bucket = self._get_bucket_resource(s3_parameters)
+        if s3_parameters := self.state.cluster.s3_credentials:
+            # backup file will be uploaded to S3 storage
+            upload_target = f"{s3_parameters['path']}/{backup_id}"
+            bucket = self._get_bucket_resource(s3_parameters)
 
-        try:
-            for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
-                with attempt:
-                    bucket.upload_file(BACKUP_FILE_PATH, upload_target)
-        except ClientError as e:
-            self.state.cluster.update({"backup_id": ""})
-            # if we can't upload, we still need to clean up the backup file to free the disk space
-            self.workload.remove_file(BACKUP_FILE_PATH)
-            logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
-            raise EtcdBackupError(e)
+            try:
+                for attempt in Retrying(
+                    stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True
+                ):
+                    with attempt:
+                        bucket.upload_file(BACKUP_FILE_PATH, upload_target)
+            except ClientError as e:
+                self.state.cluster.update({"backup_id": ""})
+                # if we can't upload, we still need to clean up the backup file to free the disk space
+                self.workload.remove_file(BACKUP_FILE_PATH)
+                logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
+                raise EtcdBackupError(e)
+        else:
+            # backup file will be uploaded to Azure storage
+            azure_parameters = self.state.cluster.azure_credentials
+            upload_target = f"{azure_parameters['path']}/{backup_id}"
+            blob_client = self._get_container_client(azure_parameters).get_blob_client(
+                upload_target
+            )
+
+            try:
+                # we use `RetryError` because the blob client raises a multitude of exceptions
+                for attempt in Retrying(
+                    stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=False
+                ):
+                    with attempt:
+                        with open(BACKUP_FILE_PATH, "rb") as backup_file:
+                            blob_client.upload_blob(backup_file)
+            except RetryError as e:
+                self.state.cluster.update({"backup_id": ""})
+                # if we can't upload, we still need to clean up the backup file to free the disk space
+                self.workload.remove_file(BACKUP_FILE_PATH)
+                logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
+                raise EtcdBackupError(e)
 
         logger.info(f"Backup uploaded to {upload_target}")
 

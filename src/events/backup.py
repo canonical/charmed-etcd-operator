@@ -136,6 +136,11 @@ class BackupEvents(Object):
             event.defer()
             return
 
+        # make sure we have all required parameters for writing to the storage
+        required_parameters = ["container", "storage-account", "path", "secret-key"]
+        if missing_parameters := [p for p in required_parameters if p not in azure_parameters]:
+            raise KeyError(f"Parameters missing from Azure integrator: {missing_parameters}")
+
         # Strip whitespaces from all parameters
         for key, value in azure_parameters.items():
             if isinstance(value, str):
