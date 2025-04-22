@@ -309,4 +309,7 @@ class BackupManager:
         if self.state.cluster.is_restore_in_progress:
             status_list.append(Status.RESTORE_IN_PROGRESS)
 
+        if self.state.cluster.s3_credentials and self.state.cluster.azure_credentials:
+            status_list.append(Status.OBJECT_STORAGE_CONFLICT)
+
         return status_list
