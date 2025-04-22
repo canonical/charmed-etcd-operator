@@ -195,20 +195,32 @@ class BackupManager:
         Returns:
             list: the available backup_id's in the bucket
         """
-        s3_parameters = self.state.cluster.s3_credentials
-
-        bucket = self._get_bucket_resource(s3_parameters)
         backup_list = []
 
-        try:
-            bucket_objects = bucket.objects.filter(Prefix=s3_parameters["path"])
-            for bucket_object in bucket_objects:
-                backup_list.append(bucket_object.key)
-        except ClientError as e:
-            raise EtcdBackupError(e)
+        if s3_parameters := self.state.cluster.s3_credentials:
+            # retrieve the list of backups from S3 storage
+            path = s3_parameters["path"]
+            bucket = self._get_bucket_resource(s3_parameters)
+
+            try:
+                bucket_objects = bucket.objects.filter(Prefix=path)
+                for bucket_object in bucket_objects:
+                    backup_list.append(bucket_object.key)
+            except ClientError as e:
+                raise EtcdBackupError(e)
+        else:
+            # retrieve the list of backups from Azure storage
+            azure_parameters = self.state.cluster.azure_credentials
+            path = azure_parameters["path"]
+
+            container_objects = self._get_container_client(azure_parameters).list_blob_names(
+                name_starts_with=path
+            )
+            for container_object in container_objects:
+                backup_list.append(container_object.name)
 
         # current format: ['etcd-backups/2025-03-19T11:56:30Z','etcd-backups/2025-03-19T11:57:52Z']
-        backup_list = [b.replace(f"{s3_parameters['path']}/", "") for b in backup_list]
+        backup_list = [b.replace(f"{path}/", "") for b in backup_list]
         backup_list.sort(reverse=True)
 
         return backup_list
@@ -220,19 +232,35 @@ class BackupManager:
             True if backup-file could be downloaded from object storage and restore process was
             initiated, False otherwise.
         """
-        s3_parameters = self.state.cluster.s3_credentials
-        download_source = f"{s3_parameters['path']}/{backup_id}"
         logger.info(f"Initiating restore process for backup-id {backup_id}")
 
-        bucket = self._get_bucket_resource(s3_parameters)
+        if s3_parameters := self.state.cluster.s3_credentials:
+            # download the backup file from S3 storage
+            download_source = f"{s3_parameters['path']}/{backup_id}"
+            bucket = self._get_bucket_resource(s3_parameters)
 
-        try:
-            bucket.download_file(download_source, f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
-            logger.info(f"Backup {backup_id} downloaded to {SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
-        except ClientError as e:
-            logger.error(e)
-            return False
+            try:
+                bucket.download_file(download_source, f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+            except ClientError as e:
+                logger.error(e)
+                return False
+        else:
+            # download the backup file from Azure storage
+            azure_parameters = self.state.cluster.azure_credentials
+            download_source = f"{azure_parameters['path']}/{backup_id}"
+            blob_client = self._get_container_client(azure_parameters).get_blob_client(
+                download_source
+            )
 
+            try:
+                with open(f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}", mode="wb") as backup_file:
+                    download_stream = blob_client.download_blob()
+                    backup_file.write(download_stream.readall())
+            except Exception as e:
+                logger.error(e)
+                return False
+
+        logger.info(f"Backup {backup_id} downloaded to {SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
         self.state.unit_server.update({"restore_step": RestoreStep.DOWNLOAD.value})
         return True
 
