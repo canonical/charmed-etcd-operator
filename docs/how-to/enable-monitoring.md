@@ -7,7 +7,7 @@ The etcd charm can use COS to connect to [Grafana](https://grafana.com/) and [Pr
 
 ## Deploy COS
 
-Deploy the [`cos-lite`](https://charmhub.io/topics/canonical-observability-stack) bundle in a Kubernetes controller following the [MicroK8s guide](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s). 
+Deploy the [`cos-lite`](https://charmhub.io/topics/canonical-observability-stack/editions/lite) bundle in a Kubernetes controller following the [MicroK8s guide](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s). 
 
 Since the etcd charm is deployed directly on a cloud infrastructure environment, it requires offering the endpoints of the COS relations with the [offers-overlay](https://github.com/canonical/cos-lite-bundle/blob/main/overlays/offers-overlay.yaml). For instructions on how to do this, see the section [Deploy the COS Lite bundle with overlays](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s#heading--deploy-the-cos-lite-bundle-with-overlays) of the MicroK8s guide.
 
