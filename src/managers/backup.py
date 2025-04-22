@@ -217,7 +217,7 @@ class BackupManager:
                 name_starts_with=path
             )
             for container_object in container_objects:
-                backup_list.append(container_object.name)
+                backup_list.append(container_object)
 
         # current format: ['etcd-backups/2025-03-19T11:56:30Z','etcd-backups/2025-03-19T11:57:52Z']
         backup_list = [b.replace(f"{path}/", "") for b in backup_list]
