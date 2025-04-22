@@ -184,6 +184,7 @@ To confirm that the API is reachable, we can use `curl` to make a request to one
 ```
 
 ## Next steps
+
 Now that your cluster is set up, you can check [how-to guides](#how-to) such as:
 * [How to scale your cluster](#scale-horizontally)
 * [How to manage TLS encryption](#tls)
