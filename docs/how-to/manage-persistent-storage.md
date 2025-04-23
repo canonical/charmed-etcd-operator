@@ -1,4 +1,3 @@
-(manage-persistent-storage)=
 # How to manage persistent storage
 
 Like many other databases, etcd stores its state on disk. In a default deployment (as described in [deploy-etcd](#deploy-etcd)),
@@ -102,7 +101,6 @@ As you can see, volumes from the `etcd-storage` pool have been attached as the `
 `logs` volume mount, non-persistent storage from `rootfs` has been used. The `logs` storage will be removed when the 
 respective unit gets removed, while the `data` storage will persist.
 
-(same-cluster-scenario)=
 ## Same cluster scenario
 In this scenario, we want to reuse storage from previous units but within the same etcd cluster/database. This could
 be useful when you want to scale down your etcd database temporarily without completely removing it.
@@ -223,7 +221,6 @@ charmed-etcd/5  data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/com
 charmed-etcd/5  logs/8      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
 ```
 
-(different-cluster-scenario)=
 ## Different cluster scenario
 
 In this scenario, we want to reuse existing storage from another etcd cluster/database.

@@ -1,4 +1,3 @@
-(tutorial)=
 # Tutorial
 
 Whether you have experience with Etcd databases, Juju orchestration, or neither, this tutorial will walk you through the essential aspects of deploying and operating Charmed Etcd.
@@ -122,7 +121,6 @@ Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.0    unsupported  17:26:15Z
 ```
 
-(deploy-etcd)=
 ## Deploy etcd
 
 To deploy charmed etcd, all you need to do is run the following command:
@@ -169,7 +167,6 @@ Machine  State    Address        Inst id         Base          AZ  Message
 
 To exit the `juju status` screen, enter `Ctrl + C`.
 
-(access-etcd)=
 ## Access etcd
 
 You can access etcd with a command line client like `etcdctl` or via REST API.

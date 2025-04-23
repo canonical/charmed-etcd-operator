@@ -1,4 +1,3 @@
-(client-relations)=
 # How to integrate etcd with an application
 
 [Relations](https://documentation.ubuntu.com/juju/latest/reference/relation/index.html) are connections between two applications with compatible endpoints. These connections simplify creating and managing users, passwords, and other shared data.
