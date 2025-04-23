@@ -211,8 +211,9 @@ linkcheck_retries = 3
 # NOTE: By default, the following MyST extensions are enabled:
 #       substitution, deflist, linkify
 
-# myst_enable_extensions = set()
+myst_enable_extensions = set()
 
+myst_heading_anchors = 3
 
 # Custom Sphinx extensions; see
 # https://www.sphinx-doc.org/en/master/usage/extensions/index.html
