@@ -66,12 +66,38 @@ class EtcdClient:
             subcommand="add",
             endpoints=self.client_url,
             user=username,
+            auth_username=self.user,
+            auth_password=self.password,
             # only admin user is added with password, all others require `CommonName` based auth
             user_password=self.password if username == INTERNAL_USER else "",
         ):
             logger.debug(result)
         else:
             raise EtcdUserManagementError(f"Failed to add user {self.user}.")
+
+    def get_user(self, username: str) -> dict | None:
+        """Get user information from etcd.
+
+        Args:
+            username (str): The username to get information for.
+
+        Returns:
+            dict: The user information as a dictionary.
+        """
+        if result := self._run_etcdctl(
+            command="user",
+            subcommand="get",
+            endpoints=self.client_url,
+            user=username,
+            auth_username=self.user,
+            auth_password=self.password,
+            output_format="json",
+        ):
+            try:
+                return json.loads(result)
+            except json.JSONDecodeError:
+                raise
+        return None
 
     def update_password(self, username: str, new_password: str) -> None:
         """Run the `user passwd` command in etcd.
@@ -204,6 +230,8 @@ class EtcdClient:
         output_format: str = "simple",
         use_input: str | None = None,
         cluster_arg: bool = False,
+        prefix: str | None = None,
+        role: str | None = None,
     ) -> str | None:
         """Execute `etcdctl` command via subprocess.
 
@@ -226,6 +254,8 @@ class EtcdClient:
             use_input: supply text input to be passed to the `etcdctl` command (e.g. for
                         non-interactive password change)
             cluster_arg: set to `True` if the command requires the `--cluster` argument
+            prefix: prefix to be used for the `role grant-permission` command
+            role: role name to be used for the `user grant-role` command
 
         Returns:
             The output of the subprocess-command as a string. In case of error, this will
@@ -267,6 +297,12 @@ class EtcdClient:
                 args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
             if cluster_arg:
                 args.append("--cluster")
+            if prefix:
+                args.append("--prefix=true")
+                args.append("readwrite")
+                args.append(prefix)
+            if role:
+                args.append(role)
 
             result = subprocess.run(
                 args,
@@ -378,3 +414,125 @@ class EtcdClient:
             member=member_id,
             peer_url=peer_urls,
         )
+
+    def add_role(self, rolename: str) -> None:
+        """Add a role to etcd.
+
+        Args:
+            rolename (str): The role name to add.
+        """
+        if result := self._run_etcdctl(
+            command="role",
+            subcommand="add",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            user=rolename,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdUserManagementError(f"Failed to add role {rolename}.")
+
+    def grant_role(self, username: str, rolename: str) -> None:
+        """Grant a role to a user in etcd.
+
+        Args:
+            username (str): The username to grant the role to.
+            rolename (str): The role name to grant.
+        """
+        if result := self._run_etcdctl(
+            command="user",
+            subcommand="grant-role",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            user=username,
+            role=rolename,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdUserManagementError(f"Failed to grant role {rolename} to user {username}.")
+
+    def grant_permission(self, rolename: str, key_prefix: str) -> None:
+        """Grant permission to a role in etcd.
+
+        Args:
+            rolename (str): The role name to grant permission to.
+            key_prefix (str): The key prefix to grant permission for.
+        """
+        if result := self._run_etcdctl(
+            command="role",
+            subcommand="grant-permission",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            user=rolename,
+            prefix=key_prefix,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdUserManagementError(f"Failed to grant permission to role {rolename}.")
+
+    def remove_role(self, rolename: str) -> None:
+        """Remove a role from etcd.
+
+        Args:
+            rolename (str): The role name to remove.
+        """
+        if result := self._run_etcdctl(
+            command="role",
+            subcommand="delete",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            user=rolename,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdUserManagementError(f"Failed to remove role {rolename}.")
+
+    def remove_user(self, username: str) -> None:
+        """Remove a user from etcd.
+
+        Args:
+            username (str): The username to remove.
+        """
+        if result := self._run_etcdctl(
+            command="user",
+            subcommand="delete",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            user=username,
+        ):
+            logger.debug(result)
+        else:
+            raise EtcdUserManagementError(f"Failed to remove user {username}.")
+
+    def get_version(self) -> str:
+        """Get the etcd version.
+
+        Returns:
+            str: The etcd version.
+        """
+        return self.get_endpoint_status()["Status"]["version"]
+
+    def list_users(self) -> list[str]:
+        """List users in etcd.
+
+        Args:
+            username (str): The username to get information for.
+
+        Returns:
+            list[str]: A list of users in etcd.
+        """
+        if result := self._run_etcdctl(
+            command="user",
+            subcommand="list",
+            endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
+            output_format="json",
+        ):
+            return json.loads(result)["users"]
+        return []

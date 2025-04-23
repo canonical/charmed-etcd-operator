@@ -14,6 +14,7 @@ from literals import INTERNAL_USER, PEER_RELATION, TLSType
 from ..helpers import (
     APP_NAME,
     CHARM_PATH,
+    TLS_NAME,
     download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
@@ -27,7 +28,6 @@ from ..helpers_deployment import wait_until
 
 logger = logging.getLogger(__name__)
 
-TLS_NAME = "self-signed-certificates"
 NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"

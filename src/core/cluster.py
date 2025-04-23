@@ -11,12 +11,17 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DataPeerData,
     DataPeerOtherUnitData,
     DataPeerUnitData,
+    EtcdProviderData,
+)
+from charms.tls_certificates_interface.v4.tls_certificates import (
+    ProviderCertificate,
 )
 from ops import Object, Relation, Unit
 
 from core.models import EtcdCluster, EtcdServer
 from literals import (
     CLIENT_TLS_RELATION_NAME,
+    EXTERNAL_CLIENTS_RELATION,
     PEER_RELATION,
     PEER_TLS_RELATION_NAME,
     SECRETS_APP,
@@ -34,6 +39,7 @@ class ClusterState(Object):
 
     def __init__(self, charm: "EtcdOperatorCharm", substrate: SUBSTRATES):
         super().__init__(parent=charm, key="charm_state")
+        self.charm = charm
         self.substrate: SUBSTRATES = substrate
         self.peer_app_interface = DataPeerData(
             self.model, relation_name=PEER_RELATION, additional_secret_fields=SECRETS_APP
@@ -111,3 +117,13 @@ class ClusterState(Object):
     def client_tls_relation(self) -> Relation | None:
         """Get the unit certificates relation."""
         return self.model.get_relation(CLIENT_TLS_RELATION_NAME)
+
+    @property
+    def etcd_provides(self) -> EtcdProviderData:
+        """Get the etcd provides interface."""
+        return EtcdProviderData(self.model, relation_name=EXTERNAL_CLIENTS_RELATION)
+
+    @property
+    def tls_client_certificate(self) -> ProviderCertificate:
+        """Get the client TLS certificates interface."""
+        return self.charm.tls_events.client_certificate.get_assigned_certificates()[0][0]

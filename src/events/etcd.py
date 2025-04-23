@@ -241,6 +241,10 @@ class EtcdEvents(Object):
             # reflect membership updates in the cluster state, e.g. ip change or tls switchover
             self.charm.cluster_manager.update_cluster_member_state()
 
+            self.charm.external_clients_manager.update_client_relations_data(
+                etcd_version=self.charm.cluster_manager.get_version()
+            )
+
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
         if not self.charm.unit.is_leader():
@@ -296,6 +300,8 @@ class EtcdEvents(Object):
             if not self.charm.cluster_manager.restart_member():
                 self.charm.set_status(Status.SERVICE_NOT_RUNNING)
                 return
+
+        self.charm.cluster_manager.clean_users()
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""

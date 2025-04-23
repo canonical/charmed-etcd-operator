@@ -4,10 +4,15 @@
 
 """Collection of state objects for the Etcd relations, apps and units."""
 
+import json
 import logging
 from dataclasses import dataclass
 
-from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
+from charms.data_platform_libs.v0.data_interfaces import (
+    Data,
+    DataPeerData,
+    DataPeerUnitData,
+)
 from ops.model import Application, Relation, Unit
 
 from literals import (
@@ -214,6 +219,14 @@ class EtcdCluster(RelationState):
         will unset the `member_id` here.
         """
         return self.relation_data.get("learning_member", "")
+
+    @property
+    def managed_users(self) -> dict[int, str]:
+        """Get the list of managed users."""
+        return {
+            int(key): value
+            for key, value in json.loads(self.relation_data.get("managed_users", "{}")).items()
+        }
 
 
 @dataclass

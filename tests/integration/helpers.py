@@ -2,12 +2,13 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import base64
 import json
 import logging
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 import yaml
 from pytest_operator.plugin import OpsTest
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
 CHARM_PATH = "./charmed-etcd_ubuntu@24.04-amd64.charm"
+TLS_NAME = "self-signed-certificates"
 
 
 class SecretNotFoundError(Exception):
@@ -334,3 +336,62 @@ def get_storage_id(ops_test: OpsTest, unit_name: str, storage_name: str) -> str:
 
         if line.split()[0] == unit_name and line.split()[1].startswith(storage_name):
             return line.split()[1]
+
+
+def get_user(
+    endpoints: str,
+    username: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> dict[str, Any] | None:
+    """Get user details using `etcdctl`."""
+    etcd_command = f"etcdctl user get {username} --endpoints={endpoints} -w json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+
+    try:
+        result = subprocess.getoutput(etcd_command)
+        logger.debug(f"User get result: {result}")
+        return json.loads(result)["roles"]
+    except json.JSONDecodeError:
+        return None
+
+
+def get_role(
+    endpoints: str,
+    rolename: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> list[dict[str, str]] | None:
+    """Get role details using `etcdctl`."""
+    etcd_command = f"etcdctl role get {rolename} --endpoints={endpoints} -w json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+    try:
+        result = json.loads(subprocess.getoutput(etcd_command))["perm"]
+        return [
+            {
+                "permType": perm["permType"],
+                "key": base64.b64decode(perm["key"]).decode("utf-8"),
+                "range_end": base64.b64decode(perm["range_end"]).decode("utf-8"),
+            }
+            for perm in result
+        ]
+    except json.JSONDecodeError:
+        return None

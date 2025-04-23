@@ -19,9 +19,11 @@ peers:
     interface: rolling_op
 
 provides:
+  etcd-client:
+    interface: etcd_client
   cos-agent:
     interface: cos_agent
-    
+
 requires:
   peer-certificates:
     interface: tls-certificates
@@ -29,6 +31,10 @@ requires:
     optional: true
   client-certificates:
     interface: tls-certificates
+    limit: 1
+    optional: true
+  client-cas:
+    interface: certificate_transfer
     limit: 1
     optional: true
 

@@ -267,6 +267,7 @@ def test_update_status():
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
     ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
@@ -275,6 +276,7 @@ def test_update_status():
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("managers.cluster.ClusterManager.restart_member", return_value=False),
+        patch("managers.cluster.ClusterManager.clean_users"),
     ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
@@ -284,7 +286,10 @@ def test_update_status():
     data_storage = testing.Storage("data")
     (data_storage.get_filesystem(ctx) / "myfile.data").write_text("helloworld")
 
-    with patch("workload.EtcdWorkload.alive", return_value=True):
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+    ):
         with ctx(ctx.on.update_status(), testing.State(storages=[data_storage])) as context:
             data = context.charm.model.storages["data"][0]
             data_loc = data.location
@@ -457,6 +462,7 @@ def test_peer_relation_joined():
         ),
     ):
         state_out = ctx.run(ctx.on.relation_joined(relation=relation, remote_unit=1), state_in)
+        relation = state_out.get_relation(relation.id)
         assert relation.local_app_data.get("learning_member") == f"{4477466968462020105:x}"
         assert (
             relation.local_app_data.get("cluster_members")
@@ -510,8 +516,10 @@ def test_peer_relation_changed():
     with (
         patch("common.client.EtcdClient._run_etcdctl") as run_etcdctl,
         patch("managers.cluster.ClusterManager.update_cluster_member_state"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.5.18"),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        relation = state_out.get_relation(relation.id)
         assert relation.local_app_data.get("learning_member") is None
         assert (
             relation.local_app_data.get("cluster_members")

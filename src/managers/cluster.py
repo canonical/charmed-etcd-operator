@@ -9,7 +9,7 @@ import socket
 from json import JSONDecodeError
 from typing import List
 
-from tenacity import retry, stop_after_attempt, wait_fixed, wait_random_exponential
+from tenacity import Retrying, retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
 from common.client import EtcdClient
 from common.exceptions import (
@@ -341,3 +341,98 @@ class ClusterManager:
             status_list.append(Status.CLUSTER_INITIALIZING)
 
         return status_list
+
+    def get_user(self, username: str) -> dict | None:
+        """Get the user information.
+
+        Args:
+            username (str): The username to get.
+
+        Returns:
+            (dict | None): The user information or None if the user does not exist.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        return client.get_user(username=username)
+
+    def get_version(self) -> str:
+        """Get the etcd version.
+
+        Returns:
+            str: The etcd version.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        return client.get_version()
+
+    def remove_managed_user(self, username: str) -> None:
+        """Remove user and role from the cluster.
+
+        Args:
+            username (str): The name of the user to remove.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        client.remove_role(username)
+        client.remove_user(username)
+        logger.info(f"Removed managed user {username}")
+
+    def add_managed_user(self, username: str, keys_prefix: str) -> None:
+        """Add user and role to the cluster.
+
+        Args:
+            username (str): The name of the user to add.
+            keys_prefix (str): The keys prefix to grant permission to.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        client.add_user(username)
+        client.add_role(username)
+        client.grant_role(username, username)
+        client.grant_permission(username, keys_prefix)
+        logger.info(f"Added managed user {username}")
+
+    def list_users(self) -> List[str]:
+        """List all users in the cluster.
+
+        Returns:
+            List[str]: The list of users.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+        return client.list_users()
+
+    def clean_users(self) -> None:
+        """Clean up users that errored on deletion."""
+        etcd_users = set(self.list_users())
+        etcd_users.discard(INTERNAL_USER)
+        active_users = set(self.state.cluster.managed_users.values())
+
+        for inactive_user in etcd_users - active_users:
+            try:
+                for attempt in Retrying(
+                    stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True
+                ):
+                    with attempt:
+                        logger.debug(
+                            f"Removing inactive user {inactive_user} from etcd - attempt {attempt.retry_state.attempt_number}"
+                        )
+                        self.remove_managed_user(inactive_user)
+            except EtcdUserManagementError as e:
+                logger.error(f"Failed to remove inactive user from etcd: {e}")

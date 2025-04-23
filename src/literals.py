@@ -23,6 +23,8 @@ DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
 RESTART_RELATION = "restart"
+EXTERNAL_CLIENTS_RELATION = "etcd-client"
+CERTIFICATE_TRANSFER_RELATION = "client-cas"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
 METRICS_PORT = 9100
@@ -92,6 +94,24 @@ class Status(Enum):
     SERVICE_STARTING = StatusLevel(MaintenanceStatus("Waiting for etcd to start..."), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
+    EC_INVALID_CERTIFICATE = StatusLevel(
+        MaintenanceStatus(
+            "Client relation: The certificate provided is a CA certificate. Please provide an end-entity certificate"
+        ),
+        "ERROR",
+    )
+    EC_MISSING_CREDENTIALS = StatusLevel(
+        MaintenanceStatus("Client relation: Missing certificate or prefix."), "ERROR"
+    )
+    EC_USERNAME_EXISTS = StatusLevel(
+        MaintenanceStatus(
+            "Client relation: The username provided already exists. Please provide a unique username"
+        ),
+        "ERROR",
+    )
+    EC_TLS_IS_DISABLED = StatusLevel(
+        MaintenanceStatus("Client relation: TLS is disabled. Please enable TLS"), "ERROR"
+    )
 
 
 # enum for TLS state

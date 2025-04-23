@@ -7,7 +7,7 @@ requires-poetry = ">=2.0.0"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-ops = "^2.17.0"
+ops = "^2.20.0"
 tenacity = "*"
 
 
@@ -94,6 +94,7 @@ lint.extend-ignore = [
 lint.ignore = ["E501", "D107"]
 extend-exclude = ["__pycache__", "*.egg_info"]
 lint.per-file-ignores = { "tests/*" = ["D100", "D101", "D102", "D103", "D104"] }
+exclude = ["tests/integration/client_relations/requirer-charm/lib"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -102,4 +103,4 @@ max-complexity = 10
 skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 
 [tool.pyright]
-include = ["src/**.py"]
+include = ["src/**/*.py", "lib/**/*.py"]
