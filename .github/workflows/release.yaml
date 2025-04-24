@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - 3.5/edge
+    paths-ignore:
+      - 'docs/**'
 
 jobs:
   ci-tests:

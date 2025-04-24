@@ -9,6 +9,8 @@ concurrency:
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
   schedule:
     - cron: "53 0 * * *" # Daily at 00:53 UTC
   # Triggered on push to default branch by .github/workflows/release.yaml
