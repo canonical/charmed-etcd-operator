@@ -124,6 +124,10 @@ class ExternalClientsManager:
         if not self.state.etcd_provides.relations:
             return
 
+        if not self.state.cluster.cluster_state:
+            logger.debug("Cluster not yet initialized, cannot update client relation data.")
+            return
+
         cluster_server_names = {
             uri.split("=")[0] for uri in self.state.cluster.cluster_members.split(",")
         }
