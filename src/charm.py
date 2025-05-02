@@ -241,6 +241,9 @@ class EtcdOperatorCharm(ops.CharmBase):
         If there are multiple statuses with the same priority, the first one added wins.
         Component statuses should be computed in their respective priority.
         """
+        if self.app.planned_units() == 0:
+            event.add_status(Status.REMOVED.value.status)
+
         # compute cluster status
         for status in self.cluster_manager.compute_component_status():
             event.add_status(status.value.status)
