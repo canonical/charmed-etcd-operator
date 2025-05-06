@@ -17,7 +17,7 @@ SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
 SNAP_USER = 584788
 SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
-TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
+TLS_ROOT_DIR = "/var/snap/charmed-etcd/current/tls"
 DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
 
 DATA_STORAGE = "data"
@@ -110,7 +110,8 @@ class Status(Enum):
         "ERROR",
     )
     EC_TLS_IS_DISABLED = StatusLevel(
-        MaintenanceStatus("Client relation: TLS is disabled. Please enable TLS"), "ERROR"
+        MaintenanceStatus("Client relation: TLS is disabled. Please enable TLS"),
+        "ERROR",
     )
 
 
