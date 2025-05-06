@@ -12,7 +12,7 @@ on:
     paths-ignore:
       - 'docs/**'
   schedule:
-    - cron: "53 0 * * *" # Daily at 00:53 UTC
+    - cron: '53 0 * * *' # Daily at 00:53 UTC
   # Triggered on push to default branch by .github/workflows/release.yaml
   workflow_call:
     outputs:
@@ -93,3 +93,74 @@ jobs:
       cloud: lxd
     permissions:
       contents: write
+
+  terraform-lint:
+    name: Terraform - Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install terraform snap
+        run: |
+          sudo snap install terraform --channel=latest/stable --classic
+      - name: lint charm module
+        working-directory: ./terraform/charm
+        run: |
+          terraform init
+          terraform fmt
+          terraform validate
+
+  terraform-test:
+    name: Terraform - Run terraform tests
+    needs:
+      - terraform-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: (GitHub hosted) Free up disk space
+        timeout-minutes: 1
+        run: |
+          printf '\nDisk usage before cleanup\n'
+          df --human-readable
+          # Based on https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+          rm -r /opt/hostedtoolcache/
+          printf '\nDisk usage after cleanup\n'
+          df --human-readable
+      - name: (self hosted) Disk usage
+        timeout-minutes: 1
+        run: df --human-readable
+      - name: Install terraform snap
+        run: |
+          sudo snap install terraform --channel=latest/stable --classic
+      - name: juju set up
+        run: |
+          sudo snap install juju --channel=3.6/beta --classic
+          sudo snap install juju-wait --channel=latest/stable --classic
+          sudo snap install jq
+      - name: LXD setup
+        run: |
+          sudo snap refresh lxd --channel=latest/stable
+          sudo adduser "$USER" 'lxd'
+          # `newgrp` does not work in GitHub Actions; use `sg` instead
+          sg 'lxd' -c "lxd waitready"
+          sg 'lxd' -c "lxd init --auto"
+          sg 'lxd' -c "lxc network set lxdbr0 ipv6.address none"
+          sudo iptables -F FORWARD
+          sudo iptables -P FORWARD ACCEPT
+      - name: Juju setup
+        run: |
+          sg 'lxd' -c "juju bootstrap 'localhost' --config model-logs-size=10G"
+          juju model-defaults logging-config='<root>=INFO; unit=DEBUG'
+      - name: Terraform deploy
+        working-directory: ./terraform/charm
+        run: |
+          juju add-model test
+          terraform init
+          terraform apply -var "model=test" -auto-approve
