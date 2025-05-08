@@ -241,7 +241,7 @@ providing credentials. This is also valid for the admin-user charmed etcd uses t
 
 At any time before removing your existing etcd cluster, you can provide a user-defined password for the admin user and configure it to charmed etcd. 
 
-For instructions on how to configure credentials to etcd, refer to the guide [How to manage passwords](#manage-passwords). 
+For instructions on how to configure credentials to etcd, refer to the guide [How to manage passwords](manage-passwords.md).
 
 With a password now configured, it is safe to remove your existing charmed etcd application:
 
