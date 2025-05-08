@@ -7,7 +7,7 @@ Charmed etcd is equipped with several features to securely store and scale compl
 ```{note}
 This new charm is still under development on the [`edge` track](https://charmhub.io/charmed-etcd). You're welcome to explore it and share your feedback as we continue to improve it.
 
-**Please wait for the upcoming stable release before deploying it in production environments.**
+**Please wait for the upcoming stable release before deploying charmed etcd in production environments.**
 ```
 
 ## In this documentation
