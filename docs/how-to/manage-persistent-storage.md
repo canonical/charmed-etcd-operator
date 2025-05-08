@@ -1,6 +1,6 @@
 # How to manage persistent storage
 
-Like many other databases, etcd stores its state on disk. In a default deployment (as described in [deploy-etcd](#deploy-etcd)),
+Like many other databases, etcd stores its state on disk. In a default deployment (as described in [](../tutorial/index.md#deploy-etcd)),
 the filesystem attached to charmed etcd will be removed when charmed etcd is removed. The content of the etcd database
 would then be lost.
 
@@ -9,9 +9,9 @@ called persistent storage. It allows to keep storage volumes around, even after 
 has been removed.
 
 The use cases can be broken down into two groups:
-- reusing storage from previous units but within the same etcd cluster/database (see: [Same cluster scenario](#same-cluster-scenario))
+- reusing storage from previous units but within the same etcd cluster/database (see: [](#same-cluster-scenario))
 or
-- reusing storage from another etcd cluster/database (see: [Different cluster scenario](#different-cluster-scenario))
+- reusing storage from another etcd cluster/database (see: [](#different-cluster-scenario))
 
 Charmed etcd uses two different storage volumes:
 - `data` containing the raw data files (the actual database) written and managed by etcd
@@ -238,7 +238,7 @@ providing credentials. This is also valid for the admin-user charmed etcd uses t
 
 At any time before removing your existing etcd cluster, you can provide a user-defined password for the admin user and configure it to charmed etcd. 
 
-For instructions on how to configure credentials to etcd, refer to the guide [How to manage passwords](#manage-passwords). 
+For instructions on how to configure credentials to etcd, refer to the guide [](#manage-passwords). 
 
 With a password now configured, it is safe to remove your existing charmed etcd application:
 

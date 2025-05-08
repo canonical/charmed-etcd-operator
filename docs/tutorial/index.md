@@ -167,6 +167,7 @@ Machine  State    Address        Inst id         Base          AZ  Message
 
 To exit the `juju status` screen, enter `Ctrl + C`.
 
+(access-etcd)=
 ## Access etcd
 
 You can access etcd with a command line client like `etcdctl` or via REST API.
@@ -182,7 +183,7 @@ To confirm that the API is reachable, we can use `curl` to make a request to one
 
 ## Next steps
 
-Now that your cluster is set up, you can check [how-to guides](#how-to) such as:
-* [How to scale your cluster](#scale-horizontally)
-* [How to manage TLS encryption](#tls)
-* [How to manage passwords](#manage-passwords)
+Now that your cluster is set up, you can check [how-to guides](../how-to/index.md) such as:
+* [How to scale your cluster](../how-to/scale-horizontally.md)
+* [How to manage TLS encryption](../how-to/tls/index.md)
+* [How to manage passwords](../how-to/manage-passwords.md)
