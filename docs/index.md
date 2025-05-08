@@ -4,6 +4,12 @@ Etcd is a distributed, reliable key-value store for the most critical data of di
 
 Charmed Etcd is equipped with several features to securely store and scale complicated data workloads, including TLS encryption, horizontal scaling, password rotation, and easy integration with client applications.
 
+```{note}
+This new charm is still under development on the [`edge` track](https://charmhub.io/charmed-etcd). You're welcome to explore it and share your feedback as we continue to improve it.
+
+**Please wait for the upcoming stable release before deploying it in production environments.**
+```
+
 ## In this documentation
 
 | | |
@@ -13,6 +19,15 @@ Charmed Etcd is equipped with several features to securely store and scale compl
 <!--
 | [Explanation](/explanation/index) </br> Concepts - discussion and clarification of key topics | [Reference](/reference/index) </br> Technical information - specifications, APIs, architecture |
 -->
+
+## Project and community
+
+The charmed etd operator is an open-source project that welcomes community contributions, suggestions, fixes and constructive feedback.
+
+- [Read our Code of Conduct](https://ubuntu.com/community/code-of-conduct)
+- [Contribute](https://github.com/canonical/charmed-etcd-operator/blob/03687ed992f30c8fea8f8576e0079894ae4b0f16/CONTRIBUTING.md) and report [issues](https://github.com/canonical/charmed-etcd-operator/issues)
+- Explore [Canonical Data & AI solutions](https://canonical.com/data)
+- [Contact us on Matrix](https://matrix.to/#/#charmhub-data-platform:ubuntu.com)
 
 ```{toctree}
 :titlesonly:

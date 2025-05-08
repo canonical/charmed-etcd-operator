@@ -5,7 +5,6 @@ Transport Layer Security (TLS) plays a crucial role in securing database communi
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:hidden:
 
 Enable TSL <enable-tls>
 Disable TLS <disable-tls>

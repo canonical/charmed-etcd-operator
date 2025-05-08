@@ -3,7 +3,6 @@
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:hidden:
 
 Scale horizontally <scale-horizontally>
 Manage passwords <manage-passwords>
