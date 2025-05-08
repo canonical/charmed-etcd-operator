@@ -1,7 +1,6 @@
-(manage-persistent-storage)=
 # How to manage persistent storage
 
-Like many other databases, etcd stores its state on disk. In a default deployment (as described in [deploy-etcd](#deploy-etcd)),
+Like many other databases, etcd stores its state on disk. In a default deployment (as described in [](../tutorial/index.md#deploy-etcd)),
 the filesystem attached to charmed etcd will be removed when charmed etcd is removed. The content of the etcd database
 would then be lost.
 
@@ -10,9 +9,9 @@ called persistent storage. It allows to keep storage volumes around, even after 
 has been removed.
 
 The use cases can be broken down into two groups:
-- reusing storage from previous units but within the same etcd cluster/database (see: [Same cluster scenario](#same-cluster-scenario))
+- reusing storage from previous units but within the same etcd cluster/database (see: [](#same-cluster-scenario))
 or
-- reusing storage from another etcd cluster/database (see: [Different cluster scenario](#different-cluster-scenario))
+- reusing storage from another etcd cluster/database (see: [](#different-cluster-scenario))
 
 Charmed etcd uses two different storage volumes:
 - `data` containing the raw data files (the actual database) written and managed by etcd
@@ -102,7 +101,6 @@ As you can see, volumes from the `etcd-storage` pool have been attached as the `
 `logs` volume mount, non-persistent storage from `rootfs` has been used. The `logs` storage will be removed when the 
 respective unit gets removed, while the `data` storage will persist.
 
-(same-cluster-scenario)=
 ## Same cluster scenario
 In this scenario, we want to reuse storage from previous units but within the same etcd cluster/database. This could
 be useful when you want to scale down your etcd database temporarily without completely removing it.
@@ -223,7 +221,6 @@ charmed-etcd/5  data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/com
 charmed-etcd/5  logs/8      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
 ```
 
-(different-cluster-scenario)=
 ## Different cluster scenario
 
 In this scenario, we want to reuse existing storage from another etcd cluster/database.
@@ -241,7 +238,7 @@ providing credentials. This is also valid for the admin-user charmed etcd uses t
 
 At any time before removing your existing etcd cluster, you can provide a user-defined password for the admin user and configure it to charmed etcd. 
 
-For instructions on how to configure credentials to etcd, refer to the guide [How to manage passwords](manage-passwords.md).
+For instructions on how to configure credentials to etcd, refer to the guide [](#manage-passwords). 
 
 With a password now configured, it is safe to remove your existing charmed etcd application:
 

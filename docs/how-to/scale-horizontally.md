@@ -1,4 +1,3 @@
-(scale-horizontally)=
 # How to scale horizontally
 
 Adding and removing nodes from an etcd deployment is done by scaling [Juju units](https://juju.is/docs/juju/unit). 
