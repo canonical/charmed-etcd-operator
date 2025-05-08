@@ -105,9 +105,6 @@ class ExternalClientsEvents(Object):
                 return
             return
 
-        relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
-            event.relation.id
-        )
         # if leader then create/update user
         if self.charm.unit.is_leader():
             if old_common_name != common_name:
@@ -121,6 +118,12 @@ class ExternalClientsEvents(Object):
                     except EtcdUserManagementError as e:
                         logger.error(f"Failed to remove old user from etcd: {e}")
                     self.charm.external_clients_manager.remove_managed_user(event.relation.id)
+
+                relation_managed_user = (
+                    self.charm.external_clients_manager.get_relation_managed_user(
+                        event.relation.id
+                    )
+                )
                 if self.charm.cluster_manager.get_user(common_name) is not None:
                     if common_name != relation_managed_user:
                         logger.error("User already exists")
