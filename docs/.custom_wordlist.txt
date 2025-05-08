@@ -7,6 +7,8 @@ cryptographically
 CSR
 etcd
 dvipng
+defragmentation
+defragment
 fonts
 freefont
 fsync
@@ -16,6 +18,7 @@ gRPC
 gyre
 https
 Intersphinx
+IPv
 lang
 latexmk
 Multipass
@@ -27,6 +30,7 @@ Rockcraft
 rst
 tex
 texlive
+th
 TOC
 toctree
 TSL

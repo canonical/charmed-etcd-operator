@@ -14,7 +14,7 @@ Whether you have experience with Etcd databases, Juju orchestration, or neither,
 * Deploy a small Charmed Etcd cluster
 * Connect to the cluster through a unit
 
-## Install and initialize LXD
+## Install and initialise LXD
 
 The simplest way to get started with charmed etcd is to set up a local LXD cloud.
 [LXD](https://documentation.ubuntu.com/lxd/en/latest/) is a system container and

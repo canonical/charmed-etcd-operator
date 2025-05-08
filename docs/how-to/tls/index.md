@@ -1,6 +1,6 @@
 # TLS encryption
 
-Transport Layer Security (TLS) plays a crucial role in securing database communications.  Just as it protects web traffic, TLS encrypts the data transmitted between database clients and servers, preventing unauthorized access and ensuring confidentiality.
+Transport Layer Security (TLS) plays a crucial role in securing database communications.  Just as it protects web traffic, TLS encrypts the data transmitted between database clients and servers, preventing unauthorised access and ensuring confidentiality.
 
 ```{toctree}
 :titlesonly:

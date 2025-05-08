@@ -22,7 +22,7 @@ This new charm is still under development on the [`edge` track](https://charmhub
 
 ## Project and community
 
-The charmed etd operator is an open-source project that welcomes community contributions, suggestions, fixes and constructive feedback.
+The charmed etcd operator is an open-source project that welcomes community contributions, suggestions, fixes and constructive feedback.
 
 - [Read our Code of Conduct](https://ubuntu.com/community/code-of-conduct)
 - [Contribute](https://github.com/canonical/charmed-etcd-operator/blob/03687ed992f30c8fea8f8576e0079894ae4b0f16/CONTRIBUTING.md) and report [issues](https://github.com/canonical/charmed-etcd-operator/issues)
