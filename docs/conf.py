@@ -23,7 +23,7 @@ import yaml
 
 # Project name
 
-project = "Charmed Etcd"
+project = "Charmed etcd"
 author = "Canonical Ltd."
 
 
