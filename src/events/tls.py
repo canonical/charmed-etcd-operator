@@ -107,7 +107,12 @@ class TLSEvents(Object):
                 CertificateRequestAttributes(
                     common_name=common_name,
                     sans_ip=frozenset({host_mapping["ip"]}),
-                    sans_dns=frozenset({self.charm.unit.name, host_mapping["hostname"]}),
+                    sans_dns=frozenset(
+                        {
+                            f"{self.charm.unit.name.replace('/', '-')}{common_name_domain}",
+                            f"{host_mapping['hostname']}{common_name_domain}",
+                        }
+                    ),
                     organization=TLSType.PEER.value,
                 ),
             ],
@@ -121,7 +126,12 @@ class TLSEvents(Object):
                 CertificateRequestAttributes(
                     common_name=common_name,
                     sans_ip=frozenset({host_mapping["ip"]}),
-                    sans_dns=frozenset({self.charm.unit.name, host_mapping["hostname"]}),
+                    sans_dns=frozenset(
+                        {
+                            f"{self.charm.unit.name.replace('/', '-')}{common_name_domain}",
+                            f"{host_mapping['hostname']}{common_name_domain}",
+                        }
+                    ),
                     organization=TLSType.CLIENT.value,
                 ),
             ],
