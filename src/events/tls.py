@@ -77,7 +77,12 @@ class TLSEvents(Object):
         super().__init__(charm, "tls")
         self.charm: "EtcdOperatorCharm" = charm
         host_mapping = self.charm.cluster_manager.get_host_mapping()
-        common_name = f"{self.charm.unit.name}-{self.charm.model.uuid}"
+        common_name_domain = (
+            f".{self.charm.config.get('common_name_domain')}"
+            if self.charm.config.get("common_name_domain")
+            else ""
+        )
+        common_name = f"{self.charm.unit.name}-{self.charm.model.uuid}{common_name_domain}"
         peer_private_key = None
         client_private_key = None
 
