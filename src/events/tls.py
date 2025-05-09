@@ -82,7 +82,9 @@ class TLSEvents(Object):
             if self.charm.config.get("common_name_domain")
             else ""
         )
-        common_name = f"{self.charm.unit.name}-{self.charm.model.uuid}{common_name_domain}"
+        common_name = (
+            f"{self.charm.unit.name.replace('/', '-')}-{self.charm.model.uuid}{common_name_domain}"
+        )
         peer_private_key = None
         client_private_key = None
 
