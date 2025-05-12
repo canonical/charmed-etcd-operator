@@ -20,9 +20,8 @@ options:
     description: |
       A Juju secret URI of a secret containing the private key for client-to-server TLS certificates.
 
-  common_name_domain:
+  common_name:
       type: string
       description: |
-        The common name domain that will be used for the certificate signing requests.
-        If set, this domain will be added to the common name property in peer or client certificates.
+        The Common Name that will be used for the certificate signing requests.
         It must match the common name configured to Vault if Vault is used as TLS provider for etcd.

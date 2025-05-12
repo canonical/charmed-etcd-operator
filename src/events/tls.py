@@ -77,13 +77,13 @@ class TLSEvents(Object):
         super().__init__(charm, "tls")
         self.charm: "EtcdOperatorCharm" = charm
         host_mapping = self.charm.cluster_manager.get_host_mapping()
-        common_name_domain = (
-            f".{self.charm.config.get('common_name_domain')}"
-            if self.charm.config.get("common_name_domain")
+        common_name_config = (
+            f".{self.charm.config.get('common_name')}"
+            if self.charm.config.get("common_name")
             else ""
         )
         common_name = (
-            f"{self.charm.unit.name.replace('/', '-')}-{self.charm.model.uuid}{common_name_domain}"
+            f"{self.charm.unit.name.replace('/', '')}.{self.charm.model.uuid}{common_name_config}"
         )
         peer_private_key = None
         client_private_key = None
@@ -109,8 +109,8 @@ class TLSEvents(Object):
                     sans_ip=frozenset({host_mapping["ip"]}),
                     sans_dns=frozenset(
                         {
-                            f"{self.charm.unit.name.replace('/', '-')}{common_name_domain}",
-                            f"{host_mapping['hostname']}{common_name_domain}",
+                            f"{self.charm.unit.name.replace('/', '-')}{common_name_config}",
+                            f"{host_mapping['hostname']}{common_name_config}",
                         }
                     ),
                     organization=TLSType.PEER.value,
@@ -128,8 +128,8 @@ class TLSEvents(Object):
                     sans_ip=frozenset({host_mapping["ip"]}),
                     sans_dns=frozenset(
                         {
-                            f"{self.charm.unit.name.replace('/', '-')}{common_name_domain}",
-                            f"{host_mapping['hostname']}{common_name_domain}",
+                            f"{self.charm.unit.name.replace('/', '-')}{common_name_config}",
+                            f"{host_mapping['hostname']}{common_name_config}",
                         }
                     ),
                     organization=TLSType.CLIENT.value,
