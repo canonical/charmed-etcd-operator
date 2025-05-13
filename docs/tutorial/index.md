@@ -1,4 +1,3 @@
-(tutorial)=
 # Tutorial
 
 Whether you have experience with Etcd databases, Juju orchestration, or neither, this tutorial will walk you through the essential aspects of deploying and operating Charmed Etcd.
@@ -15,7 +14,7 @@ Whether you have experience with Etcd databases, Juju orchestration, or neither,
 * Deploy a small Charmed Etcd cluster
 * Connect to the cluster through a unit
 
-## Install and initialize LXD
+## Install and initialise LXD
 
 The simplest way to get started with charmed etcd is to set up a local LXD cloud.
 [LXD](https://documentation.ubuntu.com/lxd/en/latest/) is a system container and
@@ -122,7 +121,6 @@ Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.0    unsupported  17:26:15Z
 ```
 
-(deploy-etcd)=
 ## Deploy etcd
 
 To deploy charmed etcd, all you need to do is run the following command:
@@ -185,7 +183,7 @@ To confirm that the API is reachable, we can use `curl` to make a request to one
 
 ## Next steps
 
-Now that your cluster is set up, you can check [how-to guides](#how-to) such as:
-* [How to scale your cluster](#scale-horizontally)
-* [How to manage TLS encryption](#tls)
-* [How to manage passwords](#manage-passwords)
+Now that your cluster is set up, you can check [how-to guides](../how-to/index.md) such as:
+* [How to scale your cluster](../how-to/scale-horizontally.md)
+* [How to manage TLS encryption](../how-to/tls/index.md)
+* [How to manage passwords](../how-to/manage-passwords.md)

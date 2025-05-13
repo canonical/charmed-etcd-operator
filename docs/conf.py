@@ -23,7 +23,7 @@ import yaml
 
 # Project name
 
-project = "Charmed Etcd"
+project = "Charmed etcd"
 author = "Canonical Ltd."
 
 
@@ -186,7 +186,8 @@ redirects = {}
 
 linkcheck_ignore = [
     "http://127.0.0.1:8000",
-    "https://github.com/canonical/ACME/*"
+    "https://github.com/canonical/ACME/*",
+    "https://matrix.to/*"
     ]
 
 
@@ -211,8 +212,9 @@ linkcheck_retries = 3
 # NOTE: By default, the following MyST extensions are enabled:
 #       substitution, deflist, linkify
 
-# myst_enable_extensions = set()
+myst_enable_extensions = set()
 
+myst_heading_anchors = 3
 
 # Custom Sphinx extensions; see
 # https://www.sphinx-doc.org/en/master/usage/extensions/index.html
