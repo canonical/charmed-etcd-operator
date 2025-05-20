@@ -3,7 +3,7 @@ name: Markdown style checks
 on:
   push:
     branches:
-    - 3.5/edge
+    - 3.6/edge
     paths:
     - 'docs/**'   # Only run on changes to the docs directory
   pull_request:

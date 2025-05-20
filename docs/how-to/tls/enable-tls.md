@@ -187,7 +187,7 @@ You can also deploy the cluster with encryption enabled from the start by integr
 
 ```text
 juju deploy self-signed-certificates --channel edge
-juju deploy charmed-etcd -n 3 --channel 3.5/edge
+juju deploy charmed-etcd -n 3 --channel 3.6/edge
 juju integrate self-signed-certificates:certificates charmed-etcd:client-certificates
 juju integrate self-signed-certificates:certificates charmed-etcd:peer-certificates
 ```

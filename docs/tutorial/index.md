@@ -126,7 +126,7 @@ etcd   dev-controller  localhost/localhost  3.6.0    unsupported  17:26:15Z
 To deploy charmed etcd, all you need to do is run the following command:
 
 ```text
-juju deploy charmed-etcd -n 3 --channel 3.5/edge
+juju deploy charmed-etcd -n 3 --channel 3.6/edge
 ```
 
 ```{note}
@@ -135,7 +135,7 @@ The `-n` flag is optional and specifies the number of units to deploy. In this c
 We recommend deploying at least three units for high availability.
 ```
 
-The command will fetch the charm from [Charmhub](https://charmhub.io/charmed-etcd?channel=3.5/edge)
+The command will fetch the charm from [Charmhub](https://charmhub.io/charmed-etcd?channel=3.6/edge)
 and deploy 3 units to the LXD cloud. This process can take several minutes
 depending on your machine. 
 

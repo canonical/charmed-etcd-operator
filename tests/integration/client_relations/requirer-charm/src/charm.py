@@ -285,7 +285,7 @@ class RequirerCharmCharm(ops.CharmBase):
     def _install_etcd_snap(self) -> bool:
         """Install the etcd snap."""
         try:
-            self.etcd_snap.ensure(snap.SnapState.Present, channel="3.5/edge")
+            self.etcd_snap.ensure(snap.SnapState.Present, channel="3.6/edge")
             self.etcd_snap.hold()
             return True
         except snap.SnapError as e:

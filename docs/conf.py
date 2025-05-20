@@ -120,7 +120,7 @@ html_context = {
     
     # Docs branch in the repo; used in links for viewing the source files
     # TODO: Update when this changes to stable
-    'repo_default_branch': '3.5/edge',
+    'repo_default_branch': '3.6/edge',
 
     # Docs location in the repo; used in links for viewing the source files
     "repo_folder": "/docs/",

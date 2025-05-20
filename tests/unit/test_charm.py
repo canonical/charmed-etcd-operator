@@ -516,7 +516,7 @@ def test_peer_relation_changed():
     with (
         patch("common.client.EtcdClient._run_etcdctl") as run_etcdctl,
         patch("managers.cluster.ClusterManager.update_cluster_member_state"),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5.18"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6.0"),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
         relation = state_out.get_relation(relation.id)
