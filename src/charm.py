@@ -208,7 +208,14 @@ class EtcdOperatorCharm(ops.CharmBase):
     def _restart_ca_rotation(self, _) -> None:
         """Restart callback for CA rotation."""
         logger.debug("ca rotation restart")
-        self._restart(None)
+
+        self.config_manager.set_config_properties()
+        # do not raise in case health check fails
+        # this can happen if the client certificate has already expired
+        # on CA-rotation the certs are only updated AFTER all cluster members updated the CA
+        if not self.cluster_manager.restart_member():
+            logger.warning("Health check failed after ca rotation restart")
+
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
             self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NEW_CA_ADDED)
 
