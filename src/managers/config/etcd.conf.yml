@@ -7,6 +7,7 @@ snapshot-count: 10000
 heartbeat-interval: 100
 election-timeout: 1000
 quota-backend-bytes: 0
+max-learners: 1
 max-snapshots: 5
 max-wals: 5
 strict-reconfig-check: false
