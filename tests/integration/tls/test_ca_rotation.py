@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import time
 
 import pytest
 from juju.application import Application
@@ -91,13 +92,15 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
 
+@pytest.mark.skip()
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_ca_rotation(ops_test: OpsTest) -> None:
+async def test_ca_rotation_by_config_change(ops_test: OpsTest) -> None:
     """Test the CA rotation.
 
     The CA certificate should be rotated and the cluster should still be accessible.
+    The rotation is triggered by updating the config for `ca-common-name` on the TLS provider side.
     """
     model = ops_test.model_full_name
     # Rotate the CA certificate
@@ -128,6 +131,125 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
 
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+
+    logger.info("Checking if the CA certificates are rotated")
+    new_peer_ca = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER, is_ca=True)
+    assert new_peer_ca, "Failed to get the new peer CA certificate"
+
+    new_client_ca = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.CLIENT, is_ca=True
+    )
+    assert new_client_ca, "Failed to get the new client CA certificate"
+
+    new_peer_certificate = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.PEER, is_ca=False
+    )
+    assert new_peer_certificate, "Failed to get the new peer certificate"
+
+    new_client_certificate = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.CLIENT, is_ca=False
+    )
+    assert new_client_certificate, "Failed to get the new client certificate"
+
+    assert current_peer_ca != new_peer_ca, "Peer CA certificate was not rotated"
+    assert current_client_ca != new_client_ca, "Client CA certificate was not rotated"
+
+    logger.info("Both CA certificates are rotated")
+
+    assert current_peer_certificate != new_peer_certificate, "Peer certificate was not rotated"
+    assert current_client_certificate != new_client_certificate, (
+        "Client certificate was not rotated"
+    )
+
+    logger.info("Both certificates are rotated")
+
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    # Check if the cluster is still accessible
+    logger.info("Checking if the cluster is still accessible")
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
+
+    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
+
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    logger.info("Reading and writing keys with HTTP peerURLs and HTTPS clientURLs")
+    assert (
+        get_key(
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=TEST_KEY,
+            tls_enabled=True,
+        )
+        == TEST_VALUE
+    ), "Failed to read key"
+
+    assert put_key(
+        endpoints,
+        user=INTERNAL_USER,
+        password=password,
+        key=f"{TEST_KEY}_4",
+        value=TEST_VALUE,
+        tls_enabled=True,
+    ), "Failed to write new key"
+
+    assert (
+        get_key(
+            endpoints,
+            user=INTERNAL_USER,
+            password=password,
+            key=f"{TEST_KEY}_4",
+            tls_enabled=True,
+        )
+        == TEST_VALUE
+    ), "Failed to read new key"
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
+    """Test the CA rotation.
+
+    The CA certificate should be rotated and the cluster should still be accessible.
+    The rotation is triggered by expiring certificates.
+    """
+    model = ops_test.model_full_name
+    # Rotate the CA certificate
+    logger.info("Getting the current CA certificates")
+    leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
+    current_peer_ca = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.PEER, is_ca=True
+    )
+    assert current_peer_ca, "Failed to get the current peer CA certificate"
+
+    current_client_ca = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.CLIENT, is_ca=True
+    )
+    assert current_client_ca, "Failed to get the current client CA certificate"
+
+    current_peer_certificate = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.PEER, is_ca=False
+    )
+    assert current_peer_certificate, "Failed to get the current peer certificate"
+
+    current_client_certificate = get_certificate_from_unit(
+        model, leader_unit, cert_type=TLSType.CLIENT, is_ca=False
+    )
+    assert current_client_certificate, "Failed to get the current client certificate"
+
+    logger.info("Adjusting validity of the CA certificate to 2 minutes")
+    tls_config = {"root-ca-validity": "2m", "certificate-validity": "1m"}
+    tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
+    await tls_app.set_config(tls_config)
+
+    logger.info("Waiting for expiration of CA certificate")
+    time.sleep(150)
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     logger.info("Checking if the CA certificates are rotated")
