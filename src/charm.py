@@ -239,7 +239,12 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.tls_manager.update_cas(self.tls_events.collect_client_cas(), TLSType.CLIENT)
             self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NO_ROTATION)
 
-        self._restart(None)
+        self.config_manager.set_config_properties()
+        # do not raise in case health check fails
+        # this can happen if the client certificate has already expired but was not renewed yet
+        # in case the peer certificate came first
+        if not self.cluster_manager.restart_member():
+            logger.warning("Health check failed after ca cleanup restart")
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         """Compute the current status for this unit.

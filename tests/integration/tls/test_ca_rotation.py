@@ -219,7 +219,14 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     The rotation is triggered by expiring certificates.
     """
     model = ops_test.model_full_name
-    # Rotate the CA certificate
+
+    logger.info("Adjusting validity of the CA certificate to 5 minutes")
+    # CA validity should be 2x cert validity to make sure the cert is also expired at this time
+    tls_config = {"root-ca-validity": "6m", "certificate-validity": "3m"}
+    tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
+    await tls_app.set_config(tls_config)
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+
     logger.info("Getting the current CA certificates")
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
     current_peer_ca = get_certificate_from_unit(
@@ -242,13 +249,8 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     )
     assert current_client_certificate, "Failed to get the current client certificate"
 
-    logger.info("Adjusting validity of the CA certificate to 2 minutes")
-    tls_config = {"root-ca-validity": "2m", "certificate-validity": "1m"}
-    tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
-    await tls_app.set_config(tls_config)
-
-    logger.info("Waiting for expiration of CA certificate")
-    time.sleep(150)
+    logger.info("Waiting 6m for expiration of CA certificate")
+    time.sleep(360)
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     logger.info("Checking if the CA certificates are rotated")
