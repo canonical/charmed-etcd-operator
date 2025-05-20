@@ -87,7 +87,6 @@ jobs:
       - unit-test
       - build
     uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v29.0.0
-    timeout-minutes: 60
     with:
       juju-agent-version: ${{ matrix.juju.agent }}
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
