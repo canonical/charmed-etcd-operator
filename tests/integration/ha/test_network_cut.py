@@ -93,7 +93,9 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     time.sleep(10)
 
     # get details for the current raft leader in the cluster
-    initial_raft_leader = get_raft_leader(endpoints=endpoints)
+    initial_raft_leader = get_raft_leader(
+        endpoints=endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"initial raft leader: {initial_raft_leader}")
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
@@ -124,7 +126,9 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     remaining_endpoints = get_remaining_endpoints(endpoints, unit_endpoint)
 
     # ensure a new leader was assigned after waiting for the `election timeout`
-    new_raft_leader = get_raft_leader(endpoints=remaining_endpoints)
+    new_raft_leader = get_raft_leader(
+        endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"new raft leader: {new_raft_leader}")
     assert new_raft_leader != initial_raft_leader, (
         "raft leadership not transferred after network disconnect of the leader"
@@ -151,7 +155,7 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is available again.")
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )
@@ -204,7 +208,9 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     time.sleep(10)
 
     # get details for the current raft leader in the cluster
-    initial_raft_leader = get_raft_leader(endpoints=endpoints)
+    initial_raft_leader = get_raft_leader(
+        endpoints=endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"initial raft leader: {initial_raft_leader}")
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
@@ -241,7 +247,9 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     remaining_endpoints = get_remaining_endpoints(endpoints, unit_endpoint)
 
     # ensure a new leader was assigned after waiting for the `election timeout`
-    new_raft_leader = get_raft_leader(endpoints=remaining_endpoints)
+    new_raft_leader = get_raft_leader(
+        endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"new raft leader: {new_raft_leader}")
     assert new_raft_leader != initial_raft_leader, (
         "raft leadership not transferred after network disconnect of the leader"
@@ -271,7 +279,7 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     logger.info(f"{leader_unit} is available again with new ip {new_unit_ip}")
 
     endpoints_updated = endpoints.replace(leader_ip, new_unit_ip)
-    cluster_members = get_cluster_members(endpoints_updated)
+    cluster_members = get_cluster_members(endpoints_updated, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )

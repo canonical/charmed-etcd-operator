@@ -74,7 +74,7 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count + 2, (
         f"Expected {init_units_count + 2} cluster members, got {len(cluster_members)}."
     )
@@ -112,7 +112,7 @@ async def test_scale_down(ops_test: OpsTest) -> None:
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
         f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
     )
@@ -141,13 +141,15 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
 
     # check cluster membership after scaling up
     updated_endpoints = get_cluster_endpoints(ops_test, app)
-    cluster_members = get_cluster_members(updated_endpoints)
+    cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"Expected {init_units_count} cluster members, got {len(cluster_members)}."
     )
 
     # find and remove the unit that is the current Raft leader
-    init_raft_leader = get_raft_leader(endpoints=init_endpoints)
+    init_raft_leader = get_raft_leader(
+        endpoints=init_endpoints, user=INTERNAL_USER, password=password
+    )
     await ops_test.model.applications[app].destroy_unit(init_raft_leader.replace(app, f"{app}/"))
 
     await wait_until(
@@ -161,13 +163,15 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     # check if unit has been removed from etcd cluster
     updated_endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(updated_endpoints)
+    cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
         f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
     )
 
     # check that another unit is now the Raft leader
-    new_raft_leader = get_raft_leader(endpoints=updated_endpoints)
+    new_raft_leader = get_raft_leader(
+        endpoints=updated_endpoints, user=INTERNAL_USER, password=password
+    )
     assert new_raft_leader != init_raft_leader
 
     assert_continuous_writes_increasing(
@@ -207,7 +211,7 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == 1, f"Expected 1 cluster member, got {len(cluster_members)}."
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -247,7 +251,7 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     # give time to write at least some data
     time.sleep(10)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == 3, f"Expected 3 cluster members, got {len(cluster_members)}."
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -282,7 +286,7 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
         f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
     )

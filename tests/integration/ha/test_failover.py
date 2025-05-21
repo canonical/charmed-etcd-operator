@@ -84,7 +84,9 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     time.sleep(10)
 
     # get details for the current raft leader in the cluster
-    initial_raft_leader = get_raft_leader(endpoints=endpoints)
+    initial_raft_leader = get_raft_leader(
+        endpoints=endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"initial raft leader: {initial_raft_leader}")
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
@@ -103,7 +105,9 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
 
     # ensure a new leader was assigned after waiting for the `election timeout`
     time.sleep(3)
-    new_raft_leader = get_raft_leader(endpoints=remaining_endpoints)
+    new_raft_leader = get_raft_leader(
+        endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"new raft leader: {new_raft_leader}")
     assert new_raft_leader != initial_raft_leader, (
         "raft leadership not transferred after stop of leader"
@@ -119,7 +123,7 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is available again.")
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )
@@ -163,7 +167,9 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     time.sleep(10)
 
     # get details for the current raft leader in the cluster
-    initial_raft_leader = get_raft_leader(endpoints=endpoints)
+    initial_raft_leader = get_raft_leader(
+        endpoints=endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"initial raft leader: {initial_raft_leader}")
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
@@ -183,7 +189,9 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     # make sure leadership was moved
     # as the stopped member is unresponsive, only query the endpoints still available
     remaining_endpoints = get_remaining_endpoints(endpoints, unit_endpoint)
-    new_raft_leader = get_raft_leader(endpoints=remaining_endpoints)
+    new_raft_leader = get_raft_leader(
+        endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"new raft leader: {new_raft_leader}")
     assert new_raft_leader != initial_raft_leader, (
         "raft leadership not transferred after freeze of leader"
@@ -203,7 +211,7 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is available again.")
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )
@@ -245,7 +253,9 @@ async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     time.sleep(10)
 
     # get details for the current raft leader in the cluster
-    initial_raft_leader = get_raft_leader(endpoints=endpoints)
+    initial_raft_leader = get_raft_leader(
+        endpoints=endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"initial raft leader: {initial_raft_leader}")
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
@@ -263,7 +273,9 @@ async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
 
     # ensure a new leader was assigned after waiting for the `election timeout`
     time.sleep(3)
-    new_raft_leader = get_raft_leader(endpoints=remaining_endpoints)
+    new_raft_leader = get_raft_leader(
+        endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"new raft leader: {new_raft_leader}")
     assert new_raft_leader != initial_raft_leader, (
         "raft leadership not transferred after freeze of leader"
@@ -279,7 +291,7 @@ async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is available again.")
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )
@@ -342,7 +354,7 @@ async def test_full_cluster_restart(ops_test: OpsTest) -> None:
     time.sleep(RESTART_DELAY_PATCHED)
 
     # now check the availability and formation of the cluster
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )
@@ -407,7 +419,7 @@ async def test_full_cluster_crash(ops_test: OpsTest) -> None:
     time.sleep(RESTART_DELAY_PATCHED)
 
     # now check the availability and formation of the cluster
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )
@@ -453,7 +465,9 @@ async def test_restart_raft_leader_after_deleting_database_file(ops_test: OpsTes
     time.sleep(10)
 
     # get details for the current raft leader in the cluster
-    initial_raft_leader = get_raft_leader(endpoints=endpoints)
+    initial_raft_leader = get_raft_leader(
+        endpoints=endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"initial raft leader: {initial_raft_leader}")
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
@@ -475,7 +489,9 @@ async def test_restart_raft_leader_after_deleting_database_file(ops_test: OpsTes
 
     # ensure a new leader was assigned after waiting for the `election timeout`
     time.sleep(3)
-    new_raft_leader = get_raft_leader(endpoints=remaining_endpoints)
+    new_raft_leader = get_raft_leader(
+        endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
+    )
     logger.info(f"new raft leader: {new_raft_leader}")
     assert new_raft_leader != initial_raft_leader, (
         "raft leadership not transferred after freeze of leader"
@@ -491,7 +507,7 @@ async def test_restart_raft_leader_after_deleting_database_file(ops_test: OpsTes
     assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is available again.")
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"expected {init_units_count} cluster members, got {len(cluster_members)}"
     )

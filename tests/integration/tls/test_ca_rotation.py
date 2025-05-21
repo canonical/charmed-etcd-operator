@@ -58,13 +58,15 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
-    assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
-
     # make sure data can be written to the cluster
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
+    assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
 
@@ -166,13 +168,15 @@ async def test_ca_rotation(ops_test: OpsTest) -> None:
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
-    assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
-
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
 
     password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
+    assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     logger.info("Reading and writing keys with HTTP peerURLs and HTTPS clientURLs")
     assert (
