@@ -5,6 +5,7 @@
 """Etcd related and core event handlers."""
 
 import logging
+from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
 
 import ops
@@ -305,6 +306,12 @@ class EtcdEvents(Object):
                 return
 
         self.charm.cluster_manager.clean_users()
+
+        try:
+            self.charm.tls_manager.check_certificate_validity()
+            self.charm.state.unit_server.update({"certificates_expiring": ""})
+        except CalledProcessError:
+            self.charm.state.unit_server.update({"certificates_expiring": "True"})
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""

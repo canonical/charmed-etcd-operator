@@ -227,7 +227,14 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     tls_config = {"root-ca-validity": "12m", "certificate-validity": "6m"}
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME, TLS_NAME],
+        apps_full_statuses={
+            APP_NAME: {"blocked": ["TLS certificates expiring soon..."], "active": []},
+            TLS_NAME: {"active": []},
+        },
+    )
 
     logger.info("Getting the current CA certificates")
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
@@ -254,7 +261,14 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     logger.info("Waiting ~6m for expiration of certificates - renewed certs will have a new CA")
     # 6m + 30s for renewal to start
     time.sleep(390)
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME, TLS_NAME],
+        apps_full_statuses={
+            APP_NAME: {"blocked": ["TLS certificates expiring soon..."], "active": []},
+            TLS_NAME: {"active": []},
+        },
+    )
 
     logger.info("Checking if the CA certificates are rotated")
     new_peer_ca = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER, is_ca=True)
