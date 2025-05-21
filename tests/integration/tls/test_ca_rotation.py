@@ -221,7 +221,7 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     """
     model = ops_test.model_full_name
 
-    logger.info("Adjusting validity of the CA certificate to 5 minutes")
+    logger.info("Adjusting validity of the CA certificate to 6 minutes")
     # CA validity should be 2x cert validity to make sure the cert is also expired at this time
     tls_config = {"root-ca-validity": "6m", "certificate-validity": "3m"}
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
