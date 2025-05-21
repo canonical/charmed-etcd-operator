@@ -264,9 +264,9 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        apps_full_statuses={
-            APP_NAME: {"blocked": ["TLS certificates expiring soon..."], "active": []},
-            TLS_NAME: {"active": []},
+        units_full_statuses={
+            APP_NAME: {"units": {"blocked": ["TLS certificates expiring soon..."], "active": []}},
+            TLS_NAME: {"units": {"active": []}},
         },
     )
 
