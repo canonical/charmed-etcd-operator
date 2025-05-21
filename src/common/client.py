@@ -46,6 +46,8 @@ class EtcdClient:
             command="endpoint",
             subcommand="status",
             endpoints=self.client_url,
+            auth_username=self.user,
+            auth_password=self.password,
             output_format="json",
         ):
             try:
