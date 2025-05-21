@@ -251,8 +251,9 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     )
     assert current_client_certificate, "Failed to get the current client certificate"
 
-    logger.info("Waiting 6m for expiration of certificates - renewed certs will have a new CA")
-    time.sleep(360)
+    logger.info("Waiting ~6m for expiration of certificates - renewed certs will have a new CA")
+    # 6m + 30s for renewal to start
+    time.sleep(390)
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
     logger.info("Checking if the CA certificates are rotated")
