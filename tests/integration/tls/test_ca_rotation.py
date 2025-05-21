@@ -221,9 +221,10 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     """
     model = ops_test.model_full_name
 
-    logger.info("Adjusting validity of the CA certificate to 6 minutes")
-    # CA validity should be 2x cert validity to make sure the cert is also expired at this time
-    tls_config = {"root-ca-validity": "6m", "certificate-validity": "3m"}
+    # cert validity should be enough time for the rotation to happen
+    # even with health checks failing because of invalid certs
+    logger.info("Adjusting validity of the CA to 1 hour and certificates to 6 minutes")
+    tls_config = {"root-ca-validity": "1h", "certificate-validity": "6m"}
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
@@ -250,7 +251,7 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     )
     assert current_client_certificate, "Failed to get the current client certificate"
 
-    logger.info("Waiting 6m for expiration of CA certificate")
+    logger.info("Waiting 6m for expiration of certificates - renewed certs will have a new CA")
     time.sleep(360)
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
