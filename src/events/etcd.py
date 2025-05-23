@@ -249,6 +249,12 @@ class EtcdEvents(Object):
             except KeyError as e:
                 logger.warning(f"Error updating client relations data: {e}")
 
+        try:
+            self.charm.tls_manager.check_certificate_validity()
+            self.charm.state.unit_server.update({"certificates_expiring": ""})
+        except CalledProcessError:
+            self.charm.state.unit_server.update({"certificates_expiring": "True"})
+
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
         if not self.charm.unit.is_leader():
