@@ -90,7 +90,12 @@ class Status(Enum):
     TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be ready"), "DEBUG")
     TLS_PEER_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating peer CA..."), "DEBUG")
     TLS_CLIENT_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating client CA..."), "DEBUG")
-    TLS_CERTS_EXPIRING = StatusLevel(BlockedStatus("TLS certificates expiring soon..."), "INFO")
+    TLS_CERTS_EXPIRING = StatusLevel(
+        MaintenanceStatus(
+            "TLS certificates expiring soon. Please ensure new certificates are provided."
+        ),
+        "WARNING",
+    )
     SERVICE_INSTALLING = StatusLevel(MaintenanceStatus("Installing etcd..."), "DEBUG")
     SERVICE_STARTING = StatusLevel(MaintenanceStatus("Waiting for etcd to start..."), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
