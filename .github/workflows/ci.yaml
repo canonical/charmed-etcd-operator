@@ -141,7 +141,7 @@ jobs:
           sudo snap install terraform --channel=latest/stable --classic
       - name: juju set up
         run: |
-          sudo snap install juju --channel=3.6/beta --classic
+          sudo snap install juju --channel=3.6/stable --classic
           sudo snap install juju-wait --channel=latest/stable --classic
           sudo snap install jq
       - name: LXD setup
@@ -164,3 +164,6 @@ jobs:
           juju add-model test
           terraform init
           terraform apply -var "model=test" -auto-approve
+      - name: Model Status
+        run: |
+          juju status --relations
