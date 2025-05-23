@@ -166,4 +166,6 @@ jobs:
           terraform apply -var "model=test" -auto-approve
       - name: Model Status
         run: |
+          # wait for etcd to be ready
+          sleep 180
           juju status --relations
