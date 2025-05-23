@@ -125,13 +125,12 @@ class ExternalClientsEvents(Object):
                     )
                 )
                 if self.charm.cluster_manager.get_user(common_name) is not None:
-                    if common_name != relation_managed_user:
-                        logger.error("User already exists")
-                        self.charm.set_status(Status.EC_USERNAME_EXISTS)
-                        return
                     if common_name == relation_managed_user:
                         logger.debug("User is already being added for this relation")
-                        return
+                    else:
+                        logger.error("User already exists")
+                        self.charm.set_status(Status.EC_USERNAME_EXISTS)
+                    return
 
                 if relation_managed_user is None:
                     logger.info(f"Creating new user: {common_name}")
