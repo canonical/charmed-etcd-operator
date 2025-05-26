@@ -33,7 +33,7 @@ resource "juju_application" "data-integrator" {
     base     = var.data-integrator.base
   }
   model  = var.etcd.model
-  config = tomap(var.data-integrator.config)
+  config = var.data-integrator.config
 
   constraints = var.data-integrator.constraints
 }
@@ -49,6 +49,19 @@ resource "juju_application" "grafana-agent" {
   config = var.grafana-agent.config
 }
 
+
+resource "juju_application" "backups-integrator" {
+  charm {
+    name     = "${var.backups-integrator.storage_type}-integrator"
+    channel  = var.backups-integrator.channel
+    revision = var.backups-integrator.revision
+    base     = var.backups-integrator.base
+  }
+  model  = var.etcd.model
+  config = var.backups-integrator.config
+
+  constraints = var.backups-integrator.constraints
+}
 
 #--------------------------------------------------------
 # 2. INTEGRATIONS
@@ -90,3 +103,5 @@ resource "juju_integration" "grafana_agent-etcd" {
     juju_application.grafana-agent,
   ]
 }
+
+# TODO add backup integrator <-> etcd integration once backups are merged in etcd

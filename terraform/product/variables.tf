@@ -37,14 +37,22 @@ variable "self-signed-certificates" {
   }
 }
 
+variable "grafana-agent" {
+  description = "Configuration for the grafana-agent"
+  type = object({
+    channel     = optional(string, "latest/stable")
+    revision    = optional(string, null)
+    base        = optional(string, "ubuntu@24.04")
+    constraints = optional(string, "arch=amd64")
+    config      = optional(map(string), {})
+  })
+  default = {}
+}
 
 variable "data-integrator" {
   description = "Configuration for the data-integrator"
   type = object({
-    config = object({
-      prefix-name = string,
-      mtls-cert   = string,
-    })
+    config      = optional(map(string), { "prefix-name" : "/test/" })
     channel     = optional(string, "latest/edge")
     base        = optional(string, "ubuntu@24.04")
     revision    = optional(string, null)
@@ -56,16 +64,29 @@ variable "data-integrator" {
     condition     = length(var.data-integrator.machines) <= 1
     error_message = "Machine count should be at most 1"
   }
+
+  default = {}
 }
 
-variable "grafana-agent" {
-  description = "Configuration for the grafana-agent"
+variable "backups-integrator" {
+  description = "Configuration for the backup integrator"
   type = object({
-    channel     = optional(string, "latest/stable")
-    revision    = optional(string, null)
-    base        = optional(string, "ubuntu@24.04")
-    constraints = optional(string, "arch=amd64")
-    config      = optional(map(string), {})
+    storage_type = optional(string, "s3")
+    config       = map(string)
+    channel      = optional(string, "latest/edge")
+    base         = optional(string, "ubuntu@22.04")
+    revision     = optional(string, null)
+    constraints  = optional(string, "arch=amd64")
+    machines     = optional(list(string), [])
   })
-  default = {}
+
+  validation {
+    condition     = contains(["s3", "azure-storage"], var.backups-integrator.storage_type)
+    error_message = "backup-integrator allows one of the values: 's3', 'azure' for storage_type."
+  }
+
+  validation {
+    condition     = length(var.backups-integrator.machines) <= 1
+    error_message = "Machine count should be at most 1"
+  }
 }
