@@ -12,6 +12,9 @@ description: |
   distributed systems, such as Kubernetes. This charmed operator deploys and operates
   etcd on virtual machines.
 
+  To learn more about its deployment and operation, see the 
+  [official Charmed etcd documentation](https://canonical-charmed-etcd.readthedocs-hosted.com/).
+
 peers:
   etcd-peers:
     interface: etcd_peers
