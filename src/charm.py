@@ -243,6 +243,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         """
         if self.app.planned_units() == 0:
             event.add_status(Status.REMOVED.value.status)
+            return
 
         # compute cluster status
         for status in self.cluster_manager.compute_component_status():
