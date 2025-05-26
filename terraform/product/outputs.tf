@@ -4,19 +4,19 @@
 
 # integration endpoints
 output "requires" {
-  description = "Map of all \"requires\" endpoints"
+  description = "Map of all \"requires\" endpoints: enppoint-name: interface-name"
   value = {
-    peer_certificates   = "peer-certificates"
-    client_certificates = "client-certificates"
-    client_cas          = "client-cas"
+    peer-certificates   = "tls-certificates"
+    client-certificates = "tls-certificates"
+    client-cas          = "certificate_transfer"
   }
 }
 
 output "provides" {
-  description = "Map of all \"provides\" endpoints"
+  description = "Map of all \"provides\" endpoints: enppoint-name: interface-name"
   value = {
-    etcd_client = "etcd-client"
-    cos_agent   = "cos-agent"
+    etcd-client = "etcd_client"
+    cos-agent   = "cos_agent"
   }
 }
 
