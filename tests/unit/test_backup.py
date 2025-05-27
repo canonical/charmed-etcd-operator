@@ -99,15 +99,6 @@ def test_create_backup_action():
 
         assert e.message == "No credentials for object storage available."
 
-    # ensure backup cannot be created if unit not started
-    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
-    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("create-backup"), state_in)
-
-        assert e.message == "Database is not started, cannot perform backup action."
-
     # ensure action fails if snapshot in etcd cannot be created
     peer_relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
@@ -115,8 +106,9 @@ def test_create_backup_action():
     secret_content = {"s3-credentials": json.dumps(s3_credentials)}
     secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
     state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with patch(
-        "subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="snapshot save")
+    with (
+        patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="snapshot save")),
+        patch("workload.EtcdWorkload.alive", return_value=True),
     ):
         with raises(testing.ActionFailed) as e:
             ctx.run(ctx.on.action("create-backup"), state_in)
@@ -183,15 +175,6 @@ def test_list_backups_action():
         ctx.run(ctx.on.action("list-backups"), state_in)
 
         assert e.message == "No credentials for object storage available."
-
-    # ensure action fails if unit not started
-    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
-    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("list-backups"), state_in)
-
-        assert e.message == "Database is not started, cannot perform backup action."
 
     # happy path
     peer_relation = testing.PeerRelation(

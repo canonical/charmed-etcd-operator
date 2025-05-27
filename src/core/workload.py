@@ -112,6 +112,11 @@ class WorkloadBase(ABC):
         pass
 
     @abstractmethod
+    def copy_file(self, src_file: str, dst_file: str) -> None:
+        """Copy a source-file to a destination-file."""
+        pass
+
+    @abstractmethod
     def remove_file(self, file: str) -> None:
         """Remove a file.
 

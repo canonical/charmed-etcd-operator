@@ -7,7 +7,7 @@
 import logging
 import subprocess
 from pathlib import Path
-from shutil import rmtree
+from shutil import copyfile, rmtree
 from typing import List
 
 from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
@@ -71,6 +71,10 @@ class EtcdWorkload(WorkloadBase):
     @override
     def restart(self) -> None:
         self.etcd.restart(services=[SNAP_SERVICE])
+
+    @override
+    def copy_file(self, src_file: str, dst_file: str) -> None:
+        copyfile(src_file, dst_file)
 
     @override
     def remove_file(self, file) -> None:

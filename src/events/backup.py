@@ -221,9 +221,6 @@ class BackupEvents(Object):
         if not self.charm.state.cluster.s3_credentials:
             return "No credentials for object storage available."
 
-        if not self.charm.state.unit_server.is_started:
-            return "Database is not started, cannot perform backup action."
-
         if self.charm.state.cluster.is_backup_in_progress:
             return "Backup in progress, cannot perform action."
 

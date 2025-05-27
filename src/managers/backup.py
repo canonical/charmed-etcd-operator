@@ -115,11 +115,16 @@ class BackupManager:
         s3_parameters = self.state.cluster.s3_credentials
         upload_target = f"{s3_parameters['path']}/{backup_id}"
 
-        etcd_client = self._get_etcd_client()
-
-        if not etcd_client.create_database_snapshot():
-            self.state.cluster.update({"backup_id": ""})
-            raise EtcdBackupError("Failed to create database backup.")
+        if self.workload.alive():
+            # online backup
+            etcd_client = self._get_etcd_client()
+            if not etcd_client.create_database_snapshot():
+                self.state.cluster.update({"backup_id": ""})
+                raise EtcdBackupError("Failed to create database backup.")
+        else:
+            # offline backup from `member/snap/db` file
+            logger.info("Cluster is not running, creating offline backup")
+            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_PATH)
 
         bucket = self._get_bucket_resource(s3_parameters)
 

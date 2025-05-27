@@ -456,6 +456,8 @@ class EtcdClient:
                 args.append("--bump-revision")
                 args.append("1000000000")
                 args.append("--mark-compacted")
+                # allow restoring from an offline backup
+                args.append("--skip-hash-check")
             if cluster_config:
                 args.append("--initial-cluster")
                 args.append(cluster_config)
