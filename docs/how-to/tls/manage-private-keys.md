@@ -30,7 +30,7 @@ For example, to set the private key for the peer-to-peer communication, run
 :input: juju config charmed-etcd tls-peer-private-key=secret:cuni0uh34trs5tihuf9g
 ```
 
-Once the configuration is set, the charm will use the private key stored in the secret to generate new certificate signing requests (CSR) to aquire new certificates from the TLS provider.
+Once the configuration is set, the charm will use the private key stored in the secret to generate new certificate signing requests (CSR) to acquire new certificates from the TLS provider.
 
 Setting the private key for the client-to-server communication is similar to the peer-to-peer communication. You can set the private key for the client-to-server communication by running:
 

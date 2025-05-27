@@ -14,7 +14,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
 
-from literals import CLIENT_PORT, PEER_RELATION, TLSType
+from literals import CLIENT_PORT, PEER_RELATION, TLS_ROOT_DIR, TLSType
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,10 @@ def get_cluster_endpoints(
 
 
 def get_unit_endpoint(
-    ops_test: OpsTest, unit_name: str, app_name: str = APP_NAME, tls_enabled: bool = False
+    ops_test: OpsTest,
+    unit_name: str,
+    app_name: str = APP_NAME,
+    tls_enabled: bool = False,
 ) -> str:
     """Resolve the etcd endpoint for a given unit name."""
     for unit in ops_test.model.applications[app_name].units:
@@ -283,7 +286,7 @@ def get_certificate_from_unit(
     model: str, unit: str, cert_type: TLSType, is_ca: bool = False
 ) -> str | None:
     """Retrieve a certificate from a unit."""
-    command = f'juju ssh --model={model} {unit} "cat /var/snap/charmed-etcd/common/tls/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
+    command = f'juju ssh --model={model} {unit} "cat {TLS_ROOT_DIR}/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
     output = subprocess.getoutput(command)
     if output.startswith("-----BEGIN CERTIFICATE-----"):
         return output
@@ -304,7 +307,9 @@ async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str
     """
     assert ops_test.model is not None, "Model is not set"
     return_code, std_out, std_err = await ops_test.juju(
-        "add-secret", secret_name, " ".join([f"{key}={value}" for key, value in content.items()])
+        "add-secret",
+        secret_name,
+        " ".join([f"{key}={value}" for key, value in content.items()]),
     )
 
     assert return_code == 0, f"Failed to add secret: {std_err}"
@@ -317,7 +322,7 @@ async def download_client_certificate_from_unit(
 ) -> None:
     """Copy the client certificate files from a unit to the host's filesystem."""
     unit = ops_test.model.applications[app_name].units[0]
-    tls_path = "/var/snap/charmed-etcd/common/tls"
+    tls_path = TLS_ROOT_DIR
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
         await unit.scp_from(f"{tls_path}/{file}", file)

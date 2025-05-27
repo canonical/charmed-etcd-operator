@@ -1,4 +1,3 @@
-(scale-horizontally)=
 # How to scale horizontally
 
 Adding and removing nodes from an etcd deployment is done by scaling [Juju units](https://juju.is/docs/juju/unit). 
@@ -62,14 +61,17 @@ $ etcdctl member list --endpoints=10.105.253.210:2379 -w=table
 ```
 
 ## Remove a node
-> Warning: It is **highly recommended** to always have a cluster size greater 
-> than two in production. It is unsafe to remove a member from a two member 
-> cluster. If there is a failure during the removal process, the cluster might
-> not be able to process requests anymore.
+
+```{caution}
+It is **highly recommended** to always have a cluster size greater 
+than two in production. It is unsafe to remove a member from a two member 
+cluster. If there is a failure during the removal process, the cluster might
+not be able to process requests anymore.
+```
 
 Removing a unit from the Juju application scales down your etcd cluster by one 
 node. Before we scale down the nodes we no longer need, list all the units with 
-juju status. Here you will see four units / nodes: 
+juju status. Here you will see four units/nodes: 
 - `charmed-etcd/0`
 - `charmed-etcd/1`
 - `charmed-etcd/2`

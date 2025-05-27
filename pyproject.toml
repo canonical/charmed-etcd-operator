@@ -18,7 +18,7 @@ ops = ">=2.0.0"
 poetry-core = "*"
 # tls_certificates_interface/v4/tls_certificates.py
 cryptography = "==44.0.2"
-pydantic = "==2.9.1"
+pydantic = ">= 1.0"
 cosl = ">= 0.0.50"
 
 [tool.poetry.requires-plugins]
@@ -59,7 +59,7 @@ juju = "==3.6.0"
 allure-pytest = "*"
 allure-pytest-collection-report = { git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/allure_pytest_collection_report" }
 tenacity = "*"
-pydantic = "==2.9.1"
+pydantic = ">= 1.0"
 
 [tool.coverage.run]
 branch = true

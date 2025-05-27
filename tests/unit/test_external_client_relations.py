@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
-    _get_certificate_request_extensions,
+    _generate_certificate_request_extensions,
     generate_ca,
     generate_certificate,
     generate_csr,
@@ -123,7 +123,7 @@ def certificate_no_basic_constaints():
         .not_valid_before(datetime.now(timezone.utc))
         .not_valid_after(datetime.now(timezone.utc) + validity)
     )
-    extensions = _get_certificate_request_extensions(
+    extensions = _generate_certificate_request_extensions(
         authority_key_identifier=ca_pem.extensions.get_extension_for_class(
             x509.SubjectKeyIdentifier
         ).value.key_identifier,
