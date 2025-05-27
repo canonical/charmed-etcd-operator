@@ -53,6 +53,9 @@ class BackupEvents(Object):
         self.framework.observe(
             self.charm.on[PEER_RELATION].relation_changed, self._on_peer_relation_changed
         )
+        self.framework.observe(
+            self.charm.on[PEER_RELATION].relation_departed, self._on_peer_relation_changed
+        )
 
     def _on_s3_credentials_changed(self, event: CredentialsChangedEvent) -> None:
         """Handle an update of the s3 credentials from s3-integrator."""

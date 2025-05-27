@@ -208,8 +208,11 @@ class BackupManager:
         logger.info(f"Restoring database backup {backup_id_to_restore}")
 
         # existing data directory has to be purged, otherwise restore will fail
-        self.workload.remove_directory(DATABASE_DIR)
-        logger.info(f"Removed previous database files from {DATABASE_DIR} before restoring.")
+        try:
+            self.workload.remove_directory(DATABASE_DIR)
+            logger.info(f"Removed previous database files from {DATABASE_DIR} before restoring.")
+        except FileNotFoundError:
+            logger.info(f"No database file found in {DATABASE_DIR} - nothing to remove")
 
         etcd_client = self._get_etcd_client()
 
