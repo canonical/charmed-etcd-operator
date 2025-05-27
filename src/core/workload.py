@@ -155,3 +155,13 @@ class WorkloadBase(ABC):
     def enable_service(self) -> None:
         """Enable the systemd service."""
         pass
+
+    @abstractmethod
+    def disable_database(self) -> None:
+        """Stop the workload and disable the service."""
+        pass
+
+    @abstractmethod
+    def enable_database(self) -> None:
+        """Enable the service and start the workload."""
+        pass

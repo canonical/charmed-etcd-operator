@@ -115,3 +115,13 @@ class EtcdWorkload(WorkloadBase):
     @override
     def enable_service(self) -> None:
         service_enable(f"snap.{SNAP_NAME}.{SNAP_SERVICE}")
+
+    @override
+    def disable_database(self) -> None:
+        self.disable_service()
+        self.stop()
+
+    @override
+    def enable_database(self) -> None:
+        self.enable_service()
+        self.start()

@@ -483,4 +483,4 @@ class EtcdClient:
             logger.error(f"Timed out running etcdutl: {e.stderr}")
             return False
 
-        return True if result == 0 else False
+        return result == 0

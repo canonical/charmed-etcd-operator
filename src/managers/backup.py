@@ -186,17 +186,16 @@ class BackupManager:
             logger.error(e)
             return False
 
-        self.state.unit_server.update({"restore_step": RestoreStep.DOWNLOAD.value})
+        self.set_restore_step(RestoreStep.DOWNLOAD.value)
         return True
 
-    def stop_database_workload(self) -> None:
+    def stop_database(self) -> None:
         """Shutdown and disable the etcd database before restoring."""
         logger.info("Stopping and disabling etcd workload.")
         # disable the service to avoid restart while the backup is restored
-        self.workload.disable_service()
-        self.workload.stop()
+        self.workload.disable_database()
 
-        self.state.unit_server.update({"restore_step": RestoreStep.STOP.value})
+        self.set_restore_step(RestoreStep.STOP.value)
 
     def restore_backup(self) -> None:
         """Perform the actual restore-operation on the etcd database."""
@@ -219,22 +218,21 @@ class BackupManager:
             raise EtcdBackupError("Failed to restore database backup.")
 
         logger.info("Restored backup successfully.")
-        self.state.unit_server.update({"restore_step": RestoreStep.RESTORE.value})
+        self.set_restore_step(RestoreStep.RESTORE.value)
 
-    def start_database_workload(self) -> None:
+    def start_database(self) -> None:
         """Enable and start the etcd database again after restoring."""
         logger.info("Enabling and starting etcd workload.")
-        self.workload.enable_service()
-        self.workload.start()
+        self.workload.enable_database()
 
-        self.state.unit_server.update({"restore_step": RestoreStep.RESTART.value})
+        self.set_restore_step(RestoreStep.START.value)
 
     def clean_up_after_restore(self) -> None:
         """Remove backup files and state from unit."""
         logger.info("Removing backup file after restore completed.")
 
         self.workload.remove_file(f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
-        self.state.unit_server.update({"restore_step": ""})
+        self.set_restore_step("")
 
     @staticmethod
     def format_backup_list(backup_list: list[str]) -> str:
@@ -271,20 +269,23 @@ class BackupManager:
             case RestoreStep.STOP:
                 return RestoreStep.RESTORE
             case RestoreStep.RESTORE:
-                return RestoreStep.RESTART
-            case RestoreStep.RESTART:
+                return RestoreStep.START
+            case RestoreStep.START:
                 return RestoreStep.COMPLETED
+
+    def set_restore_step(self, restore_step: str) -> None:
+        """Update the unit's current step in the databag."""
+        self.state.unit_server.update({"restore_step": restore_step})
 
     def proceed_restore_workflow_if_possible(self) -> None:
         """Check workflow progress for all units and proceed to next step if possible."""
         current_step = self.state.cluster.restore_instruction
 
-        # `cluster_state` must be reset before starting a restored cluster
         if current_step == RestoreStep.RESTORE:
+            # `cluster_state` must be reset before starting a restored cluster
             self.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
-
-        # clean up peer relation app data after restore workflow is done
-        if current_step == RestoreStep.COMPLETED:
+        elif current_step == RestoreStep.COMPLETED:
+            # clean up peer relation app data after restore workflow is done
             self.state.cluster.update(
                 {
                     "restore_instruction": "",
