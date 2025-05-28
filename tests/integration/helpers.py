@@ -68,11 +68,7 @@ def get_key(
             --cert client.pem \
             --key client.key"
 
-    try:
-        result = subprocess.getoutput(etcd_command).split("\n")
-        return result[1]
-    except IndexError:
-        logger.info(result)
+    return subprocess.getoutput(etcd_command).split("\n")[1]
 
 
 @retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
