@@ -94,7 +94,7 @@ class Status(Enum):
         MaintenanceStatus("Database restore is in progress"), "ERROR"
     )
     RESTORE_UNHEALTHY = StatusLevel(
-        BlockedStatus("cluster unhealthy after restoring backup - check credentials"), "ERROR"
+        BlockedStatus("cluster unhealthy after restoring backup - check debug-log"), "ERROR"
     )
     TLS_DISABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Disabling peer TLS..."), "DEBUG")
     TLS_DISABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Disabling client TLS..."), "DEBUG")
@@ -145,5 +145,5 @@ class RestoreStep(Enum):
     DOWNLOAD = "download_backup"
     STOP = "stop_workload"
     RESTORE = "restore_backup"
-    RESTART = "restart_workload"
+    START = "restart_workload"
     COMPLETED = "completed"

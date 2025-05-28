@@ -69,6 +69,9 @@ class BackupEvents(Object):
         self.framework.observe(
             self.charm.on[PEER_RELATION].relation_changed, self._on_peer_relation_changed
         )
+        self.framework.observe(
+            self.charm.on[PEER_RELATION].relation_departed, self._on_peer_relation_changed
+        )
 
     def _on_s3_credentials_changed(self, event: CredentialsChangedEvent) -> None:
         """Handle an update of the s3 credentials from s3-integrator."""
@@ -213,6 +216,10 @@ class BackupEvents(Object):
             event.fail("Must provide backup-id to restore.")
             return
 
+        if backup_id_to_restore not in self.charm.backup_manager.list_backups():
+            event.fail("Backup ID not found.")
+            return
+
         event.log(f"Initiating restore process for backup-id {backup_id_to_restore}")
 
         if not self.charm.backup_manager.download_backup_file(backup_id_to_restore):
@@ -243,22 +250,22 @@ class BackupEvents(Object):
                 ):
                     self.charm.set_status(Status.RESTORE_FAILED)
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
-                self.charm.backup_manager.stop_database_workload()
+                self.charm.backup_manager.stop_database()
             case RestoreStep.RESTORE, RestoreStep.STOP:
                 try:
                     self.charm.backup_manager.restore_backup()
                 except EtcdBackupError:
                     self.charm.set_status(Status.RESTORE_FAILED)
-            case RestoreStep.RESTART, RestoreStep.RESTORE:
+            case RestoreStep.START, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
-                self.charm.backup_manager.start_database_workload()
+                self.charm.backup_manager.start_database()
                 if self.charm.unit.is_leader():
                     try:
                         # always enable auth in case a backup without auth was restored
                         self.charm.cluster_manager.enable_authentication()
                     except EtcdUserManagementError:
                         logger.info("Auth already enabled")
-            case RestoreStep.COMPLETED, RestoreStep.RESTART:
+            case RestoreStep.COMPLETED, RestoreStep.START:
                 if not self.charm.cluster_manager.is_healthy(cluster=False):
                     # if the member is not healthy, we do not complete the restore process
                     self.charm.set_status(Status.RESTORE_UNHEALTHY)
@@ -295,10 +302,10 @@ class BackupEvents(Object):
         ):
             return "No credentials for Azure object storage available."
 
-        if not self.charm.state.unit_server.is_started:
-            return "Database is not started, cannot perform backup action."
+        if self.charm.state.cluster.is_backup_in_progress:
+            return "Backup in progress, cannot perform action."
 
         if self.charm.state.cluster.is_restore_in_progress:
-            return "Restore is already in progress."
+            return "Restore in progress, cannot perform action."
 
         return ""
