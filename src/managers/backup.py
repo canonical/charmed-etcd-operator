@@ -23,8 +23,6 @@ from literals import (
     BACKUP_ID_FORMAT,
     DATABASE_DIR,
     INTERNAL_USER,
-    RESTORE_FILE_NAME,
-    SNAP_CONFIG_PATH,
     SNAP_DATA_PATH,
     EtcdClusterState,
     RestoreStep,
@@ -124,7 +122,7 @@ class BackupManager:
         else:
             # offline backup from `member/snap/db` file
             logger.info("Cluster is not running, creating offline backup")
-            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_PATH)
+            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_NAME)
 
         bucket = self._get_bucket_resource(s3_parameters)
 
