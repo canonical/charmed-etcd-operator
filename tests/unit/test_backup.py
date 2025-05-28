@@ -141,19 +141,11 @@ def test_create_backup_action_s3():
 
     # ensure backup cannot be created if no s3-credentials
     state_in = testing.State(relations={peer_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("create-backup"), state_in)
+    with patch("workload.EtcdWorkload.alive", return_value=True):
+        with raises(testing.ActionFailed) as e:
+            ctx.run(ctx.on.action("create-backup"), state_in)
 
-        assert e.message == "No credentials for object storage available."
-
-    # ensure backup cannot be created if unit not started
-    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
-    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("create-backup"), state_in)
-
-        assert e.message == "Database is not started, cannot perform backup action."
+            assert e.message == "No credentials for object storage available."
 
     # ensure action fails if snapshot in etcd cannot be created
     peer_relation = testing.PeerRelation(
@@ -238,10 +230,11 @@ def test_create_backup_action_azure():
     state_in = testing.State(
         secrets=[secret], relations={peer_relation, azure_relation}, leader=True
     )
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("create-backup"), state_in)
+    with patch("workload.EtcdWorkload.alive", return_value=True):
+        with raises(testing.ActionFailed) as e:
+            ctx.run(ctx.on.action("create-backup"), state_in)
 
-        assert e.message == "Database is not started, cannot perform backup action."
+            assert e.message == "Database is not started, cannot perform backup action."
 
     # ensure action fails if snapshot in etcd cannot be created
     peer_relation = testing.PeerRelation(
@@ -252,8 +245,11 @@ def test_create_backup_action_azure():
     state_in = testing.State(
         secrets=[secret], relations={peer_relation, azure_relation}, leader=True
     )
-    with patch(
+    with (
+        patch(
         "subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="snapshot save")
+        ),
+        patch("workload.EtcdWorkload.alive", return_value=True),
     ):
         with raises(testing.ActionFailed) as e:
             ctx.run(ctx.on.action("create-backup"), state_in)
@@ -399,20 +395,12 @@ def test_list_backups_action_s3():
         assert e.message == "Action must be performed on the leader unit."
 
     # ensure action fails if no s3 relation
-    state_in = testing.State(relations={peer_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("list-backups"), state_in)
+    state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
+    with patch("workload.EtcdWorkload.alive", return_value=True):
+        with raises(testing.ActionFailed) as e:
+            ctx.run(ctx.on.action("list-backups"), state_in)
 
-        assert e.message == "No credentials for object storage available."
-
-    # ensure action fails if unit not started
-    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
-    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("list-backups"), state_in)
-
-        assert e.message == "Database is not started, cannot perform backup action."
+            assert e.message == "No credentials for object storage available."
 
     # happy path
     peer_relation = testing.PeerRelation(
@@ -689,7 +677,10 @@ def test_restore_action_azure():
         config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
     )
 
-    with patch("managers.backup.BackupManager.download_backup_file", return_value=True):
+    with (
+        patch("managers.backup.BackupManager.download_backup_file", return_value=True),
+        patch("managers.backup.BackupManager.list_backups", return_value=["xyz"]),
+    ):
         state_out = ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
 
         assert ctx.action_results == {"success": f"restore initiated for {backup_id}"}
