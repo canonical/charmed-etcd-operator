@@ -14,6 +14,7 @@ SNAP_NAME = "charmed-etcd"
 SNAP_REVISION = 2
 SNAP_SERVICE = "etcd"
 SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
+SNAP_CONFIG_PATH = "/var/snap/charmed-etcd/current"
 SNAP_USER = 584788
 SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
@@ -23,6 +24,7 @@ BACKUP_FILE_PATH = (
     "/var/snap/charmed-etcd/common/var/lib/etcd/member/snap/charmed-etcd_snapshot.db"
 )
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+RESTORE_FILE_NAME = "backup_to_restore.db"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
@@ -83,6 +85,13 @@ class Status(Enum):
     PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
+    RESTORE_FAILED = StatusLevel(BlockedStatus("failed to restore backup"), "ERROR")
+    RESTORE_IN_PROGRESS = StatusLevel(
+        MaintenanceStatus("Database restore is in progress"), "ERROR"
+    )
+    RESTORE_UNHEALTHY = StatusLevel(
+        BlockedStatus("cluster unhealthy after restoring backup - check debug-log"), "ERROR"
+    )
     TLS_DISABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Disabling peer TLS..."), "DEBUG")
     TLS_DISABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Disabling client TLS..."), "DEBUG")
     TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")
@@ -122,3 +131,15 @@ class TLSCARotationState(Enum):
     NEW_CA_DETECTED = "new-ca-detected"
     NEW_CA_ADDED = "new-ca-added"
     CERT_UPDATED = "cert-updated"
+
+
+# enum for Backup state
+class RestoreStep(Enum):
+    """Backup / Restore workflow step representation."""
+
+    NOT_STARTED = ""
+    DOWNLOAD = "download_backup"
+    STOP = "stop_workload"
+    RESTORE = "restore_backup"
+    START = "restart_workload"
+    COMPLETED = "completed"

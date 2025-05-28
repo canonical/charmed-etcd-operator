@@ -244,8 +244,9 @@ class EtcdOperatorCharm(ops.CharmBase):
         for status in self.tls_manager.compute_component_status():
             event.add_status(status.value.status)
 
-        # compute backup or other component's  status
-        # todo: add compute logic here
+        # compute backup status
+        for status in self.backup_manager.compute_component_status():
+            event.add_status(status.value.status)
 
         # add all other statuses collected during the current hook
         for status in self.pending_inactive_statuses + [Status.ACTIVE]:

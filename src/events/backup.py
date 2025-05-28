@@ -14,10 +14,15 @@ from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
 from ops import Object
-from ops.charm import ActionEvent
+from ops.charm import ActionEvent, RelationChangedEvent
 
-from common.exceptions import EtcdBackupError
-from literals import S3_RELATION_NAME, Status
+from common.exceptions import EtcdBackupError, EtcdUserManagementError
+from literals import (
+    PEER_RELATION,
+    S3_RELATION_NAME,
+    RestoreStep,
+    Status,
+)
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -39,9 +44,18 @@ class BackupEvents(Object):
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credentials_gone)
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
-        # When the leader unit is being removed, s3_client.on.credentials_gone is performed on it (and only on it).
+        self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
+        # When the leader unit is being removed, s3_requirer.on.credentials_gone is performed on it (and only on it).
         # After a new leader is elected, the S3 connection must be reinitialized.
         self.framework.observe(self.charm.on.leader_elected, self._on_s3_credentials_changed)
+        # The restore-workflow is synchronized across all units via the peer relation databag
+        # see for more information: https://github.com/canonical/charmed-etcd-operator/wiki/Backup-Restore:-Workflow
+        self.framework.observe(
+            self.charm.on[PEER_RELATION].relation_changed, self._on_peer_relation_changed
+        )
+        self.framework.observe(
+            self.charm.on[PEER_RELATION].relation_departed, self._on_peer_relation_changed
+        )
 
     def _on_s3_credentials_changed(self, event: CredentialsChangedEvent) -> None:
         """Handle an update of the s3 credentials from s3-integrator."""
@@ -80,8 +94,11 @@ class BackupEvents(Object):
 
     def _on_s3_credentials_gone(self, event: CredentialsGoneEvent) -> None:
         """Handle the removal of the relation with s3-integrator."""
-        if self.charm.state.cluster.is_backup_in_progress:
-            logger.debug("Backup in progress")
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.is_backup_in_progress
+        ):
+            logger.warning("Cannot s3-credentials while database backup/restore is in progress.")
             event.defer()
             return
 
@@ -101,7 +118,6 @@ class BackupEvents(Object):
             event.fail("There is currently a backup in progress, please wait.")
             return
 
-        self.charm.set_status(Status.BACKUP_IN_PROGRESS)
         event.log("Initiating backup process ...")
 
         try:
@@ -125,15 +141,93 @@ class BackupEvents(Object):
 
         event.set_results({"backups": self.charm.backup_manager.format_backup_list(backup_list)})
 
+    def _on_restore_action(self, event: ActionEvent) -> None:
+        """Download a backup from object storage and restore it to all units."""
+        if error := self._exists_preventing_reason():
+            event.set_results({"error": error})
+            event.fail(error)
+            return
+
+        if not (backup_id_to_restore := event.params.get("backup-id", "")):
+            event.fail("Must provide backup-id to restore.")
+            return
+
+        if backup_id_to_restore not in self.charm.backup_manager.list_backups():
+            event.fail("Backup ID not found.")
+            return
+
+        event.log(f"Initiating restore process for backup-id {backup_id_to_restore}")
+
+        if not self.charm.backup_manager.download_backup_file(backup_id_to_restore):
+            event.fail(f"Could not download backup-file {backup_id_to_restore}.")
+            return
+
+        # initiate synced workflow on all other units by updating peer-relation app-data
+        self.charm.state.cluster.update(
+            {"restore_id": backup_id_to_restore, "restore_instruction": RestoreStep.DOWNLOAD.value}
+        )
+
+        event.set_results({"success": f"restore initiated for {backup_id_to_restore}"})
+
+    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:  # noqa: C901
+        """Synchronize restore workflow across all units."""
+        if not self.charm.state.cluster.is_restore_in_progress:
+            return
+
+        # execute the restore-workflow
+        match (
+            # compare the current restore instruction against the current restore progress
+            self.charm.state.cluster.restore_instruction,
+            self.charm.state.unit_server.restore_step,
+        ):
+            case RestoreStep.DOWNLOAD, RestoreStep.NOT_STARTED:
+                if not self.charm.backup_manager.download_backup_file(
+                    self.charm.state.cluster.restore_id
+                ):
+                    self.charm.set_status(Status.RESTORE_FAILED)
+            case RestoreStep.STOP, RestoreStep.DOWNLOAD:
+                self.charm.backup_manager.stop_database()
+            case RestoreStep.RESTORE, RestoreStep.STOP:
+                try:
+                    self.charm.backup_manager.restore_backup()
+                except EtcdBackupError:
+                    self.charm.set_status(Status.RESTORE_FAILED)
+            case RestoreStep.START, RestoreStep.RESTORE:
+                self.charm.config_manager.set_config_properties()
+                self.charm.backup_manager.start_database()
+                if self.charm.unit.is_leader():
+                    try:
+                        # always enable auth in case a backup without auth was restored
+                        self.charm.cluster_manager.enable_authentication()
+                    except EtcdUserManagementError:
+                        logger.info("Auth already enabled")
+            case RestoreStep.COMPLETED, RestoreStep.START:
+                if not self.charm.cluster_manager.is_healthy(cluster=False):
+                    # if the member is not healthy, we do not complete the restore process
+                    self.charm.set_status(Status.RESTORE_UNHEALTHY)
+                    return
+                self.charm.backup_manager.clean_up_after_restore()
+
+        # continue to next workflow step if possible
+        if self.charm.unit.is_leader():
+            self.charm.backup_manager.proceed_restore_workflow_if_possible()
+
     def _exists_preventing_reason(self) -> str:
-        """Check if an action can be executed, if not return error message."""
+        """Check if an action can be executed, if not return error message.
+
+        Returns:
+            Error message in case a preventing reason for an action exists, otherwise empty str.
+        """
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
 
         if not self.charm.state.cluster.s3_credentials:
             return "No credentials for object storage available."
 
-        if not self.charm.state.unit_server.is_started:
-            return "Database is not started, cannot perform backup action."
+        if self.charm.state.cluster.is_backup_in_progress:
+            return "Backup in progress, cannot perform action."
+
+        if self.charm.state.cluster.is_restore_in_progress:
+            return "Restore in progress, cannot perform action."
 
         return ""

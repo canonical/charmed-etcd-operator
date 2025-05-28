@@ -111,3 +111,17 @@ class ClusterState(Object):
     def client_tls_relation(self) -> Relation | None:
         """Get the unit certificates relation."""
         return self.model.get_relation(CLIENT_TLS_RELATION_NAME)
+
+    @property
+    def can_restore_workflow_proceed(self) -> bool:
+        """Check if all units have completed the current restore instruction.
+
+        This check decides if the restore workflow can continue to the next step, by comparing the
+        current state of all peer units with the current restore instruction. Only if all units
+        have completed the current step, the workflow may proceed.
+
+        Returns:
+            True if all units are done, False if not.
+        """
+        current_instruction = self.cluster.restore_instruction
+        return all((unit.restore_step == current_instruction for unit in self.servers))

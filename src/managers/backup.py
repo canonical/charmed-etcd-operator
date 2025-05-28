@@ -6,6 +6,7 @@
 
 import logging
 from datetime import datetime
+from typing import List
 
 import boto3
 from botocore.client import Config
@@ -17,7 +18,18 @@ from common.client import EtcdClient
 from common.exceptions import EtcdBackupError
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import BACKUP_FILE_PATH, BACKUP_ID_FORMAT, INTERNAL_USER
+from literals import (
+    BACKUP_FILE_PATH,
+    BACKUP_ID_FORMAT,
+    DATABASE_DIR,
+    INTERNAL_USER,
+    RESTORE_FILE_NAME,
+    SNAP_CONFIG_PATH,
+    SNAP_DATA_PATH,
+    EtcdClusterState,
+    RestoreStep,
+    Status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +43,7 @@ class BackupManager:
         self.admin_user = INTERNAL_USER
         self.admin_password = self.state.cluster.internal_user_credentials.get(INTERNAL_USER, "")
 
-    def get_bucket_resource(self, s3_parameters: dict[str, str]) -> Bucket:
+    def _get_bucket_resource(self, s3_parameters: dict[str, str]) -> Bucket:
         """Get the Bucket resource from the s3 connection.
 
         Returns:
@@ -55,10 +67,18 @@ class BackupManager:
 
         return s3_resource.Bucket(s3_parameters["bucket"])
 
+    def _get_etcd_client(self) -> EtcdClient:
+        """Get a client connection to etcd."""
+        return EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
     def create_bucket(self, s3_parameters: dict[str, str]) -> None:
         """Create bucket if it does not exist yet."""
         region = s3_parameters.get("region")
-        bucket = self.get_bucket_resource(s3_parameters)
+        bucket = self._get_bucket_resource(s3_parameters)
 
         try:
             if region:
@@ -95,17 +115,18 @@ class BackupManager:
         s3_parameters = self.state.cluster.s3_credentials
         upload_target = f"{s3_parameters['path']}/{backup_id}"
 
-        etcd_client = EtcdClient(
-            username=self.admin_user,
-            password=self.admin_password,
-            client_url=self.state.unit_server.client_url,
-        )
+        if self.workload.alive():
+            # online backup
+            etcd_client = self._get_etcd_client()
+            if not etcd_client.create_database_snapshot():
+                self.state.cluster.update({"backup_id": ""})
+                raise EtcdBackupError("Failed to create database backup.")
+        else:
+            # offline backup from `member/snap/db` file
+            logger.info("Cluster is not running, creating offline backup")
+            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_PATH)
 
-        if not etcd_client.create_database_snapshot():
-            self.state.cluster.update({"backup_id": ""})
-            raise EtcdBackupError("Failed to create database backup.")
-
-        bucket = self.get_bucket_resource(s3_parameters)
+        bucket = self._get_bucket_resource(s3_parameters)
 
         try:
             for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
@@ -134,7 +155,7 @@ class BackupManager:
         """
         s3_parameters = self.state.cluster.s3_credentials
 
-        bucket = self.get_bucket_resource(s3_parameters)
+        bucket = self._get_bucket_resource(s3_parameters)
         backup_list = []
 
         try:
@@ -149,6 +170,77 @@ class BackupManager:
         backup_list.sort(reverse=True)
 
         return backup_list
+
+    def download_backup_file(self, backup_id: str) -> bool:
+        """Initiate the restore process by downloading the provided backup-id from object storage.
+
+        Returns:
+            True if backup-file could be downloaded from object storage and restore process was
+            initiated, False otherwise.
+        """
+        s3_parameters = self.state.cluster.s3_credentials
+        download_source = f"{s3_parameters['path']}/{backup_id}"
+        logger.info(f"Initiating restore process for backup-id {backup_id}")
+
+        bucket = self._get_bucket_resource(s3_parameters)
+
+        try:
+            bucket.download_file(download_source, f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+            logger.info(f"Backup {backup_id} downloaded to {SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+        except ClientError as e:
+            logger.error(e)
+            return False
+
+        self.set_restore_step(RestoreStep.DOWNLOAD.value)
+        return True
+
+    def stop_database(self) -> None:
+        """Shutdown and disable the etcd database before restoring."""
+        logger.info("Stopping and disabling etcd workload.")
+        # disable the service to avoid restart while the backup is restored
+        self.workload.disable_database()
+
+        self.set_restore_step(RestoreStep.STOP.value)
+
+    def restore_backup(self) -> None:
+        """Perform the actual restore-operation on the etcd database."""
+        backup_id_to_restore = self.state.cluster.restore_id
+        logger.info(f"Restoring database backup {backup_id_to_restore}")
+
+        # existing data directory has to be purged, otherwise restore will fail
+        try:
+            self.workload.remove_directory(DATABASE_DIR)
+            logger.info(f"Removed previous database files from {DATABASE_DIR} before restoring.")
+        except FileNotFoundError:
+            logger.info(f"No database file found in {DATABASE_DIR} - nothing to remove")
+
+        etcd_client = self._get_etcd_client()
+
+        if not etcd_client.restore_database_snapshot(
+            snapshot_filename=f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}",
+            data_directory=SNAP_DATA_PATH,
+            cluster_config=self.state.cluster.cluster_members,
+            peer_url=self.state.unit_server.peer_url,
+            member_name=self.state.unit_server.member_name,
+        ):
+            raise EtcdBackupError("Failed to restore database backup.")
+
+        logger.info("Restored backup successfully.")
+        self.set_restore_step(RestoreStep.RESTORE.value)
+
+    def start_database(self) -> None:
+        """Enable and start the etcd database again after restoring."""
+        logger.info("Enabling and starting etcd workload.")
+        self.workload.enable_database()
+
+        self.set_restore_step(RestoreStep.START.value)
+
+    def clean_up_after_restore(self) -> None:
+        """Remove backup files and state from unit."""
+        logger.info("Removing backup file after restore completed.")
+
+        self.workload.remove_file(f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+        self.set_restore_step("")
 
     @staticmethod
     def format_backup_list(backup_list: list[str]) -> str:
@@ -173,3 +265,57 @@ class BackupManager:
         raw_ca = "\n".join(cert for cert in tls_ca_chain)
         self.workload.write_file(raw_ca, self.workload.paths.tls.backup_ca)
         logger.debug(f"TLS CA chain stored in {self.workload.paths.tls.backup_ca}")
+
+    @staticmethod
+    def next_restore_step(current_step: RestoreStep) -> RestoreStep:
+        """Define the order of steps for the restore workflow."""
+        match current_step:
+            case RestoreStep.NOT_STARTED:
+                return RestoreStep.DOWNLOAD
+            case RestoreStep.DOWNLOAD:
+                return RestoreStep.STOP
+            case RestoreStep.STOP:
+                return RestoreStep.RESTORE
+            case RestoreStep.RESTORE:
+                return RestoreStep.START
+            case RestoreStep.START:
+                return RestoreStep.COMPLETED
+
+    def set_restore_step(self, restore_step: str) -> None:
+        """Update the unit's current step in the databag."""
+        self.state.unit_server.update({"restore_step": restore_step})
+
+    def proceed_restore_workflow_if_possible(self) -> None:
+        """Check workflow progress for all units and proceed to next step if possible."""
+        current_step = self.state.cluster.restore_instruction
+
+        if current_step == RestoreStep.RESTORE:
+            # `cluster_state` must be reset before starting a restored cluster
+            self.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
+        elif current_step == RestoreStep.COMPLETED:
+            # clean up peer relation app data after restore workflow is done
+            self.state.cluster.update(
+                {
+                    "restore_instruction": "",
+                    "restore_id": "",
+                    "cluster_state": EtcdClusterState.EXISTING.value,
+                }
+            )
+            return
+
+        if self.state.can_restore_workflow_proceed:
+            next_step = self.next_restore_step(current_step)
+            logger.info(f"Next restore step: {next_step.value}")
+            self.state.cluster.update({"restore_instruction": next_step.value})
+
+    def compute_component_status(self) -> List[Status]:
+        """Compute the Backup manager's statuses."""
+        status_list = []
+
+        if self.state.cluster.is_backup_in_progress:
+            status_list.append(Status.BACKUP_IN_PROGRESS)
+
+        if self.state.cluster.is_restore_in_progress:
+            status_list.append(Status.RESTORE_IN_PROGRESS)
+
+        return status_list
