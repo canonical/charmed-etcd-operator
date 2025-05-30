@@ -99,15 +99,6 @@ def test_create_backup_action():
 
         assert e.message == "No credentials for object storage available."
 
-    # ensure backup cannot be created if unit not started
-    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
-    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("create-backup"), state_in)
-
-        assert e.message == "Database is not started, cannot perform backup action."
-
     # ensure action fails if snapshot in etcd cannot be created
     peer_relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
@@ -115,8 +106,9 @@ def test_create_backup_action():
     secret_content = {"s3-credentials": json.dumps(s3_credentials)}
     secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
     state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with patch(
-        "subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="snapshot save")
+    with (
+        patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="snapshot save")),
+        patch("workload.EtcdWorkload.alive", return_value=True),
     ):
         with raises(testing.ActionFailed) as e:
             ctx.run(ctx.on.action("create-backup"), state_in)
@@ -184,15 +176,6 @@ def test_list_backups_action():
 
         assert e.message == "No credentials for object storage available."
 
-    # ensure action fails if unit not started
-    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
-    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("list-backups"), state_in)
-
-        assert e.message == "Database is not started, cannot perform backup action."
-
     # happy path
     peer_relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
@@ -255,21 +238,6 @@ def test_restore_action():
 
         assert e.message == "Database is not started, cannot perform backup action."
 
-    # ensure action fails if no admin-secret configured
-    peer_relation = testing.PeerRelation(
-        id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
-    )
-    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
-    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    state_in = testing.State(secrets=[secret], relations={peer_relation, s3_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("restore"), state_in)
-
-        assert (
-            e.message
-            == "Admin secret missing - configure `system-users` secret before restoring a backup."
-        )
-
     # ensure action fails if another restore is already running
     peer_relation = testing.PeerRelation(
         id=1,
@@ -324,11 +292,41 @@ def test_restore_action():
         config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
     )
 
-    with patch("managers.backup.BackupManager.download_backup_file", return_value=False):
+    with (
+        patch("managers.backup.BackupManager.download_backup_file", return_value=False),
+        patch("managers.backup.BackupManager.list_backups", return_value=["xyz", "abc"]),
+    ):
         with raises(testing.ActionFailed) as e:
             ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
 
             assert e.message == f"Could not download backup-file {backup_id}."
+
+    # action should fail if backup-id doesn't exist
+    backup_id = "xyz"
+    secret_key = "root"
+    secret_value = "123"
+    secret_content = {secret_key: secret_value}
+    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    peer_relation = testing.PeerRelation(
+        id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
+    )
+    secret_content = {"s3-credentials": json.dumps(s3_credentials)}
+    secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    state_in = testing.State(
+        secrets=[secret],
+        relations={peer_relation, s3_relation},
+        leader=True,
+        config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
+    )
+
+    with (
+        patch("managers.backup.BackupManager.download_backup_file", return_value=False),
+        patch("managers.backup.BackupManager.list_backups", return_value=["abc"]),
+    ):
+        with raises(testing.ActionFailed) as e:
+            ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
+
+            assert e.message == "Backup ID not found."
 
     # happy path
     backup_id = "xyz"
@@ -348,7 +346,10 @@ def test_restore_action():
         config={INTERNAL_USER_PASSWORD_CONFIG: admin_secret.id},
     )
 
-    with patch("managers.backup.BackupManager.download_backup_file", return_value=True):
+    with (
+        patch("managers.backup.BackupManager.download_backup_file", return_value=True),
+        patch("managers.backup.BackupManager.list_backups", return_value=["xyz", "abc"]),
+    ):
         state_out = ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
 
         assert ctx.action_results == {"success": f"restore initiated for {backup_id}"}
@@ -382,10 +383,10 @@ def test_restore_workflow_order():
             )
             assert (
                 context.charm.backup_manager.next_restore_step(current_step=RestoreStep.RESTORE)
-                == RestoreStep.RESTART
+                == RestoreStep.START
             )
             assert (
-                context.charm.backup_manager.next_restore_step(current_step=RestoreStep.RESTART)
+                context.charm.backup_manager.next_restore_step(current_step=RestoreStep.START)
                 == RestoreStep.COMPLETED
             )
 
@@ -494,7 +495,7 @@ def test_restore_workflow_synchronization():
         )
         assert (
             state_out.get_relation(1).local_app_data.get("restore_instruction")
-            == RestoreStep.RESTART.value
+            == RestoreStep.START.value
         )
         assert (
             state_out.get_relation(1).local_app_data.get("cluster_state")
@@ -534,7 +535,7 @@ def test_restore_workflow_synchronization():
         local_unit_data={"state": "started", "restore_step": RestoreStep.RESTORE.value},
         local_app_data={
             "restore_id": "xyz",
-            "restore_instruction": RestoreStep.RESTART.value,
+            "restore_instruction": RestoreStep.START.value,
             "cluster_state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
         },
@@ -550,7 +551,7 @@ def test_restore_workflow_synchronization():
         write_config.assert_called_once()
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step")
-            == RestoreStep.RESTART.value
+            == RestoreStep.START.value
         )
 
     # restore step: restart (leader)
@@ -560,7 +561,7 @@ def test_restore_workflow_synchronization():
         local_unit_data={"state": "started", "restore_step": RestoreStep.RESTORE.value},
         local_app_data={
             "restore_id": "xyz",
-            "restore_instruction": RestoreStep.RESTART.value,
+            "restore_instruction": RestoreStep.START.value,
             "cluster_state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
         },
@@ -577,7 +578,7 @@ def test_restore_workflow_synchronization():
         write_config.assert_called_once()
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step")
-            == RestoreStep.RESTART.value
+            == RestoreStep.START.value
         )
         assert (
             state_out.get_relation(1).local_app_data.get("restore_instruction")
@@ -588,7 +589,7 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
+        local_unit_data={"state": "started", "restore_step": RestoreStep.START.value},
         local_app_data={
             "restore_id": "xyz",
             "restore_instruction": RestoreStep.COMPLETED.value,
@@ -613,7 +614,7 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
+        local_unit_data={"state": "started", "restore_step": RestoreStep.START.value},
         local_app_data={
             "restore_id": "xyz",
             "restore_instruction": RestoreStep.COMPLETED.value,
@@ -628,13 +629,15 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus("failed to restore backup")
+        assert state_out.unit_status == ops.BlockedStatus(
+            "cluster unhealthy after restoring backup - check debug-log"
+        )
 
     # restore step: clean up (leader)
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
+        local_unit_data={"state": "started", "restore_step": RestoreStep.START.value},
         local_app_data={
             "restore_id": "xyz",
             "restore_instruction": RestoreStep.COMPLETED.value,
@@ -668,7 +671,7 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTART.value},
+        local_unit_data={"state": "started", "restore_step": RestoreStep.START.value},
         local_app_data={
             "restore_id": "xyz",
             "restore_instruction": RestoreStep.COMPLETED.value,
@@ -683,4 +686,6 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus("failed to restore backup")
+        assert state_out.unit_status == ops.BlockedStatus(
+            "cluster unhealthy after restoring backup - check debug-log"
+        )

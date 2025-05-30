@@ -18,7 +18,6 @@ from ops.charm import ActionEvent, RelationChangedEvent
 
 from common.exceptions import EtcdBackupError, EtcdUserManagementError
 from literals import (
-    INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
     S3_RELATION_NAME,
     RestoreStep,
@@ -53,6 +52,9 @@ class BackupEvents(Object):
         # see for more information: https://github.com/canonical/charmed-etcd-operator/wiki/Backup-Restore:-Workflow
         self.framework.observe(
             self.charm.on[PEER_RELATION].relation_changed, self._on_peer_relation_changed
+        )
+        self.framework.observe(
+            self.charm.on[PEER_RELATION].relation_departed, self._on_peer_relation_changed
         )
 
     def _on_s3_credentials_changed(self, event: CredentialsChangedEvent) -> None:
@@ -141,13 +143,17 @@ class BackupEvents(Object):
 
     def _on_restore_action(self, event: ActionEvent) -> None:
         """Download a backup from object storage and restore it to all units."""
-        if error := self._exists_preventing_reason(check_restore=True):
+        if error := self._exists_preventing_reason():
             event.set_results({"error": error})
             event.fail(error)
             return
 
         if not (backup_id_to_restore := event.params.get("backup-id", "")):
             event.fail("Must provide backup-id to restore.")
+            return
+
+        if backup_id_to_restore not in self.charm.backup_manager.list_backups():
+            event.fail("Backup ID not found.")
             return
 
         event.log(f"Initiating restore process for backup-id {backup_id_to_restore}")
@@ -180,35 +186,34 @@ class BackupEvents(Object):
                 ):
                     self.charm.set_status(Status.RESTORE_FAILED)
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
-                self.charm.backup_manager.stop_database_workload()
+                self.charm.backup_manager.stop_database()
             case RestoreStep.RESTORE, RestoreStep.STOP:
                 try:
                     self.charm.backup_manager.restore_backup()
                 except EtcdBackupError:
                     self.charm.set_status(Status.RESTORE_FAILED)
-            case RestoreStep.RESTART, RestoreStep.RESTORE:
+            case RestoreStep.START, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
-                self.charm.backup_manager.start_database_workload()
+                self.charm.backup_manager.start_database()
                 if self.charm.unit.is_leader():
                     try:
                         # always enable auth in case a backup without auth was restored
                         self.charm.cluster_manager.enable_authentication()
                     except EtcdUserManagementError:
                         logger.info("Auth already enabled")
-            case RestoreStep.COMPLETED, RestoreStep.RESTART:
-                self.charm.backup_manager.clean_up_after_restore()
+            case RestoreStep.COMPLETED, RestoreStep.START:
                 if not self.charm.cluster_manager.is_healthy(cluster=False):
-                    self.charm.set_status(Status.RESTORE_FAILED)
+                    # if the member is not healthy, we do not complete the restore process
+                    self.charm.set_status(Status.RESTORE_UNHEALTHY)
+                    return
+                self.charm.backup_manager.clean_up_after_restore()
 
         # continue to next workflow step if possible
         if self.charm.unit.is_leader():
             self.charm.backup_manager.proceed_restore_workflow_if_possible()
 
-    def _exists_preventing_reason(self, check_restore: bool = False) -> str:
+    def _exists_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.
-
-        Args:
-            check_restore: option to check if preconditions for restoring process are given
 
         Returns:
             Error message in case a preventing reason for an action exists, otherwise empty str.
@@ -219,19 +224,10 @@ class BackupEvents(Object):
         if not self.charm.state.cluster.s3_credentials:
             return "No credentials for object storage available."
 
-        if not self.charm.state.unit_server.is_started:
-            return "Database is not started, cannot perform backup action."
+        if self.charm.state.cluster.is_backup_in_progress:
+            return "Backup in progress, cannot perform action."
 
         if self.charm.state.cluster.is_restore_in_progress:
-            return "Restore is already in progress."
-
-        # default checks end here, the following checks are only relevant for the restore process
-        if not check_restore:
-            return ""
-
-        if not self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
-            return (
-                "Admin secret missing - configure `system-users` secret before restoring a backup."
-            )
+            return "Restore in progress, cannot perform action."
 
         return ""
