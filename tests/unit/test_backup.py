@@ -378,7 +378,11 @@ def test_restore_workflow_order():
                 == RestoreStep.STOP
             )
             assert (
-                context.charm.backup_manager.next_restore_step(current_step=RestoreStep.STOP)
+                    context.charm.backup_manager.next_restore_step(current_step=RestoreStep.STOP)
+                    == RestoreStep.VERIFY
+            )
+            assert (
+                context.charm.backup_manager.next_restore_step(current_step=RestoreStep.VERIFY)
                 == RestoreStep.RESTORE
             )
             assert (
@@ -443,14 +447,66 @@ def test_restore_workflow_synchronization():
         )
         assert (
             state_out.get_relation(1).local_app_data.get("restore_instruction")
-            == RestoreStep.RESTORE.value
+            == RestoreStep.VERIFY.value
+        )
+
+    # restore step: verify (leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.VERIFY.value,
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.stop"),
+        patch("workload.EtcdWorkload.disable_service"),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
+        assert (
+                state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.VERIFY.value
+        )
+        assert (
+                state_out.get_relation(1).local_app_data.get("restore_instruction")
+                == RestoreStep.RESTORE.value
+        )
+
+    # restore step: verify (non-leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.VERIFY.value,
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
+    )
+    state_in = testing.State(relations={relation})
+    with (
+        patch("workload.EtcdWorkload.stop"),
+        patch("workload.EtcdWorkload.disable_service"),
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
+        assert (
+                state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.VERIFY.value
         )
 
     # restore step: restore (non-leader)
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
         local_app_data={
             "restore_id": "xyz",
             "restore_instruction": RestoreStep.RESTORE.value,
@@ -474,7 +530,7 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
         local_app_data={
             "restore_id": "xyz",
             "restore_instruction": RestoreStep.RESTORE.value,
@@ -506,7 +562,7 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
         local_app_data={
             "restore_id": "xyz",
             "restore_instruction": RestoreStep.RESTORE.value,
