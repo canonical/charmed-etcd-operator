@@ -200,6 +200,9 @@ class BackupManager:
         # disable the service to avoid restart while the backup is restored
         self.workload.disable_database()
 
+        if self.state.cluster.restore_instruction == RestoreStep.VERIFY:
+            return
+
         self.set_restore_step(RestoreStep.STOP.value)
 
     def restore_backup(self) -> None:
@@ -219,19 +222,27 @@ class BackupManager:
         if not etcd_client.restore_database_snapshot(
             snapshot_filename=f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}",
             data_directory=SNAP_DATA_PATH,
-            cluster_config=self.state.cluster.cluster_members,
+            cluster_config=self.state.unit_server.member_endpoint
+            if self.state.cluster.restore_instruction == RestoreStep.VERIFY
+            else self.state.cluster.cluster_members,
             peer_url=self.state.unit_server.peer_url,
             member_name=self.state.unit_server.member_name,
         ):
             raise EtcdBackupError("Failed to restore database backup.")
 
         logger.info("Restored backup successfully.")
+        if self.state.cluster.restore_instruction == RestoreStep.VERIFY:
+            return
+
         self.set_restore_step(RestoreStep.RESTORE.value)
 
     def start_database(self) -> None:
         """Enable and start the etcd database again after restoring."""
         logger.info("Enabling and starting etcd workload.")
         self.workload.enable_database()
+
+        if self.state.cluster.restore_instruction == RestoreStep.VERIFY:
+            return
 
         self.set_restore_step(RestoreStep.START.value)
 
@@ -275,6 +286,8 @@ class BackupManager:
             case RestoreStep.DOWNLOAD:
                 return RestoreStep.STOP
             case RestoreStep.STOP:
+                return RestoreStep.VERIFY
+            case RestoreStep.VERIFY:
                 return RestoreStep.RESTORE
             case RestoreStep.RESTORE:
                 return RestoreStep.START
@@ -317,5 +330,8 @@ class BackupManager:
 
         if self.state.cluster.is_restore_in_progress:
             status_list.append(Status.RESTORE_IN_PROGRESS)
+
+        if self.state.cluster.restore_verification_failed:
+            status_list.append(Status.RESTORE_VERIFICATION_FAILED)
 
         return status_list

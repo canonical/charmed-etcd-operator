@@ -86,6 +86,12 @@ class Status(Enum):
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
     RESTORE_FAILED = StatusLevel(BlockedStatus("failed to restore backup"), "ERROR")
+    RESTORE_VERIFICATION_FAILED = StatusLevel(
+        BlockedStatus(
+            "Verification of restoring the backup failed - etcd data was not deleted on non-leader units"
+        ),
+        "ERROR",
+    )
     RESTORE_IN_PROGRESS = StatusLevel(
         MaintenanceStatus("Database restore is in progress"), "ERROR"
     )
@@ -140,6 +146,7 @@ class RestoreStep(Enum):
     NOT_STARTED = ""
     DOWNLOAD = "download_backup"
     STOP = "stop_workload"
+    VERIFY = "verify_backup"
     RESTORE = "restore_backup"
     START = "restart_workload"
     COMPLETED = "completed"

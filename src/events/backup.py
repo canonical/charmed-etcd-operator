@@ -16,7 +16,12 @@ from charms.data_platform_libs.v0.s3 import (
 from ops import Object
 from ops.charm import ActionEvent, RelationChangedEvent
 
-from common.exceptions import EtcdBackupError, EtcdUserManagementError
+from common.exceptions import (
+    EtcdAuthNotEnabledError,
+    EtcdBackupError,
+    EtcdUserManagementError,
+    HealthCheckFailedError,
+)
 from literals import (
     PEER_RELATION,
     S3_RELATION_NAME,
@@ -187,7 +192,39 @@ class BackupEvents(Object):
                     self.charm.set_status(Status.RESTORE_FAILED)
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
                 self.charm.backup_manager.stop_database()
-            case RestoreStep.RESTORE, RestoreStep.STOP:
+            case RestoreStep.VERIFY, RestoreStep.STOP:
+                if self.charm.unit.is_leader() and len(self.charm.state.servers) > 1:
+                    # verify restoring the backup to avoid data loss before purging all data
+                    if self.charm.state.cluster.restore_verification_failed:
+                        # verification has already failed - do not try again
+                        return
+
+                    try:
+                        self.charm.backup_manager.restore_backup()
+                        self.charm.config_manager.set_config_properties()
+                        self.charm.backup_manager.start_database()
+                        try:
+                            self.charm.cluster_manager.enable_authentication()
+                        except EtcdUserManagementError:
+                            logger.info("Auth already enabled")
+                        if not self.charm.cluster_manager.is_healthy(cluster=False):
+                            raise HealthCheckFailedError("Health check failed")
+                    except (EtcdBackupError, EtcdAuthNotEnabledError, HealthCheckFailedError):
+                        # if the verification fails, the restore workflow stops here
+                        # data on all other units will remain as is, but the cluster is down
+                        # users must manually recover from this situation
+                        self.charm.state.cluster.update({"restore_verification_failed": "True"})
+                        self.charm.backup_manager.stop_database()
+                        return
+                    # if the verification was successful, stop etcd again and continue the workflow
+                    logger.info(
+                        f"Restore verification successful: Backup {self.charm.state.cluster.restore_id} can be restored."
+                    )
+                    self.charm.backup_manager.stop_database()
+                    self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
+                else:
+                    self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
+            case RestoreStep.RESTORE, RestoreStep.VERIFY:
                 try:
                     self.charm.backup_manager.restore_backup()
                 except EtcdBackupError:
