@@ -32,6 +32,8 @@ resource "juju_application" "etcd" {
 }
 
 resource "juju_application" "self-signed-certificates" {
+  for_each = var.tls ? { "deployed" = true } : {}
+
   model = var.model
 
   charm {
@@ -53,6 +55,9 @@ resource "juju_application" "self-signed-certificates" {
 #--------------------------------------------------------
 
 resource "juju_integration" "tls-etcd-peer" {
+  # This integration is only created if TLS is enabled
+  for_each = var.tls ? { "deployed" = true } : {}
+
   model = var.model
 
   application {
@@ -72,6 +77,9 @@ resource "juju_integration" "tls-etcd-peer" {
 }
 
 resource "juju_integration" "tls-etcd-client" {
+  # This integration is only created if TLS is enabled
+  for_each = var.tls ? { "deployed" = true } : {}
+
   model = var.model
 
   application {

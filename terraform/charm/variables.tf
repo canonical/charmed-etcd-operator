@@ -50,7 +50,7 @@ variable "constraints" {
 
 variable "machines" {
   description = "List of machines for placement"
-  type        = list(string)
+  type        = set(string)
   default     = []
 }
 
@@ -73,6 +73,12 @@ variable "endpoint_bindings" {
 
 variable "expose" {
   description = "Expose the application for external access."
+  type        = bool
+  default     = false
+}
+
+variable "tls" {
+  description = "Whether TLS should be enabled"
   type        = bool
   default     = false
 }

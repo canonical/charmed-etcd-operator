@@ -23,6 +23,6 @@ output "app_names" {
   description = "Output of all deployed application names."
   value = {
     etcd                     = juju_application.etcd.name
-    self-signed-certificates = juju_application.self-signed-certificates.name
+    self-signed-certificates = var.tls ? juju_application.self-signed-certificates["deployed"].name : null
   }
 }

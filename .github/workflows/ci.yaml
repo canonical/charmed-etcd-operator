@@ -167,5 +167,5 @@ jobs:
       - name: Model Status
         run: |
           # wait for etcd to be ready
-          sleep 180
+          juju wait-for application etcd --query='name=="etcd" && (status=="active" || status=="idle")'
           juju status --relations
