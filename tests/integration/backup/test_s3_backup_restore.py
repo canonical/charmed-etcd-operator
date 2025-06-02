@@ -15,6 +15,7 @@ from ..helpers import (
     get_cluster_endpoints,
     get_key,
     put_key,
+    set_password,
 )
 from ..helpers_deployment import wait_until
 
@@ -165,17 +166,7 @@ async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=60)
 
     logger.info("Configure admin credentials in etcd")
-    secret_name = "new_test_secret"
-
-    secret_id = await ops_test.model.add_secret(
-        name=secret_name, data_args=[f"{INTERNAL_USER}={PASSWORD}"]
-    )
-    await ops_test.model.grant_secret(secret_name=secret_name, application=APP_NAME)
-
-    # update the application config to include the secret
-    await ops_test.model.applications[APP_NAME].set_config(
-        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
-    )
+    await set_password(ops_test, PASSWORD)
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     logger.info(f"Integrate the newly deployed application with {S3_INTEGRATOR}")
