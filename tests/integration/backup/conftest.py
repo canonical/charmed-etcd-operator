@@ -1,3 +1,4 @@
+import base64
 import dataclasses
 import json
 import logging
@@ -24,6 +25,7 @@ def microceph() -> ConnectionInformation:
     if not os.environ.get("CI") == "true":
         raise Exception("Not running on CI. Skipping microceph installation. ")
     logger.info("Setting up microceph")
+    host_ip = socket.gethostbyname(socket.gethostname())
     subprocess.run(["sudo", "snap", "install", "microceph"], check=True)
     subprocess.run(["sudo", "microceph", "cluster", "bootstrap"], check=True)
     subprocess.run(["sudo", "microceph", "disk", "add", "loop,4G,3"], check=True)
@@ -42,9 +44,22 @@ def microceph() -> ConnectionInformation:
             "-days",
             "365",
             "-nodes",
+            "-subj",
+            f"/CN={host_ip}",
+            "-addext",
+            f"subjectAltName=IP:{host_ip}",
         ],
         check=True,
     )
+
+    with open("cert.pem", "rb") as cert_file:
+        cert = cert_file.read()
+        cert_encoded = base64.b64encode(cert)
+
+    with open("key.pem", "rb") as key_file:
+        key = key_file.read()
+        key_encoded = base64.b64encode(key)
+
     subprocess.run(
         [
             "sudo",
@@ -52,8 +67,12 @@ def microceph() -> ConnectionInformation:
             "enable",
             "rgw",
             "--ssl-port 445",
-            "--ssl-certificate '$(base64 -w0 cert.pem)'",
-            "--ssl-private-key '$(base64 -w0 key.pem)'",
+            "--ssl-port",
+            "445",
+            "--ssl-certificate",
+            cert_encoded,
+            "--ssl-private-key",
+            key_encoded,
         ],
         check=True,
     )
@@ -80,7 +99,7 @@ def microceph() -> ConnectionInformation:
         try:
             boto3.client(
                 "s3",
-                endpoint_url="https://localhost:445",
+                endpoint_url=f"https://{host_ip}:445",
                 aws_access_key_id=key_id,
                 aws_secret_access_key=secret_key,
                 verify="cert.pem",
@@ -105,12 +124,16 @@ logger = logging.getLogger(__name__)
 def storage_config(microceph: ConnectionInformation) -> dict[str, str]:
     """Provide the configuration required by s3-integrator."""
     host_ip = socket.gethostbyname(socket.gethostname())
+    with open("cert.pem", "rb") as cert_file:
+        cert = cert_file.read()
+        cert_encoded = base64.b64encode(cert).decode("utf-8")
+
     return {
         "endpoint": f"https://{host_ip}:445",
         "bucket": microceph.bucket,
         "path": "etcd",
         "region": "",
-        "tls-ca-chain": "$(base64 -w0 cert.pem)",
+        "tls-ca-chain": cert_encoded,
     }
 
 
