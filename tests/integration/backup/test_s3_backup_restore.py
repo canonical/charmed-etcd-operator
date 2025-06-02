@@ -52,17 +52,7 @@ async def test_deploy_and_configure(
     await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
 
     logger.info("Configure admin credentials in etcd")
-    secret_name = "test_secret"
-
-    secret_id = await ops_test.model.add_secret(
-        name=secret_name, data_args=[f"{INTERNAL_USER}={PASSWORD}"]
-    )
-    await ops_test.model.grant_secret(secret_name=secret_name, application=APP_NAME)
-
-    # update the application config to include the secret
-    await ops_test.model.applications[APP_NAME].set_config(
-        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
-    )
+    await set_password(ops_test, PASSWORD)
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
 

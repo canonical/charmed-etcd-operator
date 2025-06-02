@@ -21,6 +21,7 @@ from ..helpers import (
     get_unit_endpoint,
     is_endpoint_up,
     put_key,
+    set_password,
 )
 from ..helpers_deployment import wait_until
 from .helpers import (
@@ -208,23 +209,18 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
     # remove the entire application
     await ops_test.model.remove_application(app, block_until_done=True)
 
-    # we are going to deploy a new cluster, but with an existing database
-    # that means we need to configure the correct admin password in advance
-    admin_secret = "root_password"
-    secret_id = await ops_test.model.add_secret(
-        name=admin_secret, data_args=[f"{INTERNAL_USER}={password}"]
-    )
-
     # deploy new cluster, attaching the storage from the previous last unit to the new first unit
     deploy_cluster_with_storage_cmd = f"""deploy {CHARM_PATH} \
         --model={ops_test.model.info.name} \
         --attach-storage={storage_id} \
-        --config {INTERNAL_USER_PASSWORD_CONFIG}={secret_id}
         """
 
     return_code, _, _ = await ops_test.juju(*deploy_cluster_with_storage_cmd.split())
     assert return_code == 0, f"Failed to deploy app with storage {storage_id}"
-    await ops_test.model.grant_secret(secret_name=admin_secret, application=APP_NAME)
+
+    # we are going to deploy a new cluster, but with an existing database
+    # that means we need to configure the correct admin password
+    await set_password(ops_test, password)
 
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=1, idle_period=60)
 
