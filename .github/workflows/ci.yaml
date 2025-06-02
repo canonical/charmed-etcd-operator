@@ -163,7 +163,7 @@ jobs:
         run: |
           juju add-model test
           terraform init
-          terraform apply -var "model=test" -auto-approve
+          terraform apply -var "model=test" -var 'units=3' -auto-approve
       - name: Model Status
         run: |
           # wait for etcd to be ready
