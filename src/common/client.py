@@ -19,7 +19,7 @@ from common.exceptions import (
     HealthCheckFailedError,
 )
 from core.models import Member
-from literals import BACKUP_FILE_PATH, INTERNAL_USER, SNAP_NAME, TLS_ROOT_DIR
+from literals import BACKUP_FILE_NAME, INTERNAL_USER, SNAP_NAME, TLS_ROOT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -283,7 +283,7 @@ class EtcdClient:
         if result := self._run_etcdctl(
             command="snapshot",
             subcommand="save",
-            snapshot_path=BACKUP_FILE_PATH,
+            snapshot_path=BACKUP_FILE_NAME,
             endpoints=self.client_url,
             auth_username=self.user,
             auth_password=self.password,
