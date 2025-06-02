@@ -84,7 +84,7 @@ class Status(Enum):
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
     OBJECT_STORAGE_CONFLICT = StatusLevel(
-        BlockedStatus("Azure and S3 storage configured - please remove one"), "ERROR"
+        BlockedStatus("Azure and S3 storages configured - please remove one"), "ERROR"
     )
     PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
