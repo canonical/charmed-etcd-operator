@@ -27,7 +27,36 @@ def microceph() -> ConnectionInformation:
     subprocess.run(["sudo", "snap", "install", "microceph"], check=True)
     subprocess.run(["sudo", "microceph", "cluster", "bootstrap"], check=True)
     subprocess.run(["sudo", "microceph", "disk", "add", "loop,4G,3"], check=True)
-    subprocess.run(["sudo", "microceph", "enable", "rgw"], check=True)
+    subprocess.run(
+        [
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:4096",
+            "-keyout",
+            "key.pem",
+            "-out",
+            "cert.pem",
+            "-sha256",
+            "-days",
+            "365",
+            "-nodes",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "sudo",
+            "microceph",
+            "enable",
+            "rgw",
+            "--ssl-port 445",
+            "--ssl-certificate '$(base64 -w0 cert.pem)'",
+            "--ssl-private-key '$(base64 -w0 key.pem)'",
+        ],
+        check=True,
+    )
     output = subprocess.run(
         [
             "sudo",
@@ -51,9 +80,10 @@ def microceph() -> ConnectionInformation:
         try:
             boto3.client(
                 "s3",
-                endpoint_url="http://localhost",
+                endpoint_url="https://localhost:445",
                 aws_access_key_id=key_id,
                 aws_secret_access_key=secret_key,
+                verify="cert.pem",
             ).create_bucket(Bucket=_BUCKET)
         except botocore.exceptions.EndpointConnectionError:
             if attempt == 2:
@@ -76,10 +106,11 @@ def storage_config(microceph: ConnectionInformation) -> dict[str, str]:
     """Provide the configuration required by s3-integrator."""
     host_ip = socket.gethostbyname(socket.gethostname())
     return {
-        "endpoint": f"http://{host_ip}",
+        "endpoint": f"https://{host_ip}:445",
         "bucket": microceph.bucket,
         "path": "etcd",
         "region": "",
+        "tls-ca-chain": "$(base64 -w0 cert.pem)",
     }
 
 
@@ -100,6 +131,6 @@ def s3_bucket(storage_credentials, storage_config) -> None:
         aws_secret_access_key=storage_credentials["secret-key"],
         region_name=storage_config["region"] if storage_config["region"] else None,
     )
-    s3 = session.resource("s3", endpoint_url=storage_config["endpoint"])
+    s3 = session.resource("s3", endpoint_url=storage_config["endpoint"], verify="cert.pem")
     bucket = s3.Bucket(storage_config["bucket"])
     yield bucket
