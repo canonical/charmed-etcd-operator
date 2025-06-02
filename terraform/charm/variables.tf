@@ -39,7 +39,7 @@ variable "revision" {
 variable "units" {
   description = "Charm units"
   type        = number
-  default     = 3
+  default     = null
 }
 
 variable "constraints" {
@@ -51,7 +51,7 @@ variable "constraints" {
 variable "machines" {
   description = "List of machines for placement"
   type        = set(string)
-  default     = []
+  default     = null
 }
 
 variable "storage" {

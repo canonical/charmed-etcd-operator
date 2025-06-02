@@ -15,9 +15,10 @@ resource "juju_application" "etcd" {
   config             = var.config
   model              = var.model
   name               = var.app_name
-  units              = var.units
+  units              = var.units != null ? var.units : null
   constraints        = var.constraints
   storage_directives = var.storage
+  machines           = var.machines != null ? var.machines : null
 
   dynamic "expose" {
     for_each = var.expose ? [1] : []
