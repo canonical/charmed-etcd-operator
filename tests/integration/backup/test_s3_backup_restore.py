@@ -7,7 +7,7 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG
+from literals import INTERNAL_USER
 
 from ..helpers import (
     APP_NAME,

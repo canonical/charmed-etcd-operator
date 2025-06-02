@@ -8,7 +8,7 @@ import time
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
+from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
