@@ -3,7 +3,6 @@ import dataclasses
 import json
 import logging
 import os
-import socket
 import subprocess
 import time
 
@@ -25,7 +24,14 @@ def microceph() -> ConnectionInformation:
     if not os.environ.get("CI") == "true":
         raise Exception("Not running on CI. Skipping microceph installation. ")
     logger.info("Setting up microceph")
-    host_ip = socket.gethostbyname(socket.gethostname())
+
+    # socket.gethostbyname() might return `127.0.0.1`, which does not work from inside lxd container
+    host_ip = (
+        subprocess.run(["hostname", "-I"], capture_output=True, check=True, encoding="utf-8")
+        .stdout.strip()
+        .split()[0]
+    )
+
     subprocess.run(["sudo", "snap", "install", "microceph"], check=True)
     subprocess.run(["sudo", "microceph", "cluster", "bootstrap"], check=True)
     subprocess.run(["sudo", "microceph", "disk", "add", "loop,4G,3"], check=True)
@@ -123,7 +129,13 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="session")
 def storage_config(microceph: ConnectionInformation) -> dict[str, str]:
     """Provide the configuration required by s3-integrator."""
-    host_ip = socket.gethostbyname(socket.gethostname())
+    # socket.gethostbyname() might return `127.0.0.1`, which does not work from inside lxd container
+    host_ip = (
+        subprocess.run(["hostname", "-I"], capture_output=True, check=True, encoding="utf-8")
+        .stdout.strip()
+        .split()[0]
+    )
+
     with open("cert.pem", "rb") as cert_file:
         cert = cert_file.read()
         cert_encoded = base64.b64encode(cert).decode("utf-8")
