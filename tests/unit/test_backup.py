@@ -354,6 +354,32 @@ def test_support_only_one_object_storage():
         assert e.message == "Azure and S3 storage configured - please remove one."
 
 
+def test_ensure_at_least_one_object_storage():
+    ctx = testing.Context(EtcdOperatorCharm)
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    # ensure backup cannot be created if both s3 and azure are related
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("create-backup"), state_in)
+
+        assert e.message == "No object storage configured - please add Azure or S3 relation."
+
+    # ensure backups cannot be listed if both s3 and azure are related
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("list-backups"), state_in)
+
+        assert e.message == "No object storage configured - please add Azure or S3 relation."
+
+    # ensure backup cannot be restored if both s3 and azure are related
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("restore"), state_in)
+
+        assert e.message == "No object storage configured - please add Azure or S3 relation."
+
+
 def test_list_backups_action_s3():
     ctx = testing.Context(EtcdOperatorCharm)
     peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)

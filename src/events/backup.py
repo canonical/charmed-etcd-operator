@@ -125,7 +125,7 @@ class BackupEvents(Object):
         if self.charm.unit.is_leader():
             self.charm.state.cluster.update({"s3-credentials": ""})
 
-    def _on_azure_credentials_changed(self, event: StorageConnectionInfoChangedEvent):
+    def _on_azure_credentials_changed(self, event: StorageConnectionInfoChangedEvent) -> None:
         """Handle an update of the azure credentials from azure-storage-integrator."""
         if not (azure_parameters := self.azure_requirer.get_azure_storage_connection_info()):
             logger.debug(f"No relation {AZURE_RELATION_NAME}")
@@ -156,7 +156,7 @@ class BackupEvents(Object):
         self.charm.backup_manager.create_container(azure_parameters)
         self.charm.state.cluster.update({"azure-credentials": json.dumps(azure_parameters)})
 
-    def _on_azure_credentials_gone(self, event: StorageConnectionInfoGoneEvent):
+    def _on_azure_credentials_gone(self, event: StorageConnectionInfoGoneEvent) -> None:
         """Handle the removal of the relation with the azure-storage-integrator."""
         if (
             self.charm.state.cluster.is_restore_in_progress
@@ -288,7 +288,12 @@ class BackupEvents(Object):
         if self.charm.model.get_relation(AZURE_RELATION_NAME) and self.charm.model.get_relation(
             S3_RELATION_NAME
         ):
-            return "Azure and S3 storage configured - please remove one."
+            return "Azure and S3 storages configured - please remove one."
+
+        if not self.charm.model.get_relation(
+            AZURE_RELATION_NAME
+        ) and not self.charm.model.get_relation(S3_RELATION_NAME):
+            return "No object storage configured - please add Azure or S3 relation."
 
         if (
             self.charm.model.get_relation(S3_RELATION_NAME)
