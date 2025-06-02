@@ -72,7 +72,6 @@ def microceph() -> ConnectionInformation:
             "microceph",
             "enable",
             "rgw",
-            "--ssl-port 445",
             "--ssl-port",
             "445",
             "--ssl-certificate",
