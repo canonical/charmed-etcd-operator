@@ -336,16 +336,19 @@ async def set_password(
         secret_id = await ops_test.model.add_secret(
             name=secret_name, data_args=[f"{username}={password}"]
         )
-        await ops_test.model.grant_secret(secret_name=secret_name, application=application)
-
-        # update the application config to include the secret
-        await ops_test.model.applications[application].set_config(
-            {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
-        )
     except Exception:
+        secrets = await ops_test.model.list_secrets({"name": secret_name})
+        secret_id = secrets[0].uri
         await ops_test.model.update_secret(
             name=secret_name, data_args=[f"{username}={password}"], new_name=secret_name
         )
+
+    await ops_test.model.grant_secret(secret_name=secret_name, application=application)
+
+    # update the application config to include the secret
+    await ops_test.model.applications[application].set_config(
+        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
+    )
 
 
 async def download_client_certificate_from_unit(
