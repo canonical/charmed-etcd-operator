@@ -167,5 +167,5 @@ jobs:
       - name: Model Status
         run: |
           # wait for etcd to be ready
-          juju wait-for application etcd --query='name=="etcd" && (status=="active" || status=="idle")'
+          juju wait-for application etcd --query='forEach(units, unit => startsWith(unit.name, "etcd") && unit.workload-status == "active" && unit.agent-status == "idle")'
           juju status --relations
