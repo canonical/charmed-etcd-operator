@@ -32,8 +32,10 @@ from literals import (
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
+    SNAP_ARCHIVE_PATH,
     SNAP_DATA_PATH,
     SNAP_GROUP,
+    SNAP_LOG_PATH,
     SNAP_USER,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
@@ -84,8 +86,9 @@ class EtcdEvents(Object):
     def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
         """Handle storage attachment."""
         # fix the permissions of the data dir if re-attaching existing storage
-        self.charm.workload.exec(["chmod", "-R", "750", SNAP_DATA_PATH])
-        self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", SNAP_DATA_PATH])
+        for path in [SNAP_DATA_PATH, SNAP_LOG_PATH, SNAP_ARCHIVE_PATH]:
+            self.charm.workload.exec(["chmod", "-R", "750", path])
+            self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", path])
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""

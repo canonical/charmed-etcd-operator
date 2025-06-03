@@ -21,12 +21,10 @@ from common.exceptions import EtcdBackupError
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import (
-    BACKUP_FILE_PATH,
+    BACKUP_FILE_NAME,
     BACKUP_ID_FORMAT,
     DATABASE_DIR,
     INTERNAL_USER,
-    RESTORE_FILE_NAME,
-    SNAP_CONFIG_PATH,
     SNAP_DATA_PATH,
     EtcdClusterState,
     RestoreStep,
@@ -144,7 +142,7 @@ class BackupManager:
         else:
             # offline backup from `member/snap/db` file
             logger.info("Cluster is not running, creating offline backup")
-            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_PATH)
+            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_NAME)
 
         if s3_parameters := self.state.cluster.s3_credentials:
             # backup file will be uploaded to S3 storage
@@ -156,12 +154,12 @@ class BackupManager:
                     stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True
                 ):
                     with attempt:
-                        bucket.upload_file(BACKUP_FILE_PATH, upload_target)
+                        bucket.upload_file(BACKUP_FILE_NAME, upload_target)
             except ClientError as e:
                 self.state.cluster.update({"backup_id": ""})
                 # if we can't upload, we still need to clean up the backup file to free the disk space
-                self.workload.remove_file(BACKUP_FILE_PATH)
-                logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
+                self.workload.remove_file(BACKUP_FILE_NAME)
+                logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
                 raise EtcdBackupError(e)
         else:
             # backup file will be uploaded to Azure storage
@@ -177,20 +175,20 @@ class BackupManager:
                     stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=False
                 ):
                     with attempt:
-                        with open(BACKUP_FILE_PATH, "rb") as backup_file:
+                        with open(BACKUP_FILE_NAME, "rb") as backup_file:
                             blob_client.upload_blob(backup_file)
             except RetryError as e:
                 self.state.cluster.update({"backup_id": ""})
                 # if we can't upload, we still need to clean up the backup file to free the disk space
-                self.workload.remove_file(BACKUP_FILE_PATH)
-                logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
+                self.workload.remove_file(BACKUP_FILE_NAME)
+                logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
                 raise EtcdBackupError(e)
 
         logger.info(f"Backup uploaded to {upload_target}")
 
         self.state.cluster.update({"backup_id": ""})
-        self.workload.remove_file(BACKUP_FILE_PATH)
-        logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
+        self.workload.remove_file(BACKUP_FILE_NAME)
+        logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
 
         return backup_id
 
@@ -245,7 +243,7 @@ class BackupManager:
             bucket = self._get_bucket_resource(s3_parameters)
 
             try:
-                bucket.download_file(download_source, f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+                bucket.download_file(download_source, BACKUP_FILE_NAME)
             except ClientError as e:
                 logger.error(e)
                 return False
@@ -258,14 +256,14 @@ class BackupManager:
             )
 
             try:
-                with open(f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}", mode="wb") as backup_file:
+                with open(BACKUP_FILE_NAME, mode="wb") as backup_file:
                     download_stream = blob_client.download_blob()
                     backup_file.write(download_stream.readall())
             except Exception as e:
                 logger.error(e)
                 return False
 
-        logger.info(f"Backup {backup_id} downloaded to {SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+        logger.info(f"Backup {backup_id} downloaded to {BACKUP_FILE_NAME}")
         self.set_restore_step(RestoreStep.DOWNLOAD.value)
         return True
 
@@ -292,7 +290,7 @@ class BackupManager:
         etcd_client = self._get_etcd_client()
 
         if not etcd_client.restore_database_snapshot(
-            snapshot_filename=f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}",
+            snapshot_filename=BACKUP_FILE_NAME,
             data_directory=SNAP_DATA_PATH,
             cluster_config=self.state.cluster.cluster_members,
             peer_url=self.state.unit_server.peer_url,
@@ -314,7 +312,7 @@ class BackupManager:
         """Remove backup files and state from unit."""
         logger.info("Removing backup file after restore completed.")
 
-        self.workload.remove_file(f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+        self.workload.remove_file(BACKUP_FILE_NAME)
         self.set_restore_step("")
 
     @staticmethod
