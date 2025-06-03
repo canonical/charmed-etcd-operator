@@ -5,6 +5,7 @@
 """Charmed machine operator for etcd."""
 
 import logging
+from subprocess import CalledProcessError
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -214,7 +215,11 @@ class EtcdOperatorCharm(ops.CharmBase):
         # this can happen if the client certificate has already expired
         # on CA-rotation the certs are only updated AFTER all cluster members updated the CA
         if not self.cluster_manager.restart_member():
-            logger.warning("Health check failed after ca rotation restart")
+            try:
+                self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
+                raise HealthCheckFailedError("Failed to check health of the member after restart")
+            except CalledProcessError:
+                logger.warning("Health check failed, TLS client certificates expired")
 
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
             self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NEW_CA_ADDED)
@@ -244,7 +249,11 @@ class EtcdOperatorCharm(ops.CharmBase):
         # this can happen if the client certificate has already expired but was not renewed yet
         # in case the peer certificate came first
         if not self.cluster_manager.restart_member():
-            logger.warning("Health check failed after ca cleanup restart")
+            try:
+                self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
+                raise HealthCheckFailedError("Failed to check health of the member after restart")
+            except CalledProcessError:
+                logger.warning("Health check failed, TLS client certificates expired")
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         """Compute the current status for this unit.

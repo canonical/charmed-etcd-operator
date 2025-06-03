@@ -232,7 +232,7 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
         apps=[APP_NAME, TLS_NAME],
         apps_full_statuses={
             APP_NAME: {
-                "maintenance": [Status.TLS_CERTS_EXPIRING.value.status.message],
+                "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
                 "active": [],
             },
             TLS_NAME: {"active": []},
@@ -270,7 +270,7 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
         units_full_statuses={
             APP_NAME: {
                 "units": {
-                    "maintenance": [Status.TLS_CERTS_EXPIRING.value.status.message],
+                    "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
                     "active": [],
                 }
             },

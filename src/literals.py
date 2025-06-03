@@ -90,9 +90,15 @@ class Status(Enum):
     TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be ready"), "DEBUG")
     TLS_PEER_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating peer CA..."), "DEBUG")
     TLS_CLIENT_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating client CA..."), "DEBUG")
-    TLS_CERTS_EXPIRING = StatusLevel(
+    TLS_CLIENT_CERTS_EXPIRING = StatusLevel(
         MaintenanceStatus(
-            "TLS certificates expiring soon. Please ensure new certificates are provided."
+            "TLS client certificates expiring soon. Please ensure new certificates are provided."
+        ),
+        "WARNING",
+    )
+    TLS_PEER_CERTS_EXPIRING = StatusLevel(
+        MaintenanceStatus(
+            "TLS peer certificates expiring soon. Please ensure new certificates are provided."
         ),
         "WARNING",
     )

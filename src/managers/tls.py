@@ -207,14 +207,14 @@ class TLSManager:
             else self.workload.paths.tls.client_ca,
         )
 
-    def check_certificate_validity(self) -> None:
+    def check_certificate_validity(self, tls_type: TLSType) -> None:
         """Check if the certificates installed on the unit will soon expire."""
         cert_files = []
-        if self.state.unit_server.tls_client_state == TLSState.TLS:
+        if tls_type == TLSType.CLIENT and self.state.unit_server.tls_client_state == TLSState.TLS:
             cert_files.append(self.workload.paths.tls.client_cert)
             cert_files.append(self.workload.paths.tls.client_ca)
 
-        if self.state.unit_server.tls_peer_state == TLSState.TLS:
+        if tls_type == TLSType.PEER and self.state.unit_server.tls_peer_state == TLSState.TLS:
             cert_files.append(self.workload.paths.tls.peer_cert)
             cert_files.append(self.workload.paths.tls.peer_ca)
 
@@ -254,7 +254,10 @@ class TLSManager:
         if self.state.unit_server.tls_client_ca_rotation_state != TLSCARotationState.NO_ROTATION:
             status_list.append(Status.TLS_CLIENT_CA_ROTATING)
 
-        if self.state.unit_server.certs_expiring:
-            status_list.append(Status.TLS_CERTS_EXPIRING)
+        if self.state.unit_server.tls_client_certs_expiring:
+            status_list.append(Status.TLS_CLIENT_CERTS_EXPIRING)
+
+        if self.state.unit_server.tls_peer_certs_expiring:
+            status_list.append(Status.TLS_PEER_CERTS_EXPIRING)
 
         return status_list
