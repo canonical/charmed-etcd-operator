@@ -250,17 +250,16 @@ class EtcdEvents(Object):
             except KeyError as e:
                 logger.warning(f"Error updating client relations data: {e}")
 
-        try:
-            self.charm.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
-            self.charm.state.unit_server.update({"tls_client_certificates_expiring": ""})
-        except CalledProcessError:
-            self.charm.state.unit_server.update({"tls_client_certificates_expiring": "True"})
-
-        try:
-            self.charm.tls_manager.check_certificate_validity(tls_type=TLSType.PEER)
-            self.charm.state.unit_server.update({"tls_peer_certificates_expiring": ""})
-        except CalledProcessError:
-            self.charm.state.unit_server.update({"tls_peer_certificates_expiring": "True"})
+        for tls_type in TLSType:
+            try:
+                self.charm.tls_manager.check_certificate_validity(tls_type)
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": ""}
+                )
+            except CalledProcessError:
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": "True"}
+                )
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
@@ -320,17 +319,16 @@ class EtcdEvents(Object):
 
         self.charm.cluster_manager.clean_users()
 
-        try:
-            self.charm.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
-            self.charm.state.unit_server.update({"tls_client_certificates_expiring": ""})
-        except CalledProcessError:
-            self.charm.state.unit_server.update({"tls_client_certificates_expiring": "True"})
-
-        try:
-            self.charm.tls_manager.check_certificate_validity(tls_type=TLSType.PEER)
-            self.charm.state.unit_server.update({"tls_peer_certificates_expiring": ""})
-        except CalledProcessError:
-            self.charm.state.unit_server.update({"tls_peer_certificates_expiring": "True"})
+        for tls_type in TLSType:
+            try:
+                self.charm.tls_manager.check_certificate_validity(tls_type)
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": ""}
+                )
+            except CalledProcessError:
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": "True"}
+                )
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""

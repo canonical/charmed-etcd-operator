@@ -208,13 +208,16 @@ class TLSManager:
         )
 
     def check_certificate_validity(self, tls_type: TLSType) -> None:
-        """Check if the certificates installed on the unit will soon expire."""
+        """Check if the certificates installed on the unit will soon expire.
+
+        Args:
+            tls_type (TLSType): The TLS type to check certificate validity for.
+        """
         cert_files = []
         if tls_type == TLSType.CLIENT and self.state.unit_server.tls_client_state == TLSState.TLS:
             cert_files.append(self.workload.paths.tls.client_cert)
             cert_files.append(self.workload.paths.tls.client_ca)
-
-        if tls_type == TLSType.PEER and self.state.unit_server.tls_peer_state == TLSState.TLS:
+        elif tls_type == TLSType.PEER and self.state.unit_server.tls_peer_state == TLSState.TLS:
             cert_files.append(self.workload.paths.tls.peer_cert)
             cert_files.append(self.workload.paths.tls.peer_ca)
 

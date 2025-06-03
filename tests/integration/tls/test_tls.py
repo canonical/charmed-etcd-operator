@@ -553,7 +553,7 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
         units_full_statuses={
             APP_NAME: {
                 "units": {
-                    "maintenance": [Status.TLS_CERTS_EXPIRING.value.status.message],
+                    "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
                     "active": [],
                 }
             },
