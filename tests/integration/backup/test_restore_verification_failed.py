@@ -7,13 +7,15 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, Status
+from literals import INTERNAL_USER, PEER_RELATION, Status
 
+from ..ha.helpers import get_cluster_members
 from ..helpers import (
     APP_NAME,
     CHARM_PATH,
     get_cluster_endpoints,
     get_key,
+    get_secret_by_label,
     put_key,
     set_password,
 )
@@ -25,7 +27,6 @@ NUM_UNITS = 3
 S3_INTEGRATOR = "s3-integrator"
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
-PASSWORD = "some-password"
 backup_id = ""
 
 
@@ -77,18 +78,23 @@ async def test_create_backup(ops_test: OpsTest) -> None:
     global backup_id
 
     # Before creating a backup, enter some data
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    initial_password = secret.get(f"{INTERNAL_USER}-password")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     assert (
         put_key(
             endpoints,
             user=INTERNAL_USER,
-            password=PASSWORD,
+            password=initial_password,
             key=TEST_KEY,
             value=TEST_VALUE,
         )
         == "OK"
     )
-    assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE
+    assert (
+        get_key(endpoints, user=INTERNAL_USER, password=initial_password, key=TEST_KEY)
+        == TEST_VALUE
+    )
 
     for unit in ops_test.model.applications[APP_NAME].units:
         if await unit.is_leader_from_status():
@@ -113,7 +119,8 @@ async def test_create_backup(ops_test: OpsTest) -> None:
 
     # update test data to later check if it was restored
     assert (
-        put_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY, value="0") == "OK"
+        put_key(endpoints, user=INTERNAL_USER, password=initial_password, key=TEST_KEY, value="0")
+        == "OK"
     )
 
 
@@ -123,19 +130,21 @@ async def test_create_backup(ops_test: OpsTest) -> None:
 async def test_restore_verification_failed(ops_test: OpsTest):
     """Restore a backup with invalid admin password."""
     logger.info("Configure admin credentials in etcd")
-    await set_password(ops_test, "invalid_password")
+    invalid_password = "invalid_password"
+    await set_password(ops_test, invalid_password)
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     for unit in ops_test.model.applications[APP_NAME].units:
         if await unit.is_leader_from_status():
             leader_unit = unit
 
-    # download the backup from storage and restore it
+    # download the backup from storage and try to restore it
     logger.info(f"Restoring backup {backup_id}")
     restore_action = await leader_unit.run_action("restore", **{"backup-id": backup_id})
     restore_backup_response = await restore_action.wait()
     assert restore_backup_response.results.get("return-code") == 0, "restore action failed"
 
+    # the restore will fail because the current password is not valid for the backup-file
     await wait_until(
         ops_test,
         apps=[APP_NAME],
@@ -146,4 +155,17 @@ async def test_restore_verification_failed(ops_test: OpsTest):
                 }
             },
         },
+    )
+
+    # ensure test data was not restored
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    assert not (
+        get_key(endpoints, user=INTERNAL_USER, password=invalid_password, key=TEST_KEY)
+        == TEST_VALUE
+    ), "Test data was restored even though restore should have failed"
+
+    # ensure cluster is fully formed
+    cluster_members = get_cluster_members(endpoints)
+    assert len(cluster_members) == NUM_UNITS, (
+        f"Expected {NUM_UNITS} cluster members, got {len(cluster_members)}."
     )
