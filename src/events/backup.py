@@ -8,6 +8,11 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
+from charms.data_platform_libs.v0.azure_storage import (
+    AzureStorageRequires,
+    StorageConnectionInfoChangedEvent,
+    StorageConnectionInfoGoneEvent,
+)
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
     CredentialsGoneEvent,
@@ -18,6 +23,7 @@ from ops.charm import ActionEvent, RelationChangedEvent
 
 from common.exceptions import EtcdBackupError, EtcdUserManagementError
 from literals import (
+    AZURE_RELATION_NAME,
     PEER_RELATION,
     S3_RELATION_NAME,
     RestoreStep,
@@ -37,17 +43,27 @@ class BackupEvents(Object):
         super().__init__(charm, key="backup")
         self.charm = charm
         self.s3_requirer = S3Requirer(self.charm, S3_RELATION_NAME)
+        self.azure_requirer = AzureStorageRequires(self.charm, AZURE_RELATION_NAME)
 
         self.framework.observe(
             self.s3_requirer.on.credentials_changed, self._on_s3_credentials_changed
         )
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credentials_gone)
+        self.framework.observe(
+            self.azure_requirer.on.storage_connection_info_changed,
+            self._on_azure_credentials_changed,
+        )
+        self.framework.observe(
+            self.azure_requirer.on.storage_connection_info_gone,
+            self._on_azure_credentials_gone,
+        )
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
         self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
-        # When the leader unit is being removed, s3_requirer.on.credentials_gone is performed on it (and only on it).
-        # After a new leader is elected, the S3 connection must be reinitialized.
+        # When the leader unit is being removed, s3/azure_requirer.on.credentials_gone is performed on it (and only on it).
+        # After a new leader is elected, the connection must be reinitialized.
         self.framework.observe(self.charm.on.leader_elected, self._on_s3_credentials_changed)
+        self.framework.observe(self.charm.on.leader_elected, self._on_azure_credentials_changed)
         # The restore-workflow is synchronized across all units via the peer relation databag
         # see for more information: https://github.com/canonical/charmed-etcd-operator/wiki/Backup-Restore:-Workflow
         self.framework.observe(
@@ -98,7 +114,9 @@ class BackupEvents(Object):
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.is_backup_in_progress
         ):
-            logger.warning("Cannot s3-credentials while database backup/restore is in progress.")
+            logger.warning(
+                "Cannot remove s3-credentials while database backup/restore is in progress."
+            )
             event.defer()
             return
 
@@ -106,6 +124,52 @@ class BackupEvents(Object):
 
         if self.charm.unit.is_leader():
             self.charm.state.cluster.update({"s3-credentials": ""})
+
+    def _on_azure_credentials_changed(self, event: StorageConnectionInfoChangedEvent) -> None:
+        """Handle an update of the azure credentials from azure-storage-integrator."""
+        if not (azure_parameters := self.azure_requirer.get_azure_storage_connection_info()):
+            logger.debug(f"No relation {AZURE_RELATION_NAME}")
+            return
+
+        if not self.charm.unit.is_leader():
+            return
+
+        if not self.charm.state.peer_relation:
+            self.charm.set_status(Status.NO_PEER_RELATION)
+            event.defer()
+            return
+
+        # make sure we have all required parameters for writing to the storage
+        required_parameters = ["container", "storage-account", "path", "secret-key"]
+        if missing_parameters := [p for p in required_parameters if p not in azure_parameters]:
+            raise KeyError(f"Parameters missing from Azure integrator: {missing_parameters}")
+
+        # Strip whitespaces from all parameters
+        for key, value in azure_parameters.items():
+            if isinstance(value, str):
+                azure_parameters[key] = value.strip()
+
+        # Clean up extra slash symbols to avoid issues on 3rd-party storages
+        azure_parameters["path"] = azure_parameters["path"].strip("/")
+        azure_parameters["container"] = azure_parameters["container"].strip("/")
+
+        self.charm.backup_manager.create_container(azure_parameters)
+        self.charm.state.cluster.update({"azure-credentials": json.dumps(azure_parameters)})
+
+    def _on_azure_credentials_gone(self, event: StorageConnectionInfoGoneEvent) -> None:
+        """Handle the removal of the relation with the azure-storage-integrator."""
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.is_backup_in_progress
+        ):
+            logger.warning(
+                "Cannot remove azure-credentials while database backup/restore is in progress."
+            )
+            event.defer()
+            return
+
+        if self.charm.unit.is_leader():
+            self.charm.state.cluster.update({"azure-credentials": ""})
 
     def _on_create_backup_action(self, event: ActionEvent) -> None:
         """Create a backup and upload to object storage."""
@@ -221,8 +285,27 @@ class BackupEvents(Object):
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
 
-        if not self.charm.state.cluster.s3_credentials:
-            return "No credentials for object storage available."
+        if self.charm.model.get_relation(AZURE_RELATION_NAME) and self.charm.model.get_relation(
+            S3_RELATION_NAME
+        ):
+            return "Azure and S3 storages configured - please remove one."
+
+        if not self.charm.model.get_relation(
+            AZURE_RELATION_NAME
+        ) and not self.charm.model.get_relation(S3_RELATION_NAME):
+            return "No object storage configured - please add Azure or S3 relation."
+
+        if (
+            self.charm.model.get_relation(S3_RELATION_NAME)
+            and not self.charm.state.cluster.s3_credentials
+        ):
+            return "No credentials for S3 object storage available."
+
+        if (
+            self.charm.model.get_relation(AZURE_RELATION_NAME)
+            and not self.charm.state.cluster.azure_credentials
+        ):
+            return "No credentials for Azure object storage available."
 
         if self.charm.state.cluster.is_backup_in_progress:
             return "Backup in progress, cannot perform action."

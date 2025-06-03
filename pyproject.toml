@@ -11,6 +11,8 @@ ops = "^2.17.0"
 tenacity = "*"
 boto3 = "^1.37.12"
 mypy-boto3-s3 = "^1.37.0"
+azure-storage-blob = "^12.25.1"
+azure-core = "^1.33.0"
 
 
 [tool.poetry.group.charm-libs.dependencies]

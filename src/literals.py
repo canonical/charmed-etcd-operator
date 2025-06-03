@@ -34,7 +34,7 @@ METRICS_PORT = 9100
 
 INTERNAL_USER = "root"
 INTERNAL_USER_PASSWORD_CONFIG = "system-users"
-SECRETS_APP = ["root-password", "s3-credentials"]
+SECRETS_APP = ["root-password", "s3-credentials", "azure-credentials"]
 
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 SUBSTRATES = Literal["vm", "k8s"]
@@ -46,6 +46,7 @@ TLS_PEER_PRIVATE_KEY_CONFIG = "tls-peer-private-key"
 TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 
 S3_RELATION_NAME = "s3-credentials"
+AZURE_RELATION_NAME = "azure-credentials"
 
 
 @dataclass
@@ -81,6 +82,9 @@ class Status(Enum):
     )
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
+    OBJECT_STORAGE_CONFLICT = StatusLevel(
+        BlockedStatus("Azure and S3 storages configured - please remove one"), "ERROR"
+    )
     PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
