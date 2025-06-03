@@ -228,6 +228,11 @@ class EtcdCluster(RelationState):
         return json.loads(self.relation_data.get("s3-credentials", "{}"))
 
     @property
+    def azure_credentials(self) -> dict[str, str]:
+        """Get credentials and parameters to access azure object storage."""
+        return json.loads(self.relation_data.get("azure-credentials", "{}"))
+
+    @property
     def backup_id(self) -> str:
         """Id of the backup that is currently being created."""
         return self.relation_data.get("backup_id", "")

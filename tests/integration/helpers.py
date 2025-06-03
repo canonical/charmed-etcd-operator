@@ -13,7 +13,13 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
 
-from literals import CLIENT_PORT, PEER_RELATION, TLSType
+from literals import (
+    CLIENT_PORT,
+    INTERNAL_USER,
+    INTERNAL_USER_PASSWORD_CONFIG,
+    PEER_RELATION,
+    TLSType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +314,41 @@ async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str
     assert return_code == 0, f"Failed to add secret: {std_err}"
     logger.info(f"Added secret {secret_name} to the model")
     return std_out.strip()
+
+
+async def set_password(
+    ops_test: OpsTest,
+    password: str,
+    username: str = INTERNAL_USER,
+    application: str = APP_NAME,
+) -> None:
+    """Set a user password via secret.
+
+    Args:
+        ops_test: ops_test instance.
+        username: the user to set the password.
+        password: password to use
+        application: the application the created secret will be granted to
+    """
+    secret_name = "system_users_secret"
+
+    try:
+        secret_id = await ops_test.model.add_secret(
+            name=secret_name, data_args=[f"{username}={password}"]
+        )
+    except Exception:
+        secrets = await ops_test.model.list_secrets({"name": secret_name})
+        secret_id = secrets[0].uri
+        await ops_test.model.update_secret(
+            name=secret_name, data_args=[f"{username}={password}"], new_name=secret_name
+        )
+
+    await ops_test.model.grant_secret(secret_name=secret_name, application=application)
+
+    # update the application config to include the secret
+    await ops_test.model.applications[application].set_config(
+        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
+    )
 
 
 async def download_client_certificate_from_unit(
