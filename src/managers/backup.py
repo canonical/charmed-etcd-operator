@@ -9,22 +9,22 @@ from datetime import datetime
 from typing import List
 
 import boto3
+from azure.core.exceptions import ResourceExistsError
+from azure.storage.blob import ContainerClient
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from mypy_boto3_s3.service_resource import Bucket
-from tenacity import Retrying, stop_after_attempt, wait_fixed
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from common.client import EtcdClient
 from common.exceptions import EtcdBackupError
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import (
-    BACKUP_FILE_PATH,
+    BACKUP_FILE_NAME,
     BACKUP_ID_FORMAT,
     DATABASE_DIR,
     INTERNAL_USER,
-    RESTORE_FILE_NAME,
-    SNAP_CONFIG_PATH,
     SNAP_DATA_PATH,
     EtcdClusterState,
     RestoreStep,
@@ -67,6 +67,18 @@ class BackupManager:
 
         return s3_resource.Bucket(s3_parameters["bucket"])
 
+    def _get_container_client(self, azure_parameters: dict[str, str]) -> ContainerClient:
+        """Get the Container client from the Azure connection.
+
+        Returns:
+            ContainerClient: the Azure container for uploading/downloading backups
+        """
+        return ContainerClient(
+            account_url=f"https://{azure_parameters['storage-account']}.blob.core.windows.net",
+            container_name=azure_parameters["container"],
+            credential=azure_parameters["secret-key"],
+        )
+
     def _get_etcd_client(self) -> EtcdClient:
         """Get a client connection to etcd."""
         return EtcdClient(
@@ -102,6 +114,15 @@ class BackupManager:
 
         logger.info(f"Bucket {s3_parameters['bucket']} is ready")
 
+    def create_container(self, azure_parameters: dict[str, str]) -> None:
+        """Create container if it does not exist yet."""
+        container_client = self._get_container_client(azure_parameters)
+        try:
+            container_client.create_container()
+            logger.info(f"Container {azure_parameters['container']} created")
+        except ResourceExistsError:
+            logger.info(f"Container {azure_parameters['container']} already exists")
+
     def create_backup(self) -> str:
         """Create a backup of etcd and upload it to object storage.
 
@@ -112,9 +133,6 @@ class BackupManager:
         # set flag in peer relation data to avoid concurring actions/events
         self.state.cluster.update({"backup_id": backup_id})
 
-        s3_parameters = self.state.cluster.s3_credentials
-        upload_target = f"{s3_parameters['path']}/{backup_id}"
-
         if self.workload.alive():
             # online backup
             etcd_client = self._get_etcd_client()
@@ -124,26 +142,53 @@ class BackupManager:
         else:
             # offline backup from `member/snap/db` file
             logger.info("Cluster is not running, creating offline backup")
-            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_PATH)
+            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_NAME)
 
-        bucket = self._get_bucket_resource(s3_parameters)
+        if s3_parameters := self.state.cluster.s3_credentials:
+            # backup file will be uploaded to S3 storage
+            upload_target = f"{s3_parameters['path']}/{backup_id}"
+            bucket = self._get_bucket_resource(s3_parameters)
 
-        try:
-            for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
-                with attempt:
-                    bucket.upload_file(BACKUP_FILE_PATH, upload_target)
-        except ClientError as e:
-            self.state.cluster.update({"backup_id": ""})
-            # if we can't upload, we still need to clean up the backup file to free the disk space
-            self.workload.remove_file(BACKUP_FILE_PATH)
-            logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
-            raise EtcdBackupError(e)
+            try:
+                for attempt in Retrying(
+                    stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True
+                ):
+                    with attempt:
+                        bucket.upload_file(BACKUP_FILE_NAME, upload_target)
+            except ClientError as e:
+                self.state.cluster.update({"backup_id": ""})
+                # if we can't upload, we still need to clean up the backup file to free the disk space
+                self.workload.remove_file(BACKUP_FILE_NAME)
+                logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
+                raise EtcdBackupError(e)
+        else:
+            # backup file will be uploaded to Azure storage
+            azure_parameters = self.state.cluster.azure_credentials
+            upload_target = f"{azure_parameters['path']}/{backup_id}"
+            blob_client = self._get_container_client(azure_parameters).get_blob_client(
+                upload_target
+            )
+
+            try:
+                # we use `RetryError` because the blob client raises a multitude of exceptions
+                for attempt in Retrying(
+                    stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=False
+                ):
+                    with attempt:
+                        with open(BACKUP_FILE_NAME, "rb") as backup_file:
+                            blob_client.upload_blob(backup_file)
+            except RetryError as e:
+                self.state.cluster.update({"backup_id": ""})
+                # if we can't upload, we still need to clean up the backup file to free the disk space
+                self.workload.remove_file(BACKUP_FILE_NAME)
+                logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
+                raise EtcdBackupError(e)
 
         logger.info(f"Backup uploaded to {upload_target}")
 
         self.state.cluster.update({"backup_id": ""})
-        self.workload.remove_file(BACKUP_FILE_PATH)
-        logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_PATH}")
+        self.workload.remove_file(BACKUP_FILE_NAME)
+        logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
 
         return backup_id
 
@@ -153,20 +198,32 @@ class BackupManager:
         Returns:
             list: the available backup_id's in the bucket
         """
-        s3_parameters = self.state.cluster.s3_credentials
-
-        bucket = self._get_bucket_resource(s3_parameters)
         backup_list = []
 
-        try:
-            bucket_objects = bucket.objects.filter(Prefix=s3_parameters["path"])
-            for bucket_object in bucket_objects:
-                backup_list.append(bucket_object.key)
-        except ClientError as e:
-            raise EtcdBackupError(e)
+        if s3_parameters := self.state.cluster.s3_credentials:
+            # retrieve the list of backups from S3 storage
+            path = s3_parameters["path"]
+            bucket = self._get_bucket_resource(s3_parameters)
+
+            try:
+                bucket_objects = bucket.objects.filter(Prefix=path)
+                for bucket_object in bucket_objects:
+                    backup_list.append(bucket_object.key)
+            except ClientError as e:
+                raise EtcdBackupError(e)
+        else:
+            # retrieve the list of backups from Azure storage
+            azure_parameters = self.state.cluster.azure_credentials
+            path = azure_parameters["path"]
+
+            container_objects = self._get_container_client(azure_parameters).list_blob_names(
+                name_starts_with=path
+            )
+            for container_object in container_objects:
+                backup_list.append(container_object)
 
         # current format: ['etcd-backups/2025-03-19T11:56:30Z','etcd-backups/2025-03-19T11:57:52Z']
-        backup_list = [b.replace(f"{s3_parameters['path']}/", "") for b in backup_list]
+        backup_list = [b.replace(f"{path}/", "") for b in backup_list]
         backup_list.sort(reverse=True)
 
         return backup_list
@@ -178,19 +235,35 @@ class BackupManager:
             True if backup-file could be downloaded from object storage and restore process was
             initiated, False otherwise.
         """
-        s3_parameters = self.state.cluster.s3_credentials
-        download_source = f"{s3_parameters['path']}/{backup_id}"
         logger.info(f"Initiating restore process for backup-id {backup_id}")
 
-        bucket = self._get_bucket_resource(s3_parameters)
+        if s3_parameters := self.state.cluster.s3_credentials:
+            # download the backup file from S3 storage
+            download_source = f"{s3_parameters['path']}/{backup_id}"
+            bucket = self._get_bucket_resource(s3_parameters)
 
-        try:
-            bucket.download_file(download_source, f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
-            logger.info(f"Backup {backup_id} downloaded to {SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
-        except ClientError as e:
-            logger.error(e)
-            return False
+            try:
+                bucket.download_file(download_source, BACKUP_FILE_NAME)
+            except ClientError as e:
+                logger.error(e)
+                return False
+        else:
+            # download the backup file from Azure storage
+            azure_parameters = self.state.cluster.azure_credentials
+            download_source = f"{azure_parameters['path']}/{backup_id}"
+            blob_client = self._get_container_client(azure_parameters).get_blob_client(
+                download_source
+            )
 
+            try:
+                with open(BACKUP_FILE_NAME, mode="wb") as backup_file:
+                    download_stream = blob_client.download_blob()
+                    backup_file.write(download_stream.readall())
+            except Exception as e:
+                logger.error(e)
+                return False
+
+        logger.info(f"Backup {backup_id} downloaded to {BACKUP_FILE_NAME}")
         self.set_restore_step(RestoreStep.DOWNLOAD.value)
         return True
 
@@ -217,7 +290,7 @@ class BackupManager:
         etcd_client = self._get_etcd_client()
 
         if not etcd_client.restore_database_snapshot(
-            snapshot_filename=f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}",
+            snapshot_filename=BACKUP_FILE_NAME,
             data_directory=SNAP_DATA_PATH,
             cluster_config=self.state.cluster.cluster_members,
             peer_url=self.state.unit_server.peer_url,
@@ -239,7 +312,7 @@ class BackupManager:
         """Remove backup files and state from unit."""
         logger.info("Removing backup file after restore completed.")
 
-        self.workload.remove_file(f"{SNAP_CONFIG_PATH}/{RESTORE_FILE_NAME}")
+        self.workload.remove_file(BACKUP_FILE_NAME)
         self.set_restore_step("")
 
     @staticmethod
@@ -317,5 +390,8 @@ class BackupManager:
 
         if self.state.cluster.is_restore_in_progress:
             status_list.append(Status.RESTORE_IN_PROGRESS)
+
+        if self.state.cluster.s3_credentials and self.state.cluster.azure_credentials:
+            status_list.append(Status.OBJECT_STORAGE_CONFLICT)
 
         return status_list

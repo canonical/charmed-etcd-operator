@@ -35,6 +35,10 @@ requires:
     interface: s3
     limit: 1
     optional: true
+  azure-credentials:
+    interface: azure
+    limit: 1
+    optional: true
 
 storage:
   data:
@@ -47,3 +51,7 @@ storage:
     location: /var/snap/charmed-etcd/common/var/log/etcd
     description: storage for logfiles of etcd server
     minimum-size: 1G
+  archive:
+    type: filesystem
+    location: /var/snap/charmed-etcd/common/archive
+    description: storage for local backup files during transfer to/from remote object storage

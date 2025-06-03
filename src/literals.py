@@ -14,17 +14,16 @@ SNAP_NAME = "charmed-etcd"
 SNAP_REVISION = 2
 SNAP_SERVICE = "etcd"
 SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
+SNAP_LOG_PATH = "/var/snap/charmed-etcd/common/var/log/etcd"
+SNAP_ARCHIVE_PATH = "/var/snap/charmed-etcd/common/archive"
 SNAP_CONFIG_PATH = "/var/snap/charmed-etcd/current"
 SNAP_USER = 584788
 SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
 DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
-BACKUP_FILE_PATH = (
-    "/var/snap/charmed-etcd/common/var/lib/etcd/member/snap/charmed-etcd_snapshot.db"
-)
+BACKUP_FILE_NAME = "/var/snap/charmed-etcd/common/archive/charmed-etcd_snapshot.db"
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-RESTORE_FILE_NAME = "backup_to_restore.db"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
@@ -35,7 +34,7 @@ METRICS_PORT = 9100
 
 INTERNAL_USER = "root"
 INTERNAL_USER_PASSWORD_CONFIG = "system-users"
-SECRETS_APP = ["root-password", "s3-credentials"]
+SECRETS_APP = ["root-password", "s3-credentials", "azure-credentials"]
 
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 SUBSTRATES = Literal["vm", "k8s"]
@@ -47,6 +46,7 @@ TLS_PEER_PRIVATE_KEY_CONFIG = "tls-peer-private-key"
 TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 
 S3_RELATION_NAME = "s3-credentials"
+AZURE_RELATION_NAME = "azure-credentials"
 
 
 @dataclass
@@ -82,6 +82,9 @@ class Status(Enum):
     )
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
+    OBJECT_STORAGE_CONFLICT = StatusLevel(
+        BlockedStatus("Azure and S3 storages configured - please remove one"), "ERROR"
+    )
     PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
