@@ -375,7 +375,10 @@ class BackupManager:
         """Check workflow progress for all units and proceed to next step if possible."""
         current_step = self.state.cluster.restore_instruction
 
-        if current_step == RestoreStep.RESTORE:
+        if (
+            current_step == RestoreStep.RESTORE
+            and not self.state.cluster.restore_verification_failed
+        ):
             # `cluster_state` must be reset before starting a restored cluster
             self.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
         elif current_step == RestoreStep.COMPLETED:

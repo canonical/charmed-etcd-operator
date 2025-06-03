@@ -29,6 +29,7 @@ from common.exceptions import (
 )
 from literals import (
     AZURE_RELATION_NAME,
+    DATABASE_DIR,
     PEER_RELATION,
     S3_RELATION_NAME,
     RestoreStep,
@@ -227,6 +228,10 @@ class BackupEvents(Object):
 
         event.log(f"Initiating restore process for backup-id {backup_id_to_restore}")
 
+        if self.charm.state.cluster.restore_verification_failed:
+            # clean up the state if previous restore procedure failed
+            self.charm.state.cluster.update({"restore_verification_failed": ""})
+
         if not self.charm.backup_manager.download_backup_file(backup_id_to_restore):
             event.fail(f"Could not download backup-file {backup_id_to_restore}.")
             return
@@ -259,10 +264,16 @@ class BackupEvents(Object):
             case RestoreStep.VERIFY, RestoreStep.STOP:
                 self._verify_restore()
             case RestoreStep.RESTORE, RestoreStep.VERIFY:
-                try:
-                    self.charm.backup_manager.restore_backup()
-                except EtcdBackupError:
-                    self.charm.set_status(Status.RESTORE_FAILED)
+                if self.charm.state.cluster.restore_verification_failed:
+                    logger.error(
+                        "Restore procedure not successful - start previous etcd database again"
+                    )
+                    self.charm.backup_manager.set_restore_step(RestoreStep.RESTORE.value)
+                else:
+                    try:
+                        self.charm.backup_manager.restore_backup()
+                    except EtcdBackupError:
+                        self.charm.set_status(Status.RESTORE_FAILED)
             case RestoreStep.START, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
                 self.charm.backup_manager.start_database()
@@ -322,8 +333,11 @@ class BackupEvents(Object):
                 # if the verification fails, the restore workflow stops here
                 # data on all other units will remain as is, but the cluster is down
                 # users must manually recover from this situation
+                logger.error("Failed to verify - cancel the restore procedure")
                 self.charm.state.cluster.update({"restore_verification_failed": "True"})
                 self.charm.backup_manager.stop_database()
+                self.charm.workload.remove_directory(DATABASE_DIR)
+                self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
                 return
             # if the verification was successful, stop etcd again and continue the workflow
             logger.info(

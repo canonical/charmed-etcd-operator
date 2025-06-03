@@ -620,7 +620,10 @@ def test_restore_action_s3():
     secret_content = {secret_key: secret_value}
     admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
     peer_relation = testing.PeerRelation(
-        id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started"},
+        local_app_data={"restore_verification_failed": "True"},
     )
     secret_content = {"s3-credentials": json.dumps(s3_credentials)}
     secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -873,14 +876,18 @@ def test_restore_workflow_synchronization():
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
         assert state_out.unit_status == ops.BlockedStatus(
-            "Verification of restoring the backup failed - etcd data was not deleted on non-leader units"
+            "Restore verification failed - etcd cluster still running, restore cancelled, check debug-log"
         )
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
+            state_out.get_relation(1).local_unit_data.get("restore_step")
+            == RestoreStep.VERIFY.value
         )
         assert (
             state_out.get_relation(1).local_app_data.get("restore_instruction")
-            == RestoreStep.VERIFY.value
+            == RestoreStep.RESTORE.value
+        )
+        assert (
+            state_out.get_relation(1).local_app_data.get("restore_verification_failed") == "True"
         )
 
     # restore step: restore (non-leader)
@@ -937,6 +944,70 @@ def test_restore_workflow_synchronization():
         assert (
             state_out.get_relation(1).local_app_data.get("cluster_state")
             == EtcdClusterState.NEW.value
+        )
+
+    # restore step: skip restore after verification failed (non-leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.RESTORE.value,
+            "restore_verification_failed": "True",
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
+    )
+    state_in = testing.State(relations={relation}, leader=False)
+    with (
+        patch("managers.backup.BackupManager.restore_backup") as restore_backup,
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        restore_backup.assert_not_called()
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step")
+            == RestoreStep.RESTORE.value
+        )
+        assert state_out.unit_status == ops.BlockedStatus(
+            "Restore verification failed - etcd cluster still running, restore cancelled, check debug-log"
+        )
+
+    # restore step: skip restore after verification failed (leader)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
+        local_app_data={
+            "restore_id": "xyz",
+            "restore_instruction": RestoreStep.RESTORE.value,
+            "restore_verification_failed": "True",
+            "cluster_state": EtcdClusterState.EXISTING.value,
+            "authentication": "enabled",
+        },
+    )
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("managers.backup.BackupManager.restore_backup") as restore_backup,
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+
+        restore_backup.assert_not_called()
+        assert (
+            state_out.get_relation(1).local_unit_data.get("restore_step")
+            == RestoreStep.RESTORE.value
+        )
+        assert (
+            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            == RestoreStep.START.value
+        )
+        assert (
+            state_out.get_relation(1).local_app_data.get("cluster_state")
+            == EtcdClusterState.EXISTING.value
+        )
+        assert state_out.unit_status == ops.BlockedStatus(
+            "Restore verification failed - etcd cluster still running, restore cancelled, check debug-log"
         )
 
     # restore step: restore -> failed

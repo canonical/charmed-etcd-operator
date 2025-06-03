@@ -91,7 +91,7 @@ class Status(Enum):
     RESTORE_FAILED = StatusLevel(BlockedStatus("failed to restore backup"), "ERROR")
     RESTORE_VERIFICATION_FAILED = StatusLevel(
         BlockedStatus(
-            "Verification of restoring the backup failed - etcd data was not deleted on non-leader units"
+            "Restore verification failed - etcd cluster still running, restore cancelled, check debug-log"
         ),
         "ERROR",
     )
