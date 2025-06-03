@@ -308,8 +308,10 @@ class BackupEvents(Object):
         - immediately start etcd
         - perform a health check on the unit
 
-        If the health check fails, it will raise. In this case, the restore workflow should NOT
-        proceed, so that the data on the remaining units will not be purged.
+        If the health check fails, the restore workflow will NOT proceed, so that the data on the
+        remaining units will not be purged. Instead, the leader unit will reset its data directory
+        and the restore-step will be skipped for all units. The cluster will be recovered as before
+        the restore was initiated.
 
         If the health check succeeds, the restore procedure can continue on all units.
         """
@@ -331,8 +333,8 @@ class BackupEvents(Object):
                     raise HealthCheckFailedError("Health check failed")
             except (EtcdBackupError, EtcdAuthNotEnabledError, HealthCheckFailedError):
                 # if the verification fails, the restore workflow stops here
-                # data on all other units will remain as is, but the cluster is down
-                # users must manually recover from this situation
+                # data on all other units will remain as is
+                # the cluster will try to recover as before the restore was initiated
                 logger.error("Failed to verify - cancel the restore procedure")
                 self.charm.state.cluster.update({"restore_verification_failed": "True"})
                 self.charm.backup_manager.stop_database()

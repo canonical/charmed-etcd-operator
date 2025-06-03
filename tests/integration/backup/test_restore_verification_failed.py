@@ -9,11 +9,11 @@ from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION, Status
 
-from ..ha.helpers import get_cluster_members
 from ..helpers import (
     APP_NAME,
     CHARM_PATH,
     get_cluster_endpoints,
+    get_cluster_members,
     get_key,
     get_secret_by_label,
     put_key,
