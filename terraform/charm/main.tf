@@ -84,7 +84,7 @@ resource "juju_integration" "tls-etcd-client" {
   model = var.model
 
   application {
-    name     = "self-signed-certificates"
+    name     = juju_application.self-signed-certificates["deployed"].name
     endpoint = "certificates"
   }
 
