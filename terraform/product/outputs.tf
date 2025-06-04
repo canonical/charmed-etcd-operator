@@ -25,7 +25,7 @@ output "app_names" {
   value = merge(
     module.etcd.app_names,
     {
-      "data-integrator" : juju_application.data-integrator.name,
+      "data-integrator" : var.tls ? juju_application.data-integrator["deployed"].name : null,
       "grafana-agent" : juju_application.grafana-agent.name,
       "backups-integrator" : juju_application.backups-integrator.name
     }

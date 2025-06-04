@@ -23,9 +23,12 @@ module "etcd" {
   expose            = var.etcd.expose
 
   self-signed-certificates = var.self-signed-certificates
+  tls                      = var.tls
 }
 
 resource "juju_application" "data-integrator" {
+  # This application is only created if tls is enabled
+  for_each = var.tls ? { "deployed" = true } : {}
   charm {
     name     = "data-integrator"
     channel  = var.data-integrator.channel
@@ -70,10 +73,13 @@ resource "juju_application" "backups-integrator" {
 
 # Integrator apps and grafana-agent
 resource "juju_integration" "data_integrator-etcd-integration" {
+  # This integration is only created if TLS is enabled
+  for_each = var.tls ? { "deployed" = true } : {}
+
   model = var.etcd.model
 
   application {
-    name = juju_application.data-integrator.name
+    name = juju_application.data-integrator["deployed"].name
   }
 
   application {

@@ -12,7 +12,7 @@ variable "etcd" {
     revision          = optional(string, null)
     units             = optional(number, 3)
     constraints       = optional(string, "arch=amd64")
-    machines          = optional(list(string), [])
+    machines          = optional(set(string), null)
     storage           = optional(map(string), {})
     endpoint_bindings = optional(map(string), {})
     expose            = optional(bool, false)
@@ -26,7 +26,7 @@ variable "self-signed-certificates" {
     revision    = optional(string, null)
     base        = optional(string, "ubuntu@24.04")
     constraints = optional(string, "arch=amd64")
-    machines    = optional(list(string), [])
+    machines    = optional(set(string), [])
     config      = optional(map(string), { "ca-common-name" : "CA" })
   })
   default = {}
@@ -57,7 +57,7 @@ variable "data-integrator" {
     base        = optional(string, "ubuntu@24.04")
     revision    = optional(string, null)
     constraints = optional(string, "arch=amd64")
-    machines    = optional(list(string), [])
+    machines    = optional(set(string), [])
   })
 
   validation {
@@ -77,7 +77,7 @@ variable "backups-integrator" {
     base         = optional(string, "ubuntu@22.04")
     revision     = optional(string, null)
     constraints  = optional(string, "arch=amd64")
-    machines     = optional(list(string), [])
+    machines     = optional(set(string), [])
   })
 
   validation {
@@ -89,4 +89,10 @@ variable "backups-integrator" {
     condition     = length(var.backups-integrator.machines) <= 1
     error_message = "Machine count should be at most 1"
   }
+}
+
+variable "tls" {
+  description = "Enable TLS for the application"
+  type        = bool
+  default     = false
 }
