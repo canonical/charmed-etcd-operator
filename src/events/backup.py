@@ -261,12 +261,13 @@ class BackupEvents(Object):
                     self.charm.set_status(Status.RESTORE_FAILED)
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
                 self.charm.backup_manager.stop_database()
+                self.charm.backup_manager.set_restore_step(RestoreStep.STOP.value)
             case RestoreStep.VERIFY, RestoreStep.STOP:
                 self._verify_restore()
             case RestoreStep.RESTORE, RestoreStep.VERIFY:
                 if self.charm.state.cluster.restore_verification_failed:
                     logger.error(
-                        "Restore procedure not successful - start previous etcd database again"
+                        "Restore procedure not successful - the etcd cluster will restart with the previous state."
                     )
                     self.charm.backup_manager.set_restore_step(RestoreStep.RESTORE.value)
                 else:
@@ -283,6 +284,7 @@ class BackupEvents(Object):
                         self.charm.cluster_manager.enable_authentication()
                     except EtcdUserManagementError:
                         logger.info("Auth already enabled")
+                self.charm.backup_manager.set_restore_step(RestoreStep.START.value)
             case RestoreStep.COMPLETED, RestoreStep.START:
                 if not self.charm.cluster_manager.is_healthy(cluster=False):
                     # if the member is not healthy, we do not complete the restore process
@@ -315,40 +317,41 @@ class BackupEvents(Object):
 
         If the health check succeeds, the restore procedure can continue on all units.
         """
-        if self.charm.unit.is_leader() and len(self.charm.state.servers) > 1:
-            # verify restoring the backup to avoid data loss before purging all data
-            if self.charm.state.cluster.restore_verification_failed:
-                # verification has already failed - do not try again
-                return
+        if not self.charm.unit.is_leader() or len(self.charm.state.servers) == 1:
+            self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
+            return
 
+        # verify restoring the backup to avoid data loss before purging all data
+        if self.charm.state.cluster.restore_verification_failed:
+            # verification has already failed - do not try again
+            return
+
+        try:
+            self.charm.backup_manager.restore_backup()
+            self.charm.config_manager.set_config_properties()
+            self.charm.backup_manager.start_database()
             try:
-                self.charm.backup_manager.restore_backup()
-                self.charm.config_manager.set_config_properties()
-                self.charm.backup_manager.start_database()
-                try:
-                    self.charm.cluster_manager.enable_authentication()
-                except EtcdUserManagementError:
-                    logger.info("Auth already enabled")
-                if not self.charm.cluster_manager.is_healthy(cluster=False):
-                    raise HealthCheckFailedError("Health check failed")
-            except (EtcdBackupError, EtcdAuthNotEnabledError, HealthCheckFailedError):
-                # if the verification fails, the restore workflow stops here
-                # data on all other units will remain as is
-                # the cluster will try to recover as before the restore was initiated
-                logger.error("Failed to verify - cancel the restore procedure")
-                self.charm.state.cluster.update({"restore_verification_failed": "True"})
-                self.charm.backup_manager.stop_database()
-                self.charm.workload.remove_directory(DATABASE_DIR)
-                self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
-                return
-            # if the verification was successful, stop etcd again and continue the workflow
-            logger.info(
-                f"Restore verification successful: Backup {self.charm.state.cluster.restore_id} can be restored."
-            )
+                self.charm.cluster_manager.enable_authentication()
+            except EtcdUserManagementError:
+                logger.info("Auth already enabled")
+            if not self.charm.cluster_manager.is_healthy(cluster=False):
+                raise HealthCheckFailedError("Health check failed")
+        except (EtcdBackupError, EtcdAuthNotEnabledError, HealthCheckFailedError):
+            # if the verification fails, the restore workflow stops here
+            # data on all other units will remain as is
+            # the cluster will try to recover as before the restore was initiated
+            logger.error("Failed to verify - cancel the restore procedure")
+            self.charm.state.cluster.update({"restore_verification_failed": "True"})
             self.charm.backup_manager.stop_database()
+            self.charm.workload.remove_directory(DATABASE_DIR)
             self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
-        else:
-            self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
+            return
+        # if the verification was successful, stop etcd again and continue the workflow
+        logger.info(
+            f"Restore verification successful: Backup {self.charm.state.cluster.restore_id} can be restored."
+        )
+        self.charm.backup_manager.stop_database()
+        self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
 
     def _exists_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.

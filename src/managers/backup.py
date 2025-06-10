@@ -273,11 +273,6 @@ class BackupManager:
         # disable the service to avoid restart while the backup is restored
         self.workload.disable_database()
 
-        if self.state.cluster.restore_instruction == RestoreStep.VERIFY:
-            return
-
-        self.set_restore_step(RestoreStep.STOP.value)
-
     def restore_backup(self) -> None:
         """Perform the actual restore-operation on the etcd database."""
         backup_id_to_restore = self.state.cluster.restore_id
@@ -313,11 +308,6 @@ class BackupManager:
         """Enable and start the etcd database again after restoring."""
         logger.info("Enabling and starting etcd workload.")
         self.workload.enable_database()
-
-        if self.state.cluster.restore_instruction == RestoreStep.VERIFY:
-            return
-
-        self.set_restore_step(RestoreStep.START.value)
 
     def clean_up_after_restore(self) -> None:
         """Remove backup files and state from unit."""
