@@ -381,6 +381,48 @@ def test_update_status():
         )
 
 
+def test_removal_of_inconsistent_members():
+    # this test is assuming the default relation has only one unit: remote/0
+    cluster_member_list = {
+        "remote0": Member(
+            id="1",
+            name="remote0",
+            peer_urls=["http://ip:2380"],
+            client_urls=["http://ip:2379"],
+        ),
+        "remote1": Member(
+            id="2",
+            name="remote1",
+            peer_urls=["http://ip:2381"],
+            client_urls=["http://ip:2380"],
+        ),
+    }
+
+    ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "cluster_state": "existing",
+            "authentication": "enabled",
+            "cluster_members": "remote0=http://ip0:2380,remote1=http://ip1:2380",
+        },
+    )
+    state_in = testing.State(relations={relation})
+
+    with (
+        patch("common.client.EtcdClient.member_list", return_value=cluster_member_list),
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch("workload.EtcdWorkload.exec", return_value=CompletedProcess(returncode=0, args=[])),
+        patch(
+            "managers.cluster.ClusterManager.update_cluster_member_state"
+        ) as update_cluster_member_state,
+    ):
+        ctx.run(ctx.on.update_status(), state_in)
+        update_cluster_member_state.assert_called_once()
+
+
 def test_peer_relation_created():
     test_data = {"hostname": "my_hostname", "ip": "my_ip"}
 
