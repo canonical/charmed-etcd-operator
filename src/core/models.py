@@ -140,6 +140,16 @@ class EtcdServer(RelationState):
         return self.peer_cert_ready and self.client_cert_ready
 
     @property
+    def tls_peer_certs_expiring(self) -> bool:
+        """Check if any certificate is expiring."""
+        return self.relation_data.get("tls_peer_certificates_expiring", "") == "True"
+
+    @property
+    def tls_client_certs_expiring(self) -> bool:
+        """Check if any certificate is expiring."""
+        return self.relation_data.get("tls_client_certificates_expiring", "") == "True"
+
+    @property
     def member_endpoint(self) -> str:
         """Concatenate member_name and peer_url."""
         return f"{self.member_name}={self.peer_url}"

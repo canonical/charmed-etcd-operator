@@ -207,6 +207,34 @@ class TLSManager:
             else self.workload.paths.tls.client_ca,
         )
 
+    def check_certificate_validity(self, tls_type: TLSType) -> None:
+        """Check if the certificates installed on the unit will soon expire.
+
+        Args:
+            tls_type (TLSType): The TLS type to check certificate validity for.
+        """
+        cert_files = []
+        if tls_type == TLSType.CLIENT and self.state.unit_server.tls_client_state == TLSState.TLS:
+            cert_files.append(self.workload.paths.tls.client_cert)
+            cert_files.append(self.workload.paths.tls.client_ca)
+        elif tls_type == TLSType.PEER and self.state.unit_server.tls_peer_state == TLSState.TLS:
+            cert_files.append(self.workload.paths.tls.peer_cert)
+            cert_files.append(self.workload.paths.tls.peer_ca)
+
+        for cert_file in cert_files:
+            # will raise CalledProcessError if cert expires in less than 24h (=86400s)
+            self.workload.exec(
+                [
+                    "openssl",
+                    "x509",
+                    "-checkend",
+                    "86400",
+                    "-noout",
+                    "-in",
+                    cert_file,
+                ]
+            )
+
     def compute_component_status(self) -> list[Status]:
         """Compute the component status."""
         status_list = []
@@ -228,5 +256,11 @@ class TLSManager:
 
         if self.state.unit_server.tls_client_ca_rotation_state != TLSCARotationState.NO_ROTATION:
             status_list.append(Status.TLS_CLIENT_CA_ROTATING)
+
+        if self.state.unit_server.tls_client_certs_expiring:
+            status_list.append(Status.TLS_CLIENT_CERTS_EXPIRING)
+
+        if self.state.unit_server.tls_peer_certs_expiring:
+            status_list.append(Status.TLS_PEER_CERTS_EXPIRING)
 
         return status_list

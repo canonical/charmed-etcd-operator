@@ -215,9 +215,12 @@ class TLSEvents(Object):
             # Update the CA for external clients
             if cert_type == TLSType.CLIENT:
                 if self.charm.unit.is_leader():
-                    self.charm.external_clients_manager.update_client_relations_data(
-                        etcd_version=self.charm.cluster_manager.get_version()
-                    )
+                    try:
+                        self.charm.external_clients_manager.update_client_relations_data(
+                            etcd_version=self.charm.cluster_manager.get_version()
+                        )
+                    except KeyError as e:
+                        logger.warning(f"Error updating client relations data: {e}")
             self.clean_ca_event.emit(cert_type=cert_type)
             return
 
