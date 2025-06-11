@@ -16,14 +16,14 @@ Charmed etcd can be deployed on top of several clouds and virtualisation layers:
 | Cloud     | Security guides                                                                                                                                                                                                                                                        |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | OpenStack | [OpenStack Security Guide](https://docs.openstack.org/security-guide/)                                                                                                                                                                                                 |
-| AWS       | [Best Practices for Security, Identity and Compliance](https://aws.amazon.com/architecture/security-identity-compliance), [AWS security credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds.html#access-keys-and-secret-access-keys)          |
+| AWS       | [Best Practices for Security, Identity and Compliance](https://aws.amazon.com/architecture/security-identity-compliance), [AWS security credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds.html)                                             |
 | Azure     | [Azure security best practices and patterns](https://learn.microsoft.com/en-us/azure/security/fundamentals/best-practices-and-patterns), [Managed identities for Azure resource](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/) |
-| GCP       | [Google security overview](https://cloud.google.com/kubernetes-engine/docs/concepts/security-overview), [Harden your cluster's security](https://cloud.google.com/kubernetes-engine/docs/concepts/security-overview)                                                   |
+| GCP       | [Google security overview](https://cloud.google.com/docs/security)                                                                                                                                                                                                     |  |
 
 ### Juju 
 
 Juju is the component responsible for orchestrating the entire lifecycle, from deployment to Day 2 operations. For more information on Juju security hardening, see the
-[Juju security page](https://canonical-juju.readthedocs-hosted.com/en/latest/user/explanation/juju-security/) and the [How to harden your deployment](https://juju.is/docs/juju/harden-your-deployment) guide.
+[Juju security page](https://canonical-juju.readthedocs-hosted.com/en/latest/user/explanation/juju-security/) and the [How to harden your deployment](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-deployment/#harden-your-deployment) guide.
 
 #### Cloud credentials
 
