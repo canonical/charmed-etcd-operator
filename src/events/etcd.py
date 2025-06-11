@@ -318,6 +318,8 @@ class EtcdEvents(Object):
                 return
 
         self.charm.cluster_manager.clean_users()
+        if self.charm.unit.is_leader():
+            self.charm.cluster_manager.remove_inconsistent_members_if_required()
 
         for tls_type in TLSType:
             try:

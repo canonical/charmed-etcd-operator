@@ -408,8 +408,9 @@ def test_removal_of_inconsistent_members():
             "cluster_members": "remote0=http://ip0:2380,remote1=http://ip1:2380",
         },
     )
-    state_in = testing.State(relations={relation})
 
+    # leader should clean up inconsistent cluster members
+    state_in = testing.State(relations={relation}, leader=True)
     with (
         patch("common.client.EtcdClient.member_list", return_value=cluster_member_list),
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -421,6 +422,19 @@ def test_removal_of_inconsistent_members():
     ):
         ctx.run(ctx.on.update_status(), state_in)
         update_cluster_member_state.assert_called_once()
+
+    # no clean-up on non-leader units
+    state_in = testing.State(relations={relation}, leader=False)
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch("workload.EtcdWorkload.exec", return_value=CompletedProcess(returncode=0, args=[])),
+        patch(
+            "managers.cluster.ClusterManager.update_cluster_member_state"
+        ) as update_cluster_member_state,
+    ):
+        ctx.run(ctx.on.update_status(), state_in)
+        update_cluster_member_state.assert_not_called()
 
 
 def test_peer_relation_created():

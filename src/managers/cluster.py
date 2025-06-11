@@ -309,6 +309,23 @@ class ClusterManager:
             logger.warning(f"Could not transfer cluster leadership: {e}")
             return
 
+    def remove_inconsistent_members_if_required(self) -> None:
+        """Check current cluster members and remove those not existing anymore."""
+
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        cluster_members =  client.member_list()
+        for member in cluster_members:
+            if member.name not in
+
+        # for member in list
+        # if member not in servers
+        # self.update_cluster_member_state()
+
     def update_cluster_member_state(self) -> None:
         """Get up-to-date member information and store in cluster state."""
         if not self.state.cluster.cluster_state:
