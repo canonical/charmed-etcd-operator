@@ -257,6 +257,11 @@ class EtcdCluster(RelationState):
         """Current step of the restore workflow to be executed by the cluster members."""
         return RestoreStep(self.relation_data.get("restore_instruction", ""))
 
+    @property
+    def restore_verification_failed(self) -> bool:
+        """Flag for failed restore verification."""
+        return bool(self.relation_data.get("restore_verification_failed", ""))
+
 
 @dataclass
 class Member:

@@ -273,8 +273,6 @@ class BackupManager:
         # disable the service to avoid restart while the backup is restored
         self.workload.disable_database()
 
-        self.set_restore_step(RestoreStep.STOP.value)
-
     def restore_backup(self) -> None:
         """Perform the actual restore-operation on the etcd database."""
         backup_id_to_restore = self.state.cluster.restore_id
@@ -292,21 +290,24 @@ class BackupManager:
         if not etcd_client.restore_database_snapshot(
             snapshot_filename=BACKUP_FILE_NAME,
             data_directory=SNAP_DATA_PATH,
-            cluster_config=self.state.cluster.cluster_members,
+            cluster_config=self.state.unit_server.member_endpoint
+            if self.state.cluster.restore_instruction == RestoreStep.VERIFY
+            else self.state.cluster.cluster_members,
             peer_url=self.state.unit_server.peer_url,
             member_name=self.state.unit_server.member_name,
         ):
             raise EtcdBackupError("Failed to restore database backup.")
 
         logger.info("Restored backup successfully.")
+        if self.state.cluster.restore_instruction == RestoreStep.VERIFY:
+            return
+
         self.set_restore_step(RestoreStep.RESTORE.value)
 
     def start_database(self) -> None:
         """Enable and start the etcd database again after restoring."""
         logger.info("Enabling and starting etcd workload.")
         self.workload.enable_database()
-
-        self.set_restore_step(RestoreStep.START.value)
 
     def clean_up_after_restore(self) -> None:
         """Remove backup files and state from unit."""
@@ -348,6 +349,8 @@ class BackupManager:
             case RestoreStep.DOWNLOAD:
                 return RestoreStep.STOP
             case RestoreStep.STOP:
+                return RestoreStep.VERIFY
+            case RestoreStep.VERIFY:
                 return RestoreStep.RESTORE
             case RestoreStep.RESTORE:
                 return RestoreStep.START
@@ -362,7 +365,10 @@ class BackupManager:
         """Check workflow progress for all units and proceed to next step if possible."""
         current_step = self.state.cluster.restore_instruction
 
-        if current_step == RestoreStep.RESTORE:
+        if (
+            current_step == RestoreStep.RESTORE
+            and not self.state.cluster.restore_verification_failed
+        ):
             # `cluster_state` must be reset before starting a restored cluster
             self.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
         elif current_step == RestoreStep.COMPLETED:
@@ -390,6 +396,9 @@ class BackupManager:
 
         if self.state.cluster.is_restore_in_progress:
             status_list.append(Status.RESTORE_IN_PROGRESS)
+
+        if self.state.cluster.restore_verification_failed:
+            status_list.append(Status.RESTORE_VERIFICATION_FAILED)
 
         if self.state.cluster.s3_credentials and self.state.cluster.azure_credentials:
             status_list.append(Status.OBJECT_STORAGE_CONFLICT)

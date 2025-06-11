@@ -12,7 +12,7 @@ from ops.model import ConfigData
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import DATABASE_DIR, METRICS_PORT, TLSState
+from literals import DATABASE_DIR, METRICS_PORT, RestoreStep, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,15 @@ class ConfigManager:
             config_properties = yaml.safe_load(config)
 
         config_properties["name"] = self.state.unit_server.member_name
-        if self.state.cluster.cluster_state:
+        if (
+            self.state.cluster.is_restore_in_progress
+            and self.state.cluster.restore_instruction == RestoreStep.VERIFY
+        ):
+            # when verifying a backup restore, cluster configuration is only the local unit
+            config_properties["initial-cluster-state"] = self.state.cluster.cluster_state
+            config_properties["initial-cluster"] = self.state.unit_server.member_endpoint
+        elif self.state.cluster.cluster_state:
+            # regular situation: cluster is initialized and cluster configuration should be applied
             config_properties["initial-cluster-state"] = self.state.cluster.cluster_state
             config_properties["initial-cluster"] = self.state.cluster.cluster_members
         elif self.workload.exists(DATABASE_DIR):
