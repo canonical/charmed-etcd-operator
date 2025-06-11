@@ -85,8 +85,10 @@ class ExternalClientsManager:
         """
         # split the certificates by the end of the certificate marker and keep the marker in the cert
         raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
+        raw_cas.remove("")
         # add the marker back to the certificate
-        cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
+        # we take the last certificate from the provided mtls_cert, assuming this is the client cert
+        cert = raw_cas[-1].strip() + "\n-----END CERTIFICATE-----"
         return Certificate.from_string(cert).common_name
 
     def is_leaf_certificate_valid(self, mtls_cert: str) -> bool:
@@ -100,8 +102,10 @@ class ExternalClientsManager:
         """
         # split the certificates by the end of the certificate marker and keep the marker in the cert
         raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
+        raw_cas.remove("")
         # add the marker back to the certificate
-        leaf_cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
+        # we take the last certificate from the provided mtls_cert, assuming this is the client cert
+        leaf_cert = raw_cas[-1].strip() + "\n-----END CERTIFICATE-----"
         logger.debug(f"Leaf certificate is a CA? {Certificate.from_string(leaf_cert).is_ca}")
         certificate = x509.load_pem_x509_certificate(data=leaf_cert.encode())
         # check if the certificate is a CA
