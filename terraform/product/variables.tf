@@ -90,9 +90,3 @@ variable "backups-integrator" {
     error_message = "Machine count should be at most 1"
   }
 }
-
-variable "tls" {
-  description = "Enable TLS for the application"
-  type        = bool
-  default     = false
-}
