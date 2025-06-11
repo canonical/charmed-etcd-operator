@@ -11,7 +11,7 @@ from typing import Literal
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 SNAP_NAME = "charmed-etcd"
-SNAP_REVISION = 2
+SNAP_REVISION = 10
 SNAP_SERVICE = "etcd"
 SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
 SNAP_LOG_PATH = "/var/snap/charmed-etcd/common/var/log/etcd"
@@ -20,7 +20,7 @@ SNAP_CONFIG_PATH = "/var/snap/charmed-etcd/current"
 SNAP_USER = 584788
 SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
-TLS_ROOT_DIR = "/var/snap/charmed-etcd/common/tls"
+TLS_ROOT_DIR = "/var/snap/charmed-etcd/current/tls"
 DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
 BACKUP_FILE_NAME = "/var/snap/charmed-etcd/common/archive/charmed-etcd_snapshot.db"
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -28,6 +28,8 @@ BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
 RESTART_RELATION = "restart"
+EXTERNAL_CLIENTS_RELATION = "etcd-client"
+CERTIFICATE_TRANSFER_RELATION = "client-cas"
 CLIENT_PORT = 2379
 PEER_PORT = 2380
 METRICS_PORT = 9100
@@ -72,6 +74,7 @@ class Status(Enum):
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
     BACKUP_IN_PROGRESS = StatusLevel(MaintenanceStatus("Creating database backup..."), "DEBUG")
+    CLUSTER_INITIALIZING = StatusLevel(MaintenanceStatus("Initializing etcd cluster..."), "DEBUG")
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
     CLUSTER_NOT_INITIALIZED = StatusLevel(
         BlockedStatus("Waiting for cluster initialization"), "ERROR"
@@ -112,8 +115,41 @@ class Status(Enum):
     TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be ready"), "DEBUG")
     TLS_PEER_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating peer CA..."), "DEBUG")
     TLS_CLIENT_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating client CA..."), "DEBUG")
+    TLS_CLIENT_CERTS_EXPIRING = StatusLevel(
+        MaintenanceStatus(
+            "TLS client certificates expiring soon. Please ensure new certificates are provided."
+        ),
+        "WARNING",
+    )
+    TLS_PEER_CERTS_EXPIRING = StatusLevel(
+        MaintenanceStatus(
+            "TLS peer certificates expiring soon. Please ensure new certificates are provided."
+        ),
+        "WARNING",
+    )
+    SERVICE_INSTALLING = StatusLevel(MaintenanceStatus("Installing etcd..."), "DEBUG")
+    SERVICE_STARTING = StatusLevel(MaintenanceStatus("Waiting for etcd to start..."), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("etcd service not running"), "ERROR")
+    EC_INVALID_CERTIFICATE = StatusLevel(
+        MaintenanceStatus(
+            "Client relation: The certificate provided is a CA certificate. Please provide an end-entity certificate"
+        ),
+        "ERROR",
+    )
+    EC_MISSING_CREDENTIALS = StatusLevel(
+        MaintenanceStatus("Client relation: Missing certificate or prefix."), "ERROR"
+    )
+    EC_USERNAME_EXISTS = StatusLevel(
+        MaintenanceStatus(
+            "Client relation: The username provided already exists. Please provide a unique username"
+        ),
+        "ERROR",
+    )
+    EC_TLS_IS_DISABLED = StatusLevel(
+        MaintenanceStatus("Client relation: TLS is disabled. Please enable TLS"),
+        "ERROR",
+    )
 
 
 # enum for TLS state

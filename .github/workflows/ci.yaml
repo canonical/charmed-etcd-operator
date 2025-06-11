@@ -9,8 +9,10 @@ concurrency:
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
   schedule:
-    - cron: '53 0 * * *'  # Daily at 00:53 UTC
+    - cron: "53 0 * * *" # Daily at 00:53 UTC
   # Triggered on push to default branch by .github/workflows/release.yaml
   workflow_call:
     outputs:
@@ -60,8 +62,16 @@ jobs:
           fail-build: ${{ github.event_name == 'pull_request' }}
 
   build:
+    strategy:
+      fail-fast: true
+      matrix:
+        path:
+          - .
+          - tests/integration/client_relations/requirer-charm
     name: Build charm
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.0
+    with:
+      path-to-charm-directory: ${{ matrix.path }}
 
   integration-test:
     strategy:

@@ -12,6 +12,9 @@ description: |
   distributed systems, such as Kubernetes. This charmed operator deploys and operates
   etcd on virtual machines.
 
+  To learn more about its deployment and operation, see the 
+  [official Charmed etcd documentation](https://canonical-charmed-etcd.readthedocs-hosted.com/).
+
 peers:
   etcd-peers:
     interface: etcd_peers
@@ -19,9 +22,11 @@ peers:
     interface: rolling_op
 
 provides:
+  etcd-client:
+    interface: etcd_client
   cos-agent:
     interface: cos_agent
-    
+
 requires:
   peer-certificates:
     interface: tls-certificates
@@ -29,6 +34,10 @@ requires:
     optional: true
   client-certificates:
     interface: tls-certificates
+    limit: 1
+    optional: true
+  client-cas:
+    interface: certificate_transfer
     limit: 1
     optional: true
   s3-credentials:

@@ -5,6 +5,7 @@
 """Etcd related and core event handlers."""
 
 import logging
+from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
 
 import ops
@@ -41,6 +42,7 @@ from literals import (
     TLS_PEER_PRIVATE_KEY_CONFIG,
     Status,
     TLSState,
+    TLSType,
 )
 
 if TYPE_CHECKING:
@@ -98,6 +100,9 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
+        # check if data exists before doing any operation
+        storage_reuse = self.charm.workload.exists(DATABASE_DIR)
+
         tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
         if (
             self.charm.state.unit_server.tls_client_state in tls_transition_states
@@ -116,13 +121,18 @@ class EtcdEvents(Object):
             # all subsequent units will have to be added as member before starting the workload
             self.charm.cluster_manager.start_member()
 
-            if self.charm.workload.exists(DATABASE_DIR):
+            if storage_reuse:
                 # this is a new application but storage is reused
-                self.charm.state.cluster.update({"authentication": "enabled"})
                 # update cluster membership configuration after recovering existing data
-                self.charm.cluster_manager.broadcast_peer_url(
-                    self.charm.state.unit_server.peer_url
-                )
+                try:
+                    self.charm.cluster_manager.broadcast_peer_url(
+                        self.charm.state.unit_server.peer_url
+                    )
+                    self.charm.state.cluster.update({"authentication": "enabled"})
+                except ValueError:
+                    logger.error("Failed to update member configuration")
+                    event.defer()
+                    return
 
             if not self.charm.state.cluster.auth_enabled:
                 try:
@@ -144,13 +154,16 @@ class EtcdEvents(Object):
                         self.charm.state.cluster.update({"authentication": "enabled"})
                     except (EtcdAuthNotEnabledError, EtcdUserManagementError) as e:
                         logger.error(e)
-                        raise
+                        event.defer()
+                        return
                 else:
-                    raise EtcdAuthNotEnabledError("Authentication not enabled.")
+                    logger.error("Authentication not enabled.")
+                    event.defer()
+                    return
 
             if not self.charm.state.unit_server.is_started:
                 # database files should not be deleted on running units
-                if self.charm.workload.exists(DATABASE_DIR):
+                if storage_reuse:
                     logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
                     # storage cannot be reused on non-leader members
                     try:
@@ -162,6 +175,7 @@ class EtcdEvents(Object):
                         # if removing fails, we cannot start the workload or the member would crash
                         raise
 
+                self.charm.set_status(Status.SERVICE_STARTING)
                 self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster
@@ -240,6 +254,24 @@ class EtcdEvents(Object):
             # reflect membership updates in the cluster state, e.g. ip change or tls switchover
             self.charm.cluster_manager.update_cluster_member_state()
 
+            try:
+                self.charm.external_clients_manager.update_client_relations_data(
+                    etcd_version=self.charm.cluster_manager.get_version()
+                )
+            except KeyError as e:
+                logger.warning(f"Error updating client relations data: {e}")
+
+        for tls_type in TLSType:
+            try:
+                self.charm.tls_manager.check_certificate_validity(tls_type)
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": ""}
+                )
+            except CalledProcessError:
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": "True"}
+                )
+
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
         if not self.charm.unit.is_leader():
@@ -303,6 +335,19 @@ class EtcdEvents(Object):
             if not self.charm.cluster_manager.restart_member():
                 self.charm.set_status(Status.SERVICE_NOT_RUNNING)
                 return
+
+        self.charm.cluster_manager.clean_users()
+
+        for tls_type in TLSType:
+            try:
+                self.charm.tls_manager.check_certificate_validity(tls_type)
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": ""}
+                )
+            except CalledProcessError:
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": "True"}
+                )
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""

@@ -63,18 +63,18 @@ class TLSManager:
         self.workload.write_file(certificate.certificate.raw, certificate_path)
         self.set_cert_state(cert_type, is_ready=True)
 
-    def is_new_ca(self, ca_cert: str, tls_type: TLSType) -> bool:
-        """Check if the CA is new.
+    def is_new_ca(self, ca_chain: str, tls_type: TLSType) -> bool:
+        """Check if all certificates in the CA chain are trusted.
 
         Args:
-            ca_cert (str): The CA certificate.
+            ca_chain (str): The CA certificate.
             tls_type (TLSType): The TLS type.
 
         Returns:
             bool: True if the CA is new, False otherwise.
         """
-        cas = self._load_trusted_ca(tls_type)
-        return ca_cert not in cas
+        trusted_cas = self.load_trusted_ca(tls_type)
+        return any(ca_cert not in trusted_cas for ca_cert in self.separate_certificates(ca_chain))
 
     def add_trusted_ca(self, ca_cert: str, tls_type: TLSType = TLSType.PEER) -> None:
         """Add trusted CA to the system.
@@ -88,12 +88,12 @@ class TLSManager:
         else:
             ca_certs_path = self.workload.paths.tls.peer_ca
 
-        cas = self._load_trusted_ca(tls_type)
+        cas = self.load_trusted_ca(tls_type)
         if ca_cert not in cas:
             cas.append(ca_cert)
             self.workload.write_file("\n".join(cas), ca_certs_path)
 
-    def _load_trusted_ca(self, tls_type) -> list[str]:
+    def load_trusted_ca(self, tls_type) -> list[str]:
         """Load trusted CA from the system.
 
         Args:
@@ -107,10 +107,7 @@ class TLSManager:
         if not ca_certs_path.exists():
             return []
 
-        # split the certificates by the end of the certificate marker and keep the marker in the cert
-        raw_cas = ca_certs_path.read_text().split("-----END CERTIFICATE-----")
-        # add the marker back to the certificate
-        return [cert.strip() + "\n-----END CERTIFICATE-----" for cert in raw_cas if cert.strip()]
+        return self.separate_certificates(ca_certs_path.read_text())
 
     def set_cert_state(self, cert_type: TLSType, is_ready: bool) -> None:
         """Set the certificate state.
@@ -133,26 +130,6 @@ class TLSManager:
             self.workload.remove_file(self.workload.paths.tls.peer_ca)
             self.workload.remove_file(self.workload.paths.tls.peer_key)
         logger.debug(f"Deleted {cert_type.value} certificate")
-
-    def clean_cas(self, tls_type: TLSType) -> None:
-        """Clean the CAs from the system.
-
-        Args:
-            tls_type (TLSType): The TLS type.
-        """
-        cas = self._load_trusted_ca(tls_type)
-        # clear cas file
-        cas_path = (
-            self.workload.paths.tls.client_ca
-            if tls_type == TLSType.CLIENT
-            else self.workload.paths.tls.peer_ca
-        )
-        self.workload.remove_file(cas_path)
-        # The last CA is the new CA, so we add it back
-        # We will have at most 2 CAs in the list, the old and the new one
-        # These CAs are for certificates used by the server only so no need
-        # for multiple active CAs
-        self.add_trusted_ca(cas[-1], tls_type)
 
     def set_ca_rotation_state(self, tls_type: TLSType, state: TLSCARotationState) -> None:
         """Set the CA rotation state.
@@ -202,6 +179,62 @@ class TLSManager:
                 return False
         return True
 
+    def separate_certificates(self, concatenated_certs: str) -> list[str]:
+        """Separate certificates from the concatenated certificates.
+
+        Args:
+            concatenated_certs (str): The concatenated certificates.
+
+        Returns:
+            list[str]: The list of certificates.
+        """
+        # split the certificates by the end of the certificate marker and keep the marker in the cert
+        raw_cas = concatenated_certs.split("-----END CERTIFICATE-----")
+        # add the marker back to the certificate
+        return [cert.strip() + "\n-----END CERTIFICATE-----" for cert in raw_cas if cert.strip()]
+
+    def update_cas(self, cas: list[str], tls_type: TLSType) -> None:
+        """Update the CAs.
+
+        Args:
+            cas (list[str]): The list of CAs.
+            tls_type (TLSType): The TLS type.
+        """
+        self.workload.write_file(
+            "\n".join(cas),
+            self.workload.paths.tls.peer_ca
+            if tls_type == TLSType.PEER
+            else self.workload.paths.tls.client_ca,
+        )
+
+    def check_certificate_validity(self, tls_type: TLSType) -> None:
+        """Check if the certificates installed on the unit will soon expire.
+
+        Args:
+            tls_type (TLSType): The TLS type to check certificate validity for.
+        """
+        cert_files = []
+        if tls_type == TLSType.CLIENT and self.state.unit_server.tls_client_state == TLSState.TLS:
+            cert_files.append(self.workload.paths.tls.client_cert)
+            cert_files.append(self.workload.paths.tls.client_ca)
+        elif tls_type == TLSType.PEER and self.state.unit_server.tls_peer_state == TLSState.TLS:
+            cert_files.append(self.workload.paths.tls.peer_cert)
+            cert_files.append(self.workload.paths.tls.peer_ca)
+
+        for cert_file in cert_files:
+            # will raise CalledProcessError if cert expires in less than 24h (=86400s)
+            self.workload.exec(
+                [
+                    "openssl",
+                    "x509",
+                    "-checkend",
+                    "86400",
+                    "-noout",
+                    "-in",
+                    cert_file,
+                ]
+            )
+
     def compute_component_status(self) -> list[Status]:
         """Compute the component status."""
         status_list = []
@@ -223,5 +256,11 @@ class TLSManager:
 
         if self.state.unit_server.tls_client_ca_rotation_state != TLSCARotationState.NO_ROTATION:
             status_list.append(Status.TLS_CLIENT_CA_ROTATING)
+
+        if self.state.unit_server.tls_client_certs_expiring:
+            status_list.append(Status.TLS_CLIENT_CERTS_EXPIRING)
+
+        if self.state.unit_server.tls_peer_certs_expiring:
+            status_list.append(Status.TLS_PEER_CERTS_EXPIRING)
 
         return status_list

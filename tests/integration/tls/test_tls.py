@@ -9,11 +9,12 @@ import pytest
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, TLSType
+from literals import INTERNAL_USER, PEER_RELATION, Status, TLSType
 
 from ..helpers import (
     APP_NAME,
     CHARM_PATH,
+    TLS_NAME,
     download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
@@ -27,7 +28,6 @@ from ..helpers_deployment import wait_until
 
 logger = logging.getLogger(__name__)
 
-TLS_NAME = "self-signed-certificates"
 NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
@@ -547,7 +547,19 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=15)
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME, TLS_NAME],
+        units_full_statuses={
+            APP_NAME: {
+                "units": {
+                    "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
+                    "active": [],
+                }
+            },
+            TLS_NAME: {"units": {"active": []}},
+        },
+    )
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)

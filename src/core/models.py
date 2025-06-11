@@ -8,7 +8,11 @@ import json
 import logging
 from dataclasses import dataclass
 
-from charms.data_platform_libs.v0.data_interfaces import Data, DataPeerData, DataPeerUnitData
+from charms.data_platform_libs.v0.data_interfaces import (
+    Data,
+    DataPeerData,
+    DataPeerUnitData,
+)
 from ops.model import Application, Relation, Unit
 
 from literals import (
@@ -137,6 +141,16 @@ class EtcdServer(RelationState):
         return self.peer_cert_ready and self.client_cert_ready
 
     @property
+    def tls_peer_certs_expiring(self) -> bool:
+        """Check if any certificate is expiring."""
+        return self.relation_data.get("tls_peer_certificates_expiring", "") == "True"
+
+    @property
+    def tls_client_certs_expiring(self) -> bool:
+        """Check if any certificate is expiring."""
+        return self.relation_data.get("tls_client_certificates_expiring", "") == "True"
+
+    @property
     def member_endpoint(self) -> str:
         """Concatenate member_name and peer_url."""
         return f"{self.member_name}={self.peer_url}"
@@ -221,6 +235,14 @@ class EtcdCluster(RelationState):
         will unset the `member_id` here.
         """
         return self.relation_data.get("learning_member", "")
+
+    @property
+    def managed_users(self) -> dict[int, str]:
+        """Get the list of managed users."""
+        return {
+            int(key): value
+            for key, value in json.loads(self.relation_data.get("managed_users", "{}")).items()
+        }
 
     @property
     def s3_credentials(self) -> dict[str, str]:

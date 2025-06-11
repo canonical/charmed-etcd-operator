@@ -2,12 +2,13 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import base64
 import json
 import logging
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 import yaml
 from pytest_operator.plugin import OpsTest
@@ -18,6 +19,7 @@ from literals import (
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
+    TLS_ROOT_DIR,
     TLSType,
 )
 
@@ -26,6 +28,7 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
 CHARM_PATH = "./charmed-etcd_ubuntu@24.04-amd64.charm"
+TLS_NAME = "self-signed-certificates"
 
 
 class SecretNotFoundError(Exception):
@@ -129,7 +132,10 @@ def get_cluster_endpoints(
 
 
 def get_unit_endpoint(
-    ops_test: OpsTest, unit_name: str, app_name: str = APP_NAME, tls_enabled: bool = False
+    ops_test: OpsTest,
+    unit_name: str,
+    app_name: str = APP_NAME,
+    tls_enabled: bool = False,
 ) -> str:
     """Resolve the etcd endpoint for a given unit name."""
     for unit in ops_test.model.applications[app_name].units:
@@ -287,7 +293,7 @@ def get_certificate_from_unit(
     model: str, unit: str, cert_type: TLSType, is_ca: bool = False
 ) -> str | None:
     """Retrieve a certificate from a unit."""
-    command = f'juju ssh --model={model} {unit} "cat /var/snap/charmed-etcd/common/tls/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
+    command = f'juju ssh --model={model} {unit} "cat {TLS_ROOT_DIR}/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
     output = subprocess.getoutput(command)
     if output.startswith("-----BEGIN CERTIFICATE-----"):
         return output
@@ -308,7 +314,9 @@ async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str
     """
     assert ops_test.model is not None, "Model is not set"
     return_code, std_out, std_err = await ops_test.juju(
-        "add-secret", secret_name, " ".join([f"{key}={value}" for key, value in content.items()])
+        "add-secret",
+        secret_name,
+        " ".join([f"{key}={value}" for key, value in content.items()]),
     )
 
     assert return_code == 0, f"Failed to add secret: {std_err}"
@@ -356,7 +364,7 @@ async def download_client_certificate_from_unit(
 ) -> None:
     """Copy the client certificate files from a unit to the host's filesystem."""
     unit = ops_test.model.applications[app_name].units[0]
-    tls_path = "/var/snap/charmed-etcd/common/tls"
+    tls_path = TLS_ROOT_DIR
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
         await unit.scp_from(f"{tls_path}/{file}", file)
@@ -375,3 +383,62 @@ def get_storage_id(ops_test: OpsTest, unit_name: str, storage_name: str) -> str:
 
         if line.split()[0] == unit_name and line.split()[1].startswith(storage_name):
             return line.split()[1]
+
+
+def get_user(
+    endpoints: str,
+    username: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> dict[str, Any] | None:
+    """Get user details using `etcdctl`."""
+    etcd_command = f"etcdctl user get {username} --endpoints={endpoints} -w json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+
+    try:
+        result = subprocess.getoutput(etcd_command)
+        logger.debug(f"User get result: {result}")
+        return json.loads(result)["roles"]
+    except json.JSONDecodeError:
+        return None
+
+
+def get_role(
+    endpoints: str,
+    rolename: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> list[dict[str, str]] | None:
+    """Get role details using `etcdctl`."""
+    etcd_command = f"etcdctl role get {rolename} --endpoints={endpoints} -w json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+    try:
+        result = json.loads(subprocess.getoutput(etcd_command))["perm"]
+        return [
+            {
+                "permType": perm["permType"],
+                "key": base64.b64decode(perm["key"]).decode("utf-8"),
+                "range_end": base64.b64decode(perm["range_end"]).decode("utf-8"),
+            }
+            for perm in result
+        ]
+    except json.JSONDecodeError:
+        return None
