@@ -48,7 +48,7 @@ def mtls_cert():
     client_cert = generate_certificate(
         client_csr, ca_cert, ca_private_key, validity=timedelta(days=365)
     )
-    return "\n".join([client_cert.raw, ca_cert.raw])
+    return "\n".join([ca_cert.raw, client_cert.raw])
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def mtls_cert_same_common_name():
     client_cert = generate_certificate(
         client_csr, ca_cert, ca_private_key, validity=timedelta(days=365)
     )
-    return "\n".join([client_cert.raw, ca_cert.raw])
+    return "\n".join([ca_cert.raw, client_cert.raw])
 
 
 @pytest.fixture
@@ -89,7 +89,7 @@ def mtls_cert_diff_common_name():
     client_cert = generate_certificate(
         client_csr, ca_cert, ca_private_key, validity=timedelta(days=365)
     )
-    return "\n".join([client_cert.raw, ca_cert.raw])
+    return "\n".join([ca_cert.raw, client_cert.raw])
 
 
 def _get_secret_from_state(state: State, secret_id: str) -> Secret:
