@@ -33,7 +33,7 @@ NUM_UNITS = 3
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
-    """Build and deploy the charm, allowing for skipping if already deployed."""
+    """Build and deploy the charm."""
     await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
