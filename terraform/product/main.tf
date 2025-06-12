@@ -105,4 +105,20 @@ resource "juju_integration" "grafana_agent-etcd" {
   ]
 }
 
-# TODO add backup integrator <-> etcd integration once backups are merged in etcd
+
+resource "juju_integration" "backups_integrator-etcd-integration" {
+  model = var.etcd.model
+
+  application {
+    name = juju_application.backups-integrator.name
+  }
+
+  application {
+    name = var.etcd.app_name
+  }
+
+  depends_on = [
+    module.etcd,
+    juju_application.backups-integrator,
+  ]
+}
