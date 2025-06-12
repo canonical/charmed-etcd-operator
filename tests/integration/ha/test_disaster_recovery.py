@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+import logging
+
+import pytest
+from pytest_operator.plugin import OpsTest
+
+from literals import INTERNAL_USER, PEER_RELATION
+
+from ..helpers import (
+    APP_NAME,
+    CHARM_PATH,
+    get_cluster_endpoints,
+    get_cluster_members,
+    get_secret_by_label,
+)
+from ..helpers_deployment import wait_until
+from .helpers import (
+    assert_continuous_writes_consistent,
+    assert_continuous_writes_increasing,
+    start_continuous_writes,
+    stop_continuous_writes,
+)
+
+logger = logging.getLogger(__name__)
+
+NUM_UNITS = 3
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_build_and_deploy(ops_test: OpsTest) -> None:
+    """Build and deploy the charm, allowing for skipping if already deployed."""
+    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> None:
+    """Make sure a forcefully removed unit is removed as cluster member."""
+    unit_to_remove = ops_test.model.applications[APP_NAME].units[-1]
+    logger.info(f"Forcefully removing unit {unit_to_remove.name}")
+
+    destroy_unit_cmd = (
+        f"remove-unit {unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait"
+    )
+    return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
+    assert return_code == 0, "Failed to remove unit"
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
+
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # wait for the next `update_status` for the cluster membership to be updated
+    async with ops_test.fast_forward("5s"):
+        assert_continuous_writes_increasing(
+            endpoints=endpoints, user=INTERNAL_USER, password=password
+        )
+
+    cluster_members = get_cluster_members(endpoints)
+    assert len(cluster_members) == NUM_UNITS - 1, (
+        f"Expected {NUM_UNITS - 1} cluster members, got {len(cluster_members)}."
+    )
+
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    stop_continuous_writes()
+    assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
