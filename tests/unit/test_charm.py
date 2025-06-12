@@ -425,6 +425,25 @@ def test_removal_of_inconsistent_members():
         remove_member.assert_called()
         update_cluster_member_state.assert_called_once()
 
+    # error case: clean up fails
+    state_in = testing.State(relations={relation}, leader=True)
+    with (
+        patch("common.client.EtcdClient.member_list", return_value=cluster_member_list),
+        patch(
+            "common.client.EtcdClient.remove_member", side_effect=EtcdClusterManagementError()
+        ) as remove_member,
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch("workload.EtcdWorkload.exec", return_value=CompletedProcess(returncode=0, args=[])),
+        patch(
+            "managers.cluster.ClusterManager.update_cluster_member_state"
+        ) as update_cluster_member_state,
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        remove_member.assert_called()
+        update_cluster_member_state.assert_not_called()
+        assert state_out.unit_status == ops.BlockedStatus("cluster management error")
+
     # no clean-up on non-leader units
     state_in = testing.State(relations={relation}, leader=False)
     with (
