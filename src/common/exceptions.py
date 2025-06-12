@@ -27,3 +27,7 @@ class HealthCheckFailedError(Exception):
 
 class EtcdClusterManagementError(Exception):
     """Custom Exception if cluster management operation fails."""
+
+
+class EtcdBackupError(Exception):
+    """Custom Exception if backup or restore operation fail."""

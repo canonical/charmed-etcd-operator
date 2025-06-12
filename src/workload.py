@@ -7,9 +7,10 @@
 import logging
 import subprocess
 from pathlib import Path
-from shutil import rmtree
+from shutil import copyfile, rmtree
 from typing import List
 
+from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
 from charms.operator_libs_linux.v2 import snap
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
 from typing_extensions import override
@@ -72,6 +73,10 @@ class EtcdWorkload(WorkloadBase):
         self.etcd.restart(services=[SNAP_SERVICE])
 
     @override
+    def copy_file(self, src_file: str, dst_file: str) -> None:
+        copyfile(src_file, dst_file)
+
+    @override
     def remove_file(self, file) -> None:
         path = Path(file)
         path.unlink(missing_ok=True)
@@ -106,3 +111,21 @@ class EtcdWorkload(WorkloadBase):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             logger.error(e)
             raise
+
+    @override
+    def disable_service(self) -> None:
+        service_disable(f"snap.{SNAP_NAME}.{SNAP_SERVICE}")
+
+    @override
+    def enable_service(self) -> None:
+        service_enable(f"snap.{SNAP_NAME}.{SNAP_SERVICE}")
+
+    @override
+    def disable_database(self) -> None:
+        self.disable_service()
+        self.stop()
+
+    @override
+    def enable_database(self) -> None:
+        self.enable_service()
+        self.start()
