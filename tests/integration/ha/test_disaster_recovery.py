@@ -53,9 +53,7 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
     unit_to_remove = ops_test.model.applications[APP_NAME].units[-1]
     logger.info(f"Forcefully removing unit {unit_to_remove.name}")
 
-    destroy_unit_cmd = (
-        f"remove-unit {unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
-    )
+    destroy_unit_cmd = f"remove-unit {unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
     return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
     assert return_code == 0, "Failed to remove unit"
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
