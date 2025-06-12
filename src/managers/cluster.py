@@ -311,20 +311,21 @@ class ClusterManager:
 
     def remove_inconsistent_members_if_required(self) -> None:
         """Check current cluster members and remove those not existing anymore."""
-
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
         )
 
-        cluster_members =  client.member_list()
-        for member in cluster_members:
-            if member.name not in
+        cluster_members = client.member_list()
+        for name, member in cluster_members.items():
+            if name not in [server.member_name for server in self.state.servers]:
+                logger.warning(
+                    f"Member {name} does not exist anymore and will be removed from the cluster."
+                )
+                client.remove_member(member.id)
 
-        # for member in list
-        # if member not in servers
-        # self.update_cluster_member_state()
+        self.update_cluster_member_state()
 
     def update_cluster_member_state(self) -> None:
         """Get up-to-date member information and store in cluster state."""
