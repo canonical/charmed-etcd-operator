@@ -54,7 +54,7 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
     logger.info(f"Forcefully removing unit {unit_to_remove.name}")
 
     destroy_unit_cmd = (
-        f"remove-unit {unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait"
+        f"remove-unit {unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
     )
     return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
     assert return_code == 0, "Failed to remove unit"
