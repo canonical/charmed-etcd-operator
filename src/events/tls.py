@@ -154,6 +154,11 @@ class TLSEvents(Object):
         Args:
             event (CertificateAvailableEvent): The event object.
         """
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot update certificates while database restore is in progress.")
+            event.defer()
+            return
+
         cert = event.certificate
         cert_type = TLSType(cert.organization)
         logger.debug(f"Received certificate for {cert_type}")
@@ -259,6 +264,11 @@ class TLSEvents(Object):
         Args:
             event (RelationBrokenEvent): The event object.
         """
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot update certificates while database restore is in progress.")
+            event.defer()
+            return
+
         cert_type = (
             TLSType.PEER if event.relation.name == PEER_TLS_RELATION_NAME else TLSType.CLIENT
         )

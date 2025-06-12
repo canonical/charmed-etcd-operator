@@ -20,6 +20,7 @@ from literals import (
     INTERNAL_USER,
     PEER_PORT,
     SUBSTRATES,
+    RestoreStep,
     TLSCARotationState,
     TLSState,
 )
@@ -173,6 +174,11 @@ class EtcdServer(RelationState):
             self.relation_data.get("tls_client_ca_rotation", TLSCARotationState.NO_ROTATION.value)
         )
 
+    @property
+    def restore_step(self) -> RestoreStep:
+        """Get the current progress of the restore workflow."""
+        return RestoreStep(self.relation_data.get("restore_step", ""))
+
 
 class EtcdCluster(RelationState):
     """State/Relation data collection for the etcd application."""
@@ -237,6 +243,46 @@ class EtcdCluster(RelationState):
             int(key): value
             for key, value in json.loads(self.relation_data.get("managed_users", "{}")).items()
         }
+
+    @property
+    def s3_credentials(self) -> dict[str, str]:
+        """Get credentials and parameters to access s3 object storage."""
+        return json.loads(self.relation_data.get("s3-credentials", "{}"))
+
+    @property
+    def azure_credentials(self) -> dict[str, str]:
+        """Get credentials and parameters to access azure object storage."""
+        return json.loads(self.relation_data.get("azure-credentials", "{}"))
+
+    @property
+    def backup_id(self) -> str:
+        """Id of the backup that is currently being created."""
+        return self.relation_data.get("backup_id", "")
+
+    @property
+    def is_backup_in_progress(self) -> bool:
+        """Flag to indicate if the cluster is creating a backup."""
+        return bool(self.backup_id)
+
+    @property
+    def restore_id(self) -> str:
+        """Backup id to restore."""
+        return self.relation_data.get("restore_id", "")
+
+    @property
+    def is_restore_in_progress(self) -> bool:
+        """Flag to indicate if the cluster is restoring a backup."""
+        return bool(self.restore_id)
+
+    @property
+    def restore_instruction(self) -> RestoreStep:
+        """Current step of the restore workflow to be executed by the cluster members."""
+        return RestoreStep(self.relation_data.get("restore_instruction", ""))
+
+    @property
+    def restore_verification_failed(self) -> bool:
+        """Flag for failed restore verification."""
+        return bool(self.relation_data.get("restore_verification_failed", ""))
 
 
 @dataclass

@@ -14,6 +14,7 @@ from ops import StatusBase
 
 from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
+from events.backup import BackupEvents
 from events.etcd import EtcdEvents
 from events.external_clients import ExternalClientsEvents
 from events.tls import TLSEvents
@@ -27,6 +28,7 @@ from literals import (
     TLSState,
     TLSType,
 )
+from managers.backup import BackupManager
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.external_clients import ExternalClientsManager
@@ -51,6 +53,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             state=self.state, workload=self.workload, config=self.config
         )
         self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
+        self.backup_manager = BackupManager(state=self.state, workload=self.workload)
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE
         )
@@ -58,6 +61,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
         self.tls_events = TLSEvents(self)
+        self.backup_events = BackupEvents(self)
         self.external_clients_events = ExternalClientsEvents(self)
 
         # --- LIB EVENT HANDLERS ---
@@ -277,8 +281,9 @@ class EtcdOperatorCharm(ops.CharmBase):
         for status in self.external_clients_manager.compute_component_status():
             event.add_status(status.value.status)
 
-        # compute backup or other component's  status
-        # todo: add compute logic here
+        # compute backup status
+        for status in self.backup_manager.compute_component_status():
+            event.add_status(status.value.status)
 
         # add all other statuses collected during the current hook
         for status in self.pending_inactive_statuses + [Status.ACTIVE]:
