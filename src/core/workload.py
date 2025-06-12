@@ -49,6 +49,11 @@ class TLSPaths:
         """Path to the server key."""
         return f"{self.root_dir}/client.key"
 
+    @property
+    def backup_ca(self) -> str:
+        """Path to the CA for backup/restore object storage."""
+        return f"{self.root_dir}/backup_ca.pem"
+
 
 @dataclass
 class EtcdPaths:
@@ -107,6 +112,11 @@ class WorkloadBase(ABC):
         pass
 
     @abstractmethod
+    def copy_file(self, src_file: str, dst_file: str) -> None:
+        """Copy a source-file to a destination-file."""
+        pass
+
+    @abstractmethod
     def remove_file(self, file: str) -> None:
         """Remove a file.
 
@@ -139,4 +149,24 @@ class WorkloadBase(ABC):
     @abstractmethod
     def exec(self, command: List[str]) -> None:
         """Run a command on the workload substrate."""
+        pass
+
+    @abstractmethod
+    def disable_service(self) -> None:
+        """Disable the systemd service."""
+        pass
+
+    @abstractmethod
+    def enable_service(self) -> None:
+        """Enable the systemd service."""
+        pass
+
+    @abstractmethod
+    def disable_database(self) -> None:
+        """Stop the workload and disable the service."""
+        pass
+
+    @abstractmethod
+    def enable_database(self) -> None:
+        """Enable the service and start the workload."""
         pass
