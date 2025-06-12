@@ -149,9 +149,10 @@ jobs:
           sudo snap install lxd --channel=latest/stable
           sudo adduser "$USER" 'lxd'
           # `newgrp` does not work in GitHub Actions; use `sg` instead
-          sg 'lxd' -c "lxd waitready"
-          sg 'lxd' -c "lxd init --auto"
-          sg 'lxd' -c "lxc network set lxdbr0 ipv6.address none"
+          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- lxd waitready
+          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- lxd init --auto
+          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- lxc network set lxdbr0 ipv6.address none
+          # Workaround for Docker & LXD on same machine
           sudo iptables -F FORWARD
           sudo iptables -P FORWARD ACCEPT
       - name: Juju setup
