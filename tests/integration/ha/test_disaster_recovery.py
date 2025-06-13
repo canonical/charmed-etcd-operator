@@ -51,6 +51,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> None:
     """Make sure a forcefully removed unit is removed as cluster member."""
     unit_to_remove = ops_test.model.applications[APP_NAME].units[-1]
+    removed_member_name = unit_to_remove.name.replace("/", "")
     logger.info(f"Forcefully removing unit {unit_to_remove.name}")
 
     destroy_unit_cmd = f"remove-unit {unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
@@ -69,8 +70,13 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
         )
 
     cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == NUM_UNITS - 1, (
-        f"Expected {NUM_UNITS - 1} cluster members, got {len(cluster_members)}."
+    member_names = [member["name"] for member in cluster_members]
+    for unit in ops_test.model.applications[APP_NAME].units:
+        assert unit.name.replace("/", "") in member_names, (
+            f"unit {unit.name} not in cluster members"
+        )
+    assert removed_member_name not in member_names, (
+        f"{removed_member_name} still in cluster members"
     )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
