@@ -94,6 +94,8 @@ Logging is enabled by default. The logs are stored in the `/var/snap/charmed-etc
 
 ## Additional Resources
 
+Charmed etcd also implements all CIS hardening checks for etcd as defined in the [Aqua Security kube-bench configuration for CIS 1.24](https://github.com/aquasecurity/kube-bench/blob/main/cfg/cis-1.24/etcd.yaml) to ensure compliance and security best practices.
+
 For details on the cryptography used by Charmed etcd, see the [Cryptography](cryptography) explanation page.
 
 
