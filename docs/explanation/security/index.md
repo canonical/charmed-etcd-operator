@@ -50,7 +50,8 @@ In the following, we provide guidance on how to harden your deployment using:
 2. Security upgrades
 3. Encryption 
 4. Authentication
-5. Monitoring and auditing
+5. Authorization
+6. Monitoring and auditing
 
 ### Operating system
 
@@ -58,7 +59,7 @@ Charmed etcd runs on top of Ubuntu 24.04. Deploy a [Landscape Client Charm](http
 
 ### Security upgrades
 
-Charmed etcd installs a pinned revision of the Charmed etcd snap to provide reproducible and secure environments.
+charmed-etcd-operator uses the charmed-etcd-snap, where each revision of the charm pins a revision of the snap to provide reproducible environments.
 
 Currently, the charm is available on the `edge` track, the snap is patched and updated regularly to ensure that the latest security fixes from the upstream etcd project are applied.
 
@@ -78,6 +79,10 @@ For more information on encryption, see the [Cryptography](cryptography) explana
 
 etcd saves and checks a configured password and a given password using Go’s [bcrypt](https://pkg.go.dev/golang.org/x/crypto/bcrypt) package. 
 For client authentication, Charmed etcd relies on TLS client certificate authentication. 
+
+### Authorization
+
+etcd supports [role-based access control (RBAC)](https://etcd.io/docs/v3.6/op-guide/authentication/rbac/) to restrict access to resources based on the roles assigned to users. Charmed etcd enables this feature by default. it creates a default admin user with full access to the etcd cluster. Additional users are created for each client relation. Charmed etcd creates and assigns a role to each user to restrict its access to only the range of keys specified in the relation through the `prefix` field.
 
 ### Monitoring and auditing
 

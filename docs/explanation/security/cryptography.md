@@ -4,9 +4,9 @@ This document describes the cryptography used by Charmed etcd.
 
 ## Resource checksums
 
-Charmed etcd uses pinned versions of the Charmed etcd snap to provide reproducible and secure environments.
+charmed-etcd-operator uses the charmed-etcd-snap, where each revision of the charm pins a revision of the snap to provide reproducible environments.
 
-The snap packages its workload along with the necessary dependencies and utilities required for the operators’ lifecycle. For more details, see the snaps content in the `snapcraft.yaml` file for [charmed etcd](https://github.com/canonical/charmed-etcd-snap/blob/3.5/edge/snap/snapcraft.yaml).
+The snap bundles its workload together with all the essential dependencies and tools needed to support the operator’s lifecycle. For further details, refer to the `snapcraft.yaml` file in the [charmed etcd](https://github.com/canonical/charmed-etcd-snap/blob/3.5/edge/snap/snapcraft.yaml) repository.
 
 Every artifact bundled into a snap is verified against its MD5, SHA256, or SHA512 checksum after download. The installation of certified snap into the rock is ensured by snap primitives that verify their squashfs filesystems images GPG signature. For more information on the snap verification process, refer to the [snapcraft.io documentation](https://snapcraft.io/docs/assertions).
 
@@ -26,10 +26,10 @@ All repositories in GitHub are set up with branch protection rules, requiring:
 
 Charmed etcd can be used to deploy a secure etcd cluster that provides encryption-in-transit capabilities out of the box for:
 
-* Cluster internal communications
+* Cluster internal communications (node-to-node)
 * External clients connections
 
-To set up a secure connection Charmed etcd need to be integrated with TLS Certificate Provider charms, e.g. self-signed-certificates operator. Certificate Signing Requests (CSRs) are generated for every unit using the tls_certificates_interface library that uses the cryptography Python library to create X.509 compatible certificates. The CSR is signed by the TLS Certificate Provider, returned to the units, and stored in Juju secret. The relation also provides the CA certificate, which is loaded into Juju secret.
+To set up a secure connection Charmed etcd need to be integrated with TLS Certificate Provider charms, e.g. self-signed-certificates operator. Certificate Signing Requests (CSRs) are generated for every unit using the tls_certificates_interface library that uses the cryptography Python library to create X.509 compatible certificates. The CSR is signed by the TLS Certificate Provider, returned to the units, and stored in a Juju secret. The relation also provides the CA certificate, which is then loaded from the Juju secret.
 
 Encryption at rest is currently not supported, although it can be provided by the substrate (cloud or on-premises).
 
@@ -43,7 +43,7 @@ In Charmed etcd, authentication layers can be enabled for:
 
 ### Admin authentication to etcd
 
-Authentication of the admin user to etcd is based on the `bcrypt` go module. See the [etcd official documentation](https://etcd.io/docs/v3.5/learning/design-auth-v3/) for more details.
+Authentication of the admin user to etcd is based on the `bcrypt` go module. See the [etcd official documentation](https://etcd.io/docs/v3.6/learning/design-auth-v3/) for more details.
 
 Credentials are exchanged via [Juju secrets](https://canonical-juju.readthedocs-hosted.com/en/latest/user/howto/manage-secrets/).
 
@@ -53,4 +53,4 @@ Authentication among members of a etcd cluster is based on the TLS certificate-b
 
 ### Clients authentication to etcd
 
-Authentication of clients to etcd is based on the TLS certificate-based authentication method. Each client provides a TLS certificate they use to authenticate themselves to the etcd cluster. The certificate is stored on a local trusted certificate store, which is used to verify whether the client is allowed to access the etcd cluster.
+Authentication of clients to etcd is based on the TLS certificate-based authentication method. Each client provides a TLS certificate they use to authenticate themselves to the etcd cluster. The certificate is stored on a local trusted certificate store, which is used to verify whether the client is allowed to access the etcd cluster. Before the certificate is stored, it is verified that it is an end-entity certificate, i.e. it is not a CA certificate and it cannot be used to sign other certificates.
