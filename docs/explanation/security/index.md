@@ -22,25 +22,25 @@ Charmed etcd can be deployed on top of several clouds and virtualisation layers:
 
 ### Juju 
 
-Juju is the component responsible for orchestrating the entire lifecycle, from deployment to Day 2 operations. For more information on Juju security hardening, see the
+Juju is the component responsible for orchestrating the entire life cycle, from deployment to Day 2 operations. For more information on Juju security hardening, see the
 [Juju security page](https://documentation.ubuntu.com/juju/latest/explanation/juju-security/index.html) and the [How to harden your deployment](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-deployment/#harden-your-deployment) guide.
 
 #### Cloud credentials
 
-When configuring cloud credentials to be used with Juju, ensure that users have the correct permissions to operate at the required level. Juju superusers responsible for bootstrapping and managing controllers require elevated permissions to manage several kinds of resources, such as virtual machines, networks, storages, etc. Please refer to the links below for more information on the policies required to be used depending on the cloud. 
+When configuring cloud credentials to be used with Juju, ensure that users have the correct permissions to operate at the required level. Juju superusers responsible for bootstrapping and managing controllers require elevated permissions to manage several kinds of resources, such as virtual machines, networks, storage, etc. Please refer to the links below for more information on the policies required to be used depending on the cloud. 
 
 | Cloud     | Cloud user policies                                                                                                                                                                                                                            |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | OpenStack | [OpenStack cloud and Juju](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/cloud/list-of-supported-clouds/the-openstack-cloud-and-juju/)                                                                                |
 | AWS       | [Juju AWS Permission](https://discourse.charmhub.io/t/juju-aws-permissions/5307), [AWS Instance Profiles](https://discourse.charmhub.io/t/using-aws-instance-profiles-with-juju-2-9/5185), [Juju on AWS](https://juju.is/docs/juju/amazon-ec2) |
 | Azure     | [Juju Azure Permission](https://juju.is/docs/juju/microsoft-azure), [How to use Juju with Microsoft Azure](https://discourse.charmhub.io/t/how-to-use-juju-with-microsoft-azure/15219)                                                         |
-| GCP       | [Google GCE cloud and Juju](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/cloud/list-of-supported-clouds/the-google-gce-cloud-and-juju/)                                                                              |
+| GCP       | <spellexception>[Google GCE cloud and Juju](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/cloud/list-of-supported-clouds/the-google-gce-cloud-and-juju/)</spellexception>                                             |
 
 #### Juju users
 
 It is very important that Juju users are set up with minimal permissions depending on the scope of their operations. Please refer to the [User access levels](https://documentation.ubuntu.com/juju/3.6/reference/user/#user-access-levels) documentation for more information on the access levels and corresponding abilities.
 
-Juju user credentials must be stored securely and rotated regularly to limit the chances of unauthorized access due to credentials leakage.
+Juju user credentials must be stored securely and rotated regularly to limit the chances of unauthorised access due to credentials leakage.
 
 ## Applications
 
@@ -50,7 +50,7 @@ In the following, we provide guidance on how to harden your deployment using:
 2. Security upgrades
 3. Encryption 
 4. Authentication
-5. Authorization
+5. Authorisation
 6. Monitoring and auditing
 
 ### Operating system
@@ -77,10 +77,10 @@ For more information on encryption, see the [Cryptography](cryptography) explana
 
 ### Authentication
 
-etcd saves and checks a configured password and a given password using Go’s [bcrypt](https://pkg.go.dev/golang.org/x/crypto/bcrypt) package. 
+etcd saves and checks a configured password and a given password using Go’s [`bcrypt`](https://pkg.go.dev/golang.org/x/crypto/bcrypt) package. 
 For client authentication, Charmed etcd relies on TLS client certificate authentication. 
 
-### Authorization
+### Authorisation
 
 etcd supports [role-based access control (RBAC)](https://etcd.io/docs/v3.6/op-guide/authentication/rbac/) to restrict access to resources based on the roles assigned to users. Charmed etcd enables this feature by default. it creates a default admin user with full access to the etcd cluster. Additional users are created for each client relation. Charmed etcd creates and assigns a role to each user to restrict its access to only the range of keys specified in the relation through the `prefix` field.
 
@@ -94,7 +94,7 @@ Logging is enabled by default. The logs are stored in the `/var/snap/charmed-etc
 
 ## Additional Resources
 
-Charmed etcd also implements all CIS hardening checks for etcd as defined in the [Aqua Security kube-bench configuration for CIS 1.24](https://github.com/aquasecurity/kube-bench/blob/main/cfg/cis-1.24/etcd.yaml) to ensure compliance and security best practices.
+Charmed etcd also implements all CIS hardening checks for etcd as defined in the <spellexception>[Aqua Security kube-bench configuration for CIS 1.24](https://github.com/aquasecurity/kube-bench/blob/main/cfg/cis-1.24/etcd.yaml)</spellexception> to ensure compliance and security best practices.
 
 For details on the cryptography used by Charmed etcd, see the [Cryptography](cryptography) explanation page.
 

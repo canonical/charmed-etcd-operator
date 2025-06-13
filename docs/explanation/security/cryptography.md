@@ -6,9 +6,9 @@ This document describes the cryptography used by Charmed etcd.
 
 `charmed-etcd-operator` uses the `charmed-etcd-snap`, where each revision of the charm pins a revision of the snap to provide reproducible environments.
 
-The snap bundles its workload together with all the essential dependencies and tools needed to support the operator’s lifecycle. For further details, refer to the `snapcraft.yaml` file in the [charmed etcd](https://github.com/canonical/charmed-etcd-snap/blob/3.5/edge/snap/snapcraft.yaml) repository.
+The snap bundles its workload together with all the essential dependencies and tools needed to support the operator’s life cycle. For further details, refer to the `snapcraft.yaml` file in the [charmed etcd](https://github.com/canonical/charmed-etcd-snap/blob/3.5/edge/snap/snapcraft.yaml) repository.
 
-Every artifact bundled into a snap is verified against its MD5, SHA256, or SHA512 checksum after download. The installation of certified snap into the rock is ensured by snap primitives that verify their squashfs filesystems images GPG signature. For more information on the snap verification process, refer to the [snapcraft.io documentation](https://snapcraft.io/docs/assertions).
+Every artefact bundled into a snap is verified against its MD5, SHA256, or SHA512 checksum after download. The installation of certified snap into the rock is ensured by snap primitives that verify their `squashfs` file systems images GPG signature. For more information on the snap verification process, refer to the <spellexception> [snapcraft.io documentation](https://snapcraft.io/docs/assertions).</spellexception>
 
 ## Sources verification
 
