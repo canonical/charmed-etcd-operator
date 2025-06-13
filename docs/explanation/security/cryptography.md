@@ -14,7 +14,7 @@ Every artifact bundled into a snap is verified against its MD5, SHA256, or SHA51
 
 etcd is built by Canonical from upstream source codes on [Launchpad](https://launchpad.net/etcd).
 
-The Charmed etcd charm and snap are published and released programmatically using release pipelines implemented via GitHub Actions in their respective repositories.
+Both the etcd charm and snap are published and released programmatically using release pipelines implemented via GitHub Actions in their respective repositories.
 
 All repositories in GitHub are set up with branch protection rules, requiring:
 
