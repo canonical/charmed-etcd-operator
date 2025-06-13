@@ -4,7 +4,7 @@ This document describes the cryptography used by Charmed etcd.
 
 ## Resource checksums
 
-charmed-etcd-operator uses the charmed-etcd-snap, where each revision of the charm pins a revision of the snap to provide reproducible environments.
+`charmed-etcd-operator` uses the `charmed-etcd-snap`, where each revision of the charm pins a revision of the snap to provide reproducible environments.
 
 The snap bundles its workload together with all the essential dependencies and tools needed to support the operator’s lifecycle. For further details, refer to the `snapcraft.yaml` file in the [charmed etcd](https://github.com/canonical/charmed-etcd-snap/blob/3.5/edge/snap/snapcraft.yaml) repository.
 
@@ -28,7 +28,7 @@ Charmed etcd can be used to deploy a secure etcd cluster that provides encryptio
 * Cluster internal communications (node-to-node)
 * External clients connections
 
-To set up a secure connection Charmed etcd need to be integrated with TLS Certificate Provider charms, e.g. self-signed-certificates operator. Certificate Signing Requests (CSRs) are generated for every unit using the tls_certificates_interface library that uses the cryptography Python library to create X.509 compatible certificates. The CSR is signed by the TLS Certificate Provider, returned to the units, and stored in a Juju secret. The relation also provides the CA certificate, which is then loaded from the Juju secret.
+To set up a secure connection Charmed etcd need to be integrated with TLS Certificate Provider charms, e.g. `self-signed-certificates` operator. Certificate Signing Requests (CSRs) are generated for every unit using the `tls_certificates_interface` library that uses the `cryptography` Python library to create [X.509 compatible certificates](https://charmhub.io/topics/security-with-x-509-certificates). The CSR is signed by the TLS Certificate Provider, returned to the units, and stored in a Juju secret. The relation also provides the CA certificate, which is then loaded from the [Juju secret](https://documentation.ubuntu.com/juju/3.6/reference/secret/).
 
 Encryption at rest is currently not supported, although it can be provided by the substrate (cloud or on-premises).
 
@@ -36,9 +36,9 @@ Encryption at rest is currently not supported, although it can be provided by th
 
 In Charmed etcd, authentication layers can be enabled for:
 
-1. Admin authentication to etcd, always enabled.
-2. etcd cluster authentication, enabled by TLS certificate-based authentication.
-3. Clients authentication to etcd, enabled by TLS certificate-based authentication.
+1. Admin authentication to etcd -- always enabled.
+2. etcd cluster authentication -- enabled by adding a TLS certificate provider.
+3. Clients authentication to etcd -- enabled by adding a TLS certificate provider.
 
 ### Admin authentication to etcd
 
@@ -48,7 +48,7 @@ Credentials are exchanged via [Juju secrets](https://canonical-juju.readthedocs-
 
 ### etcd cluster authentication
 
-Authentication among members of a etcd cluster is based on the TLS certificate-based authentication method. Each unit in the cluster gets issued a TLS certificate signed by the CA of the TLS Certificate Provider charm. The certificate is used to authenticate the unit to other members of the cluster.
+Authentication among members of an etcd cluster is based on the TLS certificate-based authentication method. Each unit in a cluster gets issued a TLS certificate signed by a CA of a TLS Certificate Provider charm. The TLS certificate is then used to authenticate the unit to other members of the cluster.
 
 ### Clients authentication to etcd
 

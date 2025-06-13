@@ -23,7 +23,7 @@ Charmed etcd can be deployed on top of several clouds and virtualisation layers:
 ### Juju 
 
 Juju is the component responsible for orchestrating the entire lifecycle, from deployment to Day 2 operations. For more information on Juju security hardening, see the
-[Juju security page](https://canonical-juju.readthedocs-hosted.com/en/latest/user/explanation/juju-security/) and the [How to harden your deployment](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-deployment/#harden-your-deployment) guide.
+[Juju security page](https://documentation.ubuntu.com/juju/latest/explanation/juju-security/index.html) and the [How to harden your deployment](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-deployment/#harden-your-deployment) guide.
 
 #### Cloud credentials
 
@@ -38,7 +38,7 @@ When configuring cloud credentials to be used with Juju, ensure that users have 
 
 #### Juju users
 
-It is very important that Juju users are set up with minimal permissions depending on the scope of their operations. Please refer to the [User access levels](https://juju.is/docs/juju/user-permissions) documentation for more information on the access levels and corresponding abilities.
+It is very important that Juju users are set up with minimal permissions depending on the scope of their operations. Please refer to the [User access levels](https://documentation.ubuntu.com/juju/3.6/reference/user/#user-access-levels) documentation for more information on the access levels and corresponding abilities.
 
 Juju user credentials must be stored securely and rotated regularly to limit the chances of unauthorized access due to credentials leakage.
 
@@ -59,7 +59,7 @@ Charmed etcd runs on top of Ubuntu 24.04. Deploy a [Landscape Client Charm](http
 
 ### Security upgrades
 
-charmed-etcd-operator uses the charmed-etcd-snap, where each revision of the charm pins a revision of the snap to provide reproducible environments.
+`charmed-etcd-operator` uses the `charmed-etcd-snap`, where each revision of the charm pins a revision of the snap to provide reproducible environments.
 
 Currently, the charm is available on the `edge` track, the snap is patched and updated regularly to ensure that the latest security fixes from the upstream etcd project are applied.
 
@@ -94,7 +94,7 @@ Logging is enabled by default. The logs are stored in the `/var/snap/charmed-etc
 
 ## Additional Resources
 
-For details on the cryptography used by Charmed etcd, see the [Cryptography](./cryptography) explanation page.
+For details on the cryptography used by Charmed etcd, see the [Cryptography](cryptography) explanation page.
 
 
 ```{toctree}
