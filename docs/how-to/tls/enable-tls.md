@@ -26,7 +26,7 @@ This guide will use the [Self-signed Certificates](https://charmhub.io/self-sign
 Check [this guide](https://charmhub.io/topics/security-with-x-509-certificates) for an overview of all the TLS certificates charms available. 
 ```
 
-Deploy the `self-signed-certificates` charm. etcd uses `v4` of the <spellexception>[tls-certificates library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates)</spellexception>, which is currently only supported in the `edge` channel.
+Deploy the `self-signed-certificates` charm. etcd uses `v4` of the [{spellexception}`tls-certificates` library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates), which is currently only supported in the `edge` channel.
 
 ```shell
 juju deploy self-signed-certificates --channel edge

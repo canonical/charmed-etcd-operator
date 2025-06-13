@@ -34,7 +34,7 @@ When configuring cloud credentials to be used with Juju, ensure that users have 
 | OpenStack | [OpenStack cloud and Juju](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/cloud/list-of-supported-clouds/the-openstack-cloud-and-juju/)                                                                                |
 | AWS       | [Juju AWS Permission](https://discourse.charmhub.io/t/juju-aws-permissions/5307), [AWS Instance Profiles](https://discourse.charmhub.io/t/using-aws-instance-profiles-with-juju-2-9/5185), [Juju on AWS](https://juju.is/docs/juju/amazon-ec2) |
 | Azure     | [Juju Azure Permission](https://juju.is/docs/juju/microsoft-azure), [How to use Juju with Microsoft Azure](https://discourse.charmhub.io/t/how-to-use-juju-with-microsoft-azure/15219)                                                         |
-| GCP       | <spellexception>[Google GCE cloud and Juju](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/cloud/list-of-supported-clouds/the-google-gce-cloud-and-juju/)</spellexception>                                             |
+| GCP       | [Google {spellexception}`GCE` cloud and Juju](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/cloud/list-of-supported-clouds/the-google-gce-cloud-and-juju/)                                                            |
 
 #### Juju users
 
@@ -94,7 +94,7 @@ Logging is enabled by default. The logs are stored in the `/var/snap/charmed-etc
 
 ## Additional Resources
 
-Charmed etcd also implements all CIS hardening checks for etcd as defined in the <spellexception>[Aqua Security kube-bench configuration for CIS 1.24](https://github.com/aquasecurity/kube-bench/blob/main/cfg/cis-1.24/etcd.yaml)</spellexception> to ensure compliance and security best practices.
+Charmed etcd also implements all CIS hardening checks for etcd as defined in the [Aqua Security {spellexception}`kube-bench` configuration for CIS 1.24](https://github.com/aquasecurity/kube-bench/blob/main/cfg/cis-1.24/etcd.yaml) to ensure compliance and security best practices.
 
 For details on the cryptography used by Charmed etcd, see the [Cryptography](cryptography) explanation page.
 
