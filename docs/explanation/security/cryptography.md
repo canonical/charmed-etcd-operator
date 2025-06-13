@@ -37,8 +37,8 @@ Encryption at rest is currently not supported, although it can be provided by th
 In Charmed etcd, authentication layers can be enabled for:
 
 1. Admin authentication to etcd -- always enabled.
-2. etcd cluster authentication -- enabled by adding a TLS certificate provider.
-3. Clients authentication to etcd -- enabled by adding a TLS certificate provider.
+2. etcd cluster authentication -- enabled by integrating with a TLS certificate provider.
+3. Clients authentication to etcd -- enabled by integrating with a TLS certificate provider.
 
 ### Admin authentication to etcd
 
