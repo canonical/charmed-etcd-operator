@@ -42,14 +42,13 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-
-    cluster_members = get_cluster_members(endpoints)
-    assert len(cluster_members) == NUM_UNITS
-
-    # make sure data can be written to the cluster
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
+    assert len(cluster_members) == NUM_UNITS
+
+    # make sure data can be written to the cluster
     assert (
         put_key(
             endpoints,

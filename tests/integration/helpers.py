@@ -81,9 +81,18 @@ def get_key(
 
 
 @retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
-def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]:
+def get_cluster_members(
+    endpoints: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> list[dict]:
     """Query all cluster members from etcd using `etcdctl`."""
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
             --cacert client_ca.pem \
@@ -98,10 +107,18 @@ def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]
 
 
 @retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
-def get_cluster_id(endpoints: str, tls_enabled: bool = False) -> str:
+def get_cluster_id(
+    endpoints: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> str:
     """Query the cluster id from etcd using `etcdctl`."""
     etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
-
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
             --cacert client_ca.pem \
@@ -177,13 +194,22 @@ def is_endpoint_up(
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
-def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
+def get_raft_leader(
+    endpoints: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> str:
     """Query the Raft leader via the `endpoint status` and `member list` commands.
 
     Returns:
         str: the member-name of the Raft leader, e.g. `etcd42`
     """
     etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
                 --cacert client_ca.pem \

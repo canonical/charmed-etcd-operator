@@ -100,7 +100,7 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
 
     # check cluster formation after unit with existing storage was added
     updated_endpoints = get_cluster_endpoints(ops_test, app)
-    cluster_members = get_cluster_members(updated_endpoints)
+    cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert new_unit.name.replace("/", "") in (member["name"] for member in cluster_members), (
         f"{new_unit.name} is not in {cluster_members}"
     )
@@ -129,7 +129,7 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     initial_endpoints = get_cluster_endpoints(ops_test, app)
-    initial_cluster_id = get_cluster_id(initial_endpoints)
+    initial_cluster_id = get_cluster_id(initial_endpoints, user=INTERNAL_USER, password=password)
     initial_writes_value = count_writes(initial_endpoints, INTERNAL_USER, password)
 
     # remove all units while keeping their storage-ids for later reuse
@@ -159,10 +159,10 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
 
     # check cluster formation after new cluster was forced
     endpoints = get_cluster_endpoints(ops_test, app)
-    new_cluster_id = get_cluster_id(endpoints)
+    new_cluster_id = get_cluster_id(endpoints, user=INTERNAL_USER, password=password)
     assert initial_cluster_id == new_cluster_id, "Cluster ID does not match"
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
 
     for unit in ops_test.model.applications[app].units:
         assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
@@ -197,7 +197,7 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     initial_endpoints = get_cluster_endpoints(ops_test, app)
-    initial_cluster_id = get_cluster_id(initial_endpoints)
+    initial_cluster_id = get_cluster_id(initial_endpoints, user=INTERNAL_USER, password=password)
     initial_writes_value = count_writes(initial_endpoints, INTERNAL_USER, password)
 
     # remove all units except one - we need to know which storage to attach when scaling up again
@@ -256,10 +256,10 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
 
     # check cluster formation
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    new_cluster_id = get_cluster_id(endpoints)
+    new_cluster_id = get_cluster_id(endpoints, user=INTERNAL_USER, password=password)
     assert initial_cluster_id == new_cluster_id, "Cluster ID does not match"
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
 
     for unit in ops_test.model.applications[app].units:
         assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (

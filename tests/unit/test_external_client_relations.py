@@ -172,7 +172,7 @@ def test_add_ecr_new_user_leader(cluster_tls_context, mtls_cert):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
         patch("workload.EtcdWorkload.write_file"),
         patch("managers.tls.TLSManager.is_new_ca", return_value=True),
         patch("managers.cluster.ClusterManager.restart_member") as restart_member,
@@ -503,7 +503,7 @@ def test_ecr_update_common_name_leader(cluster_tls_context, mtls_cert, mtls_cert
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("common.client.EtcdClient.remove_role") as remove_role,
         patch("common.client.EtcdClient.remove_user") as remove_user,
@@ -593,7 +593,7 @@ def test_ecr_update_common_name_leader_crash(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("common.client.EtcdClient.remove_role") as remove_role,
         patch("common.client.EtcdClient.remove_user") as remove_user,
@@ -682,7 +682,7 @@ def test_ecr_update_chain_same_common_name(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("common.client.EtcdClient.remove_role") as remove_role,
         patch("common.client.EtcdClient.remove_user") as remove_user,
@@ -951,7 +951,7 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
         patch("workload.EtcdWorkload.write_file"),
         patch("managers.tls.TLSManager.is_new_ca", return_value=True),
         patch("managers.cluster.ClusterManager.restart_member"),
@@ -1029,7 +1029,7 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
         patch("workload.EtcdWorkload.write_file"),
         patch("managers.tls.TLSManager.is_new_ca", return_value=True),
         patch("managers.cluster.ClusterManager.restart_member"),
@@ -1065,7 +1065,7 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
@@ -1108,7 +1108,7 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
         patch("workload.EtcdWorkload.write_file"),
         patch("managers.tls.TLSManager.is_new_ca", return_value=True),
         patch("managers.cluster.ClusterManager.restart_member"),
@@ -1118,7 +1118,7 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
         ecr_relation = state_out.get_relation(ecr_relation.id)
         assert ecr_relation.id in charm.state.cluster.managed_users
         assert charm.state.cluster.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
-        assert ecr_relation.local_app_data["version"] == "3.5"
+        assert ecr_relation.local_app_data["version"] == "3.6"
 
     with (
         ctx(
@@ -1128,12 +1128,12 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5.1"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6.0"),
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
-        assert ecr_relation.local_app_data["version"] == "3.5.1"
+        assert ecr_relation.local_app_data["version"] == "3.6.0"
 
 
 def test_update_client_relations_data_non_leader(cluster_tls_context):
@@ -1148,7 +1148,7 @@ def test_update_client_relations_data_non_leader(cluster_tls_context):
         ) as get_assigned_certificates,
     ):
         charm: EtcdOperatorCharm = manager.charm
-        charm.external_clients_manager.update_client_relations_data("3.5.18")
+        charm.external_clients_manager.update_client_relations_data("3.6.0")
         get_assigned_certificates.assert_not_called()
 
 
@@ -1159,7 +1159,7 @@ def test_update_client_relations_data_no_external_clients(cluster_tls_context):
     state_in = testing.State(relations=relations, leader=True)
     with (
         ctx(ctx.on.relation_changed(relations[0]), state_in) as manager,
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5.18"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6.0"),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
         ) as get_assigned_certificates,
@@ -1284,7 +1284,7 @@ def test_ecr_update_chain_invalid_new_value(cluster_tls_context, mtls_cert, ca_c
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
-        patch("managers.cluster.ClusterManager.get_version", return_value="3.5"),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("common.client.EtcdClient.remove_role") as remove_role,
         patch("common.client.EtcdClient.remove_user") as remove_user,

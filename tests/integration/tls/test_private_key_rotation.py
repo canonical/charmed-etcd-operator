@@ -78,7 +78,14 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    # make sure data can be written to the cluster
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -86,11 +93,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https://"), "Peer URL is not https"
 
     logger.info("All cluster members have HTTPS peerURLs and clientURLs")
-
-    # make sure data can be written to the cluster
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
 
@@ -188,7 +190,9 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     assert (
@@ -264,7 +268,9 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     assert (

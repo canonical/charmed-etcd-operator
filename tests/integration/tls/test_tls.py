@@ -67,7 +67,14 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    # make sure data can be written to the cluster
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -75,11 +82,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https://"), "Peer URL is not https"
 
     logger.info("All cluster members have HTTPS peerURLs and clientURLs")
-
-    # make sure data can be written to the cluster
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
 
@@ -119,8 +121,12 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -128,11 +134,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("http://"), "Peer URL is not http"
 
     logger.info("All cluster members have HTTP peerURLs and clientURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTP peerURLs and clientURLs")
     assert (
@@ -178,7 +179,13 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -186,11 +193,6 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https://"), "Peer URL is not https"
 
     logger.info("All cluster members have HTTPS peerURLs and clientURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
     assert (
@@ -250,7 +252,13 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -258,11 +266,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("http://"), "Peer URL is not http"
 
     logger.info("All cluster members have HTTPS clientURLs and HTTP peerURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTP peerURLs and HTTPS clientURLs")
     assert (
@@ -302,7 +305,9 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -371,10 +376,14 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -382,11 +391,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https://"), "Peer URL is not https"
 
     logger.info("All cluster members have HTTP clientURLs and HTTPS peerURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and HTTP clientURLs")
     assert (
@@ -427,7 +431,9 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -490,10 +496,14 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -501,11 +511,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("http://"), "Peer URL is not http"
 
     logger.info("All cluster members have HTTP peerURLs and clientURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTP peerURLs and clientURLs")
     assert (
@@ -565,7 +570,9 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:

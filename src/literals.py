@@ -11,7 +11,7 @@ from typing import Literal
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, StatusBase
 
 SNAP_NAME = "charmed-etcd"
-SNAP_REVISION = 10
+SNAP_REVISION = 13
 SNAP_SERVICE = "etcd"
 SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
 SNAP_LOG_PATH = "/var/snap/charmed-etcd/common/var/log/etcd"
