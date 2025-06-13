@@ -14,11 +14,16 @@ SNAP_NAME = "charmed-etcd"
 SNAP_REVISION = 12
 SNAP_SERVICE = "etcd"
 SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
+SNAP_LOG_PATH = "/var/snap/charmed-etcd/common/var/log/etcd"
+SNAP_ARCHIVE_PATH = "/var/snap/charmed-etcd/common/archive"
+SNAP_CONFIG_PATH = "/var/snap/charmed-etcd/current"
 SNAP_USER = 584788
 SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/current/tls"
 DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
+BACKUP_FILE_NAME = "/var/snap/charmed-etcd/common/archive/charmed-etcd_snapshot.db"
+BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
@@ -31,7 +36,7 @@ METRICS_PORT = 9100
 
 INTERNAL_USER = "root"
 INTERNAL_USER_PASSWORD_CONFIG = "system-users"
-SECRETS_APP = ["root-password"]
+SECRETS_APP = ["root-password", "s3-credentials", "azure-credentials"]
 
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 SUBSTRATES = Literal["vm", "k8s"]
@@ -41,6 +46,9 @@ PEER_TLS_RELATION_NAME = "peer-certificates"
 CLIENT_TLS_RELATION_NAME = "client-certificates"
 TLS_PEER_PRIVATE_KEY_CONFIG = "tls-peer-private-key"
 TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
+
+S3_RELATION_NAME = "s3-credentials"
+AZURE_RELATION_NAME = "azure-credentials"
 
 
 @dataclass
@@ -65,6 +73,7 @@ class Status(Enum):
     AUTHENTICATION_NOT_ENABLED = StatusLevel(
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
+    BACKUP_IN_PROGRESS = StatusLevel(MaintenanceStatus("Creating database backup..."), "DEBUG")
     CLUSTER_INITIALIZING = StatusLevel(MaintenanceStatus("Initializing etcd cluster..."), "DEBUG")
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
     CLUSTER_NOT_INITIALIZED = StatusLevel(
@@ -76,9 +85,25 @@ class Status(Enum):
     )
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
+    OBJECT_STORAGE_CONFLICT = StatusLevel(
+        BlockedStatus("Azure and S3 storages configured - please remove one"), "ERROR"
+    )
     PASSWORD_UPDATE_FAILED = StatusLevel(BlockedStatus("failed to update password"), "ERROR")
     PEER_URL_NOT_SET = StatusLevel(MaintenanceStatus("peer-url not set"), "DEBUG")
     REMOVED = StatusLevel(BlockedStatus("unit removed from cluster"), "INFO")
+    RESTORE_FAILED = StatusLevel(BlockedStatus("failed to restore backup"), "ERROR")
+    RESTORE_VERIFICATION_FAILED = StatusLevel(
+        BlockedStatus(
+            "Restore verification failed - etcd cluster still running, restore cancelled, check debug-log"
+        ),
+        "ERROR",
+    )
+    RESTORE_IN_PROGRESS = StatusLevel(
+        MaintenanceStatus("Database restore is in progress"), "ERROR"
+    )
+    RESTORE_UNHEALTHY = StatusLevel(
+        BlockedStatus("cluster unhealthy after restoring backup - check debug-log"), "ERROR"
+    )
     TLS_DISABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Disabling peer TLS..."), "DEBUG")
     TLS_DISABLING_CLIENT_TLS = StatusLevel(MaintenanceStatus("Disabling client TLS..."), "DEBUG")
     TLS_ENABLING_PEER_TLS = StatusLevel(MaintenanceStatus("Enabling peer TLS..."), "DEBUG")
@@ -90,6 +115,18 @@ class Status(Enum):
     TLS_NOT_READY = StatusLevel(MaintenanceStatus("Waiting for TLS to be ready"), "DEBUG")
     TLS_PEER_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating peer CA..."), "DEBUG")
     TLS_CLIENT_CA_ROTATING = StatusLevel(MaintenanceStatus("Rotating client CA..."), "DEBUG")
+    TLS_CLIENT_CERTS_EXPIRING = StatusLevel(
+        MaintenanceStatus(
+            "TLS client certificates expiring soon. Please ensure new certificates are provided."
+        ),
+        "WARNING",
+    )
+    TLS_PEER_CERTS_EXPIRING = StatusLevel(
+        MaintenanceStatus(
+            "TLS peer certificates expiring soon. Please ensure new certificates are provided."
+        ),
+        "WARNING",
+    )
     SERVICE_INSTALLING = StatusLevel(MaintenanceStatus("Installing etcd..."), "DEBUG")
     SERVICE_STARTING = StatusLevel(MaintenanceStatus("Waiting for etcd to start..."), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
@@ -139,3 +176,16 @@ class TLSCARotationState(Enum):
     NEW_CA_DETECTED = "new-ca-detected"
     NEW_CA_ADDED = "new-ca-added"
     CERT_UPDATED = "cert-updated"
+
+
+# enum for Backup state
+class RestoreStep(Enum):
+    """Backup / Restore workflow step representation."""
+
+    NOT_STARTED = ""
+    DOWNLOAD = "download_backup"
+    STOP = "stop_workload"
+    VERIFY = "verify_backup"
+    RESTORE = "restore_backup"
+    START = "restart_workload"
+    COMPLETED = "completed"

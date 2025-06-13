@@ -8,7 +8,7 @@ import time
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
+from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
@@ -21,6 +21,7 @@ from ..helpers import (
     get_unit_endpoint,
     is_endpoint_up,
     put_key,
+    set_password,
 )
 from ..helpers_deployment import wait_until
 from .helpers import (
@@ -46,7 +47,10 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     # create storage to be used in this test
     # this assumes the test is run on a lxd cloud
     await ops_test.model.create_storage_pool("etcd-pool", "lxd")
-    storage = {"data": {"pool": "etcd-pool", "size": 2048}}
+    storage = {
+        "data": {"pool": "etcd-pool", "size": 2048},
+        "archive": {"pool": "etcd-pool", "size": 2048},
+    }
 
     # Deploy the charm and wait for active/idle status
     await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS, storage=storage)
@@ -64,7 +68,8 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     app = APP_NAME
     init_units_count = len(ops_test.model.applications[app].units)
     unit = ops_test.model.applications[app].units[-1]
-    storage_id = get_storage_id(ops_test, unit.name, "data")
+    data_storage_id = get_storage_id(ops_test, unit.name, "data")
+    archive_storage_id = get_storage_id(ops_test, unit.name, "archive")
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -79,11 +84,11 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     )
 
     # add unit with previous storage attached
-    add_unit_cmd = (
-        f"add-unit {app} --model={ops_test.model.info.name} --attach-storage={storage_id}"
-    )
+    add_unit_cmd = f"add-unit {app} --model={ops_test.model.info.name} --attach-storage={data_storage_id} --attach-storage={archive_storage_id}"
     return_code, _, _ = await ops_test.juju(*add_unit_cmd.split())
-    assert return_code == 0, f"Failed to add unit with storage {storage_id}"
+    assert return_code == 0, (
+        f"Failed to add unit with storages {data_storage_id} and {archive_storage_id}"
+    )
 
     new_unit = ops_test.model.applications[app].units[-1]
     await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count, idle_period=60)
@@ -208,23 +213,18 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
     # remove the entire application
     await ops_test.model.remove_application(app, block_until_done=True)
 
-    # we are going to deploy a new cluster, but with an existing database
-    # that means we need to configure the correct admin password in advance
-    admin_secret = "root_password"
-    secret_id = await ops_test.model.add_secret(
-        name=admin_secret, data_args=[f"{INTERNAL_USER}={password}"]
-    )
-
     # deploy new cluster, attaching the storage from the previous last unit to the new first unit
     deploy_cluster_with_storage_cmd = f"""deploy {CHARM_PATH} \
         --model={ops_test.model.info.name} \
         --attach-storage={storage_id} \
-        --config {INTERNAL_USER_PASSWORD_CONFIG}={secret_id}
         """
 
     return_code, _, _ = await ops_test.juju(*deploy_cluster_with_storage_cmd.split())
     assert return_code == 0, f"Failed to deploy app with storage {storage_id}"
-    await ops_test.model.grant_secret(secret_name=admin_secret, application=APP_NAME)
+
+    # we are going to deploy a new cluster, but with an existing database
+    # that means we need to configure the correct admin password
+    await set_password(ops_test, password)
 
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=1, idle_period=60)
 

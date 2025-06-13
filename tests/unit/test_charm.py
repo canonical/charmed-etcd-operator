@@ -18,7 +18,13 @@ from common.exceptions import (
     EtcdUserManagementError,
 )
 from core.models import Member
-from literals import CLIENT_PORT, INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
+from literals import (
+    CLIENT_PORT,
+    INTERNAL_USER,
+    INTERNAL_USER_PASSWORD_CONFIG,
+    PEER_RELATION,
+    TLSState,
+)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -302,6 +308,77 @@ def test_update_status():
 
     # Verify that writing the file did work as expected.
     assert (data_storage.get_filesystem(ctx) / "test.txt").read_text() == "test_line"
+
+    # test certificate expiry check fails
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+        local_unit_data={
+            "tls_peer_state": TLSState.TLS.value,
+            "tls_client_state": TLSState.TLS.value,
+            "tls_client_certificates_expiring": "",
+            "tls_peer_certificates_expiring": "",
+        },
+    )
+
+    state_in = testing.State(relations={relation})
+
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch(
+            "workload.EtcdWorkload.exec",
+            side_effect=CalledProcessError(returncode=1, cmd="openssl -checkend"),
+        ),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.MaintenanceStatus(
+            "TLS client certificates expiring soon. Please ensure new certificates are provided."
+        )
+        assert (
+            state_out.get_relation(1).local_unit_data.get("tls_client_certificates_expiring")
+            == "True"
+        )
+        assert (
+            state_out.get_relation(1).local_unit_data.get("tls_peer_certificates_expiring")
+            == "True"
+        )
+
+    # test certificate expiry check successful
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+        local_unit_data={
+            "tls_peer_state": TLSState.TLS.value,
+            "tls_client_state": TLSState.TLS.value,
+            "tls_client_certificates_expiring": "",
+            "tls_peer_certificates_expiring": "",
+        },
+    )
+
+    state_in = testing.State(relations={relation})
+
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch("workload.EtcdWorkload.exec", return_value=CompletedProcess(returncode=0, args=[])),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+        assert (
+            state_out.get_relation(1).local_unit_data.get("tls_client_certificates_expiring") == ""
+        )
+        assert (
+            state_out.get_relation(1).local_unit_data.get("tls_peer_certificates_expiring") == ""
+        )
 
 
 def test_peer_relation_created():

@@ -17,6 +17,7 @@ from .helpers import (
     get_key,
     get_secret_by_label,
     put_key,
+    set_password,
 )
 from .helpers_deployment import wait_until
 
@@ -81,18 +82,8 @@ async def test_update_admin_password(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
 
     # create a user secret and grant it to the application
-    secret_name = "test_secret"
     new_password = "some-password"
-
-    secret_id = await ops_test.model.add_secret(
-        name=secret_name, data_args=[f"{INTERNAL_USER}={new_password}"]
-    )
-    await ops_test.model.grant_secret(secret_name=secret_name, application=APP_NAME)
-
-    # update the application config to include the secret
-    await ops_test.model.applications[APP_NAME].set_config(
-        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
-    )
+    await set_password(ops_test, new_password)
     await wait_until(ops_test, apps=[APP_NAME])
 
     # perform read operation with the updated password

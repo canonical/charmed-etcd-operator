@@ -96,9 +96,9 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     await asyncio.gather(
         ops_test.model.deploy(REQUIRER_CHARM_PATH, application_name=REQUIRER_NAME),
         ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS),
-        ops_test.model.deploy(TLS_NAME, channel="1/stable", config=tls_config),
+        ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config),
         ops_test.model.deploy(
-            TLS_NAME, channel="1/stable", application_name=REQUIRER_TLS_NAME, config=tls_config
+            TLS_NAME, channel="1/edge", application_name=REQUIRER_TLS_NAME, config=tls_config
         ),
     )
     # enable TLS and check if the cluster is still accessible

@@ -5,6 +5,7 @@
 """Etcd related and core event handlers."""
 
 import logging
+from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
 
 import ops
@@ -32,13 +33,16 @@ from literals import (
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
+    SNAP_ARCHIVE_PATH,
     SNAP_DATA_PATH,
     SNAP_GROUP,
+    SNAP_LOG_PATH,
     SNAP_USER,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
     Status,
     TLSState,
+    TLSType,
 )
 
 if TYPE_CHECKING:
@@ -84,8 +88,9 @@ class EtcdEvents(Object):
     def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
         """Handle storage attachment."""
         # fix the permissions of the data dir if re-attaching existing storage
-        self.charm.workload.exec(["chmod", "-R", "750", SNAP_DATA_PATH])
-        self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", SNAP_DATA_PATH])
+        for path in [SNAP_DATA_PATH, SNAP_LOG_PATH, SNAP_ARCHIVE_PATH]:
+            self.charm.workload.exec(["chmod", "-R", "750", path])
+            self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", path])
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -184,6 +189,11 @@ class EtcdEvents(Object):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot update config while database restore is in progress.")
+            event.defer()
+            return
+
         # refresh the host information and cluster membership in case of ip change
         ip_address = self.charm.cluster_manager.get_host_mapping().get("ip")
         if ip_address != self.charm.state.unit_server.ip:
@@ -227,6 +237,9 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            return
+
         if self.charm.unit.is_leader():
             if self.charm.state.cluster.learning_member:
                 try:
@@ -241,9 +254,23 @@ class EtcdEvents(Object):
             # reflect membership updates in the cluster state, e.g. ip change or tls switchover
             self.charm.cluster_manager.update_cluster_member_state()
 
-            self.charm.external_clients_manager.update_client_relations_data(
-                etcd_version=self.charm.cluster_manager.get_version()
-            )
+            try:
+                self.charm.external_clients_manager.update_client_relations_data(
+                    etcd_version=self.charm.cluster_manager.get_version()
+                )
+            except KeyError as e:
+                logger.warning(f"Error updating client relations data: {e}")
+
+        for tls_type in TLSType:
+            try:
+                self.charm.tls_manager.check_certificate_validity(tls_type)
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": ""}
+                )
+            except CalledProcessError:
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": "True"}
+                )
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
@@ -263,6 +290,11 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot add cluster member while database restore is in progress.")
+            event.defer()
+            return
+
         if self.charm.unit.is_leader():
             try:
                 self.charm.cluster_manager.add_member(event.unit.name)
@@ -296,12 +328,26 @@ class EtcdEvents(Object):
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
+        if self.charm.state.cluster.is_restore_in_progress:
+            return
+
         if not self.charm.workload.alive():
             if not self.charm.cluster_manager.restart_member():
                 self.charm.set_status(Status.SERVICE_NOT_RUNNING)
                 return
 
         self.charm.cluster_manager.clean_users()
+
+        for tls_type in TLSType:
+            try:
+                self.charm.tls_manager.check_certificate_validity(tls_type)
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": ""}
+                )
+            except CalledProcessError:
+                self.charm.state.unit_server.update(
+                    {f"tls_{tls_type.value}_certificates_expiring": "True"}
+                )
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
@@ -316,6 +362,11 @@ class EtcdEvents(Object):
         if not self.charm.unit.is_leader():
             return
 
+        if self.charm.state.cluster.is_restore_in_progress:
+            logger.warning("Cannot update credentials while database restore is in progress.")
+            event.defer()
+            return
+
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
             if admin_secret_id == event.secret.id:
                 self.update_admin_password(admin_secret_id)
@@ -323,12 +374,14 @@ class EtcdEvents(Object):
     def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
         """Handle removal of the data storage mount, e.g. when removing a unit."""
         if self.charm.app.planned_units() > 0:
-            try:
-                self.charm.cluster_manager.remove_member()
-            except (EtcdClusterManagementError, RaftLeaderNotFoundError):
-                # We want this hook to error out if we cannot remove the cluster member
-                # otherwise the cluster could become unavailable because of quorum loss
-                raise
+            if not self.charm.state.cluster.is_restore_in_progress:
+                # allow for unit removal when restore is in progress
+                try:
+                    self.charm.cluster_manager.remove_member()
+                except (EtcdClusterManagementError, RaftLeaderNotFoundError):
+                    # We want this hook to error out if we cannot remove the cluster member
+                    # otherwise the cluster could become unavailable because of quorum loss
+                    raise
         else:
             logger.info("Removing last unit from etcd cluster.")
             if self.charm.unit.is_leader():
