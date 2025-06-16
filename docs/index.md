@@ -12,8 +12,8 @@ This new charm is still under development on the [`edge` track](https://charmhub
 
 ## In this documentation
 
-| | |
-|--------|----------|
+|                                                                                                        |                                                                                                      |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | [Tutorial](/tutorial/index.md)</br>  Get started - a hands-on introduction to etcd for new users </br> | [How-to guides](/how-to/index.md) </br> Step-by-step guides covering key operations and common tasks |
 
 <!--
@@ -37,4 +37,5 @@ The charmed etcd operator is an open-source project that welcomes community cont
 Home <self>
 /tutorial/index
 /how-to/index
+/explanation/index
 ```

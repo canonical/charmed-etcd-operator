@@ -1,10 +1,10 @@
 # How to manage persistent storage
 
 Like many other databases, etcd stores its state on disk. In a default deployment (as described in [](../tutorial/index.md#deploy-etcd)),
-the filesystem attached to charmed etcd will be removed when charmed etcd is removed. The content of the etcd database
+the file system attached to charmed etcd will be removed when charmed etcd is removed. The content of the etcd database
 would then be lost.
 
-To decouple the lifecycle of the etcd database from the lifecycle of its deployment, charmed etcd provides a feature 
+To decouple the life cycle of the etcd database from the life cycle of its deployment, charmed etcd provides a feature 
 called persistent storage. It allows to keep storage volumes around, even after a deployed etcd application or unit 
 has been removed.
 
@@ -15,7 +15,7 @@ or
 
 Charmed etcd uses two different storage volumes:
 - `data` containing the raw data files (the actual database) written and managed by etcd
-- `logs` for logfiles written by etcd
+- `logs` for log files written by etcd
 
 The following document will explain how to reuse storage volumes in charmed etcd.
 

@@ -48,7 +48,7 @@ in the tutorial, none should exist, so you'll only see this as output:
 
 ## Install and set up Juju
 
-[Juju](https://juju.is/docs/juju) is an Operator Lifecycle Manager (OLM) for clouds,
+[Juju](https://juju.is/docs/juju) is an Operator Life cycle Manager (OLM) for clouds,
 bare metal, LXD or Kubernetes. We will be using it to deploy and manage charmed etcd. 
 
 As with LXD, Juju is installed using a snap package:

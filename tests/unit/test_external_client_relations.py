@@ -982,6 +982,7 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
             patch("managers.tls.TLSManager.update_cas"),
             patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
             patch("managers.cluster.ClusterManager.clean_users"),
+            patch("managers.cluster.ClusterManager.remove_inconsistent_members_if_required"),
         ):
             charm: EtcdOperatorCharm = manager.charm
             event = MagicMock(spec=CertificateAvailableEvent)
@@ -1560,6 +1561,7 @@ def test_removing_user_crash(cluster_tls_context, mtls_cert):
     with (
         ctx(ctx.on.update_status(), state_out) as manager,
         patch("managers.cluster.ClusterManager.remove_managed_user") as remove_managed_user,
+        patch("managers.cluster.ClusterManager.remove_inconsistent_members_if_required"),
         patch("common.client.EtcdClient.list_users", return_value=[CLIENT_COMMON_NAME]),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):

@@ -4,7 +4,7 @@
 The Charmed etcd Operator deploys and operates the [etcd](https://etcd.io) 
 software on VMs and machine clusters. This charm is a 
 Python project that installs etcd from the [etcd Snap](https://snapcraft.io/charmed-etcd),
-and provides lifecycle management and event handling.
+and provides life cycle management and event handling.
 
 ## Documentation
 
