@@ -24,6 +24,7 @@ The storage volumes that can be attached to charmed etcd depend on the storage p
 charmed etcd gets deployed. Please refer to the documentation about [Juju storage](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/storage)
 for more information on possible providers.
 
+## Create a storage pool
 In our case, as we deploy charmed etcd in a local LXD cloud, we use the `lxd` storage provider to create a storage pool
 for etcd:
 
