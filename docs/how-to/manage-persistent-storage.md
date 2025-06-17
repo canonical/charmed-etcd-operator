@@ -15,6 +15,7 @@ or
 
 Charmed etcd uses two different storage volumes:
 - `data` containing the raw data files (the actual database) written and managed by etcd
+- `archive` for temporarily storing a backup file before uploading it to object storage or when downloading it from object storage
 - `logs` for log files written by etcd
 
 The following document will explain how to reuse storage volumes in charmed etcd.
@@ -57,11 +58,11 @@ Details about how to manage storage pools with Juju can be found [in this guide]
 The decision about using the persistent storage feature of charmed etcd has to be made at deploy time. In order to create
 persistent storage volumes, add the `--storage` option and define your storage parameters.
 
-This command will deploy a charmed etcd application with three units, create a storage volume of 8 GB for each of them 
-and attach the volume as the `data` volume mount:
+This command will deploy a charmed etcd application with three units, create two storage volumes of 8 GB for each of them 
+and attach these volume as `data` and `archive` volume mounts:
 
 ```shell
-juju deploy charmed-etcd -n 3 --storage data=etcd-storage,8G,1
+juju deploy charmed-etcd -n 3 --storage data=etcd-storage,8G,1 --storage archive=etcd-storage,8G,1
 ```
 
 You can track the progress by executing:
@@ -90,17 +91,20 @@ Machine  State    Address         Inst id        Base          AZ  Message
 2        started  10.105.253.148  juju-84b57b-2  ubuntu@24.04      Running
 
 Storage Unit    Storage ID  Type        Pool          Mountpoint                                  Size     Status    Message
-charmed-etcd/0  data/0      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
-charmed-etcd/0  logs/1      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
-charmed-etcd/1  data/2      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
-charmed-etcd/1  logs/3      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
-charmed-etcd/2  data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
-charmed-etcd/2  logs/5      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
+charmed-etcd/0  archive/0   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached  
+charmed-etcd/0  data/1      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/0  logs/2      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
+charmed-etcd/1  archive/3   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached
+charmed-etcd/1  data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/1  logs/5      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
+charmed-etcd/1  archive/6   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached
+charmed-etcd/2  data/7      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/2  logs/8      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
 ```
 
-As you can see, volumes from the `etcd-storage` pool have been attached as the `data` volume mount, whereas for the 
-`logs` volume mount, non-persistent storage from `rootfs` has been used. The `logs` storage will be removed when the 
-respective unit gets removed, while the `data` storage will persist.
+As you can see, volumes from the `etcd-storage` pool have been attached as the `data` and `archive` volume mounts, 
+whereas for the `logs` volume mount, non-persistent storage from `rootfs` has been used. The `logs` storage will be 
+removed when the respective unit gets removed, while the `data` storage will persist.
 
 ## Same cluster scenario
 In this scenario, we want to reuse storage from previous units but within the same etcd cluster/database. This could
@@ -117,14 +121,17 @@ Example output:
 ```shell
 WARNING This command will perform the following actions:
 will remove unit charmed-etcd/0
-- will remove storage logs/1
-- will detach storage data/0
+- will remove storage logs/2
+- will detach storage archive/0
+- will detach storage data/1
 will remove unit charmed-etcd/1
-- will remove storage logs/3
-- will detach storage data/2
-will remove unit charmed-etcd/2
 - will remove storage logs/5
+- will detach storage archive/3
 - will detach storage data/4
+will remove unit charmed-etcd/2
+- will remove storage logs/8
+- will detach storage archive/6
+- will detach storage data/7
 
 Continue [y/N]? y
 ```
@@ -141,15 +148,18 @@ App           Version  Status   Scale  Charm         Channel  Rev  Exposed  Mess
 charmed-etcd           unknown      0  charmed-etcd             0  no       
 
 Storage Unit  Storage ID  Type        Pool          Mountpoint  Size     Status    Message
-              data/0      filesystem  etcd-storage              8.0 GiB  detached  
-              data/2      filesystem  etcd-storage              8.0 GiB  detached  
+              archive/0   filesystem  etcd-storage              8.0 GiB  detached  
+              archive/3   filesystem  etcd-storage              8.0 GiB  detached  
+              archive/6   filesystem  etcd-storage              8.0 GiB  detached
+              data/1      filesystem  etcd-storage              8.0 GiB  detached  
               data/4      filesystem  etcd-storage              8.0 GiB  detached  
+              data/7      filesystem  etcd-storage              8.0 GiB  detached  
 ```
 
 When you want to scale up your etcd database again, attach the desired `data` volume to the new unit of charmed etcd:
 
 ```shell
-juju add-unit charmed-etcd --attach-storage=data/0
+juju add-unit charmed-etcd --attach-storage=data/1 --attach-storage=archive/0
 ```
 
 In order to scale up and resume your cluster with the most up-to-date state and data, **make sure to attach the volume with most 
@@ -171,20 +181,23 @@ Machine  State    Address         Inst id        Base          AZ  Message
 3        started  10.105.253.200  juju-84b57b-3  ubuntu@24.04      Running
 
 Storage Unit    Storage ID  Type        Pool          Mountpoint                                  Size     Status    Message
-                data/2      filesystem  etcd-storage                                              8.0 GiB  detached  
+                archive/3   filesystem  etcd-storage                                              8.0 GiB  detached  
+                archive/6   filesystem  etcd-storage                                              8.0 GiB  detached
                 data/4      filesystem  etcd-storage                                              8.0 GiB  detached  
-charmed-etcd/3  data/0      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
-charmed-etcd/3  logs/6      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
+                data/7      filesystem  etcd-storage                                              8.0 GiB  detached  
+charmed-etcd/3  archive/0   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached  
+charmed-etcd/3  data/1      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/3  logs/9      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
 ```
 
-As you can see, the new unit `charmed-etcd/3` has been deployed with the existing `data/0` volume and the new volume
-`logs/6` attached to it.
+As you can see, the new unit `charmed-etcd/3` has been deployed with the existing `archive/0` and `data/1` volumes,
+and the new volume `logs/6` attached to it.
 
 In order to scale up to three units again, add two more `juju add-unit` commands with the other storage volumes:
 
 ```shell
-juju add-unit charmed-etcd --attach-storage=data/2
-juju add-unit charmed-etcd --attach-storage=data/4
+juju add-unit charmed-etcd --attach-storage=data/4 --attach-storage=archive/3
+juju add-unit charmed-etcd --attach-storage=data/7 --attach-storage=archive/6
 ```
 
 The data of these volumes will not be taken into account though, they will receive a full data transfer from the leader.
@@ -214,12 +227,15 @@ Machine  State    Address         Inst id        Base          AZ  Message
 5        started  10.105.253.6    juju-84b57b-5  ubuntu@24.04      Running
 
 Storage Unit    Storage ID  Type        Pool          Mountpoint                                  Size     Status    Message
-charmed-etcd/3  data/0      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
-charmed-etcd/3  logs/6      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
-charmed-etcd/4  data/2      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
-charmed-etcd/4  logs/7      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
-charmed-etcd/5  data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
-charmed-etcd/5  logs/8      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
+charmed-etcd/3  archive/0   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached
+charmed-etcd/3  data/1      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/3  logs/9      filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
+charmed-etcd/4  archive/3   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached
+charmed-etcd/4  data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/4  logs/10     filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
+charmed-etcd/5  archive/6   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached
+charmed-etcd/5  data/7      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/5  logs/11     filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
 ```
 
 ## Different cluster scenario
@@ -255,12 +271,15 @@ will remove application charmed-etcd
 - will remove unit charmed-etcd/3
 - will remove unit charmed-etcd/4
 - will remove unit charmed-etcd/5
-- will remove storage logs/6
-- will remove storage logs/7
-- will remove storage logs/8
-- will detach storage data/0
-- will detach storage data/2
+- will remove storage logs/9
+- will remove storage logs/10
+- will remove storage logs/11
+- will detach storage archive/0
+- will detach storage archive/3
+- will detach storage archive/6
+- will detach storage data/1
 - will detach storage data/4
+- will detach storage data/7
 
 Continue [y/N]? y
 ```
@@ -272,9 +291,12 @@ Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.0    unsupported  13:11:11Z
 
 Storage Unit  Storage ID  Type        Pool          Mountpoint  Size     Status    Message
-              data/0      filesystem  etcd-storage              8.0 GiB  detached  
-              data/2      filesystem  etcd-storage              8.0 GiB  detached  
+              archive/0   filesystem  etcd-storage              8.0 GiB  detached
+              archive/3   filesystem  etcd-storage              8.0 GiB  detached
+              archive/6   filesystem  etcd-storage              8.0 GiB  detached                            
+              data/1      filesystem  etcd-storage              8.0 GiB  detached  
               data/4      filesystem  etcd-storage              8.0 GiB  detached  
+              data/7      filesystem  etcd-storage              8.0 GiB  detached  
 
 Model "admin/etcd" is empty.
 ```
@@ -287,7 +309,7 @@ In order to deploy your new cluster the most up-to-date
 state and data, **make sure to attach the volume with most recent data** (meaning: of the unit you removed last):
 
 ```shell
-juju deploy charmed-etcd etcd --attach-storage=data/0 --config system-users=secret:cuvh9ggv7vbc46jefvjg
+juju deploy charmed-etcd etcd --attach-storage=data/1 --attach-storage=archive/0 --config system-users=secret:cuvh9ggv7vbc46jefvjg
 ```
 
 To be able to read the password from the secret, grant secret access to the new charmed etcd application again:
@@ -310,17 +332,20 @@ Machine  State    Address         Inst id        Base          AZ  Message
 8        started  10.105.253.225  juju-84b57b-8  ubuntu@24.04      Running
 
 Storage Unit    Storage ID  Type        Pool          Mountpoint                                  Size     Status    Message
-                data/2      filesystem  etcd-storage                                              8.0 GiB  detached  
+                archive/3   filesystem  etcd-storage              8.0 GiB  detached
+                archive/6   filesystem  etcd-storage              8.0 GiB  detached                            
                 data/4      filesystem  etcd-storage                                              8.0 GiB  detached  
-charmed-etcd/8  data/0      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+                data/7      filesystem  etcd-storage                                              8.0 GiB  detached  
+charmed-etcd/8  archive/0   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached  
+charmed-etcd/8  data/1      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
 charmed-etcd/8  logs/12     filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
 ```
 
 Once the application is in active status, scale up attaching the other volumes:
 
 ```shell
-juju add-unit charmed-etcd --attach-storage=data/2
-juju add-unit charmed-etcd --attach-storage=data/4
+juju add-unit charmed-etcd --attach-storage=data/4 --attach-storage=archive/3
+juju add-unit charmed-etcd --attach-storage=data/7--attach-storage=archive/6
 ```
 
 Again: The data of these volumes will not be taken into account, they will receive a full data transfer from the leader.
@@ -350,11 +375,14 @@ Machine  State    Address         Inst id         Base          AZ  Message
 10       started  10.105.253.220  juju-84b57b-10  ubuntu@24.04      Running
 
 Storage Unit     Storage ID  Type        Pool          Mountpoint                                  Size     Status    Message
-charmed-etcd/10  data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/10  archive/6   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached
+charmed-etcd/10  data/7      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
 charmed-etcd/10  logs/14     filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
-charmed-etcd/8   data/0      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/8   archive/0   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached
+charmed-etcd/8   data/1      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
 charmed-etcd/8   logs/12     filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached  
-charmed-etcd/9   data/2      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
+charmed-etcd/9   archive/3   filesystem  etcd-storage  /var/snap/charmed-etcd/common/archive       8.0 GiB  attached
+charmed-etcd/9   data/4      filesystem  etcd-storage  /var/snap/charmed-etcd/common/var/lib/etcd  8.0 GiB  attached  
 charmed-etcd/9   logs/13     filesystem  rootfs        /var/snap/charmed-etcd/common/var/log/etcd  76 GiB   attached
 ```
 
@@ -372,12 +400,15 @@ will remove application charmed-etcd
 - will remove unit charmed-etcd/8
 - will remove unit charmed-etcd/9
 - will remove unit charmed-etcd/10
+- will remove storage archive/0
 - will remove storage logs/12
-- will remove storage data/10
+- will remove storage data/1
+- will remove storage archive/3
 - will remove storage logs/13
-- will remove storage data/2
-- will remove storage logs/14
 - will remove storage data/4
+- will remove storage archive/6
+- will remove storage logs/14
+- will remove storage data/7
 
 Continue [y/N]? y
 ```
