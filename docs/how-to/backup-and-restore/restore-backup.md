@@ -6,7 +6,7 @@
 * It is possible to restore any backup from etcd, not only from charmed etcd clusters
   * The backup file must have been created on an etcd >= v3.0
   * The backup file to restore can either be a snapshot taken with `etcdctl` or a copy of a regular etcd database file (`member/snap/db`) 
-* Integration with a storage provider [](configure-object-storage-provider.md), the backup file to be restored must be present in the configured object storage
+* Integration with an [object storage provider](configure-object-storage-provider.md), the backup file to be restored must be present in the configured object storage
 * Make sure you have enough storage on disk to download the backup file from object storage. If this is not the case, add a volume that is big enough
 	* See [How to manage persistent storage](../manage-persistent-storage.md)
 
