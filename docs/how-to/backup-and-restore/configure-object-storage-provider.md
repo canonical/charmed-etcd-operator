@@ -33,7 +33,7 @@ To deploy the `s3-integrator`, run:
 ```
 
 Once it is running, you should see an error message in the status:
-```{}terminal
+```{terminal}
 :input: juju status
 
 Model  Controller      Cloud/Region         Version  SLA          Timestamp
@@ -48,7 +48,7 @@ charmed-etcd/0*   active    idle   2        10.198.26.225
 s3-integrator/0*  blocked   idle   1        10.198.26.200          Missing parameters: ['access-key', 'secret-key']
 ```
 
-Now you need to configure the credentials for your s3 storage. Replace the placeholders and run the following command:
+Now you need to configure the credentials for your S3 storage. Replace the placeholders and run the following command:
 ```{terminal}
 :input: juju run s3-integrator/leader sync-s3-credentials access-key=<access-key> secret-key=<secret-key> 
 ```

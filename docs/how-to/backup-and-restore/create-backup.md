@@ -4,7 +4,7 @@
 * A deployment of a charmed etcd application
   * There is no minimum amount of units
   * You can even create a backup if the etcd workload is currently not running
-* Integration with a storage provider [](configure-object-storage-provider.md)
+* Integration with a storage provider, see [](configure-object-storage-provider.md)
 * Make sure you have enough storage on disk to create the backup file of your database. If this is not the case, add a volume that is big enough
 	* See [How to manage persistent storage](../manage-persistent-storage.md)
 

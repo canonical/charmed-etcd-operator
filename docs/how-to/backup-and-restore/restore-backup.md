@@ -62,6 +62,11 @@ backups: |-
 ```
 
 ## Restore a backup
+```{caution}
+Charmed etcd has a safety mechanism to avoid data loss: It verifies the restore before deleting data.
+```
+For more information, see [handle a failed restore](#handle-a-failed-restore)
+
 To restore a backup from the previously returned list, run the restore command and pass the corresponding backup-id:
 ```{terminal}
 :input: juju run charmed-etcd/leader restore backup-id="2025-06-16T16:42:45Z"
@@ -94,7 +99,6 @@ s3-integrator/0*  active       idle       0        10.188.28.139
 The charm operator will:
 * download the backup file from object storage
 * stop the etcd database on all units
-* ```{caution}Charmed etcd has a safety mechanism to avoid data loss: It verifies the restore before deleting data.``` For more information, see [handle a failed restore](#handle-a-failed-restore)
 * purge the current cluster data and restore the backup on all units
 * start the etcd database on all units and initialize the new cluster
 * enable authentication
@@ -133,7 +137,7 @@ will be cancelled and your existing cluster will continue to run as is.
 
 In this case, investigate why the restore verification fails by checking the log:
 ```{terminal}
-:input juju debug-log
+:input: juju debug-log
 Error: etcdserver: authentication failed, invalid user ID or password
 ...
 Error: unhealthy cluster
