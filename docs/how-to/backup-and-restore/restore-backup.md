@@ -2,7 +2,7 @@
 
 ## Prerequisites
 * A deployment of a charmed etcd application
-  * There is no required amount of units; the charmed operator will initialize the cluster after restore with the currently deployed Juju units
+  * There is no required amount of units; the charmed operator will initialise the cluster after restore with the currently deployed Juju units
 * It is possible to restore any backup from etcd, not only from charmed etcd clusters
   * The backup file must have been created on an etcd >= v3.0
   * The backup file to restore can either be a snapshot taken with `etcdctl` or a copy of a regular etcd database file (`member/snap/db`) 
@@ -100,7 +100,7 @@ The charm operator will:
 * download the backup file from object storage
 * stop the etcd database on all units
 * purge the current cluster data and restore the backup on all units
-* start the etcd database on all units and initialize the new cluster
+* start the etcd database on all units and initialise the new cluster
 * enable authentication
 
 Your backup has been restored.
