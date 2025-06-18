@@ -10,6 +10,7 @@ import os
 import subprocess
 from typing import Tuple
 
+import requests
 import tenacity
 
 from common.exceptions import (
@@ -646,3 +647,23 @@ class EtcdClient:
         ):
             return json.loads(result)["users"]
         return []
+
+    def get_metric(self, metric_name: str) -> str | None:
+        """Query the metric server.
+
+        Performs an http request to the internal metric server of etcd, searches the result for
+        the given metric and returns the first result found.
+
+        Args:
+            metric_name: name of the metric
+
+        Returns:
+            str: value of the metric
+        """
+        response = requests.get(self.client_url)
+        # the metrics server always returns text format, no json available
+        for line in response.text.split("\n"):
+            if metric_name in line and "#" not in line:
+                return line.split(" ")[1]
+
+        return None
