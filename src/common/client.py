@@ -660,7 +660,12 @@ class EtcdClient:
         Returns:
             str: value of the metric
         """
-        response = requests.get(self.client_url)
+        try:
+            response = requests.get(self.client_url)
+        except requests.exceptions.RequestException as e:
+            logger.error(e)
+            raise RuntimeError(e)
+
         # the metrics server always returns text format, no json available
         for line in response.text.split("\n"):
             if metric_name in line and "#" not in line:
