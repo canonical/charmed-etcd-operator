@@ -460,6 +460,58 @@ def test_removal_of_inconsistent_members():
         update_cluster_member_state.assert_not_called()
 
 
+def test_cluster_majority_failure():
+    ctx = testing.Context(EtcdOperatorCharm)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+        local_unit_data={"ip": "ip0"},
+    )
+    state_in = testing.State(relations={relation})
+
+    # happy path: metric "etcd_server_has_leader" == 1
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch("managers.cluster.EtcdClient.get_metric", return_value="1"),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+
+    # error querying the metrics (metric not found)
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch("managers.cluster.EtcdClient.get_metric", return_value=None),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+
+    # error querying the metrics (request error)
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch("managers.cluster.EtcdClient.get_metric", side_effect=RuntimeError()),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.ActiveStatus()
+
+    # cluster has failed
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("managers.cluster.ClusterManager.clean_users"),
+        patch("managers.cluster.EtcdClient.get_metric", return_value="0"),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+        assert state_out.unit_status == ops.BlockedStatus(
+            "Cluster failure - majority of cluster members lost"
+        )
+
+
 def test_peer_relation_created():
     test_data = {"hostname": "my_hostname", "ip": "my_ip"}
 

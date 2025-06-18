@@ -339,7 +339,6 @@ class EtcdEvents(Object):
         try:
             if self.charm.cluster_manager.is_cluster_failed:
                 self.charm.set_status(Status.CLUSTER_FAILED)
-                # set flag in databag
                 return
         except RuntimeError:
             # if anything fails with the metrics request, we don't want to panic
