@@ -478,7 +478,4 @@ class EtcdEvents(Object):
         if self.charm.state.cluster.is_restore_in_progress:
             return "Restore in progress, cannot perform action."
 
-        if self.charm.state.cluster.rebuild_cluster_in_progress:
-            return "Rebuilding the cluster is already in progress, cannot perform action."
-
         return ""

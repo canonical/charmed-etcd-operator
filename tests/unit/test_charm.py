@@ -814,18 +814,6 @@ def test_rebuild_cluster_action_error_cases():
 
         assert e.message == "Action must be performed on the leader unit."
 
-    # ensure action fails if rebuild-cluster already in progress
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True"},
-    )
-    state_in = testing.State(relations={peer_relation}, leader=True)
-    with raises(testing.ActionFailed) as e:
-        ctx.run(ctx.on.action("rebuild-cluster"), state_in)
-
-        assert e.message == "Rebuilding the cluster is already in progress, cannot perform action."
-
     # ensure action fails if backup is in progress
     peer_relation = testing.PeerRelation(
         id=1,
@@ -856,6 +844,28 @@ def test_rebuild_cluster_action_happy_path():
     peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
 
     state_in = testing.State(relations={peer_relation}, leader=True)
+    with (
+        patch("workload.EtcdWorkload.stop") as stop_etcd,
+        patch("workload.EtcdWorkload.disable_service") as disable_etcd,
+    ):
+        state_out = ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+
+        stop_etcd.assert_called_once()
+        disable_etcd.assert_called_once()
+        assert ctx.action_results == {"result": "cluster rebuild in progress"}
+        assert state_out.unit_status == ops.BlockedStatus(
+            "Rebuilding with new cluster configuration..."
+        )
+        assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
+        assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
+
+    # ensure action can be run multiple times
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"rebuild_cluster": "True"},
+    )
+    state_in = testing.State(relations={peer_relation}, leader=True)
     state_out = ctx.run(ctx.on.action("rebuild-cluster"), state_in)
 
     assert ctx.action_results == {"result": "cluster rebuild in progress"}
@@ -863,3 +873,87 @@ def test_rebuild_cluster_action_happy_path():
         "Rebuilding with new cluster configuration..."
     )
     assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
+
+
+def test_rebuild_cluster_workflow_synchronisation():
+    ctx = testing.Context(EtcdOperatorCharm)
+
+    # after leader initiated workflow (on_action), non-leaders will stop
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"rebuild_cluster": "True", "initial_cluster_state": "existing"},
+        local_unit_data={"state": "started"},
+    )
+    state_in = testing.State(relations={peer_relation}, leader=False)
+
+    with (
+        patch("workload.EtcdWorkload.stop") as stop_etcd,
+        patch("workload.EtcdWorkload.disable_service") as disable_etcd,
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
+
+        stop_etcd.assert_called_once()
+        disable_etcd.assert_called_once()
+        assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
+
+    # after all units are stopped, the leader initialises a new cluster and starts
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"rebuild_cluster": "True", "initial_cluster_state": "existing"},
+        local_unit_data={},
+    )
+    state_in = testing.State(relations={peer_relation}, leader=True)
+
+    with (
+        patch("workload.EtcdWorkload.write_file") as write_config,
+        patch("workload.EtcdWorkload.start") as start_etcd,
+        patch("workload.EtcdWorkload.enable_service") as enable_etcd,
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
+
+        write_config.assert_called_once()
+        start_etcd.assert_called_once()
+        enable_etcd.assert_called_once()
+        assert state_out.get_relation(1).local_unit_data.get("state") == "started"
+        assert state_out.get_relation(1).local_app_data.get("initial_cluster_state") == "new"
+
+    # after leader has initialised, non-leaders start
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"rebuild_cluster": "True", "initial_cluster_state": "new"},
+        local_unit_data={},
+    )
+    state_in = testing.State(relations={peer_relation}, leader=False)
+
+    with (
+        patch("workload.EtcdWorkload.write_file") as write_config,
+        patch("workload.EtcdWorkload.start") as start_etcd,
+        patch("workload.EtcdWorkload.enable_service") as enable_etcd,
+    ):
+        state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
+
+        write_config.assert_called_once()
+        start_etcd.assert_called_once()
+        enable_etcd.assert_called_once()
+        assert state_out.get_relation(1).local_unit_data.get("state") == "started"
+        assert state_out.get_relation(1).local_app_data.get("initial_cluster_state") == "new"
+
+    # after all units started, leader performs health check and completes workflow
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"rebuild_cluster": "True", "initial_cluster_state": "new"},
+        local_unit_data={},
+    )
+    state_in = testing.State(relations={peer_relation}, leader=False)
+
+    with patch("managers.cluster.ClusterManager.is_healthy") as health_check:
+        state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
+
+        health_check.assert_called_once()
+        assert state_out.get_relation(1).local_unit_data.get("state") == "started"
+        assert state_out.get_relation(1).local_app_data.get("initial_cluster_state") == "existing"
+        assert not state_out.get_relation(1).local_app_data.get("rebuild_cluster") == "True"
