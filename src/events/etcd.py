@@ -41,6 +41,7 @@ from literals import (
     SNAP_USER,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
+    EtcdClusterState,
     Status,
     TLSState,
     TLSType,
@@ -412,6 +413,11 @@ class EtcdEvents(Object):
             event.fail(error)
             return
 
+        logger.info("Cluster rebuild initiated.")
+        logger.info("Stopping and disabling etcd workload.")
+        # disable the service to avoid restart while workflow is in progress
+        self.charm.workload.disable_database()
+        self.charm.state.unit_server.update({"state": ""})
         self.charm.state.cluster.update({"rebuild_cluster": "True"})
         event.set_results({"result": "cluster rebuild in progress"})
 
@@ -499,7 +505,37 @@ class EtcdEvents(Object):
         with a `BlockedStatus`. Users should then investigate (e.g. force-remove a faulty unit)
         and re-run the action.
         """
-        pass
+        cluster_members = ",".join([unit.member_endpoint for unit in self.charm.state.servers])
+
+        if self.charm.unit.is_leader():
+            if not any(unit.is_started for unit in self.charm.state.servers):
+                logger.info("All units stopped - initialise new cluster configuration.")
+                self.charm.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
+                self.charm.state.cluster.update({"cluster_members": cluster_members})
+                self.charm.config_manager.set_config_properties()
+
+                logger.info("Enabling and starting etcd again.")
+                self.charm.workload.enable_database()
+                self.charm.state.unit_server.update({"state": "started"})
+            elif (
+                all(unit.is_started for unit in self.charm.state.servers)
+                and self.charm.cluster_manager.is_healthy()
+            ):
+                logger.info("All units started again - cluster rebuild completed.")
+                self.charm.state.cluster.update({"cluster_state": EtcdClusterState.EXISTING.value})
+                self.charm.state.cluster.update({"rebuild_cluster": ""})
+
+            return
+
+        if self.charm.state.cluster.cluster_state == EtcdClusterState.EXISTING.value:
+            logger.info("Stopping and disabling etcd workload.")
+            self.charm.workload.disable_database()
+            self.charm.state.unit_server.update({"state": ""})
+        elif self.charm.state.cluster.cluster_state == EtcdClusterState.NEW.value:
+            logger.info("Enabling and starting etcd again.")
+            self.charm.config_manager.set_config_properties()
+            self.charm.workload.enable_database()
+            self.charm.state.unit_server.update({"state": "started"})
 
     def _exists_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.

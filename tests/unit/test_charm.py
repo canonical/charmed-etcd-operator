@@ -866,13 +866,17 @@ def test_rebuild_cluster_action_happy_path():
         local_app_data={"rebuild_cluster": "True"},
     )
     state_in = testing.State(relations={peer_relation}, leader=True)
-    state_out = ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+    with (
+        patch("workload.EtcdWorkload.stop") as stop_etcd,
+        patch("workload.EtcdWorkload.disable_service") as disable_etcd,
+    ):
+        state_out = ctx.run(ctx.on.action("rebuild-cluster"), state_in)
 
-    assert ctx.action_results == {"result": "cluster rebuild in progress"}
-    assert state_out.unit_status == ops.BlockedStatus(
-        "Rebuilding with new cluster configuration..."
-    )
-    assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
+        assert ctx.action_results == {"result": "cluster rebuild in progress"}
+        assert state_out.unit_status == ops.BlockedStatus(
+            "Rebuilding with new cluster configuration..."
+        )
+        assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
 
 
 def test_rebuild_cluster_workflow_synchronisation():
@@ -882,7 +886,7 @@ def test_rebuild_cluster_workflow_synchronisation():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True", "initial_cluster_state": "existing"},
+        local_app_data={"rebuild_cluster": "True", "cluster_state": "existing"},
         local_unit_data={"state": "started"},
     )
     state_in = testing.State(relations={peer_relation}, leader=False)
@@ -901,7 +905,7 @@ def test_rebuild_cluster_workflow_synchronisation():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True", "initial_cluster_state": "existing"},
+        local_app_data={"rebuild_cluster": "True", "cluster_state": "existing"},
         local_unit_data={},
     )
     state_in = testing.State(relations={peer_relation}, leader=True)
@@ -917,13 +921,13 @@ def test_rebuild_cluster_workflow_synchronisation():
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
-        assert state_out.get_relation(1).local_app_data.get("initial_cluster_state") == "new"
+        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "new"
 
     # after leader has initialised, non-leaders start
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True", "initial_cluster_state": "new"},
+        local_app_data={"rebuild_cluster": "True", "cluster_state": "new"},
         local_unit_data={},
     )
     state_in = testing.State(relations={peer_relation}, leader=False)
@@ -939,21 +943,21 @@ def test_rebuild_cluster_workflow_synchronisation():
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
-        assert state_out.get_relation(1).local_app_data.get("initial_cluster_state") == "new"
+        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "new"
 
     # after all units started, leader performs health check and completes workflow
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True", "initial_cluster_state": "new"},
-        local_unit_data={},
+        local_app_data={"rebuild_cluster": "True", "cluster_state": "new"},
+        local_unit_data={"state": "started"},
     )
-    state_in = testing.State(relations={peer_relation}, leader=False)
+    state_in = testing.State(relations={peer_relation}, leader=True)
 
     with patch("managers.cluster.ClusterManager.is_healthy") as health_check:
         state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
 
         health_check.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
-        assert state_out.get_relation(1).local_app_data.get("initial_cluster_state") == "existing"
+        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "existing"
         assert not state_out.get_relation(1).local_app_data.get("rebuild_cluster") == "True"
