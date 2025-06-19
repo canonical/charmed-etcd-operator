@@ -193,8 +193,11 @@ class EtcdEvents(Object):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
-        if self.charm.state.cluster.is_restore_in_progress:
-            logger.warning("Cannot update config while database restore is in progress.")
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
+            logger.warning("Cannot update config while another operation is in progress.")
             event.defer()
             return
 
@@ -242,6 +245,10 @@ class EtcdEvents(Object):
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
         if self.charm.state.cluster.is_restore_in_progress:
+            return
+
+        if self.charm.state.cluster.rebuild_cluster_in_progress:
+            self._rebuild_cluster()
             return
 
         if self.charm.unit.is_leader():
@@ -294,8 +301,11 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
-        if self.charm.state.cluster.is_restore_in_progress:
-            logger.warning("Cannot add cluster member while database restore is in progress.")
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
+            logger.warning("Cannot add cluster member while another operation is in progress.")
             event.defer()
             return
 
@@ -332,7 +342,10 @@ class EtcdEvents(Object):
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
-        if self.charm.state.cluster.is_restore_in_progress:
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
             return
 
         if not self.charm.workload.alive():
@@ -380,8 +393,11 @@ class EtcdEvents(Object):
         if not self.charm.unit.is_leader():
             return
 
-        if self.charm.state.cluster.is_restore_in_progress:
-            logger.warning("Cannot update credentials while database restore is in progress.")
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
+            logger.warning("Cannot update credentials while another operation is in progress.")
             event.defer()
             return
 
@@ -402,7 +418,10 @@ class EtcdEvents(Object):
     def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
         """Handle removal of the data storage mount, e.g. when removing a unit."""
         if self.charm.app.planned_units() > 0:
-            if not self.charm.state.cluster.is_restore_in_progress:
+            if not (
+                self.charm.state.cluster.is_restore_in_progress
+                or self.charm.state.cluster.rebuild_cluster_in_progress
+            ):
                 # allow for unit removal when restore is in progress
                 try:
                     self.charm.cluster_manager.remove_member()
@@ -462,6 +481,25 @@ class EtcdEvents(Object):
             return
 
         self.charm.tls_events.refresh_tls_certificates_event.emit()
+
+    def _rebuild_cluster(self) -> None:
+        """Rebuild cluster with new membership configuration, to recover from majority failure.
+
+        This method handles all the logic for the rebuild-cluster workflow, initiated by running
+        the action `rebuild-cluster` on the Juju leader.
+
+        The workflow consists of the following steps:
+        - stop etcd on all units
+        - initialise the cluster with new membership configuration
+        - start etcd on all units
+        - perform a cluster health check on the Juju leader
+
+        If the health check fails or any of the units error during the process, the cluster stays
+        stuck and the flag `rebuild_cluster` in the app-databag doesn't get reset. This is shown
+        with a `BlockedStatus`. Users should then investigate (e.g. force-remove a faulty unit)
+        and re-run the action.
+        """
+        pass
 
     def _exists_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.

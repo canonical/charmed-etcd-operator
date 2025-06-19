@@ -154,8 +154,11 @@ class TLSEvents(Object):
         Args:
             event (CertificateAvailableEvent): The event object.
         """
-        if self.charm.state.cluster.is_restore_in_progress:
-            logger.warning("Cannot update certificates while database restore is in progress.")
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
+            logger.warning("Cannot update certificates while another operation is in progress.")
             event.defer()
             return
 
@@ -264,8 +267,11 @@ class TLSEvents(Object):
         Args:
             event (RelationBrokenEvent): The event object.
         """
-        if self.charm.state.cluster.is_restore_in_progress:
-            logger.warning("Cannot update certificates while database restore is in progress.")
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
+            logger.warning("Cannot update certificates while another operation is in progress.")
             event.defer()
             return
 
