@@ -668,7 +668,7 @@ class EtcdClient:
 
         # the metrics server always returns text format, no json available
         for line in response.text.split("\n"):
-            if metric_name in line and "#" not in line:
+            if metric_name in line and not line.startswith("#"):
                 return line.split(" ")[1]
 
         return None
