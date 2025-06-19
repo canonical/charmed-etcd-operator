@@ -507,6 +507,19 @@ class EtcdEvents(Object):
         """
         cluster_members = ",".join([unit.member_endpoint for unit in self.charm.state.servers])
 
+        if len(self.charm.state.servers) == 1:
+            # no need for orchestrated workflow
+            self.charm.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
+            self.charm.state.cluster.update({"cluster_members": cluster_members})
+            self.charm.config_manager.set_config_properties()
+
+            logger.info("Enabling and starting etcd again.")
+            self.charm.workload.enable_database()
+            self.charm.state.unit_server.update({"state": "started"})
+            self.charm.state.cluster.update({"cluster_state": EtcdClusterState.EXISTING.value})
+            self.charm.state.cluster.update({"rebuild_cluster": ""})
+            return
+
         if self.charm.unit.is_leader():
             if not any(unit.is_started for unit in self.charm.state.servers):
                 logger.info("All units stopped - initialise new cluster configuration.")
