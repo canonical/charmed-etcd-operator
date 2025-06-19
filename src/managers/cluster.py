@@ -385,6 +385,9 @@ class ClusterManager:
         if not self.state.cluster.cluster_state:
             status_list.append(Status.CLUSTER_INITIALIZING)
 
+        if self.state.cluster.rebuild_cluster_in_progress:
+            status_list.append(Status.CLUSTER_REBUILD_IN_PROGRESS)
+
         return status_list
 
     def get_user(self, username: str) -> dict | None:

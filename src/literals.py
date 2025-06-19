@@ -86,6 +86,9 @@ class Status(Enum):
     CLUSTER_MEMBER_NOT_PROMOTED = StatusLevel(
         MaintenanceStatus("Waiting to promote learning member"), "DEBUG"
     )
+    CLUSTER_REBUILD_IN_PROGRESS = StatusLevel(
+        BlockedStatus("Rebuilding with new cluster configuration..."), "ERROR"
+    )
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
     OBJECT_STORAGE_CONFLICT = StatusLevel(

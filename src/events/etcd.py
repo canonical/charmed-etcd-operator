@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import ops
 from ops import Object
 from ops.charm import (
+    ActionEvent,
     LeaderElectedEvent,
     RelationChangedEvent,
     RelationCreatedEvent,
@@ -83,6 +84,9 @@ class EtcdEvents(Object):
         )
         self.framework.observe(
             self.charm.on[DATA_STORAGE].storage_attached, self._on_storage_attached
+        )
+        self.framework.observe(
+            self.charm.on.rebuild_cluster_action, self._on_rebuild_cluster_action
         )
 
     def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
@@ -385,6 +389,16 @@ class EtcdEvents(Object):
             if admin_secret_id == event.secret.id:
                 self.update_admin_password(admin_secret_id)
 
+    def _on_rebuild_cluster_action(self, event: ActionEvent) -> None:
+        """Recover from majority failure by rebuilding the cluster membership configuration."""
+        if error := self._exists_preventing_reason():
+            event.set_results({"error": error})
+            event.fail(error)
+            return
+
+        self.charm.state.cluster.update({"rebuild_cluster": "True"})
+        event.set_results({"result": "cluster rebuild in progress"})
+
     def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
         """Handle removal of the data storage mount, e.g. when removing a unit."""
         if self.charm.app.planned_units() > 0:
@@ -448,3 +462,23 @@ class EtcdEvents(Object):
             return
 
         self.charm.tls_events.refresh_tls_certificates_event.emit()
+
+    def _exists_preventing_reason(self) -> str:
+        """Check if an action can be executed, if not return error message.
+
+        Returns:
+            Error message in case a preventing reason for an action exists, otherwise empty str.
+        """
+        if not self.charm.unit.is_leader():
+            return "Action must be performed on the leader unit."
+
+        if self.charm.state.cluster.is_backup_in_progress:
+            return "Backup in progress, cannot perform action."
+
+        if self.charm.state.cluster.is_restore_in_progress:
+            return "Restore in progress, cannot perform action."
+
+        if self.charm.state.cluster.rebuild_cluster_in_progress:
+            return "Rebuilding the cluster is already in progress, cannot perform action."
+
+        return ""

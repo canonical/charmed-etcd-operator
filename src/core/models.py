@@ -284,6 +284,11 @@ class EtcdCluster(RelationState):
         """Flag for failed restore verification."""
         return bool(self.relation_data.get("restore_verification_failed", ""))
 
+    @property
+    def rebuild_cluster_in_progress(self) -> bool:
+        """Flag to indicate if the cluster is being rebuilt to recover from majority failure."""
+        return bool(self.relation_data.get("rebuild_cluster", ""))
+
 
 @dataclass
 class Member:

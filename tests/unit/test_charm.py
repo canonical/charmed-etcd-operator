@@ -801,3 +801,65 @@ def test_unit_removal():
         assert not state_out.get_relation(1).local_app_data.get("authentication")
         assert not state_out.get_relation(1).local_app_data.get("cluster_state")
         assert not state_out.get_relation(1).local_app_data.get("cluster_members")
+
+
+def test_rebuild_cluster_action_error_cases():
+    ctx = testing.Context(EtcdOperatorCharm)
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    # ensure action fails if run on non-leader unit
+    state_in = testing.State(relations={peer_relation}, leader=False)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+
+        assert e.message == "Action must be performed on the leader unit."
+
+    # ensure action fails if rebuild-cluster already in progress
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"rebuild_cluster": "True"},
+    )
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+
+        assert e.message == "Rebuilding the cluster is already in progress, cannot perform action."
+
+    # ensure action fails if backup is in progress
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"backup_id": "xyz"},
+    )
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+
+        assert e.message == "Backup in progress, cannot perform action."
+
+    # ensure action fails if restore is in progress
+    peer_relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={"restore_id": "xyz"},
+    )
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with raises(testing.ActionFailed) as e:
+        ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+
+        assert e.message == "Restore in progress, cannot perform action."
+
+
+def test_rebuild_cluster_action_happy_path():
+    ctx = testing.Context(EtcdOperatorCharm)
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    state_out = ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+
+    assert ctx.action_results == {"result": "cluster rebuild in progress"}
+    assert state_out.unit_status == ops.BlockedStatus(
+        "Rebuilding with new cluster configuration..."
+    )
+    assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
