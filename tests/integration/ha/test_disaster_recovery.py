@@ -114,7 +114,7 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
                     "blocked": [Status.CLUSTER_FAILED.value.status.message],
                 },
             },
-            wait_for_exact_units=2
+            wait_for_exact_units=2,
         )
 
     # typically users would try to add a third unit to regain quorum
@@ -128,7 +128,7 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
                     "blocked": [Status.CLUSTER_FAILED.value.status.message],
                 },
             },
-            wait_for_exact_units=3
+            wait_for_exact_units=3,
         )
 
     for unit in ops_test.model.applications[APP_NAME].units:
