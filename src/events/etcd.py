@@ -375,11 +375,16 @@ class EtcdEvents(Object):
             # if anything fails with the metrics request, we don't want to panic
             pass
 
-        self.charm.cluster_manager.clean_users()
         if self.charm.unit.is_leader():
             try:
+                self.charm.cluster_manager.clean_users()
                 self.charm.cluster_manager.remove_inconsistent_members_if_required()
-            except (ValueError, EtcdClusterManagementError) as e:
+            except (
+                AttributeError,
+                ValueError,
+                EtcdClusterManagementError,
+                EtcdUserManagementError,
+            ) as e:
                 logger.error(e)
                 self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)
 
