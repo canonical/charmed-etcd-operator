@@ -523,8 +523,9 @@ class EtcdEvents(Object):
         The workflow consists of the following steps:
         - stop etcd on all units
         - initialise the cluster with new membership configuration
-        - start etcd on all units
-        - perform a cluster health check on the Juju leader
+        - start etcd on the Juju leader
+        - add other units one-by-one as new member and start it
+        - perform a cluster health check on the Juju leader after all units are added and started
 
         If the health check fails or any of the units error during the process, the cluster stays
         stuck and the flag `rebuild_cluster` in the app-databag doesn't get reset. This is shown
