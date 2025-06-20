@@ -218,7 +218,7 @@ class ClusterManager:
                 client = EtcdClient(
                     username=self.admin_user,
                     password=self.admin_password,
-                    client_url=",".join(e for e in self.cluster_endpoints),
+                    client_url=self.state.unit_server.client_url,
                 )
                 cluster_members, member_id = client.add_member_as_learner(
                     server.member_name, peer_url
@@ -373,6 +373,7 @@ class ClusterManager:
             if (
                 self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value
                 and not self.state.cluster.is_restore_in_progress
+                and not self.state.cluster.rebuild_cluster_in_progress
             ):
                 status_list.append(Status.CLUSTER_NOT_INITIALIZED)
 

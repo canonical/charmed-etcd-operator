@@ -41,7 +41,6 @@ from literals import (
     SNAP_USER,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
-    EtcdClusterState,
     Status,
     TLSState,
     TLSType,
@@ -249,8 +248,14 @@ class EtcdEvents(Object):
             return
 
         if self.charm.state.cluster.rebuild_cluster_in_progress:
-            self._rebuild_cluster()
-            return
+            try:
+                self._rebuild_cluster()
+                return
+            except EtcdClusterManagementError as e:
+                # if adding a member or promoting a learner fails, we want to re-run this again
+                logger.warning(e)
+                event.defer()
+                return
 
         if self.charm.unit.is_leader():
             if self.charm.state.cluster.learning_member:
@@ -337,6 +342,14 @@ class EtcdEvents(Object):
                 password = self.charm.workload.generate_password()
 
             self.charm.state.cluster.update({f"{INTERNAL_USER}-password": password})
+
+        try:
+            if self.charm.cluster_manager.is_cluster_failed:
+                self.charm.set_status(Status.CLUSTER_FAILED)
+                return
+        except RuntimeError:
+            # if anything fails with the metrics request, we don't want to panic
+            pass
 
         # reflect membership updates in the cluster state
         self.charm.cluster_manager.update_cluster_member_state()
@@ -505,50 +518,51 @@ class EtcdEvents(Object):
         with a `BlockedStatus`. Users should then investigate (e.g. force-remove a faulty unit)
         and re-run the action.
         """
-        cluster_members = ",".join([unit.member_endpoint for unit in self.charm.state.servers])
-
-        if len(self.charm.state.servers) == 1:
-            # no need for orchestrated workflow
-            self.charm.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
-            self.charm.state.cluster.update({"cluster_members": cluster_members})
-            self.charm.config_manager.set_config_properties()
-
-            logger.info("Enabling and starting etcd again.")
-            self.charm.workload.enable_database()
-            self.charm.state.unit_server.update({"state": "started"})
-            self.charm.state.cluster.update({"cluster_state": EtcdClusterState.EXISTING.value})
-            self.charm.state.cluster.update({"rebuild_cluster": ""})
-            return
-
         if self.charm.unit.is_leader():
             if not any(unit.is_started for unit in self.charm.state.servers):
                 logger.info("All units stopped - initialise new cluster configuration.")
-                self.charm.state.cluster.update({"cluster_state": EtcdClusterState.NEW.value})
-                self.charm.state.cluster.update({"cluster_members": cluster_members})
+                self.charm.state.cluster.update({"cluster_state": ""})
                 self.charm.config_manager.set_config_properties()
 
                 logger.info("Enabling and starting etcd again.")
-                self.charm.workload.enable_database()
-                self.charm.state.unit_server.update({"state": "started"})
+                self.charm.workload.enable_service()
+                self.charm.cluster_manager.start_member()
+                self.charm.state.unit_server.update({"rebuild_completed": "True"})
             elif (
-                all(unit.is_started for unit in self.charm.state.servers)
+                all(unit.rebuild_completed for unit in self.charm.state.servers)
                 and self.charm.cluster_manager.is_healthy()
             ):
                 logger.info("All units started again - cluster rebuild completed.")
-                self.charm.state.cluster.update({"cluster_state": EtcdClusterState.EXISTING.value})
                 self.charm.state.cluster.update({"rebuild_cluster": ""})
+
+            if self.charm.state.cluster.learning_member:
+                self.charm.cluster_manager.promote_learning_member()
+
+            for unit in self.charm.state.servers:
+                if unit.member_endpoint not in self.charm.state.cluster.cluster_members:
+                    # we only add one learner at a time to not overload the raft leader
+                    self.charm.cluster_manager.add_member(unit.unit_name)
+                    break
 
             return
 
-        if self.charm.state.cluster.cluster_state == EtcdClusterState.EXISTING.value:
+        # this is the workflow for non-leader units
+        if (
+            self.charm.state.unit_server.is_started
+            and not self.charm.state.unit_server.rebuild_completed
+        ):
             logger.info("Stopping and disabling etcd workload.")
             self.charm.workload.disable_database()
             self.charm.state.unit_server.update({"state": ""})
-        elif self.charm.state.cluster.cluster_state == EtcdClusterState.NEW.value:
+        elif (
+            self.charm.state.unit_server.member_endpoint
+            in self.charm.state.cluster.cluster_members
+        ):
             logger.info("Enabling and starting etcd again.")
             self.charm.config_manager.set_config_properties()
-            self.charm.workload.enable_database()
-            self.charm.state.unit_server.update({"state": "started"})
+            self.charm.workload.enable_service()
+            self.charm.cluster_manager.start_member()
+            self.charm.state.unit_server.update({"rebuild_completed": "True"})
 
     def _exists_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.

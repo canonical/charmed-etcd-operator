@@ -880,7 +880,7 @@ def test_rebuild_cluster_action_happy_path():
 
 
 def test_rebuild_cluster_workflow_synchronisation():
-    ctx = testing.Context(EtcdOperatorCharm)
+    ctx = testing.Context(EtcdOperatorCharm, app_name="etcd", unit_id=0)
 
     # after leader initiated workflow (on_action), non-leaders will stop
     peer_relation = testing.PeerRelation(
@@ -921,14 +921,18 @@ def test_rebuild_cluster_workflow_synchronisation():
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
-        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "new"
+        assert state_out.get_relation(1).local_unit_data.get("rebuild_completed") == "True"
 
-    # after leader has initialised, non-leaders start
+    # after leader has initialised and non-leader unit was added, it starts
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True", "cluster_state": "new"},
-        local_unit_data={},
+        local_app_data={
+            "rebuild_cluster": "True",
+            "cluster_state": "existing",
+            "cluster_members": "etcd0=http://ip0:2380,etcd1=http://ip1:2380",
+        },
+        local_unit_data={"hostname": "etcd0", "ip": "ip0"},
     )
     state_in = testing.State(relations={peer_relation}, leader=False)
 
@@ -943,14 +947,23 @@ def test_rebuild_cluster_workflow_synchronisation():
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
-        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "new"
+        assert state_out.get_relation(1).local_unit_data.get("rebuild_completed") == "True"
 
     # after all units started, leader performs health check and completes workflow
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True", "cluster_state": "new"},
-        local_unit_data={"state": "started"},
+        local_app_data={
+            "rebuild_cluster": "True",
+            "cluster_state": "existing",
+            "cluster_members": "etcd0=http://ip0:2380,etcd1=http://ip1:2380",
+        },
+        local_unit_data={
+            "state": "started",
+            "rebuild_completed": "True",
+            "hostname": "etcd0",
+            "ip": "ip0",
+        },
     )
     state_in = testing.State(relations={peer_relation}, leader=True)
 
@@ -958,6 +971,4 @@ def test_rebuild_cluster_workflow_synchronisation():
         state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
 
         health_check.assert_called_once()
-        assert state_out.get_relation(1).local_unit_data.get("state") == "started"
-        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "existing"
         assert not state_out.get_relation(1).local_app_data.get("rebuild_cluster") == "True"
