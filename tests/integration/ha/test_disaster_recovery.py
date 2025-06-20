@@ -75,9 +75,11 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
         assert unit.name.replace("/", "") in member_names, (
             f"unit {unit.name} not in cluster members"
         )
+        logger.info(f"{unit.name} in cluster members")
     assert removed_member_name not in member_names, (
         f"{removed_member_name} still in cluster members"
     )
+    logger.info(f"{removed_member_name} not in cluster members")
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
@@ -133,9 +135,12 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
         assert unit.name.replace("/", "") in member_names, (
             f"unit {unit.name} not in cluster members"
         )
+        logger.info(f"{unit.name} in cluster members")
     assert first_removed_member_name not in member_names, (
         f"{first_removed_member_name} still in cluster members"
     )
+    logger.info(f"{first_removed_member_name} not in cluster members")
     assert second_removed_member_name not in member_names, (
         f"{second_removed_member_name} still in cluster members"
     )
+    logger.info(f"{second_removed_member_name} not in cluster members")

@@ -563,6 +563,8 @@ class EtcdEvents(Object):
             self.charm.state.unit_server.member_endpoint
             in self.charm.state.cluster.cluster_members
         ):
+            logger.warning(f"Removing database file from {DATABASE_DIR} for cluster rebuild.")
+            self.charm.workload.remove_directory(DATABASE_DIR)
             logger.info("Enabling and starting etcd again.")
             self.charm.config_manager.set_config_properties()
             self.charm.workload.enable_service()
