@@ -260,6 +260,9 @@ class EtcdEvents(Object):
                 logger.warning(e)
                 event.defer()
                 return
+        elif self.charm.state.unit_server.rebuild_completed:
+            # clean up after workflow completed
+            self.charm.state.cluster.update({"rebuild_cluster": ""})
 
         if self.charm.unit.is_leader():
             if self.charm.state.cluster.learning_member:
@@ -316,7 +319,6 @@ class EtcdEvents(Object):
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
             logger.warning("Cannot add cluster member while another operation is in progress.")
-            event.defer()
             return
 
         if self.charm.unit.is_leader():
