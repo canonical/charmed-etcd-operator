@@ -508,7 +508,7 @@ def test_cluster_majority_failure():
     ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.BlockedStatus(
-            "Cluster failure - majority of cluster members lost"
+            "Cluster failure - majority of cluster members lost. Run action `rebuild-cluster` to recover."
         )
 
 

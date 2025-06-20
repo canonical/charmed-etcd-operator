@@ -125,7 +125,11 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
             apps=[APP_NAME],
             apps_full_statuses={
                 APP_NAME: {
-                    "blocked": [Status.CLUSTER_FAILED.value.status.message],
+                    "blocked": [
+                        Status.CLUSTER_FAILED.value.status.message,
+                        Status.SERVICE_NOT_RUNNING.value.status.message,
+                    ],
+                    "maintenance": [Status.CLUSTER_NOT_JOINED.value.status.message],
                 },
             },
             wait_for_exact_units=3,

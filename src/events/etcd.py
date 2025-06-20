@@ -104,6 +104,10 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
+        if self.charm.state.cluster.rebuild_cluster_in_progress:
+            logger.info("Do not start, orchestration is handled by rebuild-cluster workflow.")
+            return
+
         # check if data exists before doing any operation
         storage_reuse = self.charm.workload.exists(DATABASE_DIR)
 
@@ -436,7 +440,9 @@ class EtcdEvents(Object):
         # disable the service to avoid restart while workflow is in progress
         self.charm.workload.disable_database()
         self.charm.state.unit_server.update({"state": ""})
+        self.charm.state.unit_server.update({"rebuild_completed": ""})
         self.charm.state.cluster.update({"rebuild_cluster": "True"})
+        self.charm.state.cluster.update({"cluster_members": ""})
         event.set_results({"result": "cluster rebuild in progress"})
 
     def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
@@ -564,12 +570,19 @@ class EtcdEvents(Object):
             in self.charm.state.cluster.cluster_members
         ):
             logger.warning(f"Removing database file from {DATABASE_DIR} for cluster rebuild.")
-            self.charm.workload.remove_directory(DATABASE_DIR)
+            try:
+                self.charm.workload.remove_directory(DATABASE_DIR)
+            except FileNotFoundError:
+                logger.info(f"No database file found in {DATABASE_DIR} - nothing to remove")
             logger.info("Enabling and starting etcd again.")
             self.charm.config_manager.set_config_properties()
             self.charm.workload.enable_service()
             self.charm.cluster_manager.start_member()
             self.charm.state.unit_server.update({"rebuild_completed": "True"})
+        else:
+            # in case a previous run failed, and we run again - clean up
+            self.charm.state.unit_server.update({"state": ""})
+            self.charm.state.unit_server.update({"rebuild_completed": ""})
 
     def _exists_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.
