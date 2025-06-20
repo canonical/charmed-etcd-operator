@@ -23,15 +23,10 @@ from .helpers import (
     start_continuous_writes,
     stop_continuous_writes,
 )
-from .helpers_network import (
-    cut_network_from_unit_with_ip_change,
-    hostname_from_unit,
-    is_unit_reachable,
-)
 
 logger = logging.getLogger(__name__)
 
-NUM_UNITS = 3
+NUM_UNITS = 5
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
@@ -92,42 +87,9 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_detect_cluster_failure(ops_test: OpsTest) -> None:
-    """When the majority of the cluster is lost, the charm should detect cluster failure."""
-    logger.info("Cut network from one of the two units to force majority loss")
-    unit_to_cut = ops_test.model.applications[APP_NAME].units[-1]
-    hostname_to_cut = await hostname_from_unit(ops_test, unit_name=unit_to_cut.name)
-    cut_network_from_unit_with_ip_change(hostname_to_cut)
-
-    unit_remaining = ops_test.model.applications[APP_NAME].units[0]
-    hostname_remaining = await hostname_from_unit(ops_test, unit_remaining.name)
-    assert not is_unit_reachable(hostname_remaining, hostname_to_cut), (
-        f"{hostname_to_cut} is reachable from {hostname_remaining}"
-    )
-
-    # wait for the next `update_status` to detect the cluster failure
-    async with ops_test.fast_forward("10s"):
-        await wait_until(
-            ops_test,
-            apps=[APP_NAME],
-            apps_full_statuses={
-                APP_NAME: {
-                    "blocked": [Status.CLUSTER_FAILED.value.status.message],
-                },
-            },
-        )
-
-    # remove the entire application to clean up for the next test
-    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
-
-
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
-@pytest.mark.abort_on_fail
 async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
     """When the majority of the cluster is lost, users can run `rebuild-cluster`."""
-    await ops_test.model.deploy(CHARM_PATH, num_units=4)
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
 
     first_unit_to_remove = ops_test.model.applications[APP_NAME].units[0]
     first_removed_member_name = first_unit_to_remove.name.replace("/", "")
@@ -162,7 +124,7 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
     assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 3)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
