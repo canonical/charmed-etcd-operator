@@ -116,3 +116,64 @@ async def test_detect_cluster_failure(ops_test: OpsTest) -> None:
                 },
             },
         )
+
+    # remove the entire application to clean up for the next test
+    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
+    """When the majority of the cluster is lost, users can run `rebuild-cluster`."""
+    await ops_test.model.deploy(CHARM_PATH, num_units=4)
+    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+
+    first_unit_to_remove = ops_test.model.applications[APP_NAME].units[0]
+    first_removed_member_name = first_unit_to_remove.name.replace("/", "")
+    second_unit_to_remove = ops_test.model.applications[APP_NAME].units[1]
+    second_removed_member_name = second_unit_to_remove.name.replace("/", "")
+    logger.info(
+        f"Forcefully removing units {first_unit_to_remove.name} and {second_unit_to_remove.name}"
+    )
+
+    destroy_unit_cmd = f"remove-unit {first_unit_to_remove.name} {second_unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
+    return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
+    assert return_code == 0, "Failed to remove units"
+
+    async with ops_test.fast_forward("10s"):
+        await wait_until(
+            ops_test,
+            apps=[APP_NAME],
+            apps_full_statuses={
+                APP_NAME: {
+                    "blocked": [Status.CLUSTER_FAILED.value.status.message],
+                },
+            },
+        )
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        if await unit.is_leader_from_status():
+            leader_unit = unit
+
+    logger.info("Rebuilding cluster after majority failure")
+    rebuild_action = await leader_unit.run_action("rebuild-cluster")
+    rebuild_response = await rebuild_action.wait()
+    assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
+
+    # wait for the rebuild to be performed
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
+
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    cluster_members = get_cluster_members(endpoints)
+    member_names = [member["name"] for member in cluster_members]
+    for unit in ops_test.model.applications[APP_NAME].units:
+        assert unit.name.replace("/", "") in member_names, (
+            f"unit {unit.name} not in cluster members"
+        )
+    assert first_removed_member_name not in member_names, (
+        f"{first_removed_member_name} still in cluster members"
+    )
+    assert second_removed_member_name not in member_names, (
+        f"{second_removed_member_name} still in cluster members"
+    )
