@@ -114,6 +114,21 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
                     "blocked": [Status.CLUSTER_FAILED.value.status.message],
                 },
             },
+            wait_for_exact_units=2
+        )
+
+    # typically users would try to add a third unit to regain quorum
+    await ops_test.model.applications[APP_NAME].add_unit(count=1)
+    async with ops_test.fast_forward("10s"):
+        await wait_until(
+            ops_test,
+            apps=[APP_NAME],
+            apps_full_statuses={
+                APP_NAME: {
+                    "blocked": [Status.CLUSTER_FAILED.value.status.message],
+                },
+            },
+            wait_for_exact_units=3
         )
 
     for unit in ops_test.model.applications[APP_NAME].units:
@@ -126,7 +141,7 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
     assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 3)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=3)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
