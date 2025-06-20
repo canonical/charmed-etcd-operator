@@ -246,7 +246,7 @@ class EtcdEvents(Object):
         """Handle event received by a new unit when joining the cluster relation."""
         self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
 
-    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:  # noqa: C901
         """Handle all events related to the cluster-peer relation."""
         if self.charm.state.cluster.is_restore_in_progress:
             return
