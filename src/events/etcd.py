@@ -566,7 +566,8 @@ class EtcdEvents(Object):
             self.charm.workload.disable_database()
             self.charm.state.unit_server.update({"state": ""})
         elif (
-            self.charm.state.unit_server.member_endpoint
+            not self.charm.state.unit_server.is_started
+            and self.charm.state.unit_server.member_endpoint
             in self.charm.state.cluster.cluster_members
         ):
             logger.warning(f"Removing database file from {DATABASE_DIR} for cluster rebuild.")
