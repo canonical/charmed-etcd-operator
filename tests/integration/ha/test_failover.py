@@ -12,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_raft_leader,
@@ -42,22 +41,18 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
     if await existing_app(ops_test):
         return
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal when the leader goes down."""
@@ -139,8 +134,6 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal when the leader stops."""
@@ -225,8 +218,6 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal when the leader goes down."""
@@ -307,8 +298,6 @@ async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_full_cluster_restart(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal after all members went down."""
@@ -372,8 +361,6 @@ async def test_full_cluster_restart(ops_test: OpsTest) -> None:
         await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_DEFAULT)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_full_cluster_crash(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal after all members went down."""
@@ -437,8 +424,6 @@ async def test_full_cluster_crash(ops_test: OpsTest) -> None:
         await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_DEFAULT)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_restart_raft_leader_after_deleting_database_file(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal when the leader's data is deleted."""

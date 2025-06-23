@@ -12,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_id,
     get_cluster_members,
@@ -39,10 +38,8 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Deploy the charm with storage volume for data, allowing for skipping if already deployed."""
     # create storage to be used in this test
     # this assumes the test is run on a lxd cloud
@@ -53,14 +50,12 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     }
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS, storage=storage)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS, storage=storage)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     assert len(ops_test.model.applications[APP_NAME].units) == NUM_UNITS
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     """Make sure storage can be re-attached after removing a unit."""
@@ -119,8 +114,6 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     """Make sure storage can be re-attached after removing all units."""
@@ -187,10 +180,8 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> None:
+async def test_attach_storage_after_removing_application(charm: str, ops_test: OpsTest) -> None:
     """Make sure storage can be re-attached to a completely new etcd application."""
     # this test should only be executed with the app we deployed
     app = APP_NAME
@@ -214,7 +205,7 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
     await ops_test.model.remove_application(app, block_until_done=True)
 
     # deploy new cluster, attaching the storage from the previous last unit to the new first unit
-    deploy_cluster_with_storage_cmd = f"""deploy {CHARM_PATH} \
+    deploy_cluster_with_storage_cmd = f"""deploy {charm} \
         --model={ops_test.model.info.name} \
         --attach-storage={storage_id} \
         """

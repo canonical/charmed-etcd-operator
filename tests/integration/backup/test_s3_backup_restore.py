@@ -11,7 +11,6 @@ from literals import INTERNAL_USER
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_key,
     put_key,
@@ -29,14 +28,12 @@ PASSWORD = "some-password"
 backup_id = ""
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_and_configure(
-    ops_test: OpsTest, storage_credentials, storage_config
+    charm: str, ops_test: OpsTest, storage_credentials, storage_config
 ) -> None:
     """Deploy and configure the charm and s3-integrator."""
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await ops_test.model.deploy(S3_INTEGRATOR, channel="latest/stable", num_units=1)
     await wait_until(ops_test, apps=[S3_INTEGRATOR], apps_statuses=["blocked"])
 
@@ -56,8 +53,6 @@ async def test_deploy_and_configure(
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_s3_integration(ops_test: OpsTest, s3_bucket) -> None:
     """Integrate charm and s3-integrator."""
@@ -73,8 +68,6 @@ async def test_s3_integration(ops_test: OpsTest, s3_bucket) -> None:
     assert s3_bucket.meta.client.head_bucket(Bucket=s3_bucket.name)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_create_backup(ops_test: OpsTest) -> None:
     """Create a backup and upload to s3-storage."""
@@ -121,8 +114,6 @@ async def test_create_backup(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_restore_backup_on_same_cluster(ops_test: OpsTest) -> None:
     """Restore a backup and check if data is recovered."""
@@ -145,14 +136,12 @@ async def test_restore_backup_on_same_cluster(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_restore_backup_on_different_cluster(ops_test: OpsTest):
+async def test_restore_backup_on_different_cluster(charm: str, ops_test: OpsTest):
     """Restore a backup and check if data is recovered."""
     logger.info("Remove existing etcd cluster and deploy a new one.")
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=60)
 
     logger.info("Configure admin credentials in etcd")

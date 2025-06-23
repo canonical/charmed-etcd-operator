@@ -11,7 +11,6 @@ from literals import INTERNAL_USER, PEER_RELATION, Status
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_key,
@@ -30,14 +29,12 @@ TEST_VALUE = "42"
 backup_id = ""
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_and_configure(
-    ops_test: OpsTest, storage_credentials, storage_config
+    charm: str, ops_test: OpsTest, storage_credentials, storage_config
 ) -> None:
     """Deploy and configure the charm and s3-integrator."""
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await ops_test.model.deploy(S3_INTEGRATOR, channel="latest/stable", num_units=1)
     await wait_until(ops_test, apps=[S3_INTEGRATOR], apps_statuses=["blocked"])
 
@@ -53,8 +50,6 @@ async def test_deploy_and_configure(
     await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_s3_integration(ops_test: OpsTest, s3_bucket) -> None:
     """Integrate charm and s3-integrator."""
@@ -70,8 +65,6 @@ async def test_s3_integration(ops_test: OpsTest, s3_bucket) -> None:
     assert s3_bucket.meta.client.head_bucket(Bucket=s3_bucket.name)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_create_backup(ops_test: OpsTest) -> None:
     """Create a backup and upload to s3-storage."""
@@ -124,8 +117,6 @@ async def test_create_backup(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_restore_verification_failed(ops_test: OpsTest):
     """Restore a backup with invalid admin password."""

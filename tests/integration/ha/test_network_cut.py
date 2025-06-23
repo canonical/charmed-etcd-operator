@@ -12,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
@@ -47,17 +46,15 @@ NUM_UNITS = 3
 TLS_NAME = "self-signed-certificates"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
     if await existing_app(ops_test):
         return
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
 
@@ -65,8 +62,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 # command fails because of wrong kernel version
 # details see: https://warthogs.atlassian.net/browse/ISD-3026
 @pytest.mark.skip()
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
@@ -171,8 +166,6 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""

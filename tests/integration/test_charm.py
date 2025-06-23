@@ -11,7 +11,6 @@ from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
 
 from .helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_key,
@@ -28,16 +27,14 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
     """
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # check if all units have been added to the cluster
@@ -62,8 +59,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     assert get_key(endpoints, user=INTERNAL_USER, password=password, key=TEST_KEY) == TEST_VALUE
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_authentication(ops_test: OpsTest) -> None:
     """Assert authentication is enabled by default."""
@@ -74,8 +69,6 @@ async def test_authentication(ops_test: OpsTest) -> None:
     assert put_key(endpoints, key=TEST_KEY, value=TEST_VALUE) != "OK"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_update_admin_password(ops_test: OpsTest) -> None:
     """Assert the admin password is updated when adding a user secret to the config."""

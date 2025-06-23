@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
-CHARM_PATH = "./charmed-etcd_ubuntu@24.04-amd64.charm"
 TLS_NAME = "self-signed-certificates"
 
 
