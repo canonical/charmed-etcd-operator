@@ -542,6 +542,7 @@ class EtcdEvents(Object):
                 self.charm.state.unit_server.update({"rebuild_completed": "True"})
             elif (
                 all(unit.rebuild_completed for unit in self.charm.state.servers)
+                and not self.charm.state.cluster.learning_member
                 and self.charm.cluster_manager.is_healthy()
             ):
                 logger.info("All units started again - cluster rebuild completed.")
@@ -550,11 +551,13 @@ class EtcdEvents(Object):
             if self.charm.state.cluster.learning_member:
                 self.charm.cluster_manager.promote_learning_member()
 
-            for unit in self.charm.state.servers:
-                if unit.member_endpoint not in self.charm.state.cluster.cluster_members:
-                    # we only add one learner at a time to not overload the raft leader
-                    self.charm.cluster_manager.add_member(unit.unit_name)
-                    break
+            if self.charm.state.unit_server.rebuild_completed:
+                # after leader has started again, subsequently add all other units
+                for unit in self.charm.state.servers:
+                    if unit.member_endpoint not in self.charm.state.cluster.cluster_members:
+                        # we only add one learner at a time to not overload the raft leader
+                        self.charm.cluster_manager.add_member(unit.unit_name)
+                        break
 
             return
 
