@@ -384,6 +384,7 @@ class EtcdEvents(Object):
                 self.charm.cluster_manager.remove_inconsistent_members_if_required()
             except (
                 AttributeError,
+                KeyError,
                 ValueError,
                 EtcdClusterManagementError,
                 EtcdUserManagementError,
