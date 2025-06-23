@@ -31,7 +31,6 @@ jobs:
         shell: python
         run: |
           import json
-          import os
           import subprocess
 
           spread_jobs = (
@@ -44,7 +43,9 @@ jobs:
           jobs = []
           for job in spread_jobs:
               # Example `job`: "github-ci:ubuntu-24.04:tests/spread/test_charm.py:juju36"
-              _, runner, task, variant = job.split(":")
+              # no variant in etcd for now
+              # _, runner, task, variant = job.split(":")
+              _, runner, task = job.split(":")
               # Example: "test_charm.py"
               task = task.removeprefix("tests/spread/")
               # For IS-hosted runners
@@ -53,9 +54,9 @@ jobs:
               else:
                   architecture = "amd64"
               # Example: "test_charm.py:juju36 | amd64"
-              name = f"{task}:{variant} | {architecture}"
+              name = f"{task} | {architecture}"
               # ":" character not valid in GitHub Actions artifact
-              name_in_artifact = f"{task.replace('/', '-')}-{variant}-{architecture}"
+              name_in_artifact = f"{task.replace('/', '-')}-{architecture}"
               jobs.append({
                   "spread_job": job,
                   "name": name,
