@@ -105,22 +105,15 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
     return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
     assert return_code == 0, "Failed to remove units"
 
-    # typically users would try to add a third unit to regain quorum
-    await ops_test.model.applications[APP_NAME].add_unit(count=1)
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME],
-        apps_full_statuses={
-            APP_NAME: {
-                "blocked": [
-                    Status.CLUSTER_FAILED.value.status.message,
-                    Status.SERVICE_NOT_RUNNING.value.status.message,
-                ],
-                "maintenance": [Status.CLUSTER_NOT_JOINED.value.status.message],
+    async with ops_test.fast_forward("10s"):
+        await wait_until(
+            ops_test,
+            apps=[APP_NAME],
+            apps_full_statuses={
+                APP_NAME: {"blocked": [Status.CLUSTER_FAILED.value.status.message]},
             },
-        },
-        wait_for_exact_units=3,
-    )
+            wait_for_exact_units=2,
+        )
 
     for unit in ops_test.model.applications[APP_NAME].units:
         if await unit.is_leader_from_status():
@@ -132,7 +125,7 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
     assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=3)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
