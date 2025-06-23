@@ -1,3 +1,7 @@
+---
+relatedlinks: "[Charmhub](https://charmhub.io/charmed-etcd)"
+---
+
 # Charmed etcd documentation
 
 Etcd is a distributed, reliable key-value store for the most critical data of distributed systems. This charmed operator deploys and operates etcd on virtual machines.
@@ -12,13 +16,11 @@ This new charm is still under development on the [`edge` track](https://charmhub
 
 ## In this documentation
 
-| | |
-|--------|----------|
+|                                                                                                        |                                                                                                      |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | [Tutorial](/tutorial/index.md)</br>  Get started - a hands-on introduction to etcd for new users </br> | [How-to guides](/how-to/index.md) </br> Step-by-step guides covering key operations and common tasks |
+| [Explanation](/explanation/index.md) </br> Concepts - discussion and clarification of key topics | <!--[Reference](/reference/index) </br> Technical information - specifications, APIs, architecture -->|
 
-<!--
-| [Explanation](/explanation/index) </br> Concepts - discussion and clarification of key topics | [Reference](/reference/index) </br> Technical information - specifications, APIs, architecture |
--->
 
 ## Project and community
 
@@ -37,4 +39,5 @@ The charmed etcd operator is an open-source project that welcomes community cont
 Home <self>
 /tutorial/index
 /how-to/index
+/explanation/index
 ```
