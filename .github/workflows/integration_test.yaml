@@ -8,6 +8,11 @@ on:
           Use canonical/data-platform-workflows build_charm.yaml to build the charm(s)
         required: true
         type: string
+      allure_report:
+        description: |
+          Whether to generate Allure report
+        type: boolean
+        default: true
 
 jobs:
   collect-integration-tests:
@@ -177,7 +182,7 @@ jobs:
   allure-report:
     # TODO future improvement: use concurrency group for job
     name: Publish Allure report
-    if: ${{ input.allure_report && !cancelled() && github.event_name == 'schedule' && github.run_attempt == '1' }}
+    if: ${{ inputs.allure_report && !cancelled() && github.event_name == 'schedule' && github.run_attempt == '1' }}
     needs:
       - integration-test
     runs-on: ubuntu-latest
