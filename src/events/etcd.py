@@ -246,7 +246,7 @@ class EtcdEvents(Object):
         """Handle event received by a new unit when joining the cluster relation."""
         self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
 
-    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:  # noqa: C901
+    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
         if self.charm.state.cluster.is_restore_in_progress:
             return
@@ -260,9 +260,6 @@ class EtcdEvents(Object):
                 logger.warning(e)
                 event.defer()
                 return
-        elif self.charm.state.unit_server.rebuild_completed:
-            # clean up after workflow completed
-            self.charm.state.cluster.update({"rebuild_cluster": ""})
 
         if self.charm.unit.is_leader():
             if self.charm.state.cluster.learning_member:
@@ -514,7 +511,7 @@ class EtcdEvents(Object):
 
         self.charm.tls_events.refresh_tls_certificates_event.emit()
 
-    def _rebuild_cluster(self) -> None:
+    def _rebuild_cluster(self) -> None:  # noqa: C901
         """Rebuild cluster with new membership configuration, to recover from majority failure.
 
         This method handles all the logic for the rebuild-cluster workflow, initiated by running
@@ -561,32 +558,37 @@ class EtcdEvents(Object):
             return
 
         # this is the workflow for non-leader units
+        if not self.charm.state.cluster.cluster_members:
+            # the action was executed on the leader, cluster member configuration was cleared
+            # clean up in case a previous run failed
+            self.charm.state.unit_server.update({"rebuild_completed": ""})
+
         if (
             self.charm.state.unit_server.is_started
             and not self.charm.state.unit_server.rebuild_completed
         ):
+            # shutdown phase
             logger.info("Stopping and disabling etcd workload.")
             self.charm.workload.disable_database()
-            self.charm.state.unit_server.update({"state": ""})
-        elif (
-            not self.charm.state.unit_server.is_started
-            and self.charm.state.unit_server.member_endpoint
-            in self.charm.state.cluster.cluster_members
-        ):
             logger.warning(f"Removing database file from {DATABASE_DIR} for cluster rebuild.")
             try:
                 self.charm.workload.remove_directory(DATABASE_DIR)
             except FileNotFoundError:
                 logger.info(f"No database file found in {DATABASE_DIR} - nothing to remove")
+            self.charm.state.unit_server.update({"state": ""})
+            return
+
+        if (
+            self.charm.state.unit_server.member_endpoint
+            in self.charm.state.cluster.cluster_members
+            and not self.charm.state.unit_server.is_started
+        ):
+            # startup phase
             logger.info("Enabling and starting etcd again.")
             self.charm.config_manager.set_config_properties()
             self.charm.workload.enable_service()
             self.charm.cluster_manager.start_member()
             self.charm.state.unit_server.update({"rebuild_completed": "True"})
-        else:
-            # in case a previous run failed, and we run again - clean up
-            self.charm.state.unit_server.update({"state": ""})
-            self.charm.state.unit_server.update({"rebuild_completed": ""})
 
     def _exists_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.

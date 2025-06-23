@@ -894,11 +894,13 @@ def test_rebuild_cluster_workflow_synchronisation():
     with (
         patch("workload.EtcdWorkload.stop") as stop_etcd,
         patch("workload.EtcdWorkload.disable_service") as disable_etcd,
+        patch("workload.EtcdWorkload.remove_directory") as remove_data,
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
 
         stop_etcd.assert_called_once()
         disable_etcd.assert_called_once()
+        remove_data.assert_called_once()
         assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
 
     # after all units are stopped, the leader initialises a new cluster and starts
@@ -937,14 +939,12 @@ def test_rebuild_cluster_workflow_synchronisation():
     state_in = testing.State(relations={peer_relation}, leader=False)
 
     with (
-        patch("workload.EtcdWorkload.remove_directory") as remove_data,
         patch("workload.EtcdWorkload.write_file") as write_config,
         patch("workload.EtcdWorkload.start") as start_etcd,
         patch("workload.EtcdWorkload.enable_service") as enable_etcd,
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
 
-        remove_data.assert_called_once()
         write_config.assert_called_once()
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
