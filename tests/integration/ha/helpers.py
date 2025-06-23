@@ -12,12 +12,11 @@ from typing import Tuple
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
-from literals import DATABASE_DIR, SNAP_NAME, SNAP_REVISION
+from literals import DATABASE_DIR
 
 logger = logging.getLogger(__name__)
 
 WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
-ETCD_PROCESS = f"/snap/{SNAP_NAME}/{SNAP_REVISION}/bin/etcd"
 ETCD_SERVICE_PATH = "/etc/systemd/system/snap.charmed-etcd.etcd.service"
 
 
@@ -116,15 +115,18 @@ def assert_continuous_writes_consistent(
         logger.info(f"Continuous writes are consistent on {endpoint}.")
 
 
-def send_process_control_signal(unit_name: str, model_full_name: str, signal: str) -> None:
+def send_process_control_signal(
+    unit_name: str, model_full_name: str, signal: str, etcd_process: str
+) -> None:
     """Send control signal to an etcd-process running on a Juju unit.
 
     Args:
         unit_name: the Juju unit running the process
         model_full_name: the Juju model for the unit
         signal: the signal to issue, e.g `SIGKILL`
+        etcd_process: the path to the etcd process binary
     """
-    juju_cmd = f"JUJU_MODEL={model_full_name} juju ssh {unit_name} sudo -i 'pkill --signal {signal} -f {ETCD_PROCESS}'"
+    juju_cmd = f"JUJU_MODEL={model_full_name} juju ssh {unit_name} sudo -i 'pkill --signal {signal} -f {etcd_process}'"
 
     try:
         subprocess.check_output(
