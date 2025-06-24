@@ -435,6 +435,16 @@ class EtcdEvents(Object):
             event.fail(error)
             return
 
+        try:
+            # safeguard to avoid users wrecking fine clusters
+            if not self.charm.cluster_manager.is_cluster_failed and not event.params.get(
+                "force", ""
+            ):
+                event.fail("Cluster has not failed. Use `force` to rebuild anyway.")
+                return
+        except RuntimeError:
+            logger.warning("Could not determine if cluster failed - continue with cluster rebuild")
+
         logger.info("Cluster rebuild initiated.")
         logger.info("Stopping and disabling etcd workload.")
         # disable the service to avoid restart while workflow is in progress

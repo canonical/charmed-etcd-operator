@@ -838,6 +838,39 @@ def test_rebuild_cluster_action_error_cases():
 
         assert e.message == "Restore in progress, cannot perform action."
 
+    # cluster didn't fail and not `force`
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with patch("managers.cluster.EtcdClient.get_metric", return_value="1"):
+        with raises(testing.ActionFailed) as e:
+            ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+
+            assert e.message == "Cluster has not failed. Use `force` to rebuild anyway."
+
+    # cluster didn't fail and `force`
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with (
+        patch("managers.cluster.EtcdClient.get_metric", return_value="1"),
+        patch("workload.EtcdWorkload.stop"),
+        patch("workload.EtcdWorkload.disable_service"),
+    ):
+        ctx.run(ctx.on.action("rebuild-cluster", params={"force": True}), state_in)
+
+        assert ctx.action_results == {"result": "cluster rebuild in progress"}
+
+    # error querying metrics server
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
+    state_in = testing.State(relations={peer_relation}, leader=True)
+    with (
+        patch("managers.cluster.EtcdClient.get_metric", side_effect=RuntimeError()),
+        patch("workload.EtcdWorkload.stop"),
+        patch("workload.EtcdWorkload.disable_service"),
+    ):
+        ctx.run(ctx.on.action("rebuild-cluster"), state_in)
+
+        assert ctx.action_results == {"result": "cluster rebuild in progress"}
+
 
 def test_rebuild_cluster_action_happy_path():
     ctx = testing.Context(EtcdOperatorCharm)
@@ -845,6 +878,7 @@ def test_rebuild_cluster_action_happy_path():
 
     state_in = testing.State(relations={peer_relation}, leader=True)
     with (
+        patch("managers.cluster.EtcdClient.get_metric", return_value="0"),
         patch("workload.EtcdWorkload.stop") as stop_etcd,
         patch("workload.EtcdWorkload.disable_service") as disable_etcd,
     ):
