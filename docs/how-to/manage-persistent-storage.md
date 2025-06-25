@@ -58,8 +58,7 @@ Details about how to manage storage pools with Juju can be found [in this guide]
 The decision about using the persistent storage feature of charmed etcd has to be made at deploy time. In order to create
 persistent storage volumes, add the `--storage` option and define your storage parameters.
 
-This command will deploy a charmed etcd application with three units, create two storage volumes of 8 GB for each of them 
-and attach these volume as `data` and `archive` volume mounts:
+This command will deploy a charmed etcd application with three units, create two storage volumes of 8 GB each, and attach them as `data` and `archive` volume mounts:
 
 ```shell
 juju deploy charmed-etcd -n 3 --storage data=etcd-storage,8G,1 --storage archive=etcd-storage,8G,1
