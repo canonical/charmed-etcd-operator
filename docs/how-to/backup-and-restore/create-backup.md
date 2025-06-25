@@ -17,12 +17,12 @@ To retrieve the Juju secret that includes the current admin password, run the fo
 juju config charmed-etcd system-users
 ```
 
-You will receive the secret-uri as confirmation: 
+You will receive the secret URI as confirmation: 
 ```text
 secret:d184d2q96n7svmjrivqg
 ```
 
-Now display the secret content using this uri:
+Now display the secret content using this URI:
 ```text
 juju show-secret --reveal secret:d184d2q96n7svmjrivqg
 ```
