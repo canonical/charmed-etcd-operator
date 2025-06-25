@@ -99,7 +99,10 @@ class BackupEvents(Object):
         # make sure we have all required parameters for writing to the storage
         required_parameters = ["bucket", "endpoint", "path", "access-key", "secret-key"]
         if missing_parameters := [p for p in required_parameters if p not in s3_parameters]:
-            raise KeyError(f"Parameters missing from S3 integrator: {missing_parameters}")
+            logger.error(
+                f"Parameters missing from S3 integrator: {missing_parameters}. Please check the relation with s3-integrator."
+            )
+            return
 
         # Strip whitespaces from all parameters
         for key, value in s3_parameters.items():
@@ -148,7 +151,10 @@ class BackupEvents(Object):
         # make sure we have all required parameters for writing to the storage
         required_parameters = ["container", "storage-account", "path", "secret-key"]
         if missing_parameters := [p for p in required_parameters if p not in azure_parameters]:
-            raise KeyError(f"Parameters missing from Azure integrator: {missing_parameters}")
+            logger.error(
+                f"Parameters missing from Azure integrator: {missing_parameters}. Please check the relation with azure-storage-integrator."
+            )
+            return
 
         # Strip whitespaces from all parameters
         for key, value in azure_parameters.items():

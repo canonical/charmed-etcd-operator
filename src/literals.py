@@ -74,6 +74,12 @@ class Status(Enum):
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
     BACKUP_IN_PROGRESS = StatusLevel(MaintenanceStatus("Creating database backup..."), "DEBUG")
+    BACKUP_S3_PARAMETERS_MISSING = StatusLevel(
+        BlockedStatus("S3 parameters are missing - please provide them"), "ERROR"
+    )
+    BACKUP_AZURE_PARAMETERS_MISSING = StatusLevel(
+        BlockedStatus("Azure parameters are missing - please provide them"), "ERROR"
+    )
     CLUSTER_INITIALIZING = StatusLevel(MaintenanceStatus("Initializing etcd cluster..."), "DEBUG")
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
     CLUSTER_NOT_INITIALIZED = StatusLevel(
