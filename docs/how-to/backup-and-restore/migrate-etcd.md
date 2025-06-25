@@ -21,21 +21,20 @@ Make sure to have to correct admin password configured to your charmed etcd appl
 ## Create a backup of the previous cluster
 If you have not done already, create a backup of the etcd database or cluster you want to migrate to your charmed etcd application. For example, 
 if you have an instance of etcd running on your local machine, run this command to create the backup file:
-```{terminal}
-:input: etcdctl snapshot save standalone-etcd.db
+```text
+etcdctl snapshot save standalone-etcd.db
 ```
 
 This will create a backup file with the name `standalone-etcd.db`, which you can then upload to your object storage 
 provider. For example, use the tool `s3cmd` to upload the backup file to an existing S3 storage bucket:
 
-```{terminal}
-:input: s3cmd put standalone-etcd.db s3://<your-bucket>/etcd/ --access_key=<your-access-key> --secret_key=<your-secret-key>
+```text
+s3cmd put standalone-etcd.db s3://<your-bucket>/etcd/ --access_key=<your-access-key> --secret_key=<your-secret-key>
 ```
 
 ## Restore backup to charmed etcd
-You can list your available backups by running the `list-backups` command:
-```{terminal}
-:input: juju run charmed-etcd/leader list-backups
+You can list your available backups by running `juju run charmed-etcd/leader list-backups`:
+```text
 Running operation 11 with 1 task
   - task 12 on unit-charmed-etcd-0
 
@@ -49,9 +48,8 @@ backups: |-
 ```
 
 The backup-id `standalone-etcd.db` is the backup file you uploaded earlier, it can now be used for restoring on your
-charmed etcd application:
-```{terminal}
-:input: juju run charmed-etcd/leader restore backup-id="standalone-etcd.db"
+charmed etcd application executing `juju run charmed-etcd/leader restore backup-id="standalone-etcd.db"`:
+```text
 Running operation 13 with 1 task
   - task 14 on unit-charmed-etcd-0
 
@@ -62,9 +60,8 @@ success: restore initiated for standalone-etcd.db
 ```
 
 The cluster migration will now be executed by restoring the backup file to your charmed etcd application. You can watch 
-the progress by running the following command:
-```{terminal}
-:input: watch juju status --color
+the progress by running `juju status`:
+```text
 Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.5    unsupported  09:59:09Z
 

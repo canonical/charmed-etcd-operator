@@ -8,7 +8,7 @@
   * The backup file to restore can either be a snapshot taken with `etcdctl` or a copy of a regular etcd database file (`member/snap/db`) 
 * Integration with an [object storage provider](configure-object-storage-provider.md), the backup file to be restored must be present in the configured object storage
 * Make sure you have enough storage on disk to download the backup file from object storage. If this is not the case, add a volume that is big enough
-	* See [How to manage persistent storage](../manage-persistent-storage.md)
+  * See [](../manage-persistent-storage.md)
 
 ## Apply cluster credentials
 For security reasons, charm credentials are not stored inside backups. So, when you restore a backup file from an etcd
@@ -16,17 +16,20 @@ cluster that had authentication enabled, **you will need the admin user's passwo
 
 Charmed etcd will enable authentication by default after restoring a backup. It will either use the credentials that are
 already configured to the deployed charmed etcd application, or automatically generate an admin password if none is provided.
-For further information, see [manage passwords](../manage-passwords.md).
+For more information, see [](../manage-passwords.md).
 
-To retrieve the Juju secret that includes the current admin password, run the following command:
-```{terminal}
-:input: juju config charmed-etcd system-users
+To retrieve the Juju secret that includes the current admin password, run `juju config charmed-etcd system-users`:
+```text
 secret:d184d2q96n7svmjrivqg
 ```
 
 Now display the secret content:
-```{terminal}
-:input: juju show-secret --reveal secret:d184d2q96n7svmjrivqg
+```text
+juju show-secret --reveal secret:d184d2q96n7svmjrivqg
+```
+
+The output should include the admin password for the `root` user:
+```text
 d184d2q96n7svmjrivqg:
   name: mysecret
   [...]
@@ -38,18 +41,16 @@ d184d2q96n7svmjrivqg:
 To change the admin password of the `root` user, run the following command (using your correct admin password from the 
 time the backup was taken):
 
-```{terminal}
-:input: juju update-secret mysecret root=changeme
+```text
+juju update-secret mysecret root=changeme
 ```
 
 If you restore a backup that was taken from the same cluster and the admin password has not changed since then, you do 
 not need to apply the credentials.
 
 ## List backups
-You can list your available backups by running the `list-backups` command:
-```{terminal}
-:input: $ juju run charmed-etcd/leader list-backups
-
+You can list your available backups by running `juju run charmed-etcd/leader list-backups`:
+```text
 Running operation 6 with 1 task
   - task 7 on unit-charmed-etcd-0
 
@@ -68,8 +69,12 @@ Charmed etcd has a safety mechanism to avoid data loss: It verifies the restore 
 For more information, see [handle a failed restore](#handle-a-failed-restore)
 
 To restore a backup from the previously returned list, run the restore command and pass the corresponding backup-id:
-```{terminal}
-:input: juju run charmed-etcd/leader restore backup-id="2025-06-16T16:42:45Z"
+```text
+juju run charmed-etcd/leader restore backup-id="2025-06-16T16:42:45Z"
+```
+
+Check the output to see if the restore was initiated:
+```text
 Running operation 5 with 1 task
   - task 6 on unit-charmed-etcd-0
 
@@ -79,9 +84,8 @@ Waiting for task 6...
 success: restore initiated for 2025-06-16T16:42:45Z
 ```
 
-Your restore will then be in progress. You can watch its progress by running the following command:
-```{terminal}
-:input: watch juju status --color
+Your restore will then be in progress. You can watch its progress by running `juju status`:
+```text
 Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.5    unsupported  07:17:08Z
 
@@ -115,9 +119,8 @@ Possible reasons for a failed restore could be (among others):
 * the configured cluster credentials are not correct
 * the health check fails after restoring the backup and restarting etcd on this unit
 
-If the restore verification fails, you will see the following status for your charmed etcd application:
-```{terminal}
-:input: watch juju status --color
+If the restore verification fails, you will see the following status for your charmed etcd application with `juju status`:
+```text
 Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.5    unsupported  07:36:01Z
 
@@ -136,8 +139,7 @@ If this happens, **the charmed operator will not purge the data of your existing
 will be cancelled and your existing cluster will continue to run as is.
 
 In this case, investigate why the restore verification fails by checking the log:
-```{terminal}
-:input: juju debug-log
+```text
 Error: etcdserver: authentication failed, invalid user ID or password
 ...
 Error: unhealthy cluster
