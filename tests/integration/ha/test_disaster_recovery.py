@@ -143,3 +143,41 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
         f"{second_removed_member_name} still in cluster members"
     )
     logger.info(f"{second_removed_member_name} not in cluster members")
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
+    """Users can run `rebuild-cluster` on a healthy cluster if the use the `force` parameter."""
+    logger.info("Scale up to HA cluster again")
+    await ops_test.model.applications[APP_NAME].add_unit(count=1)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        if await unit.is_leader_from_status():
+            leader_unit = unit
+
+    logger.info("Executing rebuild-cluster on healthy cluster - this should fail")
+    rebuild_action = await leader_unit.run_action("rebuild-cluster")
+    rebuild_response = await rebuild_action.wait()
+    assert rebuild_response.results.get("return-code") == 1, (
+        "rebuild was allowed on healthy cluster"
+    )
+
+    logger.info("Try again with `force` option")
+    rebuild_action = await leader_unit.run_action("rebuild-cluster", **{"force": True})
+    rebuild_response = await rebuild_action.wait()
+    assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
+
+    # wait for the rebuild to be performed
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    cluster_members = get_cluster_members(endpoints)
+    member_names = [member["name"] for member in cluster_members]
+    for unit in ops_test.model.applications[APP_NAME].units:
+        assert unit.name.replace("/", "") in member_names, (
+            f"unit {unit.name} not in cluster members"
+        )
+        logger.info(f"{unit.name} in cluster members")
