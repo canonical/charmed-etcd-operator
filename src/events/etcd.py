@@ -19,6 +19,7 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 from ops.model import ModelError, SecretNotFoundError
+from requests.exceptions import RequestException
 
 from common.exceptions import (
     EtcdAuthNotEnabledError,
@@ -350,7 +351,7 @@ class EtcdEvents(Object):
             if self.charm.cluster_manager.is_cluster_failed:
                 self.charm.set_status(Status.CLUSTER_FAILED)
                 return
-        except RuntimeError:
+        except RequestException:
             # if anything fails with the metrics request, we don't want to panic
             pass
 
@@ -374,7 +375,7 @@ class EtcdEvents(Object):
             if self.charm.cluster_manager.is_cluster_failed:
                 self.charm.set_status(Status.CLUSTER_FAILED)
                 return
-        except RuntimeError:
+        except RequestException:
             # if anything fails with the metrics request, we don't want to panic
             pass
 
@@ -442,7 +443,7 @@ class EtcdEvents(Object):
             ):
                 event.fail("Cluster has not failed. Use `force` to rebuild anyway.")
                 return
-        except RuntimeError:
+        except RequestException:
             logger.warning("Could not determine if cluster failed - continue with cluster rebuild")
 
         logger.info("Cluster rebuild initiated.")

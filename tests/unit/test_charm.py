@@ -11,6 +11,7 @@ import ops
 import yaml
 from ops import testing
 from pytest import raises
+from requests.exceptions import RequestException
 
 from charm import EtcdOperatorCharm
 from common.exceptions import (
@@ -495,7 +496,7 @@ def test_cluster_majority_failure():
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("managers.cluster.ClusterManager.clean_users"),
-        patch("managers.cluster.EtcdClient.get_metric", side_effect=RuntimeError()),
+        patch("managers.cluster.EtcdClient.get_metric", side_effect=RequestException()),
     ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
@@ -863,7 +864,7 @@ def test_rebuild_cluster_action_error_cases():
     peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
     state_in = testing.State(relations={peer_relation}, leader=True)
     with (
-        patch("managers.cluster.EtcdClient.get_metric", side_effect=RuntimeError()),
+        patch("managers.cluster.EtcdClient.get_metric", side_effect=RequestException()),
         patch("workload.EtcdWorkload.stop"),
         patch("workload.EtcdWorkload.disable_service"),
     ):

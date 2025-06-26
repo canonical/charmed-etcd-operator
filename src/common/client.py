@@ -664,7 +664,7 @@ class EtcdClient:
             response = requests.get(self.client_url)
         except requests.exceptions.RequestException as e:
             logger.error(e)
-            raise RuntimeError(e)
+            raise
 
         # the metrics server always returns text format, no json available
         for line in response.text.split("\n"):
