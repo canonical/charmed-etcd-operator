@@ -158,7 +158,9 @@ class TLSEvents(Object):
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
-            logger.warning("Cannot update certificates while another operation is in progress.")
+            logger.warning(
+                "Cannot update certificates while a restore or cluster-rebuild operation is in progress."
+            )
             event.defer()
             return
 
@@ -271,7 +273,9 @@ class TLSEvents(Object):
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
-            logger.warning("Cannot update certificates while another operation is in progress.")
+            logger.warning(
+                "Cannot update certificates while a restore or cluster-rebuild operation is in progress."
+            )
             event.defer()
             return
 

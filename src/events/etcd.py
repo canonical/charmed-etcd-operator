@@ -202,7 +202,9 @@ class EtcdEvents(Object):
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
-            logger.warning("Cannot update config while another operation is in progress.")
+            logger.warning(
+                "Cannot update config while a restore or cluster-rebuild operation is in progress."
+            )
             event.defer()
             return
 
@@ -255,12 +257,12 @@ class EtcdEvents(Object):
         if self.charm.state.cluster.rebuild_cluster_in_progress:
             try:
                 self._rebuild_cluster()
-                return
             except EtcdClusterManagementError as e:
                 # if adding a member or promoting a learner fails, we want to re-run this again
                 logger.warning(e)
                 event.defer()
-                return
+
+            return
 
         if self.charm.unit.is_leader():
             if self.charm.state.cluster.learning_member:
@@ -316,7 +318,9 @@ class EtcdEvents(Object):
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
-            logger.warning("Cannot add cluster member while another operation is in progress.")
+            logger.warning(
+                "Cannot add cluster member while a restore or cluster-rebuild operation is in progress."
+            )
             return
 
         if self.charm.unit.is_leader():
@@ -421,7 +425,9 @@ class EtcdEvents(Object):
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
-            logger.warning("Cannot update credentials while another operation is in progress.")
+            logger.warning(
+                "Cannot update credentials while a restore or cluster-rebuild operation is in progress."
+            )
             event.defer()
             return
 
@@ -431,7 +437,7 @@ class EtcdEvents(Object):
 
     def _on_rebuild_cluster_action(self, event: ActionEvent) -> None:
         """Recover from majority failure by rebuilding the cluster membership configuration."""
-        if error := self._exists_preventing_reason():
+        if error := self._check_rebuild_preventing_reason():
             event.set_results({"error": error})
             event.fail(error)
             return
@@ -439,7 +445,7 @@ class EtcdEvents(Object):
         try:
             # safeguard to avoid users wrecking fine clusters
             if not self.charm.cluster_manager.is_cluster_failed and not event.params.get(
-                "force", ""
+                "force", False
             ):
                 event.fail("Cluster has not failed. Use `force` to rebuild anyway.")
                 return
@@ -605,7 +611,7 @@ class EtcdEvents(Object):
             self.charm.cluster_manager.start_member()
             self.charm.state.unit_server.update({"rebuild_completed": "True"})
 
-    def _exists_preventing_reason(self) -> str:
+    def _check_rebuild_preventing_reason(self) -> str:
         """Check if an action can be executed, if not return error message.
 
         Returns:
