@@ -20,10 +20,12 @@ from ops import Object, Relation, Unit
 
 from core.models import EtcdCluster, EtcdServer
 from literals import (
+    AZURE_RELATION_NAME,
     CLIENT_TLS_RELATION_NAME,
     EXTERNAL_CLIENTS_RELATION,
     PEER_RELATION,
     PEER_TLS_RELATION_NAME,
+    S3_RELATION_NAME,
     SECRETS_APP,
     SUBSTRATES,
 )
@@ -127,6 +129,16 @@ class ClusterState(Object):
     def tls_client_certificate(self) -> ProviderCertificate:
         """Get the client TLS certificates interface."""
         return self.charm.tls_events.client_certificate.get_assigned_certificates()[0][0]
+
+    @property
+    def s3_relation(self) -> Relation | None:
+        """Get the S3 integrator relation."""
+        return self.model.get_relation(S3_RELATION_NAME)
+
+    @property
+    def azure_relation(self) -> Relation | None:
+        """Get the Azure integrator relation."""
+        return self.model.get_relation(AZURE_RELATION_NAME)
 
     @property
     def can_restore_workflow_proceed(self) -> bool:

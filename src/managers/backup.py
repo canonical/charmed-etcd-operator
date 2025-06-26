@@ -403,4 +403,10 @@ class BackupManager:
         if self.state.cluster.s3_credentials and self.state.cluster.azure_credentials:
             status_list.append(Status.OBJECT_STORAGE_CONFLICT)
 
+        if self.state.s3_relation and not self.state.cluster.s3_credentials:
+            status_list.append(Status.BACKUP_S3_PARAMETERS_MISSING)
+
+        if self.state.azure_relation and not self.state.cluster.azure_credentials:
+            status_list.append(Status.BACKUP_AZURE_PARAMETERS_MISSING)
+
         return status_list

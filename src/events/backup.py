@@ -99,7 +99,10 @@ class BackupEvents(Object):
         # make sure we have all required parameters for writing to the storage
         required_parameters = ["bucket", "endpoint", "path", "access-key", "secret-key"]
         if missing_parameters := [p for p in required_parameters if p not in s3_parameters]:
-            raise KeyError(f"Parameters missing from S3 integrator: {missing_parameters}")
+            logger.error(
+                f"Parameters missing from S3 integrator: {missing_parameters}. Please check the relation with s3-integrator."
+            )
+            return
 
         # Strip whitespaces from all parameters
         for key, value in s3_parameters.items():
@@ -148,7 +151,10 @@ class BackupEvents(Object):
         # make sure we have all required parameters for writing to the storage
         required_parameters = ["container", "storage-account", "path", "secret-key"]
         if missing_parameters := [p for p in required_parameters if p not in azure_parameters]:
-            raise KeyError(f"Parameters missing from Azure integrator: {missing_parameters}")
+            logger.error(
+                f"Parameters missing from Azure integrator: {missing_parameters}. Please check the relation with azure-storage-integrator."
+            )
+            return
 
         # Strip whitespaces from all parameters
         for key, value in azure_parameters.items():
@@ -362,26 +368,16 @@ class BackupEvents(Object):
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
 
-        if self.charm.model.get_relation(AZURE_RELATION_NAME) and self.charm.model.get_relation(
-            S3_RELATION_NAME
-        ):
+        if self.charm.state.azure_relation and self.charm.state.s3_relation:
             return "Azure and S3 storages configured - please remove one."
 
-        if not self.charm.model.get_relation(
-            AZURE_RELATION_NAME
-        ) and not self.charm.model.get_relation(S3_RELATION_NAME):
+        if not self.charm.state.azure_relation and not self.charm.state.s3_relation:
             return "No object storage configured - please add Azure or S3 relation."
 
-        if (
-            self.charm.model.get_relation(S3_RELATION_NAME)
-            and not self.charm.state.cluster.s3_credentials
-        ):
+        if self.charm.state.s3_relation and not self.charm.state.cluster.s3_credentials:
             return "No credentials for S3 object storage available."
 
-        if (
-            self.charm.model.get_relation(AZURE_RELATION_NAME)
-            and not self.charm.state.cluster.azure_credentials
-        ):
+        if self.charm.state.azure_relation and not self.charm.state.cluster.azure_credentials:
             return "No credentials for Azure object storage available."
 
         if self.charm.state.cluster.is_backup_in_progress:
