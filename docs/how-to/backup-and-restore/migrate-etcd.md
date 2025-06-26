@@ -10,13 +10,15 @@ You can migrate different types of etcd clusters to charmed etcd:
 Restoring a backup from a previous cluster to charmed etcd requires:
 * A charmed etcd application deployment with your desired amount of units
 * An etcd backup file from the previous cluster with min. version 3.0 of etcd
-* Integration with an [object storage provider](configure-object-storage-provider.md) and all configuration set
+* Integration with an [](configure-object-storage-provider.md) and all configuration set
 * The backup file from the previous cluster must be present in the configured object storage
 * Make sure you have enough storage on disk to download the backup file from object storage. If this is not the case, add a volume that is big enough
-	* See [How to manage persistent storage](../manage-persistent-storage.md)
+	* See [](../manage-persistent-storage.md)
 
 ## Apply cluster credentials
-Make sure to have to correct admin password configured to your charmed etcd application. Please see [this link](restore-backup.md/#apply-cluster-credentials) for more information.
+```{caution}
+Make sure to have to correct admin password configured to your charmed etcd application. Please see [](restore-backup.md/#apply-cluster-credentials) for more information.
+```
 
 ## Create a backup of the previous cluster
 If you have not done already, create a backup of the etcd database or cluster you want to migrate to your charmed etcd application. For example, 

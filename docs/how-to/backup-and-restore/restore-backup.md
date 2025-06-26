@@ -6,13 +6,15 @@
 * It is possible to restore any backup from etcd, not only from charmed etcd clusters
   * The backup file must have been created on an etcd >= v3.0
   * The backup file to restore can either be a snapshot taken with `etcdctl` or a copy of a regular etcd database file (`member/snap/db`) 
-* Integration with an [object storage provider](configure-object-storage-provider.md), the backup file to be restored must be present in the configured object storage
+* Integration with an [](configure-object-storage-provider.md), the backup file to be restored must be present in the configured object storage
 * Make sure you have enough storage on disk to download the backup file from object storage. If this is not the case, add a volume that is big enough
   * See [](../manage-persistent-storage.md)
 
 ## Apply cluster credentials
+```{caution}
 For security reasons, charm credentials are not stored inside backups. So, when you restore a backup file from an etcd
 cluster that had authentication enabled, **you will need the admin user's password for the cluster the backup was taken from**.
+```
 
 Charmed etcd will enable authentication by default after restoring a backup. It will either use the credentials that are
 already configured to the deployed charmed etcd application, or automatically generate an admin password if none is provided.
