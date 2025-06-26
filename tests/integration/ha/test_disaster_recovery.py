@@ -152,7 +152,7 @@ async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
     """Users can run `rebuild-cluster` on a healthy cluster if the use the `force` parameter."""
     logger.info("Scale up to HA cluster again")
     await ops_test.model.applications[APP_NAME].add_unit(count=1)
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=3)
 
     for unit in ops_test.model.applications[APP_NAME].units:
         if await unit.is_leader_from_status():
@@ -171,7 +171,7 @@ async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
     assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=3)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
