@@ -10,7 +10,7 @@ on:
 
 jobs:
   tiobe-scan:
-    runs-on: [self-hosted, linux, tiobe]
+    runs-on: [self-hosted, linux, amd64, tiobe, noble]
 
     steps:
       - name: Checkout the project
