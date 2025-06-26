@@ -38,12 +38,15 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 REQUIRER_NAME = "requirer-charm"
 REQUIRER_TLS_NAME = "requirer-tls-provider"
-REQUIRER_CHARM_PATH = (
-    "./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-amd64.charm"
-)
 
 common_name = REQUIRER_NAME
 key_prefix = "/test/"
+
+
+@pytest.fixture
+def requirer_charm(platform: str) -> str:
+    """Path to the requirer charm file to use for testing."""
+    return f"./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-{platform}.charm"
 
 
 def generate_mtls_chain(common_name: str) -> str:
@@ -87,11 +90,11 @@ async def get_requirer_leaf_certificate(ops_test: OpsTest) -> str | None:
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, requirer_charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm-under-test and the requirer charm."""
     tls_config = {"ca-common-name": "etcd"}
     await asyncio.gather(
-        ops_test.model.deploy(REQUIRER_CHARM_PATH, application_name=REQUIRER_NAME),
+        ops_test.model.deploy(requirer_charm, application_name=REQUIRER_NAME),
         ops_test.model.deploy(charm, num_units=NUM_UNITS),
         ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config),
         ops_test.model.deploy(
