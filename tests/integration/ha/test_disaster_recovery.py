@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 NUM_UNITS = 5
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -45,7 +45,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> None:
@@ -86,7 +86,7 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
@@ -145,7 +145,7 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
     logger.info(f"{second_removed_member_name} not in cluster members")
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
