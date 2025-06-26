@@ -161,14 +161,13 @@ async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
     logger.info("Executing rebuild-cluster on healthy cluster - this should fail")
     rebuild_action = await leader_unit.run_action("rebuild-cluster")
     rebuild_response = await rebuild_action.wait()
-    assert rebuild_response.results.get("return-code") == 1, (
-        "rebuild was allowed on healthy cluster"
-    )
+    assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
+    assert rebuild_response.status == "failed"
 
     logger.info("Try again with `force` option")
-    rebuild_action = await leader_unit.run_action("rebuild-cluster", **{"force": True})
-    rebuild_response = await rebuild_action.wait()
-    assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
+    rebuild_force_action = await leader_unit.run_action("rebuild-cluster", **{"force": True})
+    rebuild_force_response = await rebuild_force_action.wait()
+    assert rebuild_force_response.results.get("return-code") == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=3)
