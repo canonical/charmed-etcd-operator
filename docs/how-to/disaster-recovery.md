@@ -42,7 +42,7 @@ Charmed etcd provides a mechanism to recover from majority failure. It can be ex
 This will:
 - stop the cluster
 - keep existing data
-- re-initialize the cluster members 
+- re-initialise the cluster members 
 - form a new cluster with the remaining, functional units and the existing data
 
 ```{caution}
