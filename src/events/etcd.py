@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import ops
 from ops import Object
 from ops.charm import (
+    ActionEvent,
     LeaderElectedEvent,
     RelationChangedEvent,
     RelationCreatedEvent,
@@ -18,6 +19,7 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 from ops.model import ModelError, SecretNotFoundError
+from requests.exceptions import RequestException
 
 from common.exceptions import (
     EtcdAuthNotEnabledError,
@@ -84,6 +86,9 @@ class EtcdEvents(Object):
         self.framework.observe(
             self.charm.on[DATA_STORAGE].storage_attached, self._on_storage_attached
         )
+        self.framework.observe(
+            self.charm.on.rebuild_cluster_action, self._on_rebuild_cluster_action
+        )
 
     def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
         """Handle storage attachment."""
@@ -100,6 +105,10 @@ class EtcdEvents(Object):
 
     def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
+        if self.charm.state.cluster.rebuild_cluster_in_progress:
+            logger.info("Do not start, orchestration is handled by rebuild-cluster workflow.")
+            return
+
         # check if data exists before doing any operation
         storage_reuse = self.charm.workload.exists(DATABASE_DIR)
 
@@ -189,8 +198,13 @@ class EtcdEvents(Object):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
-        if self.charm.state.cluster.is_restore_in_progress:
-            logger.warning("Cannot update config while database restore is in progress.")
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
+            logger.warning(
+                "Cannot update config while a restore or cluster-rebuild operation is in progress."
+            )
             event.defer()
             return
 
@@ -238,6 +252,16 @@ class EtcdEvents(Object):
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""
         if self.charm.state.cluster.is_restore_in_progress:
+            return
+
+        if self.charm.state.cluster.rebuild_cluster_in_progress:
+            try:
+                self._rebuild_cluster()
+            except EtcdClusterManagementError as e:
+                # if adding a member or promoting a learner fails, we want to re-run this again
+                logger.warning(e)
+                event.defer()
+
             return
 
         if self.charm.unit.is_leader():
@@ -290,9 +314,13 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle event received by all units when a new unit joins the cluster relation."""
-        if self.charm.state.cluster.is_restore_in_progress:
-            logger.warning("Cannot add cluster member while database restore is in progress.")
-            event.defer()
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
+            logger.warning(
+                "Cannot add cluster member while a restore or cluster-rebuild operation is in progress."
+            )
             return
 
         if self.charm.unit.is_leader():
@@ -323,12 +351,23 @@ class EtcdEvents(Object):
 
             self.charm.state.cluster.update({f"{INTERNAL_USER}-password": password})
 
+        try:
+            if self.charm.cluster_manager.is_cluster_failed:
+                self.charm.set_status(Status.CLUSTER_FAILED)
+                return
+        except RequestException:
+            # if anything fails with the metrics request, we don't want to panic
+            pass
+
         # reflect membership updates in the cluster state
         self.charm.cluster_manager.update_cluster_member_state()
 
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
-        if self.charm.state.cluster.is_restore_in_progress:
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
             return
 
         if not self.charm.workload.alive():
@@ -336,11 +375,25 @@ class EtcdEvents(Object):
                 self.charm.set_status(Status.SERVICE_NOT_RUNNING)
                 return
 
-        self.charm.cluster_manager.clean_users()
+        try:
+            if self.charm.cluster_manager.is_cluster_failed:
+                self.charm.set_status(Status.CLUSTER_FAILED)
+                return
+        except RequestException:
+            # if anything fails with the metrics request, we don't want to panic
+            pass
+
         if self.charm.unit.is_leader():
             try:
+                self.charm.cluster_manager.clean_users()
                 self.charm.cluster_manager.remove_inconsistent_members_if_required()
-            except (ValueError, EtcdClusterManagementError) as e:
+            except (
+                AttributeError,
+                KeyError,
+                ValueError,
+                EtcdClusterManagementError,
+                EtcdUserManagementError,
+            ) as e:
                 logger.error(e)
                 self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)
 
@@ -368,8 +421,13 @@ class EtcdEvents(Object):
         if not self.charm.unit.is_leader():
             return
 
-        if self.charm.state.cluster.is_restore_in_progress:
-            logger.warning("Cannot update credentials while database restore is in progress.")
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+        ):
+            logger.warning(
+                "Cannot update credentials while a restore or cluster-rebuild operation is in progress."
+            )
             event.defer()
             return
 
@@ -377,10 +435,40 @@ class EtcdEvents(Object):
             if admin_secret_id == event.secret.id:
                 self.update_admin_password(admin_secret_id)
 
+    def _on_rebuild_cluster_action(self, event: ActionEvent) -> None:
+        """Recover from majority failure by rebuilding the cluster membership configuration."""
+        if error := self._check_rebuild_preventing_reason():
+            event.set_results({"error": error})
+            event.fail(error)
+            return
+
+        try:
+            # safeguard to avoid users wrecking fine clusters
+            if not self.charm.cluster_manager.is_cluster_failed and not event.params.get(
+                "force", False
+            ):
+                event.fail("Cluster has not failed. Use `force` to rebuild anyway.")
+                return
+        except RequestException:
+            logger.warning("Could not determine if cluster failed - continue with cluster rebuild")
+
+        logger.info("Cluster rebuild initiated.")
+        logger.info("Stopping and disabling etcd workload.")
+        # disable the service to avoid restart while workflow is in progress
+        self.charm.workload.disable_database()
+        self.charm.state.unit_server.update({"state": ""})
+        self.charm.state.unit_server.update({"rebuild_completed": ""})
+        self.charm.state.cluster.update({"rebuild_cluster": "True"})
+        self.charm.state.cluster.update({"cluster_members": ""})
+        event.set_results({"result": "cluster rebuild in progress"})
+
     def _on_storage_detaching(self, event: ops.StorageDetachingEvent) -> None:
         """Handle removal of the data storage mount, e.g. when removing a unit."""
         if self.charm.app.planned_units() > 0:
-            if not self.charm.state.cluster.is_restore_in_progress:
+            if not (
+                self.charm.state.cluster.is_restore_in_progress
+                or self.charm.state.cluster.rebuild_cluster_in_progress
+            ):
                 # allow for unit removal when restore is in progress
                 try:
                     self.charm.cluster_manager.remove_member()
@@ -440,3 +528,102 @@ class EtcdEvents(Object):
             return
 
         self.charm.tls_events.refresh_tls_certificates_event.emit()
+
+    def _rebuild_cluster(self) -> None:  # noqa: C901
+        """Rebuild cluster with new membership configuration, to recover from majority failure.
+
+        This method handles all the logic for the rebuild-cluster workflow, initiated by running
+        the action `rebuild-cluster` on the Juju leader.
+
+        The workflow consists of the following steps:
+        - stop etcd on all units
+        - initialise the cluster with new membership configuration
+        - start etcd on the Juju leader
+        - add other units one-by-one as new member and start it
+        - perform a cluster health check on the Juju leader after all units are added and started
+
+        If the health check fails or any of the units error during the process, the cluster stays
+        stuck and the flag `rebuild_cluster` in the app-databag doesn't get reset. This is shown
+        with a `BlockedStatus`. Users should then investigate (e.g. force-remove a faulty unit)
+        and re-run the action.
+        """
+        if self.charm.unit.is_leader():
+            if not any(unit.is_started for unit in self.charm.state.servers):
+                logger.info("All units stopped - initialise new cluster configuration.")
+                self.charm.state.cluster.update({"cluster_state": ""})
+                self.charm.config_manager.set_config_properties()
+
+                logger.info("Enabling and starting etcd again.")
+                self.charm.workload.enable_service()
+                self.charm.cluster_manager.start_member()
+                self.charm.state.unit_server.update({"rebuild_completed": "True"})
+            elif (
+                all(unit.rebuild_completed for unit in self.charm.state.servers)
+                and not self.charm.state.cluster.learning_member
+                and self.charm.cluster_manager.is_healthy()
+            ):
+                logger.info("All units started again - cluster rebuild completed.")
+                self.charm.state.cluster.update({"rebuild_cluster": ""})
+
+            if self.charm.state.cluster.learning_member:
+                self.charm.cluster_manager.promote_learning_member()
+
+            if self.charm.state.unit_server.rebuild_completed:
+                # after leader has started again, subsequently add all other units
+                for unit in self.charm.state.servers:
+                    if unit.member_endpoint not in self.charm.state.cluster.cluster_members:
+                        # we only add one learner at a time to not overload the raft leader
+                        self.charm.cluster_manager.add_member(unit.unit_name)
+                        break
+
+            return
+
+        # this is the workflow for non-leader units
+        if not self.charm.state.cluster.cluster_members:
+            # the action was executed on the leader, cluster member configuration was cleared
+            # clean up in case a previous run failed
+            self.charm.state.unit_server.update({"rebuild_completed": ""})
+
+        if (
+            self.charm.state.unit_server.is_started
+            and not self.charm.state.unit_server.rebuild_completed
+        ):
+            # shutdown phase
+            logger.info("Stopping and disabling etcd workload.")
+            self.charm.workload.disable_database()
+            logger.warning(f"Removing database file from {DATABASE_DIR} for cluster rebuild.")
+            try:
+                self.charm.workload.remove_directory(DATABASE_DIR)
+            except FileNotFoundError:
+                logger.info(f"No database file found in {DATABASE_DIR} - nothing to remove")
+            self.charm.state.unit_server.update({"state": ""})
+            return
+
+        if (
+            self.charm.state.unit_server.member_endpoint
+            in self.charm.state.cluster.cluster_members
+            and not self.charm.state.unit_server.is_started
+        ):
+            # startup phase
+            logger.info("Enabling and starting etcd again.")
+            self.charm.config_manager.set_config_properties()
+            self.charm.workload.enable_service()
+            self.charm.cluster_manager.start_member()
+            self.charm.state.unit_server.update({"rebuild_completed": "True"})
+
+    def _check_rebuild_preventing_reason(self) -> str:
+        """Check if an action can be executed, if not return error message.
+
+        Returns:
+            Error message in case a preventing reason for an action exists, otherwise empty str.
+        """
+        if not self.charm.unit.is_leader():
+            return "Action must be performed on the leader unit."
+
+        if self.charm.state.cluster.is_backup_in_progress:
+            return "Backup in progress, cannot perform action."
+
+        if self.charm.state.cluster.is_restore_in_progress:
+            return "Restore in progress, cannot perform action."
+
+        return ""

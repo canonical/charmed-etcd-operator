@@ -161,6 +161,11 @@ class EtcdServer(RelationState):
         return self.relation_data.get("state", "") == "started"
 
     @property
+    def rebuild_completed(self) -> bool:
+        """Check if the has been processed for cluster rebuild."""
+        return self.relation_data.get("rebuild_completed", "") == "True"
+
+    @property
     def tls_peer_ca_rotation_state(self) -> TLSCARotationState:
         """Check if the peer CA rotation is enabled."""
         return TLSCARotationState(
@@ -283,6 +288,11 @@ class EtcdCluster(RelationState):
     def restore_verification_failed(self) -> bool:
         """Flag for failed restore verification."""
         return bool(self.relation_data.get("restore_verification_failed", ""))
+
+    @property
+    def rebuild_cluster_in_progress(self) -> bool:
+        """Flag to indicate if the cluster is being rebuilt to recover from majority failure."""
+        return bool(self.relation_data.get("rebuild_cluster", ""))
 
 
 @dataclass

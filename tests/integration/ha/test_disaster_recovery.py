@@ -7,7 +7,7 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION
+from literals import INTERNAL_USER, PEER_RELATION, Status
 
 from ..helpers import (
     APP_NAME,
@@ -26,10 +26,10 @@ from .helpers import (
 
 logger = logging.getLogger(__name__)
 
-NUM_UNITS = 3
+NUM_UNITS = 5
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -45,7 +45,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> None:
@@ -75,10 +75,108 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
         assert unit.name.replace("/", "") in member_names, (
             f"unit {unit.name} not in cluster members"
         )
+        logger.info(f"{unit.name} in cluster members")
     assert removed_member_name not in member_names, (
         f"{removed_member_name} still in cluster members"
     )
+    logger.info(f"{removed_member_name} not in cluster members")
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
+    """When the majority of the cluster is lost, users can run `rebuild-cluster`."""
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
+
+    first_unit_to_remove = ops_test.model.applications[APP_NAME].units[0]
+    first_removed_member_name = first_unit_to_remove.name.replace("/", "")
+    second_unit_to_remove = ops_test.model.applications[APP_NAME].units[1]
+    second_removed_member_name = second_unit_to_remove.name.replace("/", "")
+    logger.info(
+        f"Forcefully removing units {first_unit_to_remove.name} and {second_unit_to_remove.name}"
+    )
+
+    destroy_unit_cmd = f"remove-unit {first_unit_to_remove.name} {second_unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
+    return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
+    assert return_code == 0, "Failed to remove units"
+
+    async with ops_test.fast_forward("10s"):
+        await wait_until(
+            ops_test,
+            apps=[APP_NAME],
+            apps_full_statuses={
+                APP_NAME: {"blocked": [Status.CLUSTER_FAILED.value.status.message]},
+            },
+            wait_for_exact_units=2,
+        )
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        if await unit.is_leader_from_status():
+            leader_unit = unit
+
+    logger.info("Rebuilding cluster after majority failure")
+    rebuild_action = await leader_unit.run_action("rebuild-cluster")
+    rebuild_response = await rebuild_action.wait()
+    assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
+
+    # wait for the rebuild to be performed
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
+
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    cluster_members = get_cluster_members(endpoints)
+    member_names = [member["name"] for member in cluster_members]
+    for unit in ops_test.model.applications[APP_NAME].units:
+        assert unit.name.replace("/", "") in member_names, (
+            f"unit {unit.name} not in cluster members"
+        )
+        logger.info(f"{unit.name} in cluster members")
+    assert first_removed_member_name not in member_names, (
+        f"{first_removed_member_name} still in cluster members"
+    )
+    logger.info(f"{first_removed_member_name} not in cluster members")
+    assert second_removed_member_name not in member_names, (
+        f"{second_removed_member_name} still in cluster members"
+    )
+    logger.info(f"{second_removed_member_name} not in cluster members")
+
+
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
+    """Users can run `rebuild-cluster` on a healthy cluster if the use the `force` parameter."""
+    logger.info("Scale up to HA cluster again")
+    await ops_test.model.applications[APP_NAME].add_unit(count=1)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=3)
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        if await unit.is_leader_from_status():
+            leader_unit = unit
+
+    logger.info("Executing rebuild-cluster on healthy cluster - this should fail")
+    rebuild_action = await leader_unit.run_action("rebuild-cluster")
+    rebuild_response = await rebuild_action.wait()
+    assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
+    assert rebuild_response.status == "failed"
+
+    logger.info("Try again with `force` option")
+    rebuild_force_action = await leader_unit.run_action("rebuild-cluster", **{"force": True})
+    rebuild_force_response = await rebuild_force_action.wait()
+    assert rebuild_force_response.results.get("return-code") == 0, "rebuild failed"
+
+    # wait for the rebuild to be performed
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=3)
+
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    cluster_members = get_cluster_members(endpoints)
+    member_names = [member["name"] for member in cluster_members]
+    for unit in ops_test.model.applications[APP_NAME].units:
+        assert unit.name.replace("/", "") in member_names, (
+            f"unit {unit.name} not in cluster members"
+        )
+        logger.info(f"{unit.name} in cluster members")
