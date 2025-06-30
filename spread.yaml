@@ -105,6 +105,10 @@ backends:
           username: ubuntu
       - self-hosted-linux-arm64-noble-medium:
           username: ubuntu
+      - self-hosted-linux-amd64-noble-large:
+          username: ubuntu
+      - self-hosted-linux-arm64-noble-large:
+          username: ubuntu
 
 suites:
   tests/spread/:

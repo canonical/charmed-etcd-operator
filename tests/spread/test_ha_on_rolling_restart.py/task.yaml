@@ -1,6 +1,9 @@
 summary: test_ha_on_rolling_restart.py
 environment:
   TEST_MODULE: ha/test_ha_on_rolling_restart.py
+systems:
+  - self-hosted-linux-amd64-noble-medium
+  - self-hosted-linux-arm64-noble-medium
 execute: |
   tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
 artifacts:
