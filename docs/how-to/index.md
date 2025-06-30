@@ -10,4 +10,5 @@ Manage persistent storage <manage-persistent-storage>
 Enable monitoring <enable-monitoring>
 Integrate with an application <client-relations>
 TLS encryption <tls/index>
+Back up and restore <backup-and-restore/index>
 ```

@@ -21,6 +21,7 @@ from literals import (
     S3_RELATION_NAME,
     EtcdClusterState,
     RestoreStep,
+    Status,
 )
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -62,10 +63,8 @@ def test_s3_relation():
 
     state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
     with patch("managers.backup.BackupManager.create_bucket"):
-        with raises(testing.errors.UncaughtCharmError) as e:
-            ctx.run(ctx.on.relation_changed(s3_relation), state_in)
-
-        assert isinstance(e.value.__cause__, KeyError)
+        state_out = ctx.run(ctx.on.relation_changed(s3_relation), state_in)
+        assert state_out.unit_status == Status.BACKUP_S3_PARAMETERS_MISSING.value.status
 
 
 def test_azure_relation():
@@ -108,10 +107,9 @@ def test_azure_relation():
 
     state_in = testing.State(relations={peer_relation, azure_relation}, leader=True)
     with patch("managers.backup.BackupManager.create_container"):
-        with raises(testing.errors.UncaughtCharmError) as e:
-            ctx.run(ctx.on.relation_changed(azure_relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(azure_relation), state_in)
 
-        assert isinstance(e.value.__cause__, KeyError)
+        assert state_out.unit_status == Status.BACKUP_AZURE_PARAMETERS_MISSING.value.status
 
 
 def test_create_backup_action_s3():

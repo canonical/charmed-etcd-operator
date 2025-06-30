@@ -21,7 +21,7 @@ from common.exceptions import (
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, EtcdClusterState, Status, TLSState
+from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, Status, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,25 @@ class ClusterManager:
             return hex(leader_id)[2:]
         except (KeyError, JSONDecodeError) as e:
             raise RaftLeaderNotFoundError(f"No raft leader found: {e}")
+
+    @property
+    def is_cluster_failed(self) -> bool:
+        """Check if the cluster is experiencing majority failure.
+
+        Returns:
+            bool: True if the cluster has failed, False if not.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=f"http://{self.state.unit_server.ip}:{METRICS_PORT}/metrics",
+        )
+
+        if client.get_metric(metric_name="etcd_server_has_leader") == "0":
+            logger.warning("Cluster failed - no raft leader")
+            return True
+
+        return False
 
     @retry(
         stop=stop_after_attempt(3),
@@ -199,7 +218,7 @@ class ClusterManager:
                 client = EtcdClient(
                     username=self.admin_user,
                     password=self.admin_password,
-                    client_url=",".join(e for e in self.cluster_endpoints),
+                    client_url=self.state.unit_server.client_url,
                 )
                 cluster_members, member_id = client.add_member_as_learner(
                     server.member_name, peer_url
@@ -354,6 +373,7 @@ class ClusterManager:
             if (
                 self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value
                 and not self.state.cluster.is_restore_in_progress
+                and not self.state.cluster.rebuild_cluster_in_progress
             ):
                 status_list.append(Status.CLUSTER_NOT_INITIALIZED)
 
@@ -365,6 +385,9 @@ class ClusterManager:
 
         if not self.state.cluster.cluster_state:
             status_list.append(Status.CLUSTER_INITIALIZING)
+
+        if self.state.cluster.rebuild_cluster_in_progress:
+            status_list.append(Status.CLUSTER_REBUILD_IN_PROGRESS)
 
         return status_list
 

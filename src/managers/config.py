@@ -61,6 +61,7 @@ class ConfigManager:
         elif self.workload.exists(DATABASE_DIR):
             # if no cluster state is available, but we find a database file
             # we force a new one-cluster-member with existing data
+            # this is the case for storage reuse and `rebuild_cluster` workflows
             config_properties["force-new-cluster"] = True
         else:
             config_properties["initial-cluster-state"] = "new"

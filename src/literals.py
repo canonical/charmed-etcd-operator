@@ -74,7 +74,19 @@ class Status(Enum):
         BlockedStatus("failed to enable authentication in etcd"), "ERROR"
     )
     BACKUP_IN_PROGRESS = StatusLevel(MaintenanceStatus("Creating database backup..."), "DEBUG")
+    BACKUP_S3_PARAMETERS_MISSING = StatusLevel(
+        BlockedStatus("Missing required parameters in the s3 relation."), "ERROR"
+    )
+    BACKUP_AZURE_PARAMETERS_MISSING = StatusLevel(
+        BlockedStatus("Missing required parameters in the azure relation."), "ERROR"
+    )
     CLUSTER_INITIALIZING = StatusLevel(MaintenanceStatus("Initializing etcd cluster..."), "DEBUG")
+    CLUSTER_FAILED = StatusLevel(
+        BlockedStatus(
+            "Cluster failure - majority of cluster members lost. Run action `rebuild-cluster` to recover."
+        ),
+        "ERROR",
+    )
     CLUSTER_MANAGEMENT_ERROR = StatusLevel(BlockedStatus("cluster management error"), "ERROR")
     CLUSTER_NOT_INITIALIZED = StatusLevel(
         BlockedStatus("Waiting for cluster initialization"), "ERROR"
@@ -82,6 +94,9 @@ class Status(Enum):
     CLUSTER_NOT_JOINED = StatusLevel(MaintenanceStatus("Waiting to join cluster"), "DEBUG")
     CLUSTER_MEMBER_NOT_PROMOTED = StatusLevel(
         MaintenanceStatus("Waiting to promote learning member"), "DEBUG"
+    )
+    CLUSTER_REBUILD_IN_PROGRESS = StatusLevel(
+        BlockedStatus("Rebuilding with new cluster configuration..."), "ERROR"
     )
     HEALTH_CHECK_FAILED = StatusLevel(MaintenanceStatus("health check failed"), "DEBUG")
     NO_PEER_RELATION = StatusLevel(MaintenanceStatus("no peer relation available"), "DEBUG")
