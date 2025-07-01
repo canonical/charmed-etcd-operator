@@ -13,7 +13,6 @@ from literals import INTERNAL_USER, PEER_RELATION, Status, TLSType
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
@@ -34,10 +33,8 @@ TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 90
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
+async def test_build_and_deploy_with_tls(charm: str, ops_test: OpsTest) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
@@ -48,7 +45,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -94,8 +91,6 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_ca_rotation_by_config_change(ops_test: OpsTest) -> None:
     """Test the CA rotation.
@@ -213,8 +208,6 @@ async def test_ca_rotation_by_config_change(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     """Test the CA rotation.

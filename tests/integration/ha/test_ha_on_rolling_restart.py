@@ -12,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_secret_by_label,
 )
@@ -31,10 +30,8 @@ TLS_NAME = "self-signed-certificates"
 NUM_UNITS = 3
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_deploy_with_peer_tls(ops_test: OpsTest) -> None:
+async def test_deploy_with_peer_tls(charm: str, ops_test: OpsTest) -> None:
     """Deploy a cluster with three units and peer-certificates."""
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
@@ -45,7 +42,7 @@ async def test_deploy_with_peer_tls(ops_test: OpsTest) -> None:
 
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates relations")
@@ -53,8 +50,6 @@ async def test_deploy_with_peer_tls(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     """Disable and enable peer TLS on a running cluster.

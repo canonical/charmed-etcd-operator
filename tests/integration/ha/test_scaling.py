@@ -12,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_juju_leader_unit_name,
@@ -31,24 +30,20 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
     if await existing_app(ops_test):
         return
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(CHARM_PATH, num_units=1)
+    await ops_test.model.deploy(charm, num_units=1)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     assert len(ops_test.model.applications[APP_NAME].units) == 1
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_scale_up(ops_test: OpsTest) -> None:
     """Make sure new units are added to the etcd cluster without downtime."""
@@ -84,8 +79,6 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_scale_down(ops_test: OpsTest) -> None:
     """Make sure a unit is removed from the etcd cluster without downtime."""
@@ -122,8 +115,6 @@ async def test_scale_down(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     """Make sure the etcd cluster is still available when the Raft leader is removed."""
@@ -183,8 +174,6 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     """Make sure multiple units can be removed from the etcd cluster without downtime."""
@@ -219,8 +208,6 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     """Make sure that removing all units and then adding them again works."""
@@ -259,8 +246,6 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_juju_leader(ops_test: OpsTest) -> None:
     """Make sure that removing the juju leader unit works."""
@@ -296,8 +281,6 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_application(ops_test: OpsTest) -> None:
     """Make sure removing the application works."""

@@ -12,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_raft_leader,
@@ -42,24 +41,20 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
     if await existing_app(ops_test):
         return
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
+async def test_kill_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal when the leader goes down."""
     app = (await existing_app(ops_test)) or APP_NAME
 
@@ -92,7 +87,10 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
 
     # axe away the etcd process of the cluster/raft leader
     send_process_control_signal(
-        unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGKILL"
+        unit_name=leader_unit,
+        model_full_name=ops_test.model_full_name,
+        signal="SIGKILL",
+        etcd_process=etcd_process,
     )
 
     # make sure the process is stopped
@@ -139,10 +137,8 @@ async def test_kill_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
+async def test_freeze_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal when the leader stops."""
     app = (await existing_app(ops_test)) or APP_NAME
 
@@ -175,7 +171,10 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
 
     # freeze the etcd process of the cluster/raft leader
     send_process_control_signal(
-        unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGSTOP"
+        unit_name=leader_unit,
+        model_full_name=ops_test.model_full_name,
+        signal="SIGSTOP",
+        etcd_process=etcd_process,
     )
 
     # wait until the SIGSTOP fully takes effect
@@ -204,7 +203,10 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
 
     # continue the etcd process
     send_process_control_signal(
-        unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGCONT"
+        unit_name=leader_unit,
+        model_full_name=ops_test.model_full_name,
+        signal="SIGCONT",
+        etcd_process=etcd_process,
     )
 
     # ensure the stopped unit is reachable again
@@ -225,10 +227,8 @@ async def test_freeze_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
+async def test_restart_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal when the leader goes down."""
     app = (await existing_app(ops_test)) or APP_NAME
 
@@ -261,7 +261,10 @@ async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
 
     # axe away the etcd process of the cluster/raft leader
     send_process_control_signal(
-        unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGTERM"
+        unit_name=leader_unit,
+        model_full_name=ops_test.model_full_name,
+        signal="SIGTERM",
+        etcd_process=etcd_process,
     )
 
     # make sure the process is stopped
@@ -307,10 +310,8 @@ async def test_restart_db_process_on_raft_leader(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_full_cluster_restart(ops_test: OpsTest) -> None:
+async def test_full_cluster_restart(etcd_process: str, ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal after all members went down."""
     app = (await existing_app(ops_test)) or APP_NAME
 
@@ -341,7 +342,10 @@ async def test_full_cluster_restart(ops_test: OpsTest) -> None:
     # axe away the etcd process on all units
     for unit in ops_test.model.applications[app].units:
         send_process_control_signal(
-            unit_name=unit.name, model_full_name=ops_test.model_full_name, signal="SIGTERM"
+            unit_name=unit.name,
+            model_full_name=ops_test.model_full_name,
+            signal="SIGTERM",
+            etcd_process=etcd_process,
         )
 
     # ensure the all cluster members are down
@@ -372,10 +376,8 @@ async def test_full_cluster_restart(ops_test: OpsTest) -> None:
         await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_DEFAULT)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_full_cluster_crash(ops_test: OpsTest) -> None:
+async def test_full_cluster_crash(etcd_process: str, ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal after all members went down."""
     app = (await existing_app(ops_test)) or APP_NAME
 
@@ -406,7 +408,10 @@ async def test_full_cluster_crash(ops_test: OpsTest) -> None:
     # axe away the etcd process on all units
     for unit in ops_test.model.applications[app].units:
         send_process_control_signal(
-            unit_name=unit.name, model_full_name=ops_test.model_full_name, signal="SIGKILL"
+            unit_name=unit.name,
+            model_full_name=ops_test.model_full_name,
+            signal="SIGKILL",
+            etcd_process=etcd_process,
         )
 
     # ensure the all cluster members are down
@@ -437,10 +442,10 @@ async def test_full_cluster_crash(ops_test: OpsTest) -> None:
         await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_DEFAULT)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_restart_raft_leader_after_deleting_database_file(ops_test: OpsTest) -> None:
+async def test_restart_raft_leader_after_deleting_database_file(
+    etcd_process: str, ops_test: OpsTest
+) -> None:
     """Make sure the cluster can self-heal when the leader's data is deleted."""
     app = (await existing_app(ops_test)) or APP_NAME
 
@@ -474,7 +479,10 @@ async def test_restart_raft_leader_after_deleting_database_file(ops_test: OpsTes
     # stop the etcd process of the cluster/raft leader
     await patch_restart_delay(ops_test, unit_name=leader_unit, delay=RESTART_DELAY_PATCHED)
     send_process_control_signal(
-        unit_name=leader_unit, model_full_name=ops_test.model_full_name, signal="SIGTERM"
+        unit_name=leader_unit,
+        model_full_name=ops_test.model_full_name,
+        signal="SIGTERM",
+        etcd_process=etcd_process,
     )
 
     # make sure the process is stopped

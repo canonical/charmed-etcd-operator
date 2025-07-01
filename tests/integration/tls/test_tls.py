@@ -13,7 +13,6 @@ from literals import INTERNAL_USER, PEER_RELATION, Status, TLSType
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     TLS_NAME,
     download_client_certificate_from_unit,
     get_certificate_from_unit,
@@ -34,10 +33,8 @@ TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 250
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
+async def test_build_and_deploy_with_tls(charm: str, ops_test: OpsTest) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
@@ -49,7 +46,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -58,8 +55,6 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=60)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Check if the TLS has been enabled on app startup."""
@@ -108,8 +103,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_tls(ops_test: OpsTest) -> None:
     """Disable TLS on a running cluster and check if it is still accessible."""
@@ -165,8 +158,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_enable_tls(ops_test: OpsTest) -> None:
     """Enable TLS on a running cluster and check if it is still accessible."""
@@ -227,8 +218,6 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     """Disable then enable peer TLS on a running cluster and check if it is still accessible."""
@@ -355,8 +344,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     """Disable then enable client TLS on a running cluster and check if it is still accessible."""
@@ -481,8 +468,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_certificate_expiration(ops_test: OpsTest) -> None:
     """Test the TLS certificate expiration on a running cluster."""

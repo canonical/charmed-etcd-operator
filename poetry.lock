@@ -17,25 +17,20 @@ allure-python-commons = "2.14.0"
 pytest = ">=4.5.0"
 
 [[package]]
-name = "allure-pytest-collection-report"
-version = "0.1.0"
-description = ""
+name = "allure-pytest-default-results"
+version = "0.1.3"
+description = "Generate default \"unknown\" results to show in Allure Report if test case does not run"
 optional = false
-python-versions = "^3.8"
+python-versions = ">=3.8"
 groups = ["integration"]
-files = []
-develop = false
+files = [
+    {file = "allure_pytest_default_results-0.1.3-py3-none-any.whl", hash = "sha256:750de894d3713a3f890e62dbda3993b522cb52c4072651e12662e7df26d7dd4c"},
+    {file = "allure_pytest_default_results-0.1.3.tar.gz", hash = "sha256:e9031d19bd7e799da289ab53a56ec5b4ca974e21fef1533f6626249a3c856725"},
+]
 
 [package.dependencies]
 allure-pytest = ">=2.13.5"
 pytest = "*"
-
-[package.source]
-type = "git"
-url = "https://github.com/canonical/data-platform-workflows"
-reference = "v29.0.0"
-resolved_reference = "90077c956fd22995aec4c1e5b86cf6248717d8c7"
-subdirectory = "python/pytest_plugins/allure_pytest_collection_report"
 
 [[package]]
 name = "allure-python-commons"
@@ -1750,23 +1745,6 @@ docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1)"]
 testing = ["coverage (>=6.2)", "hypothesis (>=5.7.1)"]
 
 [[package]]
-name = "pytest-github-secrets"
-version = "0.1.0"
-description = ""
-optional = false
-python-versions = "^3.8"
-groups = ["integration"]
-files = []
-develop = false
-
-[package.source]
-type = "git"
-url = "https://github.com/canonical/data-platform-workflows"
-reference = "v29.0.0"
-resolved_reference = "90077c956fd22995aec4c1e5b86cf6248717d8c7"
-subdirectory = "python/pytest_plugins/github_secrets"
-
-[[package]]
 name = "pytest-mock"
 version = "3.14.0"
 description = "Thin-wrapper around the mock package for easier use with pytest"
@@ -1803,46 +1781,6 @@ juju = "*"
 pytest = "*"
 pytest-asyncio = "*"
 pyyaml = "*"
-
-[[package]]
-name = "pytest-operator-cache"
-version = "0.1.0"
-description = ""
-optional = false
-python-versions = "^3.8"
-groups = ["integration"]
-files = []
-develop = false
-
-[package.dependencies]
-pyyaml = "*"
-
-[package.source]
-type = "git"
-url = "https://github.com/canonical/data-platform-workflows"
-reference = "v29.0.0"
-resolved_reference = "90077c956fd22995aec4c1e5b86cf6248717d8c7"
-subdirectory = "python/pytest_plugins/pytest_operator_cache"
-
-[[package]]
-name = "pytest-operator-groups"
-version = "0.1.0"
-description = ""
-optional = false
-python-versions = "^3.8"
-groups = ["integration"]
-files = []
-develop = false
-
-[package.dependencies]
-pytest = "*"
-
-[package.source]
-type = "git"
-url = "https://github.com/canonical/data-platform-workflows"
-reference = "v29.0.0"
-resolved_reference = "90077c956fd22995aec4c1e5b86cf6248717d8c7"
-subdirectory = "python/pytest_plugins/pytest_operator_groups"
 
 [[package]]
 name = "python-dateutil"
@@ -2339,4 +2277,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "e839b3a44218a520335dbc9eeef2e8511db95aaa22b56b1e85d8cc392852a76e"
+content-hash = "7c19b5639dcf9613c9a69d6617c4eec12bcf74ff2303aa53c130e7051448772b"

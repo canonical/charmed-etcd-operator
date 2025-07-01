@@ -11,7 +11,6 @@ from literals import INTERNAL_USER, PEER_RELATION, Status
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_secret_by_label,
@@ -29,12 +28,10 @@ logger = logging.getLogger(__name__)
 NUM_UNITS = 5
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm."""
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
@@ -45,8 +42,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> None:
     """Make sure a forcefully removed unit is removed as cluster member."""
