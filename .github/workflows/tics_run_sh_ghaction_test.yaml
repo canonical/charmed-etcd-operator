@@ -10,7 +10,7 @@ on:
 
 jobs:
   tiobe-scan:
-    runs-on: [self-hosted, linux, amd64, tiobe, noble]
+    runs-on: [self-hosted, jammy, tiobe]
 
     steps:
       - name: Checkout the project
@@ -35,8 +35,8 @@ jobs:
 
       - name: Move results to necessary folder for TICS
         run: |
-          mkdir -p .cover
-          mv coverage.xml .cover/coverage.xml
+          mkdir -p cover
+          mv coverage.xml cover/coverage.xml
 
       - name: Run TICS analysis with github-action
         uses: tiobe/tics-github-action@v3
