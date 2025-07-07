@@ -264,3 +264,26 @@ class TLSManager:
             status_list.append(Status.TLS_PEER_CERTS_EXPIRING)
 
         return status_list
+
+    def get_sans_ip(self, tls_type: TLSType) -> frozenset[str]:
+        """Get the SANs IP for the TLS certificate.
+
+        Returns:
+            frozenset[str]: The SANs IP.
+        """
+        private_ip = self.workload.get_private_ip()
+        if not private_ip:
+            logger.warning("No private IP found for SANs IP.")
+            raise ValueError("No private IP found for SANs IP.")
+        
+        if tls_type == TLSType.PEER:
+            logger.debug(f"Using private IP {private_ip} for peer SANs IP.")
+            return frozenset({private_ip})
+        
+        # For client TLS, we use both private and public IPs if available
+        if public_ip := self.workload.get_public_ip():
+            logger.debug(f"Using public and private IPs for SANs.")
+            return frozenset({private_ip, public_ip})
+        
+        logger.debug(f"Using only private IP {private_ip} for SANs IP.")
+        return frozenset({private_ip})

@@ -99,7 +99,7 @@ class TLSEvents(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=frozenset({host_mapping["ip"]}),
+                    sans_ip=self.charm.tls_manager.get_sans_ip(TLSType.PEER),
                     sans_dns=frozenset({self.charm.unit.name, host_mapping["hostname"]}),
                     organization=TLSType.PEER.value,
                 ),
@@ -113,7 +113,7 @@ class TLSEvents(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=frozenset({host_mapping["ip"]}),
+                    sans_ip=self.charm.tls_manager.get_sans_ip(TLSType.CLIENT),
                     sans_dns=frozenset({self.charm.unit.name, host_mapping["hostname"]}),
                     organization=TLSType.CLIENT.value,
                 ),

@@ -170,3 +170,21 @@ class WorkloadBase(ABC):
     def enable_database(self) -> None:
         """Enable the service and start the workload."""
         pass
+
+    @abstractmethod
+    def get_private_ip(self) -> str | None:
+        """Get the private IP of the workload.
+
+        Returns:
+            str: The private IP address.
+        """
+        pass
+
+    @abstractmethod
+    def get_public_ip(self) -> str | None:
+        """Get the public IP of the workload.
+
+        Returns:
+            str: The public IP address.
+        """
+        pass
