@@ -149,12 +149,12 @@ class EtcdWorkload(WorkloadBase):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             logger.error(f"Error executing command '{cmd}': {e}")
             return None
-        
+
         if output.returncode != 0:
             return None
 
         return output.stdout.strip()
-    
+
     @override
     def get_private_ip(self) -> str | None:
         """Get the Private IP address of the current unit."""
@@ -171,7 +171,7 @@ class EtcdWorkload(WorkloadBase):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             logger.error(f"Error executing command '{cmd}': {e}")
             return None
-        
+
         if output.returncode != 0:
             return None
 

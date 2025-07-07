@@ -275,15 +275,15 @@ class TLSManager:
         if not private_ip:
             logger.warning("No private IP found for SANs IP.")
             raise ValueError("No private IP found for SANs IP.")
-        
+
         if tls_type == TLSType.PEER:
             logger.debug(f"Using private IP {private_ip} for peer SANs IP.")
             return frozenset({private_ip})
-        
+
         # For client TLS, we use both private and public IPs if available
         if public_ip := self.workload.get_public_ip():
-            logger.debug(f"Using public and private IPs for SANs.")
+            logger.debug("Using public and private IPs for SANs.")
             return frozenset({private_ip, public_ip})
-        
+
         logger.debug(f"Using only private IP {private_ip} for SANs IP.")
         return frozenset({private_ip})
