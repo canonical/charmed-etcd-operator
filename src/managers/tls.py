@@ -6,6 +6,7 @@
 
 import logging
 from pathlib import Path
+import socket
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
@@ -273,8 +274,8 @@ class TLSManager:
         """
         private_ip = self.workload.get_private_ip()
         if not private_ip:
-            logger.warning("No private IP found for SANs IP.")
-            raise ValueError("No private IP found for SANs IP.")
+            logger.warning("No private IP found using unit-get. Using socket instead.")
+            return frozenset({socket.gethostbyname(socket.gethostname())})
 
         if tls_type == TLSType.PEER:
             logger.debug(f"Using private IP {private_ip} for peer SANs IP.")

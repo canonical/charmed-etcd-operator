@@ -613,9 +613,9 @@ def test_secret_changed():
         relations={relation},
         leader=True,
     )
-    with patch("subprocess.run") as run:
+    with patch("common.client.EtcdClient.update_password") as update_password:
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
-        run.assert_not_called()
+        update_password.assert_not_called()
         assert state_out.unit_status == ops.BlockedStatus("failed to update password")
 
 
