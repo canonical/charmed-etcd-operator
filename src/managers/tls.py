@@ -5,8 +5,8 @@
 """Manager for handling TLS related events."""
 
 import logging
-from pathlib import Path
 import socket
+from pathlib import Path
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
