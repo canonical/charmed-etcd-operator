@@ -127,8 +127,18 @@ class ClusterState(Object):
 
     @property
     def tls_client_certificate(self) -> ProviderCertificate:
-        """Get the client TLS certificates interface."""
+        """Get the client TLS certificate."""
         return self.charm.tls_events.client_certificate.get_assigned_certificates()[0][0]
+
+    @property
+    def tls_peer_certificate(self) -> ProviderCertificate:
+        """Get the peer TLS certificate."""
+        return self.charm.tls_events.peer_certificate.get_assigned_certificates()[0][0]
+
+    @property
+    def tls_certificate_transfer_certificates(self) -> Set[str]:
+        """Get the TLS certificates from the certificate transfer interface."""
+        return self.charm.external_clients_events.certificate_transfer.get_all_certificates()
 
     @property
     def s3_relation(self) -> Relation | None:
