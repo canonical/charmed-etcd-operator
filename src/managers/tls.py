@@ -41,16 +41,18 @@ class TLSManager:
             }
         )
 
-    def write_certificate(self, certificate: ProviderCertificate, private_key: PrivateKey) -> None:
+    def write_certificate(
+        self, certificate: ProviderCertificate, private_key: PrivateKey, cert_type: TLSType
+    ) -> None:
         """Write certificates to disk.
 
         Args:
             certificate (ProviderCertificate): The certificate.
             private_key (PrivateKey): The private key.
+            cert_type (TLSType): The certificate type (client or peer).
         """
         logger.debug("Writing certificates to disk")
         ca_cert = certificate.ca
-        cert_type = TLSType(certificate.certificate.organization)
         if cert_type == TLSType.CLIENT:
             certificate_path = self.workload.paths.tls.client_cert
             private_key_path = self.workload.paths.tls.client_key
