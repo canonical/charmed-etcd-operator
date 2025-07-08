@@ -5,17 +5,19 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
+import platform
 import subprocess
 from pathlib import Path
-from shutil import rmtree
+from shutil import copyfile, rmtree
 from typing import List
 
+from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
 from charms.operator_libs_linux.v2 import snap
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
 from core.workload import WorkloadBase
-from literals import SNAP_NAME, SNAP_REVISION, SNAP_SERVICE
+from literals import SNAP_NAME, SNAP_REVISIONS, SNAP_SERVICE
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +45,9 @@ class EtcdWorkload(WorkloadBase):
             True if successfully installed, False if any error occurs.
         """
         try:
-            self.etcd.ensure(snap.SnapState.Present, revision=SNAP_REVISION)
+            self.etcd.ensure(
+                snap.SnapState.Present, revision=str(SNAP_REVISIONS[platform.machine()])
+            )
             self.etcd.hold()
             return True
         except snap.SnapError as e:
@@ -70,6 +74,10 @@ class EtcdWorkload(WorkloadBase):
     @override
     def restart(self) -> None:
         self.etcd.restart(services=[SNAP_SERVICE])
+
+    @override
+    def copy_file(self, src_file: str, dst_file: str) -> None:
+        copyfile(src_file, dst_file)
 
     @override
     def remove_file(self, file) -> None:
@@ -106,3 +114,21 @@ class EtcdWorkload(WorkloadBase):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             logger.error(e)
             raise
+
+    @override
+    def disable_service(self) -> None:
+        service_disable(f"snap.{SNAP_NAME}.{SNAP_SERVICE}")
+
+    @override
+    def enable_service(self) -> None:
+        service_enable(f"snap.{SNAP_NAME}.{SNAP_SERVICE}")
+
+    @override
+    def disable_database(self) -> None:
+        self.disable_service()
+        self.stop()
+
+    @override
+    def enable_database(self) -> None:
+        self.enable_service()
+        self.start()

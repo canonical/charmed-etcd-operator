@@ -12,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_members,
     get_juju_leader_unit_name,
@@ -31,24 +30,20 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
     if await existing_app(ops_test):
         return
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(CHARM_PATH, num_units=1)
+    await ops_test.model.deploy(charm, num_units=1)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     assert len(ops_test.model.applications[APP_NAME].units) == 1
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_scale_up(ops_test: OpsTest) -> None:
     """Make sure new units are added to the etcd cluster without downtime."""
@@ -74,7 +69,7 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count + 2, (
         f"Expected {init_units_count + 2} cluster members, got {len(cluster_members)}."
     )
@@ -84,8 +79,6 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_scale_down(ops_test: OpsTest) -> None:
     """Make sure a unit is removed from the etcd cluster without downtime."""
@@ -112,7 +105,7 @@ async def test_scale_down(ops_test: OpsTest) -> None:
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
         f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
     )
@@ -122,8 +115,6 @@ async def test_scale_down(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     """Make sure the etcd cluster is still available when the Raft leader is removed."""
@@ -141,13 +132,15 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
 
     # check cluster membership after scaling up
     updated_endpoints = get_cluster_endpoints(ops_test, app)
-    cluster_members = get_cluster_members(updated_endpoints)
+    cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"Expected {init_units_count} cluster members, got {len(cluster_members)}."
     )
 
     # find and remove the unit that is the current Raft leader
-    init_raft_leader = get_raft_leader(endpoints=init_endpoints)
+    init_raft_leader = get_raft_leader(
+        endpoints=init_endpoints, user=INTERNAL_USER, password=password
+    )
     await ops_test.model.applications[app].destroy_unit(init_raft_leader.replace(app, f"{app}/"))
 
     await wait_until(
@@ -161,13 +154,15 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     # check if unit has been removed from etcd cluster
     updated_endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(updated_endpoints)
+    cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
         f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
     )
 
     # check that another unit is now the Raft leader
-    new_raft_leader = get_raft_leader(endpoints=updated_endpoints)
+    new_raft_leader = get_raft_leader(
+        endpoints=updated_endpoints, user=INTERNAL_USER, password=password
+    )
     assert new_raft_leader != init_raft_leader
 
     assert_continuous_writes_increasing(
@@ -179,8 +174,6 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     """Make sure multiple units can be removed from the etcd cluster without downtime."""
@@ -207,7 +200,7 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == 1, f"Expected 1 cluster member, got {len(cluster_members)}."
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -215,8 +208,6 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     """Make sure that removing all units and then adding them again works."""
@@ -247,7 +238,7 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     # give time to write at least some data
     time.sleep(10)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == 3, f"Expected 3 cluster members, got {len(cluster_members)}."
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -255,8 +246,6 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_juju_leader(ops_test: OpsTest) -> None:
     """Make sure that removing the juju leader unit works."""
@@ -282,7 +271,7 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
     # check if unit has been removed from etcd cluster
     endpoints = get_cluster_endpoints(ops_test, app)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
         f"Expected {init_units_count - 1} cluster members, got {len(cluster_members)}."
     )
@@ -292,8 +281,6 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_application(ops_test: OpsTest) -> None:
     """Make sure removing the application works."""

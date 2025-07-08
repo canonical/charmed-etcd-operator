@@ -8,11 +8,10 @@ import time
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
+from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     get_cluster_endpoints,
     get_cluster_id,
     get_cluster_members,
@@ -21,6 +20,7 @@ from ..helpers import (
     get_unit_endpoint,
     is_endpoint_up,
     put_key,
+    set_password,
 )
 from ..helpers_deployment import wait_until
 from .helpers import (
@@ -38,25 +38,24 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Deploy the charm with storage volume for data, allowing for skipping if already deployed."""
     # create storage to be used in this test
     # this assumes the test is run on a lxd cloud
     await ops_test.model.create_storage_pool("etcd-pool", "lxd")
-    storage = {"data": {"pool": "etcd-pool", "size": 2048}}
+    storage = {
+        "data": {"pool": "etcd-pool", "size": 2048},
+        "archive": {"pool": "etcd-pool", "size": 2048},
+    }
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS, storage=storage)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS, storage=storage)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     assert len(ops_test.model.applications[APP_NAME].units) == NUM_UNITS
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     """Make sure storage can be re-attached after removing a unit."""
@@ -64,7 +63,8 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     app = APP_NAME
     init_units_count = len(ops_test.model.applications[app].units)
     unit = ops_test.model.applications[app].units[-1]
-    storage_id = get_storage_id(ops_test, unit.name, "data")
+    data_storage_id = get_storage_id(ops_test, unit.name, "data")
+    archive_storage_id = get_storage_id(ops_test, unit.name, "archive")
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -79,11 +79,11 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     )
 
     # add unit with previous storage attached
-    add_unit_cmd = (
-        f"add-unit {app} --model={ops_test.model.info.name} --attach-storage={storage_id}"
-    )
+    add_unit_cmd = f"add-unit {app} --model={ops_test.model.info.name} --attach-storage={data_storage_id} --attach-storage={archive_storage_id}"
     return_code, _, _ = await ops_test.juju(*add_unit_cmd.split())
-    assert return_code == 0, f"Failed to add unit with storage {storage_id}"
+    assert return_code == 0, (
+        f"Failed to add unit with storages {data_storage_id} and {archive_storage_id}"
+    )
 
     new_unit = ops_test.model.applications[app].units[-1]
     await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count, idle_period=60)
@@ -95,7 +95,7 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
 
     # check cluster formation after unit with existing storage was added
     updated_endpoints = get_cluster_endpoints(ops_test, app)
-    cluster_members = get_cluster_members(updated_endpoints)
+    cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert new_unit.name.replace("/", "") in (member["name"] for member in cluster_members), (
         f"{new_unit.name} is not in {cluster_members}"
     )
@@ -114,8 +114,6 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     """Make sure storage can be re-attached after removing all units."""
@@ -124,7 +122,7 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     initial_endpoints = get_cluster_endpoints(ops_test, app)
-    initial_cluster_id = get_cluster_id(initial_endpoints)
+    initial_cluster_id = get_cluster_id(initial_endpoints, user=INTERNAL_USER, password=password)
     initial_writes_value = count_writes(initial_endpoints, INTERNAL_USER, password)
 
     # remove all units while keeping their storage-ids for later reuse
@@ -154,10 +152,10 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
 
     # check cluster formation after new cluster was forced
     endpoints = get_cluster_endpoints(ops_test, app)
-    new_cluster_id = get_cluster_id(endpoints)
+    new_cluster_id = get_cluster_id(endpoints, user=INTERNAL_USER, password=password)
     assert initial_cluster_id == new_cluster_id, "Cluster ID does not match"
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
 
     for unit in ops_test.model.applications[app].units:
         assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
@@ -182,17 +180,15 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> None:
+async def test_attach_storage_after_removing_application(charm: str, ops_test: OpsTest) -> None:
     """Make sure storage can be re-attached to a completely new etcd application."""
     # this test should only be executed with the app we deployed
     app = APP_NAME
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     initial_endpoints = get_cluster_endpoints(ops_test, app)
-    initial_cluster_id = get_cluster_id(initial_endpoints)
+    initial_cluster_id = get_cluster_id(initial_endpoints, user=INTERNAL_USER, password=password)
     initial_writes_value = count_writes(initial_endpoints, INTERNAL_USER, password)
 
     # remove all units except one - we need to know which storage to attach when scaling up again
@@ -208,23 +204,18 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
     # remove the entire application
     await ops_test.model.remove_application(app, block_until_done=True)
 
-    # we are going to deploy a new cluster, but with an existing database
-    # that means we need to configure the correct admin password in advance
-    admin_secret = "root_password"
-    secret_id = await ops_test.model.add_secret(
-        name=admin_secret, data_args=[f"{INTERNAL_USER}={password}"]
-    )
-
     # deploy new cluster, attaching the storage from the previous last unit to the new first unit
-    deploy_cluster_with_storage_cmd = f"""deploy {CHARM_PATH} \
+    deploy_cluster_with_storage_cmd = f"""deploy {charm} \
         --model={ops_test.model.info.name} \
         --attach-storage={storage_id} \
-        --config {INTERNAL_USER_PASSWORD_CONFIG}={secret_id}
         """
 
     return_code, _, _ = await ops_test.juju(*deploy_cluster_with_storage_cmd.split())
     assert return_code == 0, f"Failed to deploy app with storage {storage_id}"
-    await ops_test.model.grant_secret(secret_name=admin_secret, application=APP_NAME)
+
+    # we are going to deploy a new cluster, but with an existing database
+    # that means we need to configure the correct admin password
+    await set_password(ops_test, password)
 
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=1, idle_period=60)
 
@@ -256,10 +247,10 @@ async def test_attach_storage_after_removing_application(ops_test: OpsTest) -> N
 
     # check cluster formation
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    new_cluster_id = get_cluster_id(endpoints)
+    new_cluster_id = get_cluster_id(endpoints, user=INTERNAL_USER, password=password)
     assert initial_cluster_id == new_cluster_id, "Cluster ID does not match"
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
 
     for unit in ops_test.model.applications[app].units:
         assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (

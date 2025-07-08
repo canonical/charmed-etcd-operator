@@ -21,7 +21,6 @@ from literals import EXTERNAL_CLIENTS_RELATION, INTERNAL_USER, PEER_RELATION, St
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     TLS_NAME,
     download_client_certificate_from_unit,
     get_certificate_from_unit,
@@ -39,12 +38,15 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 REQUIRER_NAME = "requirer-charm"
 REQUIRER_TLS_NAME = "requirer-tls-provider"
-REQUIRER_CHARM_PATH = (
-    "./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-amd64.charm"
-)
 
 common_name = REQUIRER_NAME
 key_prefix = "/test/"
+
+
+@pytest.fixture
+def requirer_charm(platform: str) -> str:
+    """Path to the requirer charm file to use for testing."""
+    return f"./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-{platform}.charm"
 
 
 def generate_mtls_chain(common_name: str) -> str:
@@ -87,18 +89,16 @@ async def get_requirer_leaf_certificate(ops_test: OpsTest) -> str | None:
     return None
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(charm: str, requirer_charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm-under-test and the requirer charm."""
     tls_config = {"ca-common-name": "etcd"}
     await asyncio.gather(
-        ops_test.model.deploy(REQUIRER_CHARM_PATH, application_name=REQUIRER_NAME),
-        ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS),
-        ops_test.model.deploy(TLS_NAME, channel="1/stable", config=tls_config),
+        ops_test.model.deploy(requirer_charm, application_name=REQUIRER_NAME),
+        ops_test.model.deploy(charm, num_units=NUM_UNITS),
+        ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config),
         ops_test.model.deploy(
-            TLS_NAME, channel="1/stable", application_name=REQUIRER_TLS_NAME, config=tls_config
+            TLS_NAME, channel="1/edge", application_name=REQUIRER_TLS_NAME, config=tls_config
         ),
     )
     # enable TLS and check if the cluster is still accessible
@@ -109,8 +109,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME])
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_relate_client_charm(ops_test: OpsTest) -> None:
     """Relate the client charm."""
@@ -154,8 +152,6 @@ async def test_relate_client_charm(ops_test: OpsTest) -> None:
         assert ca_chain in client_cas, f"CA chain not in trusted CAs for {unit.name}"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
     """Write and read to the key prefix with the requirer charm."""
@@ -183,8 +179,6 @@ async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
     assert action.results["message"] == f"{key}\n{TEST_VALUE}", "Action should return the value"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_update_chain(ops_test: OpsTest) -> None:
     """Update the common name used by the requirer app."""
@@ -216,8 +210,6 @@ async def test_update_chain(ops_test: OpsTest) -> None:
         assert ca_chain not in client_cas, f"old CA chain still in trusted CAs for {unit.name}"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_etcd_updates_ca(ops_test: OpsTest) -> None:
     """Update the common name used by the requirer app."""
@@ -251,8 +243,6 @@ async def test_etcd_updates_ca(ops_test: OpsTest) -> None:
     assert old_ca != new_ca, "CA should be updated"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_remove_client_relation(ops_test: OpsTest) -> None:
     """Remove the client relation and check if the user and role are removed."""
@@ -297,8 +287,6 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
         assert ca_chain not in client_cas, f"old CA chain still in trusted CAs for {unit.name}"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_certificate_transfer(ops_test: OpsTest) -> None:
     """Test if the requirer charm sends a ca certificate instead of an end-entity."""
@@ -327,8 +315,6 @@ async def test_certificate_transfer(ops_test: OpsTest) -> None:
         assert ca_cert in client_cas, f"CA chain not in trusted CAs for {unit.name}"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_requirer_sends_ca(ops_test: OpsTest) -> None:
     """Test if the requirer charm sends a ca certificate instead of an end-entity."""

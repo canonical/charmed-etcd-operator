@@ -14,13 +14,19 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
 
-from literals import CLIENT_PORT, PEER_RELATION, TLS_ROOT_DIR, TLSType
+from literals import (
+    CLIENT_PORT,
+    INTERNAL_USER,
+    INTERNAL_USER_PASSWORD_CONFIG,
+    PEER_RELATION,
+    TLS_ROOT_DIR,
+    TLSType,
+)
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
-CHARM_PATH = "./charmed-etcd_ubuntu@24.04-amd64.charm"
 TLS_NAME = "self-signed-certificates"
 
 
@@ -74,9 +80,18 @@ def get_key(
 
 
 @retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
-def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]:
+def get_cluster_members(
+    endpoints: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> list[dict]:
     """Query all cluster members from etcd using `etcdctl`."""
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
             --cacert client_ca.pem \
@@ -91,10 +106,18 @@ def get_cluster_members(endpoints: str, tls_enabled: bool = False) -> list[dict]
 
 
 @retry(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True)
-def get_cluster_id(endpoints: str, tls_enabled: bool = False) -> str:
+def get_cluster_id(
+    endpoints: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> str:
     """Query the cluster id from etcd using `etcdctl`."""
     etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
-
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
             --cacert client_ca.pem \
@@ -170,13 +193,22 @@ def is_endpoint_up(
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
-def get_raft_leader(endpoints: str, tls_enabled: bool = False) -> str:
+def get_raft_leader(
+    endpoints: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> str:
     """Query the Raft leader via the `endpoint status` and `member list` commands.
 
     Returns:
         str: the member-name of the Raft leader, e.g. `etcd42`
     """
     etcd_command = f"etcdctl endpoint status --endpoints={endpoints} -w=json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
                 --cacert client_ca.pem \
@@ -315,6 +347,41 @@ async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str
     assert return_code == 0, f"Failed to add secret: {std_err}"
     logger.info(f"Added secret {secret_name} to the model")
     return std_out.strip()
+
+
+async def set_password(
+    ops_test: OpsTest,
+    password: str,
+    username: str = INTERNAL_USER,
+    application: str = APP_NAME,
+) -> None:
+    """Set a user password via secret.
+
+    Args:
+        ops_test: ops_test instance.
+        username: the user to set the password.
+        password: password to use
+        application: the application the created secret will be granted to
+    """
+    secret_name = "system_users_secret"
+
+    try:
+        secret_id = await ops_test.model.add_secret(
+            name=secret_name, data_args=[f"{username}={password}"]
+        )
+    except Exception:
+        secrets = await ops_test.model.list_secrets({"name": secret_name})
+        secret_id = secrets[0].uri
+        await ops_test.model.update_secret(
+            name=secret_name, data_args=[f"{username}={password}"], new_name=secret_name
+        )
+
+    await ops_test.model.grant_secret(secret_name=secret_name, application=application)
+
+    # update the application config to include the secret
+    await ops_test.model.applications[application].set_config(
+        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
+    )
 
 
 async def download_client_certificate_from_unit(

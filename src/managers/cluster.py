@@ -21,7 +21,7 @@ from common.exceptions import (
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, EtcdClusterState, Status, TLSState
+from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, Status, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,25 @@ class ClusterManager:
             return hex(leader_id)[2:]
         except (KeyError, JSONDecodeError) as e:
             raise RaftLeaderNotFoundError(f"No raft leader found: {e}")
+
+    @property
+    def is_cluster_failed(self) -> bool:
+        """Check if the cluster is experiencing majority failure.
+
+        Returns:
+            bool: True if the cluster has failed, False if not.
+        """
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=f"http://{self.state.unit_server.ip}:{METRICS_PORT}/metrics",
+        )
+
+        if client.get_metric(metric_name="etcd_server_has_leader") == "0":
+            logger.warning("Cluster failed - no raft leader")
+            return True
+
+        return False
 
     @retry(
         stop=stop_after_attempt(3),
@@ -199,7 +218,7 @@ class ClusterManager:
                 client = EtcdClient(
                     username=self.admin_user,
                     password=self.admin_password,
-                    client_url=",".join(e for e in self.cluster_endpoints),
+                    client_url=self.state.unit_server.client_url,
                 )
                 cluster_members, member_id = client.add_member_as_learner(
                     server.member_name, peer_url
@@ -300,9 +319,32 @@ class ClusterManager:
                 # wait for leadership to be moved before continuing operation
                 if self.is_healthy(cluster=True):
                     logger.debug(f"Successfully moved leader to {new_leader_id}.")
-        except (EtcdClusterManagementError, RaftLeaderNotFoundError, ValueError) as e:
+        except (
+            EtcdClusterManagementError,
+            RaftLeaderNotFoundError,
+            ValueError,
+            StopIteration,
+        ) as e:
             logger.warning(f"Could not transfer cluster leadership: {e}")
             return
+
+    def remove_inconsistent_members_if_required(self) -> None:
+        """Check current cluster members and remove those not existing anymore."""
+        client = EtcdClient(
+            username=self.admin_user,
+            password=self.admin_password,
+            client_url=self.state.unit_server.client_url,
+        )
+
+        cluster_members = client.member_list()
+        for name, member in cluster_members.items():
+            if name not in [server.member_name for server in self.state.servers]:
+                logger.warning(
+                    f"Member {name} does not exist anymore and will be removed from the cluster."
+                )
+                client.remove_member(member.id)
+
+        self.update_cluster_member_state()
 
     def update_cluster_member_state(self) -> None:
         """Get up-to-date member information and store in cluster state."""
@@ -328,7 +370,11 @@ class ClusterManager:
         status_list = []
 
         if self.state.unit_server.is_started:
-            if self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value:
+            if (
+                self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value
+                and not self.state.cluster.is_restore_in_progress
+                and not self.state.cluster.rebuild_cluster_in_progress
+            ):
                 status_list.append(Status.CLUSTER_NOT_INITIALIZED)
 
             if not self.state.cluster.auth_enabled:
@@ -339,6 +385,9 @@ class ClusterManager:
 
         if not self.state.cluster.cluster_state:
             status_list.append(Status.CLUSTER_INITIALIZING)
+
+        if self.state.cluster.rebuild_cluster_in_progress:
+            status_list.append(Status.CLUSTER_REBUILD_IN_PROGRESS)
 
         return status_list
 

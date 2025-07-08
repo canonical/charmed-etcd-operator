@@ -5,6 +5,7 @@
 """Charmed machine operator for etcd."""
 
 import logging
+from subprocess import CalledProcessError
 
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -13,6 +14,7 @@ from ops import StatusBase
 
 from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
+from events.backup import BackupEvents
 from events.etcd import EtcdEvents
 from events.external_clients import ExternalClientsEvents
 from events.tls import TLSEvents
@@ -26,6 +28,7 @@ from literals import (
     TLSState,
     TLSType,
 )
+from managers.backup import BackupManager
 from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.external_clients import ExternalClientsManager
@@ -50,6 +53,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             state=self.state, workload=self.workload, config=self.config
         )
         self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
+        self.backup_manager = BackupManager(state=self.state, workload=self.workload)
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE
         )
@@ -57,6 +61,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         # --- EVENT HANDLERS ---
         self.etcd_events = EtcdEvents(self)
         self.tls_events = TLSEvents(self)
+        self.backup_events = BackupEvents(self)
         self.external_clients_events = ExternalClientsEvents(self)
 
         # --- LIB EVENT HANDLERS ---
@@ -208,7 +213,18 @@ class EtcdOperatorCharm(ops.CharmBase):
     def _restart_ca_rotation(self, _) -> None:
         """Restart callback for CA rotation."""
         logger.debug("ca rotation restart")
-        self._restart(None)
+
+        self.config_manager.set_config_properties()
+        # do not raise in case health check fails
+        # this can happen if the client certificate has already expired
+        # on CA-rotation the certs are only updated AFTER all cluster members updated the CA
+        if not self.cluster_manager.restart_member():
+            try:
+                self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
+                raise HealthCheckFailedError("Failed to check health of the member after restart")
+            except CalledProcessError:
+                logger.warning("Health check failed, TLS client certificates expired")
+
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
             self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NEW_CA_ADDED)
 
@@ -232,7 +248,16 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.tls_manager.update_cas(self.tls_events.collect_client_cas(), TLSType.CLIENT)
             self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NO_ROTATION)
 
-        self._restart(None)
+        self.config_manager.set_config_properties()
+        # do not raise in case health check fails
+        # this can happen if the client certificate has already expired but was not renewed yet
+        # in case the peer certificate came first
+        if not self.cluster_manager.restart_member():
+            try:
+                self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
+                raise HealthCheckFailedError("Failed to check health of the member after restart")
+            except CalledProcessError:
+                logger.warning("Health check failed, TLS client certificates expired")
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         """Compute the current status for this unit.
@@ -243,6 +268,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         """
         if self.app.planned_units() == 0:
             event.add_status(Status.REMOVED.value.status)
+            return
 
         # compute cluster status
         for status in self.cluster_manager.compute_component_status():
@@ -255,8 +281,9 @@ class EtcdOperatorCharm(ops.CharmBase):
         for status in self.external_clients_manager.compute_component_status():
             event.add_status(status.value.status)
 
-        # compute backup or other component's  status
-        # todo: add compute logic here
+        # compute backup status
+        for status in self.backup_manager.compute_component_status():
+            event.add_status(status.value.status)
 
         # add all other statuses collected during the current hook
         for status in self.pending_inactive_statuses + [Status.ACTIVE]:

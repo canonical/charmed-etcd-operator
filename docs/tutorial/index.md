@@ -1,4 +1,3 @@
-(tutorial)=
 # Tutorial
 
 Whether you have experience with Etcd databases, Juju orchestration, or neither, this tutorial will walk you through the essential aspects of deploying and operating Charmed Etcd.
@@ -15,7 +14,7 @@ Whether you have experience with Etcd databases, Juju orchestration, or neither,
 * Deploy a small Charmed Etcd cluster
 * Connect to the cluster through a unit
 
-## Install and initialize LXD
+## Install and initialise LXD
 
 The simplest way to get started with charmed etcd is to set up a local LXD cloud.
 [LXD](https://documentation.ubuntu.com/lxd/en/latest/) is a system container and
@@ -49,7 +48,7 @@ in the tutorial, none should exist, so you'll only see this as output:
 
 ## Install and set up Juju
 
-[Juju](https://juju.is/docs/juju) is an Operator Lifecycle Manager (OLM) for clouds,
+[Juju](https://juju.is/docs/juju) is an Operator Life cycle Manager (OLM) for clouds,
 bare metal, LXD or Kubernetes. We will be using it to deploy and manage charmed etcd. 
 
 As with LXD, Juju is installed using a snap package:
@@ -122,13 +121,12 @@ Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.0    unsupported  17:26:15Z
 ```
 
-(deploy-etcd)=
 ## Deploy etcd
 
 To deploy charmed etcd, all you need to do is run the following command:
 
 ```text
-juju deploy charmed-etcd -n 3 --channel 3.5/edge
+juju deploy charmed-etcd -n 3 --channel 3.6/edge
 ```
 
 ```{note}
@@ -137,7 +135,7 @@ The `-n` flag is optional and specifies the number of units to deploy. In this c
 We recommend deploying at least three units for high availability.
 ```
 
-The command will fetch the charm from [Charmhub](https://charmhub.io/charmed-etcd?channel=3.5/edge)
+The command will fetch the charm from [Charmhub](https://charmhub.io/charmed-etcd?channel=3.6/edge)
 and deploy 3 units to the LXD cloud. This process can take several minutes
 depending on your machine. 
 
@@ -185,7 +183,7 @@ To confirm that the API is reachable, we can use `curl` to make a request to one
 
 ## Next steps
 
-Now that your cluster is set up, you can check [how-to guides](#how-to) such as:
-* [How to scale your cluster](#scale-horizontally)
-* [How to manage TLS encryption](#tls)
-* [How to manage passwords](#manage-passwords)
+Now that your cluster is set up, you can check [how-to guides](../how-to/index.md) such as:
+* [How to scale your cluster](../how-to/scale-horizontally.md)
+* [How to manage TLS encryption](../how-to/tls/index.md)
+* [How to manage passwords](../how-to/manage-passwords.md)

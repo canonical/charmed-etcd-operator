@@ -107,7 +107,7 @@ class RequirerCharmCharm(ops.CharmBase):
         certs, _ = self.certificates.get_assigned_certificates()
         if not certs:
             return None
-        return "\n".join(cert.raw for cert in certs[0].chain[::-1])
+        return "\n".join(cert.raw for cert in certs[0].chain[::])
 
     @property
     def ca_cert(self) -> str | None:
@@ -285,7 +285,7 @@ class RequirerCharmCharm(ops.CharmBase):
     def _install_etcd_snap(self) -> bool:
         """Install the etcd snap."""
         try:
-            self.etcd_snap.ensure(snap.SnapState.Present, channel="3.5/edge")
+            self.etcd_snap.ensure(snap.SnapState.Present, channel="3.6/edge")
             self.etcd_snap.hold()
             return True
         except snap.SnapError as e:
@@ -363,8 +363,10 @@ def _get(endpoints: str, key: str) -> str | None:
 def _get_common_name_from_chain(mtls_cert: str) -> str:
     """Get common name from chain."""
     raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
+    raw_cas.remove("")
     # add the marker back to the certificate
-    cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
+    # we take the last certificate from the provided mtls_cert, assuming this is the client cert
+    cert = raw_cas[-1].strip() + "\n-----END CERTIFICATE-----"
     return Certificate.from_string(cert).common_name
 
 

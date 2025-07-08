@@ -119,20 +119,29 @@ class ExternalClientsEvents(Object):
                         logger.error(f"Failed to remove old user from etcd: {e}")
                     self.charm.external_clients_manager.remove_managed_user(event.relation.id)
 
+                relation_managed_user = (
+                    self.charm.external_clients_manager.get_relation_managed_user(
+                        event.relation.id
+                    )
+                )
                 if self.charm.cluster_manager.get_user(common_name) is not None:
-                    logger.error("User already exists")
-                    self.charm.set_status(Status.EC_USERNAME_EXISTS)
+                    if common_name == relation_managed_user:
+                        logger.debug("User is already being added for this relation")
+                    else:
+                        logger.error("User already exists")
+                        self.charm.set_status(Status.EC_USERNAME_EXISTS)
                     return
 
-                logger.info("Creating new user")
-                self.charm.cluster_manager.add_managed_user(common_name, event.prefix)
-                self.charm.external_clients_manager.add_managed_user(
-                    event.relation.id, common_name
-                )
-                self.etcd_provides.set_credentials(event.relation.id, common_name, "")
-                self.charm.external_clients_manager.update_client_relations_data(
-                    etcd_version=self.charm.cluster_manager.get_version()
-                )
+                if relation_managed_user is None:
+                    logger.info(f"Creating new user: {common_name}")
+                    self.charm.cluster_manager.add_managed_user(common_name, event.prefix)
+                    self.charm.external_clients_manager.add_managed_user(
+                        event.relation.id, common_name
+                    )
+                    self.etcd_provides.set_credentials(event.relation.id, common_name, "")
+                    self.charm.external_clients_manager.update_client_relations_data(
+                        etcd_version=self.charm.cluster_manager.get_version()
+                    )
 
         relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
             event.relation.id

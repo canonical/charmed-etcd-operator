@@ -9,11 +9,10 @@ import pytest
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, TLSType
+from literals import INTERNAL_USER, PEER_RELATION, Status, TLSType
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     TLS_NAME,
     download_client_certificate_from_unit,
     get_certificate_from_unit,
@@ -34,10 +33,8 @@ TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 250
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
+async def test_build_and_deploy_with_tls(charm: str, ops_test: OpsTest) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
@@ -49,7 +46,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
 
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -58,8 +55,6 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=60)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Check if the TLS has been enabled on app startup."""
@@ -67,7 +62,14 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    # make sure data can be written to the cluster
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -75,11 +77,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https://"), "Peer URL is not https"
 
     logger.info("All cluster members have HTTPS peerURLs and clientURLs")
-
-    # make sure data can be written to the cluster
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
 
@@ -106,8 +103,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_tls(ops_test: OpsTest) -> None:
     """Disable TLS on a running cluster and check if it is still accessible."""
@@ -119,8 +114,12 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -128,11 +127,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("http://"), "Peer URL is not http"
 
     logger.info("All cluster members have HTTP peerURLs and clientURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTP peerURLs and clientURLs")
     assert (
@@ -164,8 +158,6 @@ async def test_disable_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_enable_tls(ops_test: OpsTest) -> None:
     """Enable TLS on a running cluster and check if it is still accessible."""
@@ -178,7 +170,13 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -186,11 +184,6 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https://"), "Peer URL is not https"
 
     logger.info("All cluster members have HTTPS peerURLs and clientURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
     assert (
@@ -225,8 +218,6 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     """Disable then enable peer TLS on a running cluster and check if it is still accessible."""
@@ -250,7 +241,13 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -258,11 +255,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("http://"), "Peer URL is not http"
 
     logger.info("All cluster members have HTTPS clientURLs and HTTP peerURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTP peerURLs and HTTPS clientURLs")
     assert (
@@ -302,7 +294,9 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -350,8 +344,6 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     """Disable then enable client TLS on a running cluster and check if it is still accessible."""
@@ -371,10 +363,14 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -382,11 +378,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https://"), "Peer URL is not https"
 
     logger.info("All cluster members have HTTP clientURLs and HTTPS peerURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and HTTP clientURLs")
     assert (
@@ -427,7 +418,9 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -475,8 +468,6 @@ async def test_disable_and_enable_client_tls(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_certificate_expiration(ops_test: OpsTest) -> None:
     """Test the TLS certificate expiration on a running cluster."""
@@ -490,10 +481,14 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
 
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -501,11 +496,6 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("http://"), "Peer URL is not http"
 
     logger.info("All cluster members have HTTP peerURLs and clientURLs")
-
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
-
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTP peerURLs and clientURLs")
     assert (
@@ -547,13 +537,27 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=15)
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME, TLS_NAME],
+        units_full_statuses={
+            APP_NAME: {
+                "units": {
+                    "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
+                    "active": [],
+                }
+            },
+            TLS_NAME: {"units": {"active": []}},
+        },
+    )
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:

@@ -1,8 +1,8 @@
 # How to enable TLS
 
-Transport Layer Security (TLS) plays a crucial role in securing database communications.  Just as it protects web traffic, TLS encrypts the data transmitted between database clients and servers, preventing unauthorized access and ensuring confidentiality.
+Transport Layer Security (TLS) plays a crucial role in securing database communications.  Just as it protects web traffic, TLS encrypts the data transmitted between database clients and servers, preventing unauthorised access and ensuring confidentiality.
 
-etcd provides a secure transport layer for **peer-to-peer** and **client-server** communication, and the charm provides a simmple way of enabling TLS encryption for both types.
+etcd provides a secure transport layer for **peer-to-peer** and **client-server** communication, and the charm provides a simple way of enabling TLS encryption for both types.
 
 Peer-to-peer
 : All communication between members in the cluster will be encrypted and authenticated using the client certificates. 
@@ -18,7 +18,7 @@ Charmed etcd provides the option of using different CA certificates for client-s
 
 You can enable peer-to-peer encryption alone, client-to-server encryption alone, or both at the same time.
 
-This guide will use the [Self-signed Certificates](https://charmhub.io/self-signed-certificates) charm as an example for al cases.
+This guide will use the [Self-signed Certificates](https://charmhub.io/self-signed-certificates) charm as an example for all cases.
 
 ```{caution}
 **[Self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) are not recommended for a production environment.**
@@ -26,7 +26,7 @@ This guide will use the [Self-signed Certificates](https://charmhub.io/self-sign
 Check [this guide](https://charmhub.io/topics/security-with-x-509-certificates) for an overview of all the TLS certificates charms available. 
 ```
 
-Deploy the `self-signed-certificates` charm. etcd uses `v4` of the [tls-certificates library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates), which is currently only supported in the `edge` channel.
+Deploy the `self-signed-certificates` charm. etcd uses `v4` of the [{spellexception}`tls-certificates` library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates), which is currently only supported in the `edge` channel.
 
 ```shell
 juju deploy self-signed-certificates --channel edge
@@ -187,7 +187,7 @@ You can also deploy the cluster with encryption enabled from the start by integr
 
 ```text
 juju deploy self-signed-certificates --channel edge
-juju deploy charmed-etcd -n 3 --channel 3.5/edge
+juju deploy charmed-etcd -n 3 --channel 3.6/edge
 juju integrate self-signed-certificates:certificates charmed-etcd:client-certificates
 juju integrate self-signed-certificates:certificates charmed-etcd:peer-certificates
 ```

@@ -1,0 +1,28 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+create-backup:
+  description: Create a database backup and send it to an object storage.
+    S3 credentials are retrieved from a relation with the S3 integrator charm.
+
+list-backups:
+  description: List database backups. 
+    S3 credentials are retrieved from a relation with the S3 integrator charm.
+
+restore:
+  description: Restore a database backup from object storage.
+    S3 credentials are retrieved from a relation with the S3 integrator charm.
+  params:
+    backup-id:
+      type: string
+      description: A backup-id to identify the backup to restore. Format of <%Y-%m-%dT%H:%M:%SZ>
+
+rebuild-cluster:
+  description: Stop the cluster and rebuild the cluster membership configuration.
+    This action induces a downtime if executed on a running cluster. It should only be used to
+    recover from majority failure, and it must be run on the Juju leader. The cluster will be 
+    initialised with new membership configuration, based on the current Juju units at runtime.
+  params:
+    force:
+      type: boolean
+      description: Force the rebuild of a cluster even if the majority was not lost.

@@ -21,7 +21,6 @@ from literals import (
 
 from ..helpers import (
     APP_NAME,
-    CHARM_PATH,
     SecretNotFoundError,
     add_secret,
     download_client_certificate_from_unit,
@@ -43,10 +42,8 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
+async def test_build_and_deploy_with_tls(charm: str, ops_test: OpsTest) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
@@ -57,7 +54,7 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(CHARM_PATH, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -66,8 +63,6 @@ async def test_build_and_deploy_with_tls(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], idle_period=60)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Check if the TLS has been enabled on app startup."""
@@ -78,7 +73,14 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
 
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    # make sure data can be written to the cluster
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     for cluster_member in cluster_members:
@@ -86,11 +88,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         assert cluster_member["peerURLs"][0].startswith("https://"), "Peer URL is not https"
 
     logger.info("All cluster members have HTTPS peerURLs and clientURLs")
-
-    # make sure data can be written to the cluster
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
 
@@ -117,8 +114,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_set_private_key(ops_test: OpsTest) -> None:
     """Set a new private key and check if the cluster is still accessible."""
@@ -188,7 +183,9 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     assert (
@@ -264,7 +261,9 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    cluster_members = get_cluster_members(endpoints, tls_enabled=True)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
     assert (
