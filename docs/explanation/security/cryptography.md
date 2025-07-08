@@ -1,3 +1,4 @@
+(cryptography_page)=
 # Cryptography
 
 This document describes the cryptography used by Charmed etcd.

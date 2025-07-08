@@ -3,12 +3,8 @@
 Additional context about key concepts behind the etcd charm.
 
 ## Security and hardening
-* [Security hardening guide][Security]
-  * [Cryptography]
-
-
-[Security]: /explanation/security/index
-[Cryptography]: /explanation/security/cryptography
+* [Security hardening guide](security_index)
+  * [Cryptography](cryptography_page)
 
 
 ```{toctree}
