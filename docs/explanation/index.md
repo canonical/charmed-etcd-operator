@@ -1,8 +1,11 @@
 # Explanation
 
-Additional context about key concepts behind the etcd charm.
+Additional context for better understanding of key concepts behind the etcd charm.
 
 ## Security and hardening
+
+Security-related topics:
+
 * [Security hardening guide](security_index)
   * [Cryptography](cryptography_page)
 

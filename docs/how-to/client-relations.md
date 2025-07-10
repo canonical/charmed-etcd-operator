@@ -170,5 +170,5 @@ To remove the relation, you can use the `juju remove-relation` command:
 ```
 
 ```{caution}
- It's important to be aware that charmed etcd does not provide automatic `mtls_cert` rotation or expiration. Consequently, managing this certificate's life cycle must be handled by the user.
+It's important to be aware that charmed etcd does not provide automatic `mtls_cert` rotation or expiration. Consequently, managing this certificate's life cycle must be handled by the user.
  ```
