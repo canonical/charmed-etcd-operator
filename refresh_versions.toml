@@ -1,0 +1,11 @@
+charm_major = 1
+workload = "3.6.1"
+
+[snap]
+name = "charmed-etcd"
+
+[snap.revisions]
+# amd64
+x86_64 = "1"
+# arm64
+aarch64 = "1" 
