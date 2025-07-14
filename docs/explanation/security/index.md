@@ -103,7 +103,7 @@ For details on the cryptography used by Charmed etcd, see the [Cryptography](cry
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:glob:
 :hidden:
 
 Cryptography <cryptography>
+```
