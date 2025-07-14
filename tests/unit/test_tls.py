@@ -5,7 +5,6 @@
 import base64
 import dataclasses
 import json
-import socket
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
