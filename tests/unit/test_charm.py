@@ -181,7 +181,7 @@ def test_start():
             "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
             "authentication": "enabled",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0"},
     )
     state_in = testing.State(relations={relation})
     with (
@@ -202,7 +202,7 @@ def test_start():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (
@@ -223,7 +223,7 @@ def test_start():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation}, leader=True)
     with (
@@ -245,7 +245,7 @@ def test_start():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0"},
     )
     state_in = testing.State(relations={relation})
     with (
@@ -470,7 +470,7 @@ def test_cluster_majority_failure():
             "authentication": "enabled",
             "cluster_state": "existing",
         },
-        local_unit_data={"ip": "ip0"},
+        local_unit_data={"private_ip": "ip0"},
     )
     state_in = testing.State(relations={relation})
 
@@ -514,7 +514,7 @@ def test_cluster_majority_failure():
 
 
 def test_peer_relation_created():
-    test_data = {"hostname": "my_hostname", "ip": "my_ip"}
+    test_data = {"hostname": "my_hostname", "private_ip": "my_ip"}
 
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
@@ -627,7 +627,7 @@ def test_peer_relation_joined():
         peers_data={
             0: {
                 "hostname": "charmed-etcd0",
-                "ip": "ip0",
+                "private_ip": "ip0",
             },
         },
     )
@@ -641,11 +641,11 @@ def test_peer_relation_joined():
         peers_data={
             0: {
                 "hostname": "charmed-etcd0",
-                "ip": "ip0",
+                "private_ip": "ip0",
             },
             1: {
                 "hostname": "charmed-etcd1",
-                "ip": "ip1",
+                "private_ip": "ip1",
             },
         },
     )
@@ -687,7 +687,7 @@ def test_peer_relation_changed():
         peers_data={
             0: {
                 "hostname": "charmed-etcd0",
-                "ip": "ip0",
+                "private_ip": "ip0",
             },
         },
     )
@@ -701,7 +701,7 @@ def test_peer_relation_changed():
         peers_data={
             1: {
                 "hostname": "charmed-etcd1",
-                "ip": "ip1",
+                "private_ip": "ip1",
                 "state": "started",
             },
         },
@@ -711,7 +711,7 @@ def test_peer_relation_changed():
             "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
             "learning_member": "4477466968462020105",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation}, leader=True)
     with patch(
@@ -969,7 +969,7 @@ def test_rebuild_cluster_workflow_synchronisation():
             "cluster_state": "existing",
             "cluster_members": "etcd0=http://ip0:2380,etcd1=http://ip1:2380",
         },
-        local_unit_data={"hostname": "etcd0", "ip": "ip0"},
+        local_unit_data={"hostname": "etcd0", "private_ip": "ip0"},
     )
     state_in = testing.State(relations={peer_relation}, leader=False)
 
@@ -999,7 +999,7 @@ def test_rebuild_cluster_workflow_synchronisation():
             "state": "started",
             "rebuild_completed": "True",
             "hostname": "etcd0",
-            "ip": "ip0",
+            "private_ip": "ip0",
         },
     )
     state_in = testing.State(relations={peer_relation}, leader=True)

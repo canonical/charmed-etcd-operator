@@ -40,12 +40,16 @@ class ClusterManager:
         """Collect hostname mapping for current unit.
 
         Returns:
-            dict[str, str]: Dict of string keys 'hostname', 'ip' and their values
+            dict[str, str]: Dict of string keys 'hostname', 'private_ip', 'public_ip' and their values
         """
         hostname = socket.gethostname()
-        ip = socket.gethostbyname(hostname)
+        private_ip = self.workload.get_private_ip()
+        public_ip = self.workload.get_public_ip() or ""
+        if not private_ip:
+            raise ValueError("Could not get private IP address of the unit.")
 
-        return {"hostname": hostname, "ip": ip}
+
+        return {"hostname": hostname, "pivate_ip": private_ip, "public_ip": public_ip}
 
     @property
     def leader(self) -> str:

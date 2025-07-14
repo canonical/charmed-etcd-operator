@@ -209,10 +209,10 @@ class EtcdEvents(Object):
             return
 
         # refresh the host information and cluster membership in case of ip change
-        ip_address = self.charm.cluster_manager.get_host_mapping().get("ip")
-        if ip_address != self.charm.state.unit_server.ip:
+        ip_address = self.charm.cluster_manager.get_host_mapping().get("private_ip")
+        if ip_address and ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
-            self.charm.state.unit_server.update({"ip": ip_address})
+            self.charm.state.unit_server.update({"private_ip": ip_address})
 
             # update cluster configuration
             self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)

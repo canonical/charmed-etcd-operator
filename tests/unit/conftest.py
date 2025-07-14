@@ -51,7 +51,7 @@ def cluster_tls_context():
             ),
         },
         local_unit_data={
-            "ip": current_unit.client_urls[0].replace("http://", "").replace(":2379", ""),
+            "private_ip": current_unit.client_urls[0].replace("http://", "").replace(":2379", ""),
             "hostname": current_unit.name,
             "client_cert_ready": "True",
             "peer_cert_ready": "True",
@@ -62,7 +62,7 @@ def cluster_tls_context():
             int(member.id): {
                 "client_cert_ready": "True",
                 "hostname": member.name,
-                "ip": member.client_urls[0].replace("http://", "").replace(":2379", ""),
+                "private_ip": member.client_urls[0].replace("http://", "").replace(":2379", ""),
                 "peer_cert_ready": "True",
                 "tls_client_state": "tls",
                 "tls_peer_state": "tls",
@@ -94,12 +94,12 @@ def cluster_no_tls_context():
             ),
         },
         local_unit_data={
-            "ip": current_unit.client_urls[0].replace("https://", "").replace(":2379", ""),
+            "private_ip": current_unit.client_urls[0].replace("https://", "").replace(":2379", ""),
             "hostname": current_unit.name,
         },
         peers_data={
             int(member.id): {
-                "ip": member.client_urls[0].replace("https://", "").replace(":2379", ""),
+                "private_ip": member.client_urls[0].replace("https://", "").replace(":2379", ""),
                 "hostname": member.name,
             }
             for member in peer_units
@@ -108,3 +108,7 @@ def cluster_no_tls_context():
     restart_relation = testing.PeerRelation(id=4, endpoint="restart")
 
     return ctx, [peer_relation, restart_relation]
+
+@pytest.fixture(autouse=True) # autouse=True makes this fixture run for all tests in the module
+def mock_get_host_mapping(mocker):
+    mocker.patch('managers.cluster.ClusterManager.get_host_mapping', return_value={"hostname": "my_hostname", "private_ip": "my_ip", "public_ip": "my_public_ip"}  )
