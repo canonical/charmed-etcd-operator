@@ -48,7 +48,7 @@ class ClusterManager:
         if not private_ip:
             raise ValueError("Could not get private IP address of the unit.")
 
-        return {"hostname": hostname, "pivate_ip": private_ip, "public_ip": public_ip}
+        return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
 
     @property
     def leader(self) -> str:
