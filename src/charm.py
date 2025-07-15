@@ -10,6 +10,7 @@ from subprocess import CalledProcessError
 import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
+from data_platform_helpers.advanced_statuses.handler import StatusHandler
 from ops import StatusBase
 
 from common.exceptions import HealthCheckFailedError
@@ -56,6 +57,11 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.backup_manager = BackupManager(state=self.state, workload=self.workload)
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE
+        )
+
+        self.status = StatusHandler(  # priority order
+            self,
+            self.cluster_manager,
         )
 
         # --- EVENT HANDLERS ---

@@ -9,6 +9,9 @@ import socket
 from json import JSONDecodeError
 from typing import List
 
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
 from common.client import EtcdClient
@@ -26,8 +29,11 @@ from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, Status, TLSS
 logger = logging.getLogger(__name__)
 
 
-class ClusterManager:
+class ClusterManager(ManagerStatusProtocol):
     """Manage cluster members, quorum and authorization."""
+
+    name: str = "cluster"
+    state: ClusterState
 
     def __init__(self, state: ClusterState, workload: WorkloadBase):
         self.state = state
@@ -485,3 +491,7 @@ class ClusterManager:
                         self.remove_managed_user(inactive_user)
             except EtcdUserManagementError as e:
                 logger.error(f"Failed to remove inactive user from etcd: {e}")
+
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+        """Get the statuses for the cluster manager."""
+        return []

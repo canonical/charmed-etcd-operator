@@ -16,6 +16,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from charms.tls_certificates_interface.v4.tls_certificates import (
     ProviderCertificate,
 )
+from data_platform_helpers.advanced_statuses.protocol import StatusesState, StatusesStateProtocol
 from ops import Object, Relation, Unit
 
 from core.models import EtcdCluster, EtcdServer
@@ -27,6 +28,7 @@ from literals import (
     PEER_TLS_RELATION_NAME,
     S3_RELATION_NAME,
     SECRETS_APP,
+    STATUS_PEERS_RELATION,
     SUBSTRATES,
 )
 
@@ -36,7 +38,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ClusterState(Object):
+class ClusterState(Object, StatusesStateProtocol):
     """Global state object for the etcd cluster."""
 
     def __init__(self, charm: "EtcdOperatorCharm", substrate: SUBSTRATES):
@@ -47,6 +49,8 @@ class ClusterState(Object):
             self.model, relation_name=PEER_RELATION, additional_secret_fields=SECRETS_APP
         )
         self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_RELATION)
+        self.statuses_relation_name = STATUS_PEERS_RELATION
+        self.statuses = StatusesState(self, self.statuses_relation_name)
 
     @property
     def peer_relation(self) -> Relation | None:

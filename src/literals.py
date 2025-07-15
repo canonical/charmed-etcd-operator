@@ -27,6 +27,7 @@ BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
+STATUS_PEERS_RELATION = "status-peers"
 RESTART_RELATION = "restart"
 EXTERNAL_CLIENTS_RELATION = "etcd-client"
 CERTIFICATE_TRANSFER_RELATION = "client-cas"
