@@ -31,11 +31,11 @@ from literals import (
     PEER_TLS_RELATION_NAME,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
-    Status,
     TLSCARotationState,
     TLSState,
     TLSType,
 )
+from statuses import TLSStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -85,13 +85,33 @@ class TLSEvents(Object):
             if (
                 peer_private_key := self.read_and_validate_private_key(peer_private_key_id)
             ) is None:
-                self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
+                self.charm.state.statuses.add(
+                    TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
+                    scope="unit",
+                    component=self.charm.tls_manager.name,
+                )
+            else:
+                self.charm.state.statuses.delete(
+                    TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
+                    scope="unit",
+                    component=self.charm.tls_manager.name,
+                )
 
         if client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if (
                 client_private_key := self.read_and_validate_private_key(client_private_key_id)
             ) is None:
-                self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
+                self.charm.state.statuses.add(
+                    TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
+                    scope="unit",
+                    component=self.charm.tls_manager.name,
+                )
+            else:
+                self.charm.state.statuses.delete(
+                    TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
+                    scope="unit",
+                    component=self.charm.tls_manager.name,
+                )
 
         self.peer_certificate = TLSCertificatesRequiresV4(
             self.charm,
@@ -284,10 +304,12 @@ class TLSEvents(Object):
         )
 
         self.charm.tls_manager.set_tls_state(state=TLSState.TO_NO_TLS, tls_type=cert_type)
-        self.charm.set_status(
-            Status.TLS_DISABLING_PEER_TLS
+        self.charm.state.statuses.add(
+            TLSStatuses.TLS_DISABLING_PEER_TLS.value
             if cert_type == TLSType.PEER
-            else Status.TLS_DISABLING_CLIENT_TLS
+            else TLSStatuses.TLS_DISABLING_CLIENT_TLS.value,
+            scope="unit",
+            component=self.charm.tls_manager.name,
         )
         self.charm.tls_manager.set_cert_state(cert_type, is_ready=False)
 

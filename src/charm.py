@@ -62,6 +62,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.status = StatusHandler(  # priority order
             self,
             self.cluster_manager,
+            self.tls_manager,
         )
 
         # --- EVENT HANDLERS ---

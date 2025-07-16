@@ -11,16 +11,23 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
     ProviderCertificate,
 )
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import SUBSTRATES, Status, TLSCARotationState, TLSState, TLSType
+from literals import SUBSTRATES, TLSCARotationState, TLSState, TLSType
+from statuses import CharmStatuses, TLSStatuses
 
 logger = logging.getLogger(__name__)
 
 
-class TLSManager:
+class TLSManager(ManagerStatusProtocol):
     """Manage all TLS related events."""
+
+    name: str = "tls"
+    state: ClusterState
 
     def __init__(self, state: ClusterState, workload: WorkloadBase, substrate: SUBSTRATES):
         self.state = state
@@ -235,32 +242,38 @@ class TLSManager:
                 ]
             )
 
-    def compute_component_status(self) -> list[Status]:
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the component status."""
+        if not recompute:
+            return self.state.statuses.get(
+                scope=scope,
+                component=self.name,
+            ).root
+
         status_list = []
 
         if self.state.unit_server.tls_peer_state == TLSState.TO_TLS:
-            status_list.append(Status.TLS_ENABLING_PEER_TLS)
+            status_list.append(TLSStatuses.TLS_ENABLING_PEER_TLS.value)
 
         if self.state.unit_server.tls_client_state == TLSState.TO_TLS:
-            status_list.append(Status.TLS_ENABLING_CLIENT_TLS)
+            status_list.append(TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
 
         if self.state.unit_server.tls_peer_state == TLSState.TO_NO_TLS:
-            status_list.append(Status.TLS_DISABLING_PEER_TLS)
+            status_list.append(TLSStatuses.TLS_DISABLING_PEER_TLS.value)
 
         if self.state.unit_server.tls_client_state == TLSState.TO_NO_TLS:
-            status_list.append(Status.TLS_DISABLING_CLIENT_TLS)
+            status_list.append(TLSStatuses.TLS_DISABLING_CLIENT_TLS.value)
 
         if self.state.unit_server.tls_peer_ca_rotation_state != TLSCARotationState.NO_ROTATION:
-            status_list.append(Status.TLS_PEER_CA_ROTATING)
+            status_list.append(TLSStatuses.TLS_PEER_CA_ROTATING.value)
 
         if self.state.unit_server.tls_client_ca_rotation_state != TLSCARotationState.NO_ROTATION:
-            status_list.append(Status.TLS_CLIENT_CA_ROTATING)
+            status_list.append(TLSStatuses.TLS_CLIENT_CA_ROTATING.value)
 
         if self.state.unit_server.tls_client_certs_expiring:
-            status_list.append(Status.TLS_CLIENT_CERTS_EXPIRING)
+            status_list.append(TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value)
 
         if self.state.unit_server.tls_peer_certs_expiring:
-            status_list.append(Status.TLS_PEER_CERTS_EXPIRING)
+            status_list.append(TLSStatuses.TLS_PEER_CERTS_EXPIRING.value)
 
-        return status_list
+        return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
