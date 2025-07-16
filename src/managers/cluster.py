@@ -24,7 +24,8 @@ from common.exceptions import (
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, Status, TLSState
+from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, TLSState
+from statuses import CharmStatuses, ClusterStatuses, EtcdServiceStatuses
 
 logger = logging.getLogger(__name__)
 
@@ -371,31 +372,33 @@ class ClusterManager(ManagerStatusProtocol):
             # we should not have errors here, but if we do, we don't want the error to raise
             logger.warning(f"Error updating the cluster member state: {e}")
 
-    def compute_component_status(self) -> List[Status]:
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the Cluster manager's statuses."""
-        status_list = []
+        if not recompute:
+            return self.state.statuses.get(scope=scope, component=self.name).root
 
+        status_list: list[StatusObject] = []
         if self.state.unit_server.is_started:
             if (
                 self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value
                 and not self.state.cluster.is_restore_in_progress
                 and not self.state.cluster.rebuild_cluster_in_progress
             ):
-                status_list.append(Status.CLUSTER_NOT_INITIALIZED)
+                status_list.append(ClusterStatuses.CLUSTER_NOT_INITIALIZED.value)
 
             if not self.state.cluster.auth_enabled:
-                status_list.append(Status.AUTHENTICATION_NOT_ENABLED)
+                status_list.append(ClusterStatuses.AUTHENTICATION_NOT_ENABLED.value)
 
         if not self.state.peer_relation:
-            status_list.append(Status.SERVICE_INSTALLING)
+            status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
 
         if not self.state.cluster.cluster_state:
-            status_list.append(Status.CLUSTER_INITIALIZING)
+            status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
 
         if self.state.cluster.rebuild_cluster_in_progress:
-            status_list.append(Status.CLUSTER_REBUILD_IN_PROGRESS)
+            status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
 
-        return status_list
+        return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 
     def get_user(self, username: str) -> dict | None:
         """Get the user information.
@@ -491,7 +494,3 @@ class ClusterManager(ManagerStatusProtocol):
                         self.remove_managed_user(inactive_user)
             except EtcdUserManagementError as e:
                 logger.error(f"Failed to remove inactive user from etcd: {e}")
-
-    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
-        """Get the statuses for the cluster manager."""
-        return []
