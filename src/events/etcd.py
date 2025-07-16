@@ -100,7 +100,7 @@ class EtcdEvents(Object):
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
         if not self.charm.workload.install():
-            self.charm.state.statuses.add(
+            self.charm.state.statuses.set(
                 EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
                 scope="unit",
                 component=self.charm.cluster_manager.name,
@@ -188,7 +188,7 @@ class EtcdEvents(Object):
                         # if removing fails, we cannot start the workload or the member would crash
                         raise
 
-                self.charm.state.statuses.add(
+                self.charm.state.statuses.set(
                     EtcdServiceStatuses.SERVICE_STARTING.value,
                     scope="unit",
                     component=self.charm.cluster_manager.name,
@@ -197,17 +197,33 @@ class EtcdEvents(Object):
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
-            self.charm.state.statuses.add(
+            self.charm.state.statuses.set(
                 ClusterStatuses.CLUSTER_NOT_JOINED.value,
                 scope="unit",
                 component=self.charm.cluster_manager.name,
             )
             event.defer()
             return
+        self.charm.state.statuses.delete(
+            ClusterStatuses.CLUSTER_NOT_JOINED.value,
+            scope="unit",
+            component=self.charm.cluster_manager.name,
+        )
 
         if not self.charm.workload.alive():
-            self.charm.state.statuses.add(
+            self.charm.state.statuses.set(
                 EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                scope="unit",
+                component=self.charm.cluster_manager.name,
+            )
+        else:
+            self.charm.state.statuses.delete(
+                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                scope="unit",
+                component=self.charm.cluster_manager.name,
+            )
+            self.charm.state.statuses.delete(
+                EtcdServiceStatuses.SERVICE_STARTING.value,
                 scope="unit",
                 component=self.charm.cluster_manager.name,
             )
@@ -285,6 +301,11 @@ class EtcdEvents(Object):
                 try:
                     # this will promote any learner, not only the unit that updated its relation data
                     self.charm.cluster_manager.promote_learning_member()
+                    self.charm.state.statuses.delete(
+                        ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value,
+                        scope="unit",
+                        component=self.charm.cluster_manager.name,
+                    )
                 except EtcdClusterManagementError as e:
                     logger.warning(e)
 
@@ -362,6 +383,12 @@ class EtcdEvents(Object):
             )
             return
 
+        self.charm.state.statuses.delete(
+            CharmStatuses.NO_PEER_RELATION.value,
+            scope="unit",
+            component=self.charm.cluster_manager.name,
+        )
+
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
                 try:
@@ -378,7 +405,7 @@ class EtcdEvents(Object):
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
-                self.charm.state.statuses.add(
+                self.charm.state.statuses.set(
                     ClusterStatuses.CLUSTER_FAILED.value,
                     scope="unit",
                     component=self.charm.cluster_manager.name,
@@ -401,7 +428,7 @@ class EtcdEvents(Object):
 
         if not self.charm.workload.alive():
             if not self.charm.cluster_manager.restart_member():
-                self.charm.state.statuses.add(
+                self.charm.state.statuses.set(
                     EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
                     scope="unit",
                     component=self.charm.cluster_manager.name,
@@ -410,7 +437,7 @@ class EtcdEvents(Object):
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
-                self.charm.state.statuses.add(
+                self.charm.state.statuses.set(
                     ClusterStatuses.CLUSTER_FAILED.value,
                     scope="unit",
                     component=self.charm.cluster_manager.name,
@@ -424,6 +451,11 @@ class EtcdEvents(Object):
             try:
                 self.charm.cluster_manager.clean_users()
                 self.charm.cluster_manager.remove_inconsistent_members_if_required()
+                self.charm.state.statuses.delete(
+                    ClusterStatuses.CLUSTER_MANAGEMENT_ERROR.value,
+                    scope="unit",
+                    component=self.charm.cluster_manager.name,
+                )
             except (
                 AttributeError,
                 KeyError,
@@ -530,7 +562,7 @@ class EtcdEvents(Object):
 
         self.charm.workload.stop()
         self.charm.state.unit_server.update({"state": ""})
-        self.charm.state.statuses.add(
+        self.charm.state.statuses.set(
             ClusterStatuses.REMOVED.value,
             scope="unit",
             component=self.charm.cluster_manager.name,
@@ -553,6 +585,11 @@ class EtcdEvents(Object):
                         )
                         self.charm.state.cluster.update(
                             {f"{INTERNAL_USER}-password": new_password}
+                        )
+                        self.charm.state.statuses.delete(
+                            ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+                            scope="unit",
+                            component=self.charm.cluster_manager.name,
                         )
                     except EtcdUserManagementError as e:
                         logger.error(e)
@@ -587,6 +624,11 @@ class EtcdEvents(Object):
                 component=self.charm.cluster_manager.name,
             )
             return
+        self.charm.state.statuses.delete(
+            TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
+            scope="unit",
+            component=self.charm.cluster_manager.name,
+        )
 
         self.charm.tls_events.refresh_tls_certificates_event.emit()
 
