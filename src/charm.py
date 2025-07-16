@@ -88,9 +88,6 @@ class EtcdOperatorCharm(ops.CharmBase):
             ],
         )
 
-        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
-        self.framework.observe(self.on.collect_app_status, self._on_collect_status)
-
     def set_status(self, key: Status) -> None:
         """Set charm status."""
         status: StatusBase = key.value.status
@@ -264,36 +261,6 @@ class EtcdOperatorCharm(ops.CharmBase):
                 raise HealthCheckFailedError("Failed to check health of the member after restart")
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
-
-    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
-        """Compute the current status for this unit.
-
-        Ops framework will choose the highest-priority status and set that as the status.
-        If there are multiple statuses with the same priority, the first one added wins.
-        Component statuses should be computed in their respective priority.
-        """
-        if self.app.planned_units() == 0:
-            event.add_status(Status.REMOVED.value.status)
-            return
-
-        # compute cluster status
-        for status in self.cluster_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        # compute TLS status
-        for status in self.tls_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        for status in self.external_clients_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        # compute backup status
-        for status in self.backup_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        # add all other statuses collected during the current hook
-        for status in self.pending_inactive_statuses + [Status.ACTIVE]:
-            event.add_status(status.value.status)
 
 
 if __name__ == "__main__":  # pragma: nocover
