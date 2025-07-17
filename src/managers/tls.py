@@ -264,3 +264,33 @@ class TLSManager:
             status_list.append(Status.TLS_PEER_CERTS_EXPIRING)
 
         return status_list
+
+    def collect_client_cas(self) -> list[str]:
+        """Collect client CAs.
+
+        Returns:
+            list[str]: The client CAs.
+        """
+        cas: list[str] = [self.state.tls_client_certificate.ca.raw]
+
+        # managed users cas
+        for relation in self.state.etcd_provides.relations:
+            mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
+            logger.debug(
+                f"Collecting CA from relation {relation.id}, chain exists: {bool(mtls_cert)}"
+            )
+            if mtls_cert:
+                cas.extend(self.separate_certificates(mtls_cert))
+
+        # certificate transfer cas
+        cas.extend(self.state.tls_certificate_transfer_certificates)
+
+        return cas
+
+    def collect_peer_ca(self) -> str:
+        """Collect peer CA.
+
+        Returns:
+            str: The peer CA.
+        """
+        return self.state.tls_peer_certificate.ca.raw
