@@ -3,6 +3,8 @@
 An etcd cluster automatically recovers from temporary failures of cluster members. If cluster members are lost permanently,
 etcd is able to withstand up to `(N-1)/2` lost members.
 
+As stated by the [official etcd docs](https://etcd.io/docs/v3.6/op-guide/recovery/):
+
 ```{caution}
 If the cluster permanently loses more than `(N-1)/2` members then it loses quorum and fails. 
 Once quorum is lost, the cluster cannot reach consensus and therefore cannot perform write operations anymore.
