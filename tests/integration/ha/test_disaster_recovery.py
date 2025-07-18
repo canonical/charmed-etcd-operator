@@ -86,7 +86,7 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
 @pytest.mark.abort_on_fail
 async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
     """Users can run `rebuild-cluster` on a healthy cluster if the use the `force` parameter."""
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
 
     for unit in ops_test.model.applications[APP_NAME].units:
         if await unit.is_leader_from_status():
@@ -104,7 +104,7 @@ async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
     assert rebuild_force_response.results.get("return-code") == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
