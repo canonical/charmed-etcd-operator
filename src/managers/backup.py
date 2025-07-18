@@ -12,6 +12,9 @@ from azure.core.exceptions import ResourceExistsError
 from azure.storage.blob import ContainerClient
 from botocore.client import Config
 from botocore.exceptions import ClientError
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 from mypy_boto3_s3.service_resource import Bucket
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
@@ -28,12 +31,16 @@ from literals import (
     EtcdClusterState,
     RestoreStep,
 )
+from statuses import BackupStatuses, CharmStatuses
 
 logger = logging.getLogger(__name__)
 
 
-class BackupManager:
+class BackupManager(ManagerStatusProtocol):
     """Manage everything related to backup and restore."""
+
+    name = "backup"
+    state: ClusterState
 
     def __init__(self, state: ClusterState, workload: WorkloadBase):
         self.state = state
@@ -385,26 +392,26 @@ class BackupManager:
             logger.info(f"Next restore step: {next_step.value}")
             self.state.cluster.update({"restore_instruction": next_step.value})
 
-    # def compute_component_status(self) -> List[Status]:
-    #     """Compute the Backup manager's statuses."""
-    #     status_list = []
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+        """Compute the Backup manager's statuses."""
+        status_list: list[StatusObject] = []
 
-    #     if self.state.cluster.is_backup_in_progress:
-    #         status_list.append(Status.BACKUP_IN_PROGRESS)
+        if self.state.cluster.is_backup_in_progress:
+            status_list.append(BackupStatuses.BACKUP_IN_PROGRESS.value)
 
-    #     if self.state.cluster.is_restore_in_progress:
-    #         status_list.append(Status.RESTORE_IN_PROGRESS)
+        if self.state.cluster.is_restore_in_progress:
+            status_list.append(BackupStatuses.RESTORE_IN_PROGRESS.value)
 
-    #     if self.state.cluster.restore_verification_failed:
-    #         status_list.append(Status.RESTORE_VERIFICATION_FAILED)
+        if self.state.cluster.restore_verification_failed:
+            status_list.append(BackupStatuses.RESTORE_VERIFICATION_FAILED.value)
 
-    #     if self.state.cluster.s3_credentials and self.state.cluster.azure_credentials:
-    #         status_list.append(Status.OBJECT_STORAGE_CONFLICT)
+        if self.state.cluster.s3_credentials and self.state.cluster.azure_credentials:
+            status_list.append(BackupStatuses.OBJECT_STORAGE_CONFLICT.value)
 
-    #     if self.state.s3_relation and not self.state.cluster.s3_credentials:
-    #         status_list.append(Status.BACKUP_S3_PARAMETERS_MISSING)
+        if self.state.s3_relation and not self.state.cluster.s3_credentials:
+            status_list.append(BackupStatuses.BACKUP_S3_PARAMETERS_MISSING.value)
 
-    #     if self.state.azure_relation and not self.state.cluster.azure_credentials:
-    #         status_list.append(Status.BACKUP_AZURE_PARAMETERS_MISSING)
+        if self.state.azure_relation and not self.state.cluster.azure_credentials:
+            status_list.append(BackupStatuses.BACKUP_AZURE_PARAMETERS_MISSING.value)
 
-    #     return status_list
+        return status_list or [CharmStatuses.ACTIVE_IDLE.value]

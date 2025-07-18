@@ -34,6 +34,7 @@ from literals import (
     S3_RELATION_NAME,
     RestoreStep,
 )
+from statuses import BackupStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -91,7 +92,6 @@ class BackupEvents(Object):
             return
 
         if not self.charm.state.peer_relation:
-            # self.charm.set_status(Status.NO_PEER_RELATION)
             event.defer()
             return
 
@@ -143,7 +143,6 @@ class BackupEvents(Object):
             return
 
         if not self.charm.state.peer_relation:
-            # self.charm.set_status(Status.NO_PEER_RELATION)
             event.defer()
             return
 
@@ -263,8 +262,15 @@ class BackupEvents(Object):
                 if not self.charm.backup_manager.download_backup_file(
                     self.charm.state.cluster.restore_id
                 ):
-                    # self.charm.set_status(Status.RESTORE_FAILED)
+                    self.charm.state.statuses.add(
+                        BackupStatuses.RESTORE_FAILED.value, "unit", self.charm.backup_manager.name
+                    )
                     pass
+                self.charm.state.statuses.delete(
+                    BackupStatuses.RESTORE_IN_PROGRESS.value,
+                    "unit",
+                    self.charm.backup_manager.name,
+                )
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
                 self.charm.backup_manager.stop_database()
                 self.charm.backup_manager.set_restore_step(RestoreStep.STOP.value)
@@ -279,8 +285,17 @@ class BackupEvents(Object):
                 else:
                     try:
                         self.charm.backup_manager.restore_backup()
+                        self.charm.state.statuses.delete(
+                            BackupStatuses.RESTORE_FAILED.value,
+                            "unit",
+                            self.charm.backup_manager.name,
+                        )
                     except EtcdBackupError:
-                        # self.charm.set_status(Status.RESTORE_FAILED)
+                        self.charm.state.statuses.add(
+                            BackupStatuses.RESTORE_FAILED.value,
+                            "unit",
+                            self.charm.backup_manager.name,
+                        )
                         pass
             case RestoreStep.START, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
@@ -295,8 +310,17 @@ class BackupEvents(Object):
             case RestoreStep.COMPLETED, RestoreStep.START:
                 if not self.charm.cluster_manager.is_healthy(cluster=False):
                     # if the member is not healthy, we do not complete the restore process
-                    # self.charm.set_status(Status.RESTORE_UNHEALTHY)
+                    self.charm.state.statuses.add(
+                        BackupStatuses.RESTORE_UNHEALTHY.value,
+                        "unit",
+                        self.charm.backup_manager.name,
+                    )
                     return
+                self.charm.state.statuses.delete(
+                    BackupStatuses.RESTORE_IN_PROGRESS.value,
+                    "unit",
+                    self.charm.backup_manager.name,
+                )
                 self.charm.backup_manager.clean_up_after_restore()
 
         # continue to next workflow step if possible

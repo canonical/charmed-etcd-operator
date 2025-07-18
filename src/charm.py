@@ -60,6 +60,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.cluster_manager,
             self.tls_manager,
             self.external_clients_manager,
+            self.backup_manager,
         )
 
         # --- EVENT HANDLERS ---
