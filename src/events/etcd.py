@@ -100,10 +100,11 @@ class EtcdEvents(Object):
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
         if not self.charm.workload.install():
-            self.charm.state.statuses.set(
+            self.charm.status.set_running_status(
                 EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
                 scope="unit",
-                component=self.charm.cluster_manager.name,
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
             )
             return
 
@@ -188,10 +189,11 @@ class EtcdEvents(Object):
                         # if removing fails, we cannot start the workload or the member would crash
                         raise
 
-                self.charm.state.statuses.set(
+                self.charm.status.set_running_status(
                     EtcdServiceStatuses.SERVICE_STARTING.value,
                     scope="unit",
-                    component=self.charm.cluster_manager.name,
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
                 )
                 self.charm.cluster_manager.start_member()
         else:
@@ -211,10 +213,11 @@ class EtcdEvents(Object):
         )
 
         if not self.charm.workload.alive():
-            self.charm.state.statuses.set(
+            self.charm.status.set_running_status(
                 EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
                 scope="unit",
-                component=self.charm.cluster_manager.name,
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
             )
         else:
             self.charm.state.statuses.delete(
@@ -301,19 +304,8 @@ class EtcdEvents(Object):
                 try:
                     # this will promote any learner, not only the unit that updated its relation data
                     self.charm.cluster_manager.promote_learning_member()
-                    self.charm.state.statuses.delete(
-                        ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value,
-                        scope="unit",
-                        component=self.charm.cluster_manager.name,
-                    )
                 except EtcdClusterManagementError as e:
                     logger.warning(e)
-
-                    self.charm.state.statuses.add(
-                        ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value,
-                        scope="unit",
-                        component=self.charm.cluster_manager.name,
-                    )
                     event.defer()
                     return
 
@@ -383,12 +375,6 @@ class EtcdEvents(Object):
             )
             return
 
-        self.charm.state.statuses.delete(
-            CharmStatuses.NO_PEER_RELATION.value,
-            scope="unit",
-            component=self.charm.cluster_manager.name,
-        )
-
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
                 try:
@@ -405,10 +391,11 @@ class EtcdEvents(Object):
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
-                self.charm.state.statuses.set(
+                self.charm.status.set_running_status(
                     ClusterStatuses.CLUSTER_FAILED.value,
                     scope="unit",
-                    component=self.charm.cluster_manager.name,
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
                 )
                 return
         except RequestException:
@@ -428,19 +415,21 @@ class EtcdEvents(Object):
 
         if not self.charm.workload.alive():
             if not self.charm.cluster_manager.restart_member():
-                self.charm.state.statuses.set(
+                self.charm.status.set_running_status(
                     EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
                     scope="unit",
-                    component=self.charm.cluster_manager.name,
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
                 )
                 return
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
-                self.charm.state.statuses.set(
+                self.charm.status.set_running_status(
                     ClusterStatuses.CLUSTER_FAILED.value,
                     scope="unit",
-                    component=self.charm.cluster_manager.name,
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
                 )
                 return
         except RequestException:
@@ -562,10 +551,11 @@ class EtcdEvents(Object):
 
         self.charm.workload.stop()
         self.charm.state.unit_server.update({"state": ""})
-        self.charm.state.statuses.set(
+        self.charm.status.set_running_status(
             ClusterStatuses.REMOVED.value,
             scope="unit",
-            component=self.charm.cluster_manager.name,
+            component_name=self.charm.cluster_manager.name,
+            statuses_state=self.charm.state.statuses,
         )
 
     def update_admin_password(self, admin_secret_id: str) -> None:

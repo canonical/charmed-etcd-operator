@@ -274,13 +274,7 @@ class TLSManager(ManagerStatusProtocol):
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the component status."""
-        if not recompute:
-            return self.state.statuses.get(
-                scope=scope,
-                component=self.name,
-            ).root
-
-        status_list = []
+        status_list: list[StatusObject] = []
 
         if self.state.unit_server.tls_peer_state == TLSState.TO_TLS:
             status_list.append(TLSStatuses.TLS_ENABLING_PEER_TLS.value)

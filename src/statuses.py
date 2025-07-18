@@ -55,6 +55,7 @@ class ClusterStatuses(Enum):
     CLUSTER_FAILED = StatusObject(
         status="blocked",
         message="Cluster failure - majority of cluster members lost. Run action `rebuild-cluster` to recover.",
+        running="async",
     )
     CLUSTER_MANAGEMENT_ERROR = StatusObject(status="blocked", message="cluster management error")
     CLUSTER_NOT_INITIALIZED = StatusObject(
@@ -71,7 +72,7 @@ class ClusterStatuses(Enum):
         status="blocked", message="failed to enable authentication in etcd"
     )
     HEALTH_CHECK_FAILED = StatusObject(status="maintenance", message="health check failed")
-    REMOVED = StatusObject(status="blocked", message="unit removed from cluster")
+    REMOVED = StatusObject(status="blocked", message="unit removed from cluster", running="async")
     PASSWORD_UPDATE_FAILED = StatusObject(status="blocked", message="failed to update password")
 
 
@@ -123,7 +124,15 @@ class ExternalClientsStatuses(Enum):
 class EtcdServiceStatuses(Enum):
     """Collection of etcd service related statuses."""
 
-    SERVICE_INSTALLING = StatusObject(status="maintenance", message="Installing etcd...")
-    SERVICE_STARTING = StatusObject(status="maintenance", message="Waiting for etcd to start...")
-    SERVICE_NOT_INSTALLED = StatusObject(status="blocked", message="unable to install etcd snap")
-    SERVICE_NOT_RUNNING = StatusObject(status="blocked", message="etcd service not running")
+    SERVICE_INSTALLING = StatusObject(
+        status="maintenance", message="Installing etcd...", running="async"
+    )
+    SERVICE_STARTING = StatusObject(
+        status="maintenance", message="Waiting for etcd to start...", running="async"
+    )
+    SERVICE_NOT_INSTALLED = StatusObject(
+        status="blocked", message="unable to install etcd snap", running="async"
+    )
+    SERVICE_NOT_RUNNING = StatusObject(
+        status="blocked", message="etcd service not running", running="async"
+    )

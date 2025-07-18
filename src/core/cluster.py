@@ -167,3 +167,8 @@ class ClusterState(Object, StatusesStateProtocol):
         """
         current_instruction = self.cluster.restore_instruction
         return all((unit.restore_step == current_instruction for unit in self.servers))
+
+    @property
+    def is_leader(self) -> bool:
+        """Check if the current unit is the leader of the cluster."""
+        return self.model.unit.is_leader()

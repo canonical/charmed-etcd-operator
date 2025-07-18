@@ -374,10 +374,10 @@ class ClusterManager(ManagerStatusProtocol):
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the Cluster manager's statuses."""
-        if not recompute:
-            return self.state.statuses.get(scope=scope, component=self.name).root
+        status_list: list[StatusObject] = self.state.statuses.get(
+            scope=scope, component=self.name
+        ).root
 
-        status_list: list[StatusObject] = []
         if self.state.unit_server.is_started:
             if (
                 self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value
@@ -397,6 +397,9 @@ class ClusterManager(ManagerStatusProtocol):
 
         if self.state.cluster.rebuild_cluster_in_progress:
             status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
+
+        if self.state.cluster.learning_member and self.state.is_leader:
+            status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 
