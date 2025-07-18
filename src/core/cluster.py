@@ -17,7 +17,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     ProviderCertificate,
 )
 from data_platform_helpers.advanced_statuses.protocol import StatusesState, StatusesStateProtocol
-from ops import Object, Relation, Unit
+from ops import ModelError, Object, Relation, SecretNotFoundError, Unit
 
 from core.models import EtcdCluster, EtcdServer
 from literals import (
@@ -51,6 +51,7 @@ class ClusterState(Object, StatusesStateProtocol):
         self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_RELATION)
         self.statuses_relation_name = STATUS_PEERS_RELATION
         self.statuses = StatusesState(self, self.statuses_relation_name)
+        self.config = charm.config
 
     @property
     def peer_relation(self) -> Relation | None:
@@ -168,7 +169,21 @@ class ClusterState(Object, StatusesStateProtocol):
         current_instruction = self.cluster.restore_instruction
         return all((unit.restore_step == current_instruction for unit in self.servers))
 
-    @property
-    def is_leader(self) -> bool:
-        """Check if the current unit is the leader of the cluster."""
-        return self.model.unit.is_leader()
+    def get_secret_from_id(self, secret_id: str) -> dict[str, str]:
+        """Resolve the given id of a Juju secret and return the content as a dict.
+
+        Args:
+            model (Model): Model object.
+            secret_id (str): The id of the secret.
+
+        Returns:
+            dict: The content of the secret.
+        """
+        try:
+            secret_content = self.charm.model.get_secret(id=secret_id).get_content(refresh=True)
+        except SecretNotFoundError:
+            raise SecretNotFoundError(f"The secret '{secret_id}' does not exist.")
+        except ModelError:
+            raise
+
+        return secret_content

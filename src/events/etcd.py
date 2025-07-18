@@ -28,7 +28,6 @@ from common.exceptions import (
     HealthCheckFailedError,
     RaftLeaderNotFoundError,
 )
-from common.secrets import get_secret_from_id
 from literals import (
     DATA_STORAGE,
     DATABASE_DIR,
@@ -378,7 +377,7 @@ class EtcdEvents(Object):
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
                 try:
-                    password = get_secret_from_id(self.charm.model, admin_secret_id).get(
+                    password = self.charm.state.get_secret_from_id(str(admin_secret_id)).get(
                         INTERNAL_USER
                     )
                 except (ModelError, SecretNotFoundError) as e:
@@ -561,7 +560,7 @@ class EtcdEvents(Object):
     def update_admin_password(self, admin_secret_id: str) -> None:
         """Compare current admin password and update in etcd if required."""
         try:
-            if new_password := get_secret_from_id(self.charm.model, admin_secret_id).get(
+            if new_password := self.charm.state.get_secret_from_id(admin_secret_id).get(
                 INTERNAL_USER
             ):
                 # only update admin credentials if the password has changed
@@ -607,7 +606,7 @@ class EtcdEvents(Object):
         """Update the private key in etcd."""
         logger.debug("Updating TLS private key.")
 
-        if self.charm.tls_events.read_and_validate_private_key(private_key_id) is None:
+        if self.charm.tls_manager.read_and_validate_private_key(private_key_id) is None:
             self.charm.state.statuses.add(
                 TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
                 scope="unit",

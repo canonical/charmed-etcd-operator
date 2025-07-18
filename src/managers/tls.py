@@ -4,7 +4,9 @@
 
 """Manager for handling TLS related events."""
 
+import base64
 import logging
+import re
 from pathlib import Path
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
@@ -14,10 +16,18 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
+from ops import ModelError, SecretNotFoundError
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import SUBSTRATES, TLSCARotationState, TLSState, TLSType
+from literals import (
+    SUBSTRATES,
+    TLS_CLIENT_PRIVATE_KEY_CONFIG,
+    TLS_PEER_PRIVATE_KEY_CONFIG,
+    TLSCARotationState,
+    TLSState,
+    TLSType,
+)
 from statuses import CharmStatuses, TLSStatuses
 
 logger = logging.getLogger(__name__)
@@ -272,6 +282,39 @@ class TLSManager(ManagerStatusProtocol):
         """
         return self.state.tls_peer_certificate.ca.raw
 
+    def read_and_validate_private_key(self, private_key_secret_id: str) -> PrivateKey | None:
+        """Read and validate the private key.
+
+        Args:
+            private_key_secret_id (str): The private key secret ID.
+
+        Returns:
+            PrivateKey: The private key.
+        """
+        try:
+            secret_content = self.state.get_secret_from_id(private_key_secret_id).get(
+                "private-key"
+            )
+        except (ModelError, SecretNotFoundError) as e:
+            logger.error(e)
+            return None
+
+        if secret_content is None:
+            logger.error(f"Secret {private_key_secret_id} does not contain a private key.")
+            return None
+
+        private_key = (
+            secret_content
+            if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
+            else base64.b64decode(secret_content).decode("utf-8").strip()
+        )
+        private_key = PrivateKey(raw=private_key)
+        if not private_key.is_valid():
+            logger.error("Invalid private key format.")
+            return None
+
+        return private_key
+
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the component status."""
         status_list: list[StatusObject] = []
@@ -299,5 +342,14 @@ class TLSManager(ManagerStatusProtocol):
 
         if self.state.unit_server.tls_peer_certs_expiring:
             status_list.append(TLSStatuses.TLS_PEER_CERTS_EXPIRING.value)
+
+        if (
+            (peer_private_key_id := self.state.config.get(TLS_PEER_PRIVATE_KEY_CONFIG))
+            and self.read_and_validate_private_key(str(peer_private_key_id)) is None
+        ) or (
+            (client_private_key_id := self.state.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG))
+            and self.read_and_validate_private_key(str(client_private_key_id)) is None
+        ):
+            status_list.append(TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]

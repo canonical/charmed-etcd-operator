@@ -4,28 +4,22 @@
 
 """TLS related event handlers."""
 
-import base64
 import logging
-import re
 from typing import TYPE_CHECKING
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
     CertificateRequestAttributes,
-    PrivateKey,
     TLSCertificatesRequiresV4,
 )
 from ops import (
     EventSource,
     Handle,
-    ModelError,
     RelationBrokenEvent,
     RelationCreatedEvent,
-    SecretNotFoundError,
 )
 from ops.framework import EventBase, Object
 
-from common.secrets import get_secret_from_id
 from literals import (
     CLIENT_TLS_RELATION_NAME,
     PEER_TLS_RELATION_NAME,
@@ -83,7 +77,9 @@ class TLSEvents(Object):
 
         if peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
             if (
-                peer_private_key := self.read_and_validate_private_key(peer_private_key_id)
+                peer_private_key := self.charm.tls_manager.read_and_validate_private_key(
+                    peer_private_key_id
+                )
             ) is None:
                 self.charm.state.statuses.add(
                     TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
@@ -99,7 +95,9 @@ class TLSEvents(Object):
 
         if client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if (
-                client_private_key := self.read_and_validate_private_key(client_private_key_id)
+                client_private_key := self.charm.tls_manager.read_and_validate_private_key(
+                    client_private_key_id
+                )
             ) is None:
                 self.charm.state.statuses.add(
                     TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
@@ -333,38 +331,3 @@ class TLSEvents(Object):
                 "Waiting for all servers to update certificates before cleaning up old CAs"
             )
             event.defer()
-
-    def read_and_validate_private_key(
-        self, private_key_secret_id: str | None
-    ) -> PrivateKey | None:
-        """Read and validate the private key.
-
-        Args:
-            private_key_secret_id (str): The private key secret ID.
-
-        Returns:
-            PrivateKey: The private key.
-        """
-        try:
-            secret_content = get_secret_from_id(self.charm.model, private_key_secret_id).get(
-                "private-key"
-            )
-        except (ModelError, SecretNotFoundError) as e:
-            logger.error(e)
-            return None
-
-        if secret_content is None:
-            logger.error(f"Secret {private_key_secret_id} does not contain a private key.")
-            return None
-
-        private_key = (
-            secret_content
-            if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
-            else base64.b64decode(secret_content).decode("utf-8").strip()
-        )
-        private_key = PrivateKey(raw=private_key)
-        if not private_key.is_valid():
-            logger.error("Invalid private key format.")
-            return None
-
-        return private_key
