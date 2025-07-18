@@ -138,6 +138,8 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
         # if the cluster member cannot be removed immediately, the `storage_detaching` hook might fail temporarily
         raise_on_error=False,
         timeout=1000,
+        # give Juju some time to release the storage volumes
+        idle_period=60,
     )
 
     # scale up again re-attaching the storage
