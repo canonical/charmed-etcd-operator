@@ -12,6 +12,7 @@ from typing import List
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
+from ops import BlockedStatus
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
 from common.client import EtcdClient
@@ -378,6 +379,11 @@ class ClusterManager(ManagerStatusProtocol):
             scope=scope, component=self.name
         ).root
 
+        if self.state.unit_server.unit.status == BlockedStatus(
+            EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value.message
+        ):
+            return [EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value]
+
         if self.state.unit_server.is_started:
             if (
                 self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value
@@ -391,15 +397,15 @@ class ClusterManager(ManagerStatusProtocol):
 
         if not self.state.peer_relation:
             status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
+        else:
+            if not self.state.cluster.cluster_state:
+                status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
 
-        if not self.state.cluster.cluster_state:
-            status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
+            if self.state.cluster.rebuild_cluster_in_progress:
+                status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
 
-        if self.state.cluster.rebuild_cluster_in_progress:
-            status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
-
-        if self.state.cluster.learning_member and self.state.unit_server.is_leader:
-            status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
+            if self.state.cluster.learning_member and self.state.unit_server.is_leader:
+                status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 

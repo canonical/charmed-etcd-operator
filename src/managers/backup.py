@@ -394,7 +394,12 @@ class BackupManager(ManagerStatusProtocol):
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the Backup manager's statuses."""
-        status_list: list[StatusObject] = []
+        if recompute:
+            self.state.statuses.clear(scope=scope, component=self.name)
+
+        status_list: list[StatusObject] = self.state.statuses.get(
+            scope=scope, component=self.name
+        ).root
 
         if self.state.cluster.is_backup_in_progress:
             status_list.append(BackupStatuses.BACKUP_IN_PROGRESS.value)

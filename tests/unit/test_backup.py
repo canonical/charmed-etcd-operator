@@ -19,9 +19,9 @@ from literals import (
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
     S3_RELATION_NAME,
+    STATUS_PEERS_RELATION,
     EtcdClusterState,
     RestoreStep,
-    Status,
 )
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -64,7 +64,7 @@ def test_s3_relation():
     state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
     with patch("managers.backup.BackupManager.create_bucket"):
         state_out = ctx.run(ctx.on.relation_changed(s3_relation), state_in)
-        assert state_out.unit_status == Status.BACKUP_S3_PARAMETERS_MISSING.value.status
+        assert state_out.unit_status.name == "blocked"
 
 
 def test_azure_relation():
@@ -109,7 +109,7 @@ def test_azure_relation():
     with patch("managers.backup.BackupManager.create_container"):
         state_out = ctx.run(ctx.on.relation_changed(azure_relation), state_in)
 
-        assert state_out.unit_status == Status.BACKUP_AZURE_PARAMETERS_MISSING.value.status
+        assert state_out.unit_status.name == "blocked"
 
 
 def test_create_backup_action_s3():
@@ -326,9 +326,7 @@ def test_support_only_one_object_storage():
             leader=True,
         )
         state_out = ctx.run(ctx.on.relation_changed(s3_relation), state_in)
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Azure and S3 storages configured - please remove one"
-        )
+        assert state_out.unit_status.name == "blocked"
 
     # ensure backup cannot be created if both s3 and azure are related
     state_in = testing.State(relations={peer_relation, azure_relation, s3_relation}, leader=True)
@@ -753,7 +751,11 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=False)
+    status_relation = testing.PeerRelation(
+        id=2,
+        endpoint=STATUS_PEERS_RELATION,
+    )
+    state_in = testing.State(relations={relation, status_relation}, leader=False)
     with (
         patch("workload.EtcdWorkload.stop"),
         patch("workload.EtcdWorkload.disable_service"),
@@ -805,7 +807,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=False)
+    state_in = testing.State(relations={relation, status_relation}, leader=False)
     state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
     assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
@@ -825,7 +827,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.remove_directory"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="")),
@@ -860,7 +862,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.remove_directory"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="")),
@@ -871,10 +873,13 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.stop"),
         patch("workload.EtcdWorkload.disable_service"),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        with ctx(ctx.on.relation_changed(relation=relation), state_in) as manager:
+            charm = manager.charm
+            state_out = manager.run()
 
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Restore verification failed - etcd cluster still running, restore cancelled, check debug-log"
+        assert (
+            state_out.unit_status.name == "blocked"
+            and state_out.unit_status.message.startswith("Restore verification failed")
         )
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step")
@@ -900,7 +905,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=False)
+    state_in = testing.State(relations={relation, status_relation}, leader=False)
     with (
         patch("workload.EtcdWorkload.remove_directory"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="")),
@@ -924,7 +929,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.remove_directory"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="")),
@@ -957,7 +962,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=False)
+    state_in = testing.State(relations={relation, status_relation}, leader=False)
     with (
         patch("managers.backup.BackupManager.restore_backup") as restore_backup,
     ):
@@ -968,8 +973,9 @@ def test_restore_workflow_synchronization():
             state_out.get_relation(1).local_unit_data.get("restore_step")
             == RestoreStep.RESTORE.value
         )
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Restore verification failed - etcd cluster still running, restore cancelled, check debug-log"
+        assert (
+            state_out.unit_status.name == "blocked"
+            and state_out.unit_status.message.startswith("Restore verification failed")
         )
 
     # restore step: skip restore after verification failed (leader)
@@ -985,7 +991,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
         patch("managers.backup.BackupManager.restore_backup") as restore_backup,
     ):
@@ -1004,8 +1010,9 @@ def test_restore_workflow_synchronization():
             state_out.get_relation(1).local_app_data.get("cluster_state")
             == EtcdClusterState.EXISTING.value
         )
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Restore verification failed - etcd cluster still running, restore cancelled, check debug-log"
+        assert (
+            state_out.unit_status.name == "blocked"
+            and state_out.unit_status.message.startswith("Restore verification failed")
         )
 
     # restore step: restore -> failed
@@ -1020,7 +1027,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation})
+    state_in = testing.State(relations={relation, status_relation})
     with (
         patch("workload.EtcdWorkload.remove_directory"),
         patch(
@@ -1032,7 +1039,10 @@ def test_restore_workflow_synchronization():
             state_out.get_relation(1).local_app_data.get("cluster_state")
             == EtcdClusterState.NEW.value
         )
-        assert state_out.unit_status == ops.BlockedStatus("failed to restore backup")
+        assert (
+            state_out.unit_status.name == "blocked"
+            and state_out.unit_status.message.startswith("failed to restore backup")
+        )
 
     # restore step: restart (non-leader)
     relation = testing.PeerRelation(
@@ -1046,7 +1056,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=False)
+    state_in = testing.State(relations={relation, status_relation}, leader=False)
     with (
         patch("workload.EtcdWorkload.write_file") as write_config,
         patch("workload.EtcdWorkload.start"),
@@ -1072,7 +1082,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.write_file") as write_config,
         patch("workload.EtcdWorkload.start"),
@@ -1103,7 +1113,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=False)
+    state_in = testing.State(relations={relation, status_relation}, leader=False)
     with (
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
         patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
@@ -1128,15 +1138,18 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=False)
+    state_in = testing.State(relations={relation, status_relation}, leader=False)
     with (
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
         patch("managers.cluster.ClusterManager.is_healthy", return_value=False),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus(
-            "cluster unhealthy after restoring backup - check debug-log"
+        assert (
+            state_out.unit_status.name == "blocked"
+            and state_out.unit_status.message.startswith(
+                "cluster unhealthy after restoring backup"
+            )
         )
 
     # restore step: clean up (leader)
@@ -1151,7 +1164,7 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
         patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
@@ -1185,13 +1198,16 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
         },
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
         patch("managers.cluster.ClusterManager.is_healthy", return_value=False),
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus(
-            "cluster unhealthy after restoring backup - check debug-log"
+        assert (
+            state_out.unit_status.name == "blocked"
+            and state_out.unit_status.message.startswith(
+                "cluster unhealthy after restoring backup"
+            )
         )

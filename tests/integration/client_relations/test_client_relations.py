@@ -17,7 +17,8 @@ from juju.application import Application
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 
-from literals import EXTERNAL_CLIENTS_RELATION, INTERNAL_USER, PEER_RELATION, Status, TLSType
+from literals import EXTERNAL_CLIENTS_RELATION, INTERNAL_USER, PEER_RELATION, TLSType
+from statuses import ExternalClientsStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -331,14 +332,16 @@ async def test_requirer_sends_ca(ops_test: OpsTest) -> None:
         # idle_period=10,
         apps_full_statuses={
             APP_NAME: {
-                "maintenance": [Status.EC_INVALID_CERTIFICATE.value.status.message],
+                "maintenance": [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value.message],
             },
             REQUIRER_NAME: {"active": []},
             TLS_NAME: {"active": []},
         },
         units_full_statuses={
             APP_NAME: {
-                "units": {"maintenance": [Status.EC_INVALID_CERTIFICATE.value.status.message]}
+                "units": {
+                    "maintenance": [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value.message]
+                }
             },
             REQUIRER_NAME: {"units": {"active": []}},
             TLS_NAME: {"units": {"active": []}},

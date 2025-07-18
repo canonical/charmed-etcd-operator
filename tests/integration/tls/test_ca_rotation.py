@@ -9,7 +9,8 @@ import pytest
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, Status, TLSType
+from literals import INTERNAL_USER, PEER_RELATION, TLSType
+from statuses import TLSStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -229,7 +230,7 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
         apps=[APP_NAME, TLS_NAME],
         apps_full_statuses={
             APP_NAME: {
-                "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
+                "maintenance": [TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value.message],
                 "active": [],
             },
             TLS_NAME: {"active": []},
@@ -267,7 +268,7 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
         units_full_statuses={
             APP_NAME: {
                 "units": {
-                    "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
+                    "maintenance": [TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value.message],
                     "active": [],
                 }
             },

@@ -7,7 +7,8 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, Status
+from literals import INTERNAL_USER, PEER_RELATION
+from statuses import BackupStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -142,7 +143,7 @@ async def test_restore_verification_failed(ops_test: OpsTest):
         units_full_statuses={
             APP_NAME: {
                 "units": {
-                    "blocked": [Status.RESTORE_VERIFICATION_FAILED.value.status.message],
+                    "blocked": [BackupStatuses.RESTORE_VERIFICATION_FAILED.value.message],
                 }
             },
         },

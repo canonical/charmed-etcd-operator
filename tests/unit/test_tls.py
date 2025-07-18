@@ -23,6 +23,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
+from data_platform_helpers.advanced_statuses.utils import as_status
 from ops import testing
 from scenario import Secret
 
@@ -35,11 +36,11 @@ from literals import (
     RESTART_RELATION,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
-    Status,
     TLSCARotationState,
     TLSState,
 )
 from managers.tls import TLSType
+from statuses import CharmStatuses, TLSStatuses
 
 MEMBER_LIST_DICT = {
     "charmed-etcd0": Member(
@@ -202,7 +203,7 @@ def test_enable_tls_on_start():
         # no tls
         state_out = ctx.run(ctx.on.start(), state_in)
         peer_relation = state_out.get_relation(peer_relation.id)
-        assert state_out.unit_status == Status.ACTIVE.value.status
+        assert state_out.unit_status == as_status(CharmStatuses.ACTIVE_IDLE.value)
         assert peer_relation.local_unit_data["state"] == "started"
         assert peer_relation.local_app_data["cluster_state"] == "existing"
 
@@ -227,7 +228,7 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         assert "start" in [event.name for event in state_out.deferred]
-        assert state_out.app_status == Status.TLS_ENABLING_PEER_TLS.value.status
+        assert state_out.app_status == as_status(TLSStatuses.TLS_ENABLING_PEER_TLS.value)
 
         peer_relation = testing.PeerRelation(
             id=1,
@@ -249,7 +250,7 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         assert "start" in [event.name for event in state_out.deferred]
-        assert state_out.app_status == Status.TLS_ENABLING_CLIENT_TLS.value.status
+        assert state_out.app_status == as_status(TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
 
         peer_relation = testing.PeerRelation(
             id=1,
@@ -268,10 +269,10 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         peer_relation = state_out.get_relation(peer_relation.id)
-        assert state_out.unit_status == Status.ACTIVE.value.status
+        assert state_out.unit_status == as_status(CharmStatuses.ACTIVE_IDLE.value)
         assert peer_relation.local_unit_data["state"] == "started"
         assert peer_relation.local_app_data["cluster_state"] == "existing"
-        assert state_out.app_status == Status.ACTIVE.value.status
+        assert state_out.app_status == as_status(CharmStatuses.ACTIVE_IDLE.value)
 
 
 def test_certificates_broken():
@@ -665,7 +666,7 @@ def test_certificates_relation_created():
 
     with patch("workload.EtcdWorkload.alive", return_value=True):
         state_out = ctx.run(ctx.on.relation_created(relation=peer_tls_relation), state_in)
-        assert state_out.unit_status == Status.TLS_ENABLING_PEER_TLS.value.status
+        assert state_out.unit_status == as_status(TLSStatuses.TLS_ENABLING_PEER_TLS.value)
         assert (
             state_out.get_relation(peer_relation.id).local_unit_data["tls_peer_state"]
             == TLSState.TO_TLS.value
@@ -687,7 +688,7 @@ def test_certificates_relation_created():
 
     with patch("workload.EtcdWorkload.alive", return_value=True):
         state_out = ctx.run(ctx.on.relation_created(relation=client_tls_relation), state_in)
-        assert state_out.unit_status == Status.TLS_ENABLING_CLIENT_TLS.value.status
+        assert state_out.unit_status == as_status(TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
         assert (
             state_out.get_relation(peer_relation.id).local_unit_data["tls_client_state"]
             == TLSState.TO_TLS.value
@@ -907,7 +908,7 @@ def test_set_tls_private_key():
             },
         )
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
-        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert state_out.unit_status == as_status(TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
         secret = dataclasses.replace(
             secret,
@@ -938,12 +939,12 @@ def test_set_tls_private_key():
             config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
         )
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
-        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert state_out.unit_status == as_status(TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
         state_in.config[TLS_PEER_PRIVATE_KEY_CONFIG] = "secret:cu9ibpp34trs4baf20c0"
 
         state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert state_out.unit_status == as_status(TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
     # client private key
     secret = Secret(

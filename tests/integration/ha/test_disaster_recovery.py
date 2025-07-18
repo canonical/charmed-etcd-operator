@@ -7,7 +7,8 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, Status
+from literals import INTERNAL_USER, PEER_RELATION
+from statuses import ClusterStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -105,7 +106,7 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
             ops_test,
             apps=[APP_NAME],
             apps_full_statuses={
-                APP_NAME: {"blocked": [Status.CLUSTER_FAILED.value.status.message]},
+                APP_NAME: {"blocked": [ClusterStatuses.CLUSTER_FAILED.value.message]},
             },
             wait_for_exact_units=2,
         )

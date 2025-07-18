@@ -296,7 +296,6 @@ class BackupEvents(Object):
                             "unit",
                             self.charm.backup_manager.name,
                         )
-                        pass
             case RestoreStep.START, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
                 self.charm.backup_manager.start_database()
