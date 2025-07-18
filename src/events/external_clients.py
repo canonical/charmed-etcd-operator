@@ -200,6 +200,6 @@ class ExternalClientsEvents(Object):
     def _update_client_truststore(self) -> None:
         """Update the client truststore and Initiate a rolling restart of the cluster."""
         self.charm.tls_manager.update_cas(
-            self.charm.tls_events.collect_client_cas(), TLSType.CLIENT
+            self.charm.tls_manager.collect_client_cas(), TLSType.CLIENT
         )
         self.charm.rolling_restart()

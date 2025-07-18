@@ -244,14 +244,12 @@ def test_add_ecr_new_user_not_leader(cluster_tls_context, mtls_cert):
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
         patch("managers.cluster.ClusterManager.add_managed_user") as add_managed_user,
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch("workload.EtcdWorkload.write_file"),
     ):
         state_out = manager.run()
         add_managed_user.assert_not_called()
         assert "mtls_cert_updated" not in [event.name for event in state_out.deferred]
-        # TODO add more assertions after checking custom event not being emitted in non leader setting
-        # restart_member.assert_called_once()
 
 
 def test_add_ecr_new_user_no_tls_leader(cluster_no_tls_context, mtls_cert):
@@ -498,7 +496,7 @@ def test_ecr_update_common_name_leader(cluster_tls_context, mtls_cert, mtls_cert
         patch("common.client.EtcdClient.get_user", return_value=None),
         patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
@@ -588,7 +586,7 @@ def test_ecr_update_common_name_leader_crash(
         patch("common.client.EtcdClient.get_user", return_value=None),
         patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
@@ -677,7 +675,7 @@ def test_ecr_update_chain_same_common_name(
         patch("common.client.EtcdClient.get_user", return_value=None),
         patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
@@ -760,7 +758,7 @@ def test_ecr_update_common_name_non_leader(
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
@@ -788,7 +786,7 @@ def test_ecr_update_common_name_non_leader(
         ctx(ctx.on.secret_changed(secret), state_in) as manager,
         patch("managers.tls.TLSManager.is_new_ca", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
     ):
         peer_relation.local_app_data["managed_users"] = f'{{"5":"diff-{CLIENT_COMMON_NAME}"}}'
         charm: EtcdOperatorCharm = manager.charm
@@ -870,7 +868,7 @@ def test_ecr_relation_broken_leader(cluster_tls_context, mtls_cert):
         ctx(ctx.on.relation_broken(ecr_relation), state_in) as manager,
         patch("common.client.EtcdClient.remove_role") as remove_role,
         patch("common.client.EtcdClient.remove_user") as remove_user,
-        patch("events.tls.TLSEvents.collect_client_cas") as collect_client_cas,
+        patch("managers.tls.TLSManager.collect_client_cas") as collect_client_cas,
         patch("managers.tls.TLSManager.update_cas") as update_cas,
         patch("charm.EtcdOperatorCharm._restart") as restart,
     ):
@@ -917,7 +915,7 @@ def test_ecr_relation_broken_not_leader(cluster_tls_context):
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("managers.cluster.ClusterManager.remove_managed_user") as remove_managed_user,
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
     ):
         manager.run()
         remove_managed_user.assert_not_called()
@@ -980,7 +978,9 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
             patch("managers.tls.TLSManager.is_new_ca_saved_on_all_servers", return_value=True),
             patch("managers.tls.TLSManager.write_certificate"),
             patch("managers.tls.TLSManager.update_cas"),
-            patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+            patch(
+                "managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]
+            ),
             patch("managers.cluster.ClusterManager.clean_users"),
             patch("managers.cluster.ClusterManager.remove_inconsistent_members_if_required"),
         ):
@@ -1280,7 +1280,7 @@ def test_ecr_update_chain_invalid_new_value(cluster_tls_context, mtls_cert, ca_c
         patch("common.client.EtcdClient.get_user", return_value=None),
         patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
@@ -1356,7 +1356,7 @@ def test_certificate_transfer_new_ca(cluster_tls_context, ca_cert):
     with (
         patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("managers.tls.TLSManager.update_cas") as update_cas,
     ):
@@ -1390,7 +1390,7 @@ def test_certificate_transfer_old_ca(cluster_tls_context, ca_cert):
     with (
         patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("managers.tls.TLSManager.update_cas") as update_cas,
         patch("managers.tls.TLSManager.is_new_ca", return_value=False),
@@ -1427,7 +1427,7 @@ def test_certificate_transfer_new_ca_rotation_happening(cluster_tls_context, ca_
     with (
         patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("managers.tls.TLSManager.update_cas") as update_cas,
     ):
@@ -1462,7 +1462,7 @@ def test_certificate_transfer_removed(cluster_tls_context, ca_cert):
     with (
         # patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("managers.tls.TLSManager.update_cas") as update_cas,
     ):
@@ -1498,7 +1498,7 @@ def test_certificate_transfer_removed_on_rotation(cluster_tls_context, ca_cert):
     with (
         # patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
         patch("workload.EtcdWorkload.write_file"),
-        patch("events.tls.TLSEvents.collect_client_cas", return_value=["test_ca", "test_ca1"]),
+        patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
         patch("managers.cluster.ClusterManager.restart_member"),
         patch("managers.tls.TLSManager.update_cas") as update_cas,
     ):
@@ -1543,7 +1543,7 @@ def test_removing_user_crash(cluster_tls_context, mtls_cert):
         ctx(ctx.on.relation_broken(ecr_relation), state_in) as manager,
         patch("common.client.EtcdClient.remove_role") as remove_role,
         patch("common.client.EtcdClient.remove_user") as remove_user,
-        patch("events.tls.TLSEvents.collect_client_cas") as collect_client_cas,
+        patch("managers.tls.TLSManager.collect_client_cas") as collect_client_cas,
         patch("managers.tls.TLSManager.update_cas") as update_cas,
         patch("charm.EtcdOperatorCharm._restart") as restart,
     ):

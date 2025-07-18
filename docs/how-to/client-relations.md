@@ -56,6 +56,10 @@ class MyCharm(CharmBase):
         )
 ```
 
+```{caution}
+It's important to be aware that charmed etcd does not provide automatic `mtls_cert` rotation or expiration. Consequently, the logic for managing this certificate's life cycle must be implemented within the client charm.
+```
+
 Finally, define a callback function to handle the `etcd-ready` event. This function will be called when the relation is established and the authentication information is available. You can use this information to connect to etcd and perform any necessary operations.
 
 ```python
@@ -164,3 +168,7 @@ To remove the relation, you can use the `juju remove-relation` command:
 ```{terminal}
 :input: juju remove-relation data-integrator charmed-etcd
 ```
+
+```{caution}
+It's important to be aware that charmed etcd does not provide automatic `mtls_cert` rotation or expiration. Consequently, managing this certificate's life cycle must be handled by the user.
+ ```

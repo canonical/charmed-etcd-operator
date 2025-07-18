@@ -1,3 +1,4 @@
+(security_index)=
 # Security hardening guide
 
 This document provides an overview of security features and guidance for hardening the security of [Charmed etcd](https://charmhub.io/charmed-etcd) deployments, including setting up and managing a secure environment.
@@ -102,7 +103,7 @@ For details on the cryptography used by Charmed etcd, see the [Cryptography](cry
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:glob:
 :hidden:
 
 Cryptography <cryptography>
+```
