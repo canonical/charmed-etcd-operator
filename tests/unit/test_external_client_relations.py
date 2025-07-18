@@ -1051,7 +1051,7 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
 
     peer_relation = state_out.get_relation(relations[0].id)
     peer_relation = dataclasses.replace(
-        peer_relation, local_unit_data={**peer_relation.local_unit_data, "ip": "ip10"}
+        peer_relation, local_unit_data={**peer_relation.local_unit_data, "private_ip": "ip10"}
     )
     state_out = dataclasses.replace(
         state_out,

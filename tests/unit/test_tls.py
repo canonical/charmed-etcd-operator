@@ -5,7 +5,6 @@
 import base64
 import dataclasses
 import json
-import socket
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
@@ -83,17 +82,17 @@ def certificate_available_context():
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={"cluster_state": "existing"},
-        local_unit_data={"ip": "localhost"},
+        local_unit_data={"private_ip": "localhost"},
         peers_data={
             1: {
-                "ip": "localhost",
+                "private_ip": "localhost",
                 "client_cert_ready": "True",
                 "peer_cert_ready": "True",
                 "tls_client_state": "tls",
                 "tls_peer_state": "tls",
             },
             2: {
-                "ip": "localhost",
+                "private_ip": "localhost",
                 "client_cert_ready": "True",
                 "peer_cert_ready": "True",
                 "tls_client_state": "tls",
@@ -190,7 +189,7 @@ def test_enable_tls_on_start():
             id=1,
             endpoint=PEER_RELATION,
             local_unit_data={
-                "ip": "localhost",
+                "private_ip": "localhost",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -211,7 +210,7 @@ def test_enable_tls_on_start():
             id=1,
             endpoint=PEER_RELATION,
             local_unit_data={
-                "ip": "localhost",
+                "private_ip": "localhost",
                 "tls_peer_state": TLSState.TO_TLS.value,
             },
             local_app_data={
@@ -233,7 +232,7 @@ def test_enable_tls_on_start():
             id=1,
             endpoint=PEER_RELATION,
             local_unit_data={
-                "ip": "localhost",
+                "private_ip": "localhost",
                 "tls_client_state": TLSState.TO_TLS.value,
             },
             local_app_data={
@@ -255,7 +254,7 @@ def test_enable_tls_on_start():
             id=1,
             endpoint=PEER_RELATION,
             local_unit_data={
-                "ip": "localhost",
+                "private_ip": "localhost",
                 "tls_peer_state": TLSState.TLS.value,
                 "tls_client_state": TLSState.TLS.value,
             },
@@ -410,7 +409,7 @@ def test_certificate_available_enabling_tls(certificate_available_context):
     peer_relation.local_unit_data.update(
         {
             "hostname": "localhost",
-            "ip": "localhost",
+            "private_ip": "localhost",
             "state": "started",
         }
     )
@@ -500,7 +499,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
     peer_relation.local_unit_data.update(
         {
             "hostname": "localhost",
-            "ip": "localhost",
+            "private_ip": "localhost",
             "state": "started",
         }
     )
@@ -597,7 +596,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
                 "cluster_state": "existing",
             },
             local_unit_data={
-                "ip": "localhost",
+                "private_ip": "localhost",
                 "state": "started",
             },
         )
@@ -755,8 +754,6 @@ def test_certificate_expiration(certificate_available_context):
 def test_set_tls_private_key():
     """Test setting the private key through a config option."""
     ctx = testing.Context(EtcdOperatorCharm)
-    hostname = socket.gethostname()
-    ip = socket.gethostbyname(hostname)
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
@@ -766,7 +763,7 @@ def test_set_tls_private_key():
             "tls_client_state": "tls",
             "tls_peer_state": "tls",
             "state": "started",
-            "ip": ip,
+            "private_ip": "my_ip",
         },
         local_app_data={
             "cluster_state": "existing",
@@ -1069,7 +1066,7 @@ def test_ca_peer_rotation(certificate_available_context):
             "client_cert_ready": "True",
             "peer_cert_ready": "True",
             "hostname": "localhost",
-            "ip": "localhost",
+            "private_ip": "localhost",
             "tls_client_state": "tls",
             "tls_peer_state": "tls",
             "state": "started",
@@ -1262,7 +1259,7 @@ def test_ca_client_rotation(certificate_available_context):
             "client_cert_ready": "True",
             "peer_cert_ready": "True",
             "hostname": "localhost",
-            "ip": "localhost",
+            "private_ip": "localhost",
             "tls_client_state": "tls",
             "tls_peer_state": "tls",
             "state": "started",
