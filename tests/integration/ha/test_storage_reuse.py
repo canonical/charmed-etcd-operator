@@ -80,9 +80,9 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
 
     # add unit with previous storage attached
     add_unit_cmd = f"add-unit {app} --model={ops_test.model.info.name} --attach-storage={data_storage_id} --attach-storage={archive_storage_id}"
-    return_code, _, _ = await ops_test.juju(*add_unit_cmd.split())
+    return_code, _, std_err = await ops_test.juju(*add_unit_cmd.split())
     assert return_code == 0, (
-        f"Failed to add unit with storages {data_storage_id} and {archive_storage_id}"
+        f"Failed to add unit with storages {data_storage_id} and {archive_storage_id}: {std_err}"
     )
 
     new_unit = ops_test.model.applications[app].units[-1]
@@ -145,8 +145,8 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
         add_unit_cmd = (
             f"add-unit {app} --model={ops_test.model.info.name} --attach-storage={storage_id}"
         )
-        return_code, _, _ = await ops_test.juju(*add_unit_cmd.split())
-        assert return_code == 0, f"Failed to add unit with storage {storage_id}"
+        return_code, _, std_err = await ops_test.juju(*add_unit_cmd.split())
+        assert return_code == 0, f"Failed to add unit with storage {storage_id}: {std_err}"
 
     await wait_until(ops_test, apps=[app], wait_for_exact_units=len(storage_ids), idle_period=120)
 
