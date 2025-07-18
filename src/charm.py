@@ -244,12 +244,12 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         # peer CA rotation
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.CERT_UPDATED:
-            self.tls_manager.update_cas([self.tls_events.collect_peer_ca()], TLSType.PEER)
+            self.tls_manager.update_cas([self.tls_manager.collect_peer_ca()], TLSType.PEER)
             self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NO_ROTATION)
 
         # client CA rotation
         if self.state.unit_server.tls_client_ca_rotation_state == TLSCARotationState.CERT_UPDATED:
-            self.tls_manager.update_cas(self.tls_events.collect_client_cas(), TLSType.CLIENT)
+            self.tls_manager.update_cas(self.tls_manager.collect_client_cas(), TLSType.CLIENT)
             self.tls_manager.set_ca_rotation_state(TLSType.CLIENT, TLSCARotationState.NO_ROTATION)
 
         self.config_manager.set_config_properties()

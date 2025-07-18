@@ -234,7 +234,9 @@ class TLSEvents(Object):
         self.charm.tls_manager.write_certificate(cert, private_key)  # type: ignore
         # if there are client relations add their CAs to the trusted client CAs
         if cert_type == TLSType.CLIENT and tls_state == TLSState.TO_TLS:
-            self.charm.tls_manager.update_cas(self.collect_client_cas(), cert_type)
+            self.charm.tls_manager.update_cas(
+                self.charm.tls_manager.collect_client_cas(), cert_type
+            )
 
         # TLS is enabled, New CA added to all servers, and cert updated -> no rolling restart needed until we clean up old CA
         if tls_state == TLSState.TLS and tls_ca_rotation_state == TLSCARotationState.NEW_CA_ADDED:
@@ -366,42 +368,3 @@ class TLSEvents(Object):
             return None
 
         return private_key
-
-    # TODO migrate to TLS manager
-    def collect_client_cas(self) -> list[str]:
-        """Collect client CAs.
-
-        Returns:
-            list[str]: The client CAs.
-        """
-        cas: list[str] = []
-
-        # server ca
-        certs, _ = self.client_certificate.get_assigned_certificates()
-        cas.append(certs[0].ca.raw)
-
-        # managed users cas
-        for relation in self.charm.external_clients_events.etcd_provides.relations:
-            mtls_cert = self.charm.external_clients_events.etcd_provides.fetch_relation_field(
-                relation.id, "mtls-cert"
-            )
-            logger.debug(
-                f"Collecting CA from relation {relation.id}, chain exists: {bool(mtls_cert)}"
-            )
-            if mtls_cert:
-                cas.extend(self.charm.tls_manager.separate_certificates(mtls_cert))
-
-        # certificate transfer cas
-        cas.extend(self.charm.external_clients_events.certificate_transfer.get_all_certificates())
-
-        return cas
-
-    def collect_peer_ca(self) -> str:
-        """Collect peer CA.
-
-        Returns:
-            str: The peer CA.
-        """
-        # server ca
-        certs, _ = self.peer_certificate.get_assigned_certificates()
-        return certs[0].ca.raw
