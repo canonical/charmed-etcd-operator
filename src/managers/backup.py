@@ -6,7 +6,6 @@
 
 import logging
 from datetime import datetime
-from typing import List
 
 import boto3
 from azure.core.exceptions import ResourceExistsError
@@ -28,7 +27,6 @@ from literals import (
     SNAP_DATA_PATH,
     EtcdClusterState,
     RestoreStep,
-    Status,
 )
 
 logger = logging.getLogger(__name__)
@@ -387,26 +385,26 @@ class BackupManager:
             logger.info(f"Next restore step: {next_step.value}")
             self.state.cluster.update({"restore_instruction": next_step.value})
 
-    def compute_component_status(self) -> List[Status]:
-        """Compute the Backup manager's statuses."""
-        status_list = []
+    # def compute_component_status(self) -> List[Status]:
+    #     """Compute the Backup manager's statuses."""
+    #     status_list = []
 
-        if self.state.cluster.is_backup_in_progress:
-            status_list.append(Status.BACKUP_IN_PROGRESS)
+    #     if self.state.cluster.is_backup_in_progress:
+    #         status_list.append(Status.BACKUP_IN_PROGRESS)
 
-        if self.state.cluster.is_restore_in_progress:
-            status_list.append(Status.RESTORE_IN_PROGRESS)
+    #     if self.state.cluster.is_restore_in_progress:
+    #         status_list.append(Status.RESTORE_IN_PROGRESS)
 
-        if self.state.cluster.restore_verification_failed:
-            status_list.append(Status.RESTORE_VERIFICATION_FAILED)
+    #     if self.state.cluster.restore_verification_failed:
+    #         status_list.append(Status.RESTORE_VERIFICATION_FAILED)
 
-        if self.state.cluster.s3_credentials and self.state.cluster.azure_credentials:
-            status_list.append(Status.OBJECT_STORAGE_CONFLICT)
+    #     if self.state.cluster.s3_credentials and self.state.cluster.azure_credentials:
+    #         status_list.append(Status.OBJECT_STORAGE_CONFLICT)
 
-        if self.state.s3_relation and not self.state.cluster.s3_credentials:
-            status_list.append(Status.BACKUP_S3_PARAMETERS_MISSING)
+    #     if self.state.s3_relation and not self.state.cluster.s3_credentials:
+    #         status_list.append(Status.BACKUP_S3_PARAMETERS_MISSING)
 
-        if self.state.azure_relation and not self.state.cluster.azure_credentials:
-            status_list.append(Status.BACKUP_AZURE_PARAMETERS_MISSING)
+    #     if self.state.azure_relation and not self.state.cluster.azure_credentials:
+    #         status_list.append(Status.BACKUP_AZURE_PARAMETERS_MISSING)
 
-        return status_list
+    #     return status_list

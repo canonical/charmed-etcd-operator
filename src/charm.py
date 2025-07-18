@@ -11,7 +11,6 @@ import ops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from data_platform_helpers.advanced_statuses.handler import StatusHandler
-from ops import StatusBase
 
 from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
@@ -23,8 +22,6 @@ from literals import (
     METRICS_PORT,
     RESTART_RELATION,
     SUBSTRATE,
-    DebugLevel,
-    Status,
     TLSCARotationState,
     TLSState,
     TLSType,
@@ -46,7 +43,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         super().__init__(*args)
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
-        self.pending_inactive_statuses: list[Status] = []
 
         # --- MANAGERS ---
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
@@ -63,6 +59,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             self,
             self.cluster_manager,
             self.tls_manager,
+            self.external_clients_manager,
         )
 
         # --- EVENT HANDLERS ---
@@ -88,14 +85,6 @@ class EtcdOperatorCharm(ops.CharmBase):
                 }
             ],
         )
-
-    def set_status(self, key: Status) -> None:
-        """Set charm status."""
-        status: StatusBase = key.value.status
-        log_level: DebugLevel = key.value.log_level
-
-        getattr(logger, log_level.lower())(status.message)
-        self.pending_inactive_statuses.append(key)
 
     def _restart(self, _) -> None:
         """Restart callback for the rolling ips lib."""

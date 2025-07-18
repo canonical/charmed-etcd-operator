@@ -22,7 +22,6 @@ from common.exceptions import EtcdUserManagementError
 from literals import (
     CERTIFICATE_TRANSFER_RELATION,
     EXTERNAL_CLIENTS_RELATION,
-    Status,
     TLSCARotationState,
     TLSState,
     TLSType,
@@ -62,16 +61,13 @@ class ExternalClientsEvents(Object):
         """Handle the ca chain updated event."""
         if not event.mtls_cert or not event.prefix:
             logger.error("CA chain, keys prefix, or common name not provided")
-            self.charm.set_status(Status.EC_MISSING_CREDENTIALS)
             return
         if self.charm.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
             logger.error("TLS is not enabled")
-            self.charm.set_status(Status.EC_TLS_IS_DISABLED)
             event.defer()
             return
         if self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS:
             logger.error("TLS is not ready")
-            self.charm.set_status(Status.TLS_NOT_READY)
             event.defer()
             return
 
@@ -80,7 +76,6 @@ class ExternalClientsEvents(Object):
             != TLSCARotationState.NO_ROTATION
         ):
             logger.debug("CA rotation is in progress")
-            self.charm.set_status(Status.TLS_CLIENT_CA_ROTATING)
             event.defer()
             return
 
@@ -129,7 +124,6 @@ class ExternalClientsEvents(Object):
                         logger.debug("User is already being added for this relation")
                     else:
                         logger.error("User already exists")
-                        self.charm.set_status(Status.EC_USERNAME_EXISTS)
                     return
 
                 if relation_managed_user is None:

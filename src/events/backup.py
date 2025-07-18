@@ -33,7 +33,6 @@ from literals import (
     PEER_RELATION,
     S3_RELATION_NAME,
     RestoreStep,
-    Status,
 )
 
 if TYPE_CHECKING:
@@ -92,7 +91,7 @@ class BackupEvents(Object):
             return
 
         if not self.charm.state.peer_relation:
-            self.charm.set_status(Status.NO_PEER_RELATION)
+            # self.charm.set_status(Status.NO_PEER_RELATION)
             event.defer()
             return
 
@@ -144,7 +143,7 @@ class BackupEvents(Object):
             return
 
         if not self.charm.state.peer_relation:
-            self.charm.set_status(Status.NO_PEER_RELATION)
+            # self.charm.set_status(Status.NO_PEER_RELATION)
             event.defer()
             return
 
@@ -264,7 +263,8 @@ class BackupEvents(Object):
                 if not self.charm.backup_manager.download_backup_file(
                     self.charm.state.cluster.restore_id
                 ):
-                    self.charm.set_status(Status.RESTORE_FAILED)
+                    # self.charm.set_status(Status.RESTORE_FAILED)
+                    pass
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
                 self.charm.backup_manager.stop_database()
                 self.charm.backup_manager.set_restore_step(RestoreStep.STOP.value)
@@ -280,7 +280,8 @@ class BackupEvents(Object):
                     try:
                         self.charm.backup_manager.restore_backup()
                     except EtcdBackupError:
-                        self.charm.set_status(Status.RESTORE_FAILED)
+                        # self.charm.set_status(Status.RESTORE_FAILED)
+                        pass
             case RestoreStep.START, RestoreStep.RESTORE:
                 self.charm.config_manager.set_config_properties()
                 self.charm.backup_manager.start_database()
@@ -294,7 +295,7 @@ class BackupEvents(Object):
             case RestoreStep.COMPLETED, RestoreStep.START:
                 if not self.charm.cluster_manager.is_healthy(cluster=False):
                     # if the member is not healthy, we do not complete the restore process
-                    self.charm.set_status(Status.RESTORE_UNHEALTHY)
+                    # self.charm.set_status(Status.RESTORE_UNHEALTHY)
                     return
                 self.charm.backup_manager.clean_up_after_restore()
 
