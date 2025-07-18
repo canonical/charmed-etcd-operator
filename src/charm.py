@@ -44,9 +44,9 @@ logger = logging.getLogger(__name__)
 @dataclasses.dataclass(eq=False)
 class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
     """CharmSpecific implementation for the etcd charm."""
-    
+
     _charm: "EtcdOperatorCharm"
-    
+
     @classmethod
     def is_compatible(
         cls,
@@ -57,13 +57,13 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
         new_workload_version: str,
     ) -> bool:
         """Check if refresh from old to new versions is compatible.
-        
+
         Args:
             old_charm_version: The charm version being refreshed from
             new_charm_version: The charm version being refreshed to
             old_workload_version: The etcd version being refreshed from
             new_workload_version: The etcd version being refreshed to
-            
+
         Returns:
             True if the refresh is compatible, False otherwise
         """
@@ -99,7 +99,7 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
 
         # Do not allow downgrades
         return new_patch >= old_patch
-    
+
     def refresh_snap(
         self,
         *,
@@ -108,30 +108,32 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
         refresh: charm_refresh.Machines,
     ) -> None:
         """Refresh the etcd snap.
-        
+
         Args:
             snap_name: The name of the snap to refresh
             snap_revision: The revision to refresh to
             refresh: The refresh instance for calling update_snap_revision()
         """
         from charms.operator_libs_linux.v2 import snap
-        
+
         # 1. Gracefully stop the workload if it is running
         if self._charm.workload.alive():
             logger.info("Stopping etcd workload before snap refresh")
             self._charm.workload.stop()
-        
+
         # 2. Refresh the workload snap
         etcd_snap = snap.SnapCache()[snap_name]
         revision_before_refresh = etcd_snap.revision
-        
+
         assert snap_revision != revision_before_refresh
-        
+
         try:
-            logger.info(f"Refreshing snap {snap_name} from revision {revision_before_refresh} to {snap_revision}")
+            logger.info(
+                f"Refreshing snap {snap_name} from revision {revision_before_refresh} to {snap_revision}"
+            )
             etcd_snap.ensure(snap.SnapState.Present, revision=snap_revision)
             etcd_snap.hold()
-        except (snap.SnapError, snap.SnapAPIError) as e:
+        except (snap.SnapError, snap.SnapAPIError):
             logger.exception("Snap refresh failed")
             if etcd_snap.revision == revision_before_refresh:
                 # Refresh failed and snap revision didn't change, restart workload
@@ -146,29 +148,31 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
             # 3. Immediately call refresh.update_snap_revision()
             refresh.update_snap_revision()
             logger.info(f"Successfully refreshed snap {snap_name} to revision {snap_revision}")
-        
+
         # Complete the post-snap refresh workflow
         self._post_snap_refresh(refresh)
-    
+
     def _post_snap_refresh(self, refresh: charm_refresh.Machines) -> None:
         """Handle post-snap refresh workflow: start workload, check health, allow next unit."""
         try:
             # 1. Start the workload
             logger.info("Starting etcd workload after snap refresh")
             self._charm.workload.start()
-            
+
             # 2. Check if the application and unit are healthy
             self._ensure_application_and_unit_are_healthy()
-            
+
             # 3. If healthy, set next_unit_allowed_to_refresh = True
             refresh.next_unit_allowed_to_refresh = True
             logger.info("Snap refresh completed successfully, next unit allowed to refresh")
-            
+
         except Exception as e:
             logger.warning(f"Post-snap refresh health check failed: {e}")
-            self._charm.unit.status = ops.BlockedStatus(f"Post-refresh health check failed: {str(e)}")
+            self._charm.unit.status = ops.BlockedStatus(
+                f"Post-refresh health check failed: {str(e)}"
+            )
             # next_unit_allowed_to_refresh remains False, refresh will pause
-    
+
     def _ensure_application_and_unit_are_healthy(self) -> None:
         """Check if the application and unit are healthy after refresh."""
         # Check if workload is alive
@@ -185,7 +189,7 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
 
         if self._charm.cluster_manager.state.cluster.rebuild_cluster_in_progress:
             raise Exception("Rebuild cluster is in progress, cannot refresh")
-        
+
         if self._charm.cluster_manager.state.cluster.is_restore_in_progress:
             raise Exception("Restore is in progress, cannot refresh")
 
@@ -231,7 +235,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         for handler in root_logger.handlers:
             if isinstance(handler, ops.log.JujuLogHandler):
                 handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
-        
+
         # Initialize refresh capability
         try:
             self.refresh = charm_refresh.Machines(
@@ -250,7 +254,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.unit.status = ops.MaintenanceStatus("Tearing down")
             # Gracefully shut down workload if needed
             return
-        
+
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
         self.pending_inactive_statuses: list[Status] = []
@@ -292,35 +296,33 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.collect_app_status, self._on_collect_status)
-        
+
         # Handle post-refresh health checks if needed
         self._handle_post_refresh_health_checks()
 
     def _handle_post_refresh_health_checks(self) -> None:
         """Handle post-refresh health checks that need to be retried in every Juju event."""
-        if not hasattr(self, 'refresh'):
+        if not hasattr(self, "refresh"):
             # Refresh not initialized yet (early startup or exception handling)
             return
-            
+
         # Check if refresh is in progress and next_unit_allowed_to_refresh is not set
-        if (self.refresh.in_progress and 
-            not self.refresh.next_unit_allowed_to_refresh):
-            
+        if self.refresh.in_progress and not self.refresh.next_unit_allowed_to_refresh:
             try:
                 # Retry the health checks and set next_unit_allowed_to_refresh if healthy
                 logger.info("Retrying post-refresh health checks")
-                
+
                 # Ensure workload is running
                 if not self.workload.alive():
                     self.workload.start()
-                
+
                 # Check if application and unit are healthy
                 if self.cluster_manager.is_healthy() and self.workload.alive():
                     self.refresh.next_unit_allowed_to_refresh = True
                     logger.info("Post-refresh health checks passed, next unit allowed to refresh")
                 else:
                     self.unit.status = ops.BlockedStatus("Post-refresh health check failed")
-                    
+
             except Exception as e:
                 logger.warning(f"Post-refresh health check retry failed: {e}")
                 self.unit.status = ops.BlockedStatus(f"Post-refresh health check failed: {str(e)}")
