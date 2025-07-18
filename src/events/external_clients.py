@@ -60,6 +60,13 @@ class ExternalClientsEvents(Object):
 
     def _on_mtls_cert_updated(self, event: MTLSCertUpdatedEvent) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
+        if self.charm.refresh.in_progress:
+            logger.warning(
+                "Cannot update external client certificates while refresh operation is in progress"
+            )
+            event.defer()
+            return
+
         if not event.mtls_cert or not event.prefix:
             logger.error("CA chain, keys prefix, or common name not provided")
             self.charm.set_status(Status.EC_MISSING_CREDENTIALS)
@@ -171,6 +178,13 @@ class ExternalClientsEvents(Object):
 
     def _on_certificates_available(self, event: CertificatesAvailableEvent) -> None:
         """Handle the certificates available event."""
+        if self.charm.refresh.in_progress:
+            logger.warning(
+                "Cannot handle certificate events while refresh operation is in progress"
+            )
+            event.defer()
+            return
+
         logger.debug("Certificates available event")
         if (
             self.charm.state.unit_server.tls_client_ca_rotation_state
@@ -188,6 +202,13 @@ class ExternalClientsEvents(Object):
 
     def _on_certificates_removed(self, event: CertificatesRemovedEvent) -> None:
         """Handle the certificates removed event."""
+        if self.charm.refresh.in_progress:
+            logger.warning(
+                "Cannot handle certificate events while refresh operation is in progress"
+            )
+            event.defer()
+            return
+
         if (
             self.charm.state.unit_server.tls_client_ca_rotation_state
             != TLSCARotationState.NO_ROTATION

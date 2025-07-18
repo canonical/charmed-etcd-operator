@@ -383,7 +383,11 @@ class BackupEvents(Object):
         if self.charm.state.cluster.is_backup_in_progress:
             return "Backup in progress, cannot perform action."
 
-        if self.charm.state.cluster.is_restore_in_progress:
-            return "Restore in progress, cannot perform action."
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh.in_progress
+        ):
+            return "Restore, cluster-rebuild or refresh in progress, cannot perform action."
 
         return ""

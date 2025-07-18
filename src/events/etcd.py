@@ -201,9 +201,10 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh.in_progress
         ):
             logger.warning(
-                "Cannot update config while a restore or cluster-rebuild operation is in progress."
+                "Cannot update config while a restore, cluster-rebuild or refresh operation is in progress."
             )
             event.defer()
             return
@@ -317,9 +318,10 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh.in_progress
         ):
             logger.warning(
-                "Cannot add cluster member while a restore or cluster-rebuild operation is in progress."
+                "Cannot add cluster member while a restore, cluster-rebuild or refresh operation is in progress."
             )
             return
 
@@ -424,9 +426,10 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh.in_progress
         ):
             logger.warning(
-                "Cannot update credentials while a restore or cluster-rebuild operation is in progress."
+                "Cannot update credentials while a restore, cluster-rebuild or refresh operation is in progress."
             )
             event.defer()
             return
@@ -468,6 +471,7 @@ class EtcdEvents(Object):
             if not (
                 self.charm.state.cluster.is_restore_in_progress
                 or self.charm.state.cluster.rebuild_cluster_in_progress
+                or self.charm.refresh.in_progress
             ):
                 # allow for unit removal when restore is in progress
                 try:
