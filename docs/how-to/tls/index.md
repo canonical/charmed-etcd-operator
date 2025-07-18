@@ -6,7 +6,7 @@ Transport Layer Security (TLS) plays a crucial role in securing database communi
 :titlesonly:
 :maxdepth: 2
 
-Enable TSL <enable-tls>
+Enable TLS <enable-tls>
 Disable TLS <disable-tls>
 Manage private keys <manage-private-keys>
 ```
