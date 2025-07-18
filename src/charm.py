@@ -77,20 +77,28 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
             return False
 
         # Check etcd workload version compatibility
-        # etcd supports minor version upgrades within the same major version
+        # etcd only supports upgrades between minor versions, and does not support downgrades
         try:
-            old_major, old_minor = (int(component) for component in old_workload_version.split("."))
-            new_major, new_minor = (int(component) for component in new_workload_version.split("."))
+            old_major, old_minor, old_patch = (
+                int(component) for component in old_workload_version.split(".")
+            )
+            new_major, new_minor, new_patch = (
+                int(component) for component in new_workload_version.split(".")
+            )
         except (ValueError, IndexError):
             # If we can't parse the version, assume incompatible
             return False
-            
+
         # Only allow upgrades within the same major version
         if old_major != new_major:
             return False
-            
-        # Allow same or higher minor versions
-        return new_minor >= old_minor
+
+        # Only allow upgrades within the same minor version track
+        if old_minor != new_minor:
+            return False
+
+        # Do not allow downgrades
+        return new_patch >= old_patch
     
     def refresh_snap(
         self,
