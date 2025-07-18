@@ -194,10 +194,30 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
 
         logger.info("Application and unit health checks passed")
 
+    def run_pre_refresh_checks(self) -> None:
+        """Run checks to ensure the cluster is in a healthy state before refresh."""
+        if not self._charm.workload.alive():
+            raise Exception("Workload not running")
+
+        if self._charm.cluster_manager.is_cluster_failed:
+            raise Exception("Cluster has failed")
+
+        if self._charm.cluster_manager.state.cluster.is_backup_in_progress:
+            raise Exception("Backup in progress")
+
+        if self._charm.cluster_manager.state.cluster.is_restore_in_progress:
+            raise Exception("Restore in progress")
+
+        if self._charm.cluster_manager.state.cluster.rebuild_cluster_in_progress:
+            raise Exception("Cluster rebuild in progress")
+
+        if not self._charm.cluster_manager.is_healthy(cluster=True):
+            raise Exception("Cluster is not healthy")
+
     @staticmethod
     def run_pre_refresh_checks_after_1_unit_refreshed() -> None:
         """Run pre-refresh checks after 1 unit has refreshed."""
-        # TODO: Implement cross version checks on top of checks above
+        # Implement Cross version checks on top of checks above
         pass
 
 
