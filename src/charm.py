@@ -174,11 +174,15 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
         # Check if workload is alive
         if not self._charm.workload.alive():
             raise Exception("Workload is not running")
-        
+
+        # Check if the cluster has a leader and is not in a failed state
+        if not self._charm.cluster_manager.is_healthy(cluster=False):
+            raise Exception("Unit is not healthy, cannot refresh")
+
         # Check if the cluster is healthy
-        if not self._charm.cluster_manager.is_healthy():
-            raise Exception("Cluster is not healthy, cannot refresh")
-        
+        if self._charm.cluster_manager.is_cluster_failed:
+            raise Exception("Cluster has failed, cannot refresh")
+
         if self._charm.cluster_manager.state.cluster.rebuild_cluster_in_progress:
             raise Exception("Rebuild cluster is in progress, cannot refresh")
         
@@ -189,7 +193,7 @@ class EtcdCharmSpecific(charm_refresh.CharmSpecificMachines):
             raise Exception("Backup is in progress, cannot refresh")
 
         logger.info("Application and unit health checks passed")
-    
+
     @staticmethod
     def run_pre_refresh_checks_after_1_unit_refreshed() -> None:
         """Run pre-refresh checks after 1 unit has refreshed."""
