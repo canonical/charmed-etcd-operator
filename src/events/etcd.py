@@ -209,7 +209,7 @@ class EtcdEvents(Object):
             return
 
         # refresh the host information and cluster membership in case of ip change
-        ip_address = self.charm.cluster_manager.get_host_mapping().get("private_ip")
+        ip_address = self.charm.workload.get_host_mapping().get("private_ip")
         if ip_address and ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
             self.charm.state.unit_server.update({"private_ip": ip_address})
@@ -247,7 +247,7 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
-        self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
+        self.charm.state.unit_server.update(self.charm.workload.get_host_mapping())
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""

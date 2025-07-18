@@ -76,7 +76,7 @@ class TLSEvents(Object):
     def __init__(self, charm: "EtcdOperatorCharm"):
         super().__init__(charm, "tls")
         self.charm: "EtcdOperatorCharm" = charm
-        host_mapping = self.charm.cluster_manager.get_host_mapping()
+        host_mapping = self.charm.workload.get_host_mapping()
         common_name = f"{self.charm.unit.name}-{self.charm.model.uuid}"
         peer_private_key = None
         client_private_key = None

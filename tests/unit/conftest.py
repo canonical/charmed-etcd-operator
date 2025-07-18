@@ -113,7 +113,7 @@ def cluster_no_tls_context():
 @pytest.fixture(autouse=True)  # autouse=True makes this fixture run for all tests in the module
 def mock_get_host_mapping(mocker):
     mocker.patch(
-        "managers.cluster.ClusterManager.get_host_mapping",
+        "core.workload.WorkloadBase.get_host_mapping",
         return_value={
             "hostname": "my_hostname",
             "private_ip": "my_ip",

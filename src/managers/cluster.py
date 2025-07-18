@@ -5,7 +5,6 @@
 """Manager for all cluster/quorum/rbac related tasks."""
 
 import logging
-import socket
 from json import JSONDecodeError
 from typing import List
 
@@ -35,20 +34,6 @@ class ClusterManager:
         self.admin_user = INTERNAL_USER
         self.admin_password = self.state.cluster.internal_user_credentials.get(INTERNAL_USER, "")
         self.cluster_endpoints = [server.client_url for server in self.state.servers]
-
-    def get_host_mapping(self) -> dict[str, str]:
-        """Collect hostname mapping for current unit.
-
-        Returns:
-            dict[str, str]: Dict of string keys 'hostname', 'private_ip', 'public_ip' and their values
-        """
-        hostname = socket.gethostname()
-        private_ip = self.workload.get_private_ip()
-        public_ip = self.workload.get_public_ip() or ""
-        if not private_ip:
-            raise ValueError("Could not get private IP address of the unit.")
-
-        return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
 
     @property
     def leader(self) -> str:

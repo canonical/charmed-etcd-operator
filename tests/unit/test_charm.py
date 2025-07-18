@@ -520,7 +520,7 @@ def test_peer_relation_created():
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation})
     with (
-        patch("managers.cluster.ClusterManager.get_host_mapping", return_value=test_data),
+        patch("core.workload.WorkloadBase.get_host_mapping", return_value=test_data),
         patch("managers.cluster.ClusterManager.leader"),
     ):
         state_out = ctx.run(ctx.on.relation_created(relation=relation), state_in)

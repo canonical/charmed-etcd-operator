@@ -4,13 +4,18 @@
 
 """Base objects for workload operations across different substrates."""
 
+import logging
 import secrets
+import socket
 import string
+import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import List
 
 from literals import CONFIG_FILE, TLS_ROOT_DIR
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -171,20 +176,58 @@ class WorkloadBase(ABC):
         """Enable the service and start the workload."""
         pass
 
-    @abstractmethod
-    def get_private_ip(self) -> str | None:
-        """Get the private IP of the workload.
-
-        Returns:
-            str: The private IP address.
-        """
-        pass
-
-    @abstractmethod
     def get_public_ip(self) -> str | None:
-        """Get the public IP of the workload.
+        """Get the Public IP address of the current unit."""
+        cmd = "unit-get public-address"
+        try:
+            output = subprocess.run(
+                cmd,
+                check=True,
+                text=True,
+                shell=True,
+                capture_output=True,
+                timeout=10,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            logger.error(f"Error executing command '{cmd}': {e}")
+            return None
+
+        if output.returncode != 0:
+            return None
+
+        return output.stdout.strip()
+
+    def get_private_ip(self) -> str | None:
+        """Get the Private IP address of the current unit."""
+        cmd = "unit-get private-address"
+        try:
+            output = subprocess.run(
+                cmd,
+                check=True,
+                text=True,
+                shell=True,
+                capture_output=True,
+                timeout=10,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            logger.error(f"Error executing command '{cmd}': {e}")
+            return None
+
+        if output.returncode != 0:
+            return None
+
+        return output.stdout.strip()
+
+    def get_host_mapping(self) -> dict[str, str]:
+        """Collect hostname mapping for current unit.
 
         Returns:
-            str: The public IP address.
+            dict[str, str]: Dict of string keys 'hostname', 'private_ip', 'public_ip' and their values
         """
-        pass
+        hostname = socket.gethostname()
+        private_ip = self.get_private_ip()
+        public_ip = self.get_public_ip() or ""
+        if not private_ip:
+            raise ValueError("Could not get private IP address of the unit.")
+
+        return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
