@@ -23,6 +23,9 @@ from literals import (
     EtcdClusterState,
     RestoreStep,
 )
+from statuses import BackupStatuses
+
+from .helpers import status_is
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -64,7 +67,7 @@ def test_s3_relation():
     state_in = testing.State(relations={peer_relation, s3_relation}, leader=True)
     with patch("managers.backup.BackupManager.create_bucket"):
         state_out = ctx.run(ctx.on.relation_changed(s3_relation), state_in)
-        assert state_out.unit_status.name == "blocked"
+        assert status_is(state_out, BackupStatuses.BACKUP_S3_PARAMETERS_MISSING.value)
 
 
 def test_azure_relation():
@@ -108,8 +111,7 @@ def test_azure_relation():
     state_in = testing.State(relations={peer_relation, azure_relation}, leader=True)
     with patch("managers.backup.BackupManager.create_container"):
         state_out = ctx.run(ctx.on.relation_changed(azure_relation), state_in)
-
-        assert state_out.unit_status.name == "blocked"
+        assert status_is(state_out, BackupStatuses.BACKUP_AZURE_PARAMETERS_MISSING.value)
 
 
 def test_create_backup_action_s3():
@@ -173,7 +175,6 @@ def test_create_backup_action_s3():
     with patch("subprocess.run"):
         with raises(testing.ActionFailed) as e:
             ctx.run(ctx.on.action("create-backup"), state_in)
-
             assert e.message == "There is currently a backup in progress, please wait."
 
     # happy path
@@ -218,7 +219,6 @@ def test_create_backup_action_azure():
     state_in = testing.State(relations={peer_relation, azure_relation}, leader=False)
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("create-backup"), state_in)
-
         assert e.message == "Action must be performed on the leader unit."
 
     # ensure action fails if snapshot in etcd cannot be created
@@ -236,7 +236,6 @@ def test_create_backup_action_azure():
     ):
         with raises(testing.ActionFailed) as e:
             ctx.run(ctx.on.action("create-backup"), state_in)
-
             assert e.message == "Failed to create database backup."
 
     # ensure action fails if backup already in progress
@@ -254,7 +253,6 @@ def test_create_backup_action_azure():
     with patch("subprocess.run"):
         with raises(testing.ActionFailed) as e:
             ctx.run(ctx.on.action("create-backup"), state_in)
-
             assert e.message == "There is currently a backup in progress, please wait."
 
     # happy path
@@ -326,28 +324,28 @@ def test_support_only_one_object_storage():
             leader=True,
         )
         state_out = ctx.run(ctx.on.relation_changed(s3_relation), state_in)
-        assert state_out.unit_status.name == "blocked"
+        assert status_is(state_out, BackupStatuses.OBJECT_STORAGE_CONFLICT.value)
 
     # ensure backup cannot be created if both s3 and azure are related
     state_in = testing.State(relations={peer_relation, azure_relation, s3_relation}, leader=True)
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("create-backup"), state_in)
 
-        assert e.message == "Azure and S3 storages configured - please remove one."
+        assert e.message == BackupStatuses.OBJECT_STORAGE_CONFLICT.value.message
 
     # ensure backups cannot be listed if both s3 and azure are related
     state_in = testing.State(relations={peer_relation, azure_relation, s3_relation}, leader=True)
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("list-backups"), state_in)
 
-        assert e.message == "Azure and S3 storages configured - please remove one."
+        assert e.message == BackupStatuses.OBJECT_STORAGE_CONFLICT.value.message
 
     # ensure backup cannot be restored if both s3 and azure are related
     state_in = testing.State(relations={peer_relation, azure_relation, s3_relation}, leader=True)
     with raises(testing.ActionFailed) as e:
         ctx.run(ctx.on.action("restore"), state_in)
 
-        assert e.message == "Azure and S3 storages configured - please remove one."
+        assert e.message == BackupStatuses.OBJECT_STORAGE_CONFLICT.value.message
 
 
 def test_ensure_at_least_one_object_storage():
@@ -873,14 +871,9 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.stop"),
         patch("workload.EtcdWorkload.disable_service"),
     ):
-        with ctx(ctx.on.relation_changed(relation=relation), state_in) as manager:
-            charm = manager.charm
-            state_out = manager.run()
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert (
-            state_out.unit_status.name == "blocked"
-            and state_out.unit_status.message.startswith("Restore verification failed")
-        )
+        assert status_is(state_out, BackupStatuses.RESTORE_VERIFICATION_FAILED.value)
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step")
             == RestoreStep.VERIFY.value
@@ -973,10 +966,7 @@ def test_restore_workflow_synchronization():
             state_out.get_relation(1).local_unit_data.get("restore_step")
             == RestoreStep.RESTORE.value
         )
-        assert (
-            state_out.unit_status.name == "blocked"
-            and state_out.unit_status.message.startswith("Restore verification failed")
-        )
+        assert status_is(state_out, BackupStatuses.RESTORE_VERIFICATION_FAILED.value)
 
     # restore step: skip restore after verification failed (leader)
     relation = testing.PeerRelation(
@@ -1010,10 +1000,7 @@ def test_restore_workflow_synchronization():
             state_out.get_relation(1).local_app_data.get("cluster_state")
             == EtcdClusterState.EXISTING.value
         )
-        assert (
-            state_out.unit_status.name == "blocked"
-            and state_out.unit_status.message.startswith("Restore verification failed")
-        )
+        assert status_is(state_out, BackupStatuses.RESTORE_VERIFICATION_FAILED.value)
 
     # restore step: restore -> failed
     relation = testing.PeerRelation(
@@ -1039,10 +1026,7 @@ def test_restore_workflow_synchronization():
             state_out.get_relation(1).local_app_data.get("cluster_state")
             == EtcdClusterState.NEW.value
         )
-        assert (
-            state_out.unit_status.name == "blocked"
-            and state_out.unit_status.message.startswith("failed to restore backup")
-        )
+        assert status_is(state_out, BackupStatuses.RESTORE_FAILED.value)
 
     # restore step: restart (non-leader)
     relation = testing.PeerRelation(
@@ -1145,12 +1129,7 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert (
-            state_out.unit_status.name == "blocked"
-            and state_out.unit_status.message.startswith(
-                "cluster unhealthy after restoring backup"
-            )
-        )
+        assert status_is(state_out, BackupStatuses.RESTORE_UNHEALTHY.value)
 
     # restore step: clean up (leader)
     relation = testing.PeerRelation(
@@ -1205,9 +1184,4 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert (
-            state_out.unit_status.name == "blocked"
-            and state_out.unit_status.message.startswith(
-                "cluster unhealthy after restoring backup"
-            )
-        )
+        assert status_is(state_out, BackupStatuses.RESTORE_UNHEALTHY.value)

@@ -32,6 +32,8 @@ from literals import (
 )
 from statuses import ExternalClientsStatuses
 
+from .helpers import status_is
+
 CLIENT_COMMON_NAME = "test-common-name"
 server_cert = MagicMock()
 server_cert.ca.raw = "test_ca_server"
@@ -382,8 +384,8 @@ def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context, 
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        assert state_out.app_status == as_status(
-            ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value
+        assert status_is(
+            state_out, ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value, is_app=True
         )
         assert ecr_relation.id not in charm.state.cluster.managed_users
 
