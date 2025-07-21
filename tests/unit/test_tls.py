@@ -42,6 +42,8 @@ from literals import (
 from managers.tls import TLSType
 from statuses import CharmStatuses, TLSStatuses
 
+from .helpers import status_is
+
 MEMBER_LIST_DICT = {
     "charmed-etcd0": Member(
         id="3e23287c34b94e09",
@@ -193,6 +195,9 @@ def test_enable_tls_on_start():
             local_unit_data={
                 "ip": "localhost",
             },
+            local_app_data={
+                "cluster_members": "charmed-etcd0=http://localhost:2380",
+            },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
         client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
@@ -203,7 +208,7 @@ def test_enable_tls_on_start():
         # no tls
         state_out = ctx.run(ctx.on.start(), state_in)
         peer_relation = state_out.get_relation(peer_relation.id)
-        assert state_out.unit_status == as_status(CharmStatuses.ACTIVE_IDLE.value)
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
         assert peer_relation.local_unit_data["state"] == "started"
         assert peer_relation.local_app_data["cluster_state"] == "existing"
 
@@ -218,6 +223,7 @@ def test_enable_tls_on_start():
             local_app_data={
                 "authentication": "enabled",
                 "cluster_state": "existing",
+                "cluster_members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -240,6 +246,7 @@ def test_enable_tls_on_start():
             local_app_data={
                 "authentication": "enabled",
                 "cluster_state": "existing",
+                "cluster_members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -260,6 +267,9 @@ def test_enable_tls_on_start():
                 "tls_peer_state": TLSState.TLS.value,
                 "tls_client_state": TLSState.TLS.value,
             },
+            local_app_data={
+                "cluster_members": "charmed-etcd0=http://localhost:2380",
+            },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
         client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
@@ -269,7 +279,7 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         peer_relation = state_out.get_relation(peer_relation.id)
-        assert state_out.unit_status == as_status(CharmStatuses.ACTIVE_IDLE.value)
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
         assert peer_relation.local_unit_data["state"] == "started"
         assert peer_relation.local_app_data["cluster_state"] == "existing"
         assert state_out.app_status == as_status(CharmStatuses.ACTIVE_IDLE.value)
@@ -656,6 +666,7 @@ def test_certificates_relation_created():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -666,7 +677,7 @@ def test_certificates_relation_created():
 
     with patch("workload.EtcdWorkload.alive", return_value=True):
         state_out = ctx.run(ctx.on.relation_created(relation=peer_tls_relation), state_in)
-        assert state_out.unit_status == as_status(TLSStatuses.TLS_ENABLING_PEER_TLS.value)
+        assert status_is(state_out, TLSStatuses.TLS_ENABLING_PEER_TLS.value)
         assert (
             state_out.get_relation(peer_relation.id).local_unit_data["tls_peer_state"]
             == TLSState.TO_TLS.value
@@ -678,6 +689,7 @@ def test_certificates_relation_created():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     client_tls_relation = testing.Relation(id=2, endpoint=CLIENT_TLS_RELATION_NAME)
@@ -688,7 +700,7 @@ def test_certificates_relation_created():
 
     with patch("workload.EtcdWorkload.alive", return_value=True):
         state_out = ctx.run(ctx.on.relation_created(relation=client_tls_relation), state_in)
-        assert state_out.unit_status == as_status(TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
+        assert status_is(state_out, TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
         assert (
             state_out.get_relation(peer_relation.id).local_unit_data["tls_client_state"]
             == TLSState.TO_TLS.value
@@ -908,7 +920,7 @@ def test_set_tls_private_key():
             },
         )
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
-        assert state_out.unit_status == as_status(TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
+        assert status_is(state_out, TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
         secret = dataclasses.replace(
             secret,
@@ -939,12 +951,12 @@ def test_set_tls_private_key():
             config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
         )
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
-        assert state_out.unit_status == as_status(TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
+        assert status_is(state_out, TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
         state_in.config[TLS_PEER_PRIVATE_KEY_CONFIG] = "secret:cu9ibpp34trs4baf20c0"
 
         state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert state_out.unit_status == as_status(TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
+        assert status_is(state_out, TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
     # client private key
     secret = Secret(

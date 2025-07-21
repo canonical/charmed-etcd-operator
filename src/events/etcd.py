@@ -198,18 +198,8 @@ class EtcdEvents(Object):
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
-            self.charm.state.statuses.set(
-                ClusterStatuses.CLUSTER_NOT_JOINED.value,
-                scope="unit",
-                component=self.charm.cluster_manager.name,
-            )
             event.defer()
             return
-        self.charm.state.statuses.delete(
-            ClusterStatuses.CLUSTER_NOT_JOINED.value,
-            scope="unit",
-            component=self.charm.cluster_manager.name,
-        )
 
         if not self.charm.workload.alive():
             self.charm.status.set_running_status(

@@ -7,7 +7,6 @@ from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess
 from unittest.mock import patch
 
-import ops
 import yaml
 from ops import testing
 from pytest import raises
@@ -747,6 +746,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.STOP.value,
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     status_relation = testing.PeerRelation(
@@ -760,7 +760,7 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
+        assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
         )
@@ -775,6 +775,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.STOP.value,
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -784,7 +785,7 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
+        assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
         )
@@ -803,12 +804,13 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.VERIFY.value,
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
     state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-    assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
+    assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
     assert (
         state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.VERIFY.value
     )
@@ -823,6 +825,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.VERIFY.value,
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -838,7 +841,7 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
-        assert state_out.unit_status == ops.MaintenanceStatus("Database restore is in progress")
+        assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
             state_out.get_relation(1).local_unit_data.get("restore_step")
             == RestoreStep.VERIFY.value
@@ -858,6 +861,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.VERIFY.value,
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -896,6 +900,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.RESTORE.value,
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -920,6 +925,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.RESTORE.value,
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -953,6 +959,7 @@ def test_restore_workflow_synchronization():
             "restore_verification_failed": "True",
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -979,6 +986,7 @@ def test_restore_workflow_synchronization():
             "restore_verification_failed": "True",
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -1012,6 +1020,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.RESTORE.value,
             "cluster_state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation})
@@ -1038,6 +1047,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.START.value,
             "cluster_state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -1064,6 +1074,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.START.value,
             "cluster_state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -1095,6 +1106,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.COMPLETED.value,
             "cluster_state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -1120,6 +1132,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.COMPLETED.value,
             "cluster_state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -1141,6 +1154,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.COMPLETED.value,
             "cluster_state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -1175,6 +1189,7 @@ def test_restore_workflow_synchronization():
             "restore_instruction": RestoreStep.COMPLETED.value,
             "cluster_state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
