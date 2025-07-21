@@ -81,8 +81,6 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
     """Users can run `rebuild-cluster` on a healthy cluster if the use the `force` parameter."""
@@ -116,8 +114,6 @@ async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
         logger.info(f"{unit.name} in cluster members")
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
     """When the majority of the cluster is lost, users can run `rebuild-cluster`."""
