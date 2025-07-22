@@ -54,8 +54,9 @@ class ClusterStatuses(Enum):
     )
     CLUSTER_FAILED = StatusObject(
         status="blocked",
-        message="Cluster failure - majority of cluster members lost. Run action `rebuild-cluster` to recover.",
+        message="Cluster failure - majority of cluster members lost.",
         running="async",
+        action="rebuild-cluster",
     )
     CLUSTER_MANAGEMENT_ERROR = StatusObject(status="blocked", message="cluster management error")
     CLUSTER_NOT_INITIALIZED = StatusObject(
