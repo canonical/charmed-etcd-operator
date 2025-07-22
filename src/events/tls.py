@@ -183,7 +183,6 @@ class TLSEvents(Object):
             tls_ca_rotation_state = self.charm.state.unit_server.tls_peer_ca_rotation_state
         else:
             logger.error(f"Received certificate does not match any assigned certificates: {cert}")
-            event.defer()
             return
 
         logger.debug(f"Received certificate for {cert_type}")
