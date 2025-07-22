@@ -133,8 +133,7 @@ class EtcdServiceStatuses(Enum):
     SERVICE_NOT_INSTALLED = StatusObject(
         status="blocked",
         message="unable to install etcd snap",
-        running="blocking",
-        approved_critical_component=True,
+        running="async",
     )
     SERVICE_NOT_RUNNING = StatusObject(
         status="blocked", message="etcd service not running", running="async"

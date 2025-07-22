@@ -651,11 +651,9 @@ def test_peer_relation_joined():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        peers_data={
-            0: {
+        local_unit_data={
                 "hostname": "charmed-etcd0",
                 "ip": "ip0",
-            },
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -665,11 +663,11 @@ def test_peer_relation_joined():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        peers_data={
-            0: {
+        local_unit_data={
                 "hostname": "charmed-etcd0",
                 "ip": "ip0",
             },
+        peers_data={
             1: {
                 "hostname": "charmed-etcd1",
                 "ip": "ip1",
@@ -711,11 +709,9 @@ def test_peer_relation_changed():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        peers_data={
-            0: {
-                "hostname": "charmed-etcd0",
-                "ip": "ip0",
-            },
+        local_unit_data={
+            "hostname": "charmed-etcd0",
+            "ip": "ip0",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)

@@ -863,6 +863,13 @@ def test_restore_workflow_synchronization():
             "authentication": "enabled",
             "cluster_members": "charmed-etcd0=http://:2380",
         },
+        peers_data={
+            1: {
+                "state": "started",
+                "restore_step": RestoreStep.VERIFY.value,
+            }
+        }
+        
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
