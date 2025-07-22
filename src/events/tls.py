@@ -172,8 +172,14 @@ class TLSEvents(Object):
             self.peer_certificate if cert_type == TLSType.PEER else self.client_certificate
         )
 
-        certs, private_key = relation_requirer.get_assigned_certificates()
-        cert = certs[0]
+        try:
+            certs, private_key = relation_requirer.get_assigned_certificates()
+            cert = certs[0]
+        except IndexError:
+            logger.error(
+                f"No assigned certificate found for the received certificate {event.certificate}"
+            )
+            return
 
         tls_state = (
             self.charm.state.unit_server.tls_peer_state
