@@ -6,13 +6,22 @@
 
 import logging
 from pathlib import Path
+from typing import List
 
 import yaml
 from ops.model import ConfigData
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import DATABASE_DIR, METRICS_PORT, RestoreStep, TLSState
+from literals import (
+    DATABASE_DIR,
+    ELECTION_TIMEOUT_CONFIG,
+    HEARTBEAT_INTERVAL_CONFIG,
+    METRICS_PORT,
+    RestoreStep,
+    Status,
+    TLSState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +149,32 @@ class ConfigManager:
             content=self.config_properties,
             file=self.config_file,
         )
+
+    @property
+    def tuning_parameters_valid(self) -> bool:
+        """Validate configuration values for tuning parameters.
+
+        Returns:
+            bool: True if tuning config values are valid, False if invalid.
+        """
+        if heartbeat_interval := self.config.get(HEARTBEAT_INTERVAL_CONFIG):
+            if heartbeat_interval < 10 or heartbeat_interval > 5000:
+                return False
+
+        if election_timeout := self.config.get(ELECTION_TIMEOUT_CONFIG):
+            if election_timeout < heartbeat_interval * 10 or election_timeout > 50000:
+                return False
+
+        return True
+
+    def compute_component_status(self) -> List[Status]:
+        """Compute the Cluster manager's statuses."""
+        status_list = []
+
+        if not self.tuning_parameters_valid:
+            status_list.append(Status.TUNING_CONFIG_INVALID)
+
+        return status_list
 
     def _get_cluster_endpoints(self) -> str:
         """Concatenate peer-urls of all cluster members.

@@ -47,6 +47,9 @@ CLIENT_TLS_RELATION_NAME = "client-certificates"
 TLS_PEER_PRIVATE_KEY_CONFIG = "tls-peer-private-key"
 TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 
+ELECTION_TIMEOUT_CONFIG = "election-timeout"
+HEARTBEAT_INTERVAL_CONFIG = "heartbeat-interval"
+
 S3_RELATION_NAME = "s3-credentials"
 AZURE_RELATION_NAME = "azure-credentials"
 
@@ -141,6 +144,12 @@ class Status(Enum):
             "TLS peer certificates expiring soon. Please ensure new certificates are provided."
         ),
         "WARNING",
+    )
+    TUNING_CONFIG_INVALID = StatusLevel(
+        BlockedStatus(
+            "Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        ),
+        "ERROR",
     )
     SERVICE_INSTALLING = StatusLevel(MaintenanceStatus("Installing etcd..."), "DEBUG")
     SERVICE_STARTING = StatusLevel(MaintenanceStatus("Waiting for etcd to start..."), "DEBUG")
