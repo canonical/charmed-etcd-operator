@@ -85,6 +85,11 @@ class ConfigManager:
             f"http://{self.state.unit_server.ip}:{METRICS_PORT}"
         )
 
+        if self.tuning_parameters_valid:
+            for option in TuningOptions:
+                # take over the config value set by users
+                config_properties[option.value] = self.config.get(option.value)
+
         if self.state.unit_server.tls_client_state in [TLSState.TO_TLS, TLSState.TLS]:
             # replace http with https in listen-client-urls and advertise-client-urls
             config_properties["listen-client-urls"] = self.state.unit_server.client_url.replace(
