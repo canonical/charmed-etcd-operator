@@ -179,7 +179,6 @@ class TLSEvents(Object):
             logger.error(
                 f"No assigned certificate found for the received certificate {event.certificate}"
             )
-            event.defer()
             return
 
         tls_state = (
