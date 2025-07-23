@@ -7,10 +7,12 @@
 import logging
 import platform
 import subprocess
+from os.path import exists
 from pathlib import Path
 from shutil import copyfile, rmtree
-from typing import List
+from typing import Any, Dict, List
 
+import yaml
 from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
 from charms.operator_libs_linux.v2 import snap
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
@@ -66,6 +68,14 @@ class EtcdWorkload(WorkloadBase):
         path = Path(file)
         path.parent.mkdir(exist_ok=True, parents=True)
         path.write_text(content)
+
+    @override
+    def load_yaml_file(self, file: str) -> Dict[str, Any]:
+        if not exists(file):
+            return {}
+
+        with open(file, "r") as f:
+            return yaml.safe_load(f)
 
     @override
     def stop(self) -> None:

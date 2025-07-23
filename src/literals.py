@@ -47,9 +47,6 @@ CLIENT_TLS_RELATION_NAME = "client-certificates"
 TLS_PEER_PRIVATE_KEY_CONFIG = "tls-peer-private-key"
 TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 
-ELECTION_TIMEOUT_CONFIG = "election-timeout"
-HEARTBEAT_INTERVAL_CONFIG = "heartbeat-interval"
-
 S3_RELATION_NAME = "s3-credentials"
 AZURE_RELATION_NAME = "azure-credentials"
 
@@ -213,3 +210,10 @@ class RestoreStep(Enum):
     RESTORE = "restore_backup"
     START = "restart_workload"
     COMPLETED = "completed"
+
+
+class TuningOptions(Enum):
+    """Configuration options for tuning etcd performance."""
+
+    ELECTION_TIMEOUT_CONFIG = "election-timeout"
+    HEARTBEAT_INTERVAL_CONFIG = "heartbeat-interval"

@@ -14,13 +14,13 @@ from ops.model import ConfigData
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import (
+    CONFIG_FILE,
     DATABASE_DIR,
-    ELECTION_TIMEOUT_CONFIG,
-    HEARTBEAT_INTERVAL_CONFIG,
     METRICS_PORT,
     RestoreStep,
     Status,
     TLSState,
+    TuningOptions,
 )
 
 logger = logging.getLogger(__name__)
@@ -157,15 +157,30 @@ class ConfigManager:
         Returns:
             bool: True if tuning config values are valid, False if invalid.
         """
-        if heartbeat_interval := self.config.get(HEARTBEAT_INTERVAL_CONFIG):
+        if heartbeat_interval := self.config.get(TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value):
             if heartbeat_interval < 10 or heartbeat_interval > 5000:
                 return False
 
-        if election_timeout := self.config.get(ELECTION_TIMEOUT_CONFIG):
+        if election_timeout := self.config.get(TuningOptions.ELECTION_TIMEOUT_CONFIG.value):
             if election_timeout < heartbeat_interval * 10 or election_timeout > 50000:
                 return False
 
         return True
+
+    def requires_restart(self) -> bool:
+        """Check current configuration and determine if restart is required."""
+        try:
+            current_config_values = self.workload.load_yaml_file(CONFIG_FILE)
+        except yaml.YAMLError as e:
+            logger.error(f"Error loading current config: {e}")
+            return False
+
+        for option in TuningOptions:
+            if self.config.get(option.value) != current_config_values[option.value]:
+                logger.info(f"Config change to {option.value} requires restart")
+                return True
+
+        return False
 
     def compute_component_status(self) -> List[Status]:
         """Compute the Cluster manager's statuses."""

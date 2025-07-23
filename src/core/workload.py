@@ -11,7 +11,7 @@ import string
 import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List
+from typing import Any, Dict, List
 
 from literals import CONFIG_FILE, TLS_ROOT_DIR
 
@@ -94,6 +94,18 @@ class WorkloadBase(ABC):
         Args:
             content (str): Content to write to the file.
             file (str): Path to the file.
+        """
+        pass
+
+    @abstractmethod
+    def load_yaml_file(self, file: str) -> Dict[str, Any]:
+        """Read yaml content from a file.
+
+        Args:
+            file (str): Path to the file.
+
+        Returns:
+            The content of a YAML file as a dict.
         """
         pass
 
