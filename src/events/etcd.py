@@ -30,6 +30,7 @@ from common.exceptions import (
 )
 from common.secrets import get_secret_from_id
 from literals import (
+    CLIENT_PORT,
     DATA_STORAGE,
     DATABASE_DIR,
     INTERNAL_USER,
@@ -193,7 +194,10 @@ class EtcdEvents(Object):
             event.defer()
             return
 
-        if not self.charm.workload.alive():
+        if self.charm.workload.alive():
+            logger.info("Workload started successfully. Opening client port")
+            self.charm.unit.open_port("tcp", CLIENT_PORT)
+        else:
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
