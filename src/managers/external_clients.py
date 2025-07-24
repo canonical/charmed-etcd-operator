@@ -144,8 +144,10 @@ class ExternalClientsManager:
         server_ca = self.state.tls_client_certificate.ca.raw
 
         for relation in self.state.etcd_provides.relations:
-            if not self.state.etcd_provides.fetch_relation_field(relation.id, "prefix"):
-                # Skip relations that have not requested a prefix yet
+            if not self.state.etcd_provides.fetch_relation_field(
+                relation.id, "prefix"
+            ) or not self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert"):
+                # Skip relations with invalid paylods
                 continue
 
             relation_data = self.state.etcd_provides.fetch_my_relation_data(
