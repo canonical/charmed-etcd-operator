@@ -141,6 +141,10 @@ class ExternalClientsManager:
         server_ca = self.state.tls_client_certificate.ca.raw
 
         for relation in self.state.etcd_provides.relations:
+            if not self.state.etcd_provides.fetch_relation_field(relation.id, "prefix"):
+                # Skip relations that are not ready yet
+                continue
+
             relation_data = self.state.etcd_provides.fetch_my_relation_data(
                 [relation.id], ["uris", "endpoints", "tls-ca", "version"]
             )[relation.id]
