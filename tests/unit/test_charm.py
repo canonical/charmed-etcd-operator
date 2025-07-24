@@ -25,6 +25,7 @@ from literals import (
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
     TLSState,
+    TuningOptions,
 )
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -565,7 +566,10 @@ def test_config_changed():
         leader=True,
     )
 
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
     with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("subprocess.run"),
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("common.client.EtcdClient.broadcast_peer_url"),
@@ -575,6 +579,116 @@ def test_config_changed():
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+
+def test_set_config_options():
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"private_ip": "my_ip"},
+    )
+    ctx = testing.Context(EtcdOperatorCharm)
+
+    # happy path - leader
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_called_once()
+
+    # happy path - non-leader
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_called_once()
+
+    # config values are equal to current config -> no restart triggered
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_not_called()
+
+    # config values are invalid -> no restart triggered, blocked status
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 100,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 100,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_not_called()
+        assert state_out.unit_status == ops.BlockedStatus(
+            "Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        )
+
+    # config values are invalid -> no restart triggered, blocked status
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 50001,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 100,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_not_called()
+        assert state_out.unit_status == ops.BlockedStatus(
+            "Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        )
 
 
 def test_secret_changed():
