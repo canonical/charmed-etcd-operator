@@ -154,7 +154,8 @@ def test_add_ecr_new_user_leader(cluster_tls_context, mtls_cert):
         remote_app_data={
             "secret-mtls": secret.id,
             "prefix": "/test/keys",
-            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "mtls-cert"]',
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "read-only-uris", "entity-name", "entity-password"]',
+            "provided-secrets": '["mtls-cert"]'
         },
     )
 
@@ -931,7 +932,8 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
         remote_app_data={
             "secret-mtls": secret.id,
             "prefix": "/test/keys",
-            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "mtls-cert"]',
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "read-only-uris", "entity-name", "entity-password"]',
+            "provided-secrets": '["mtls-cert"]'
         },
     )
 
@@ -1012,7 +1014,8 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
         remote_app_data={
             "secret-mtls": secret.id,
             "prefix": "/test/keys",
-            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "mtls-cert"]',
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "read-only-uris", "entity-name", "entity-password"]',
+            "provided-secrets": '["mtls-cert"]'
         },
     )
 
@@ -1091,7 +1094,8 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
         remote_app_data={
             "secret-mtls": secret.id,
             "prefix": "/test/keys",
-            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "mtls-cert"]',
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "read-only-uris", "entity-name", "entity-password"]',
+            "provided-secrets": '["mtls-cert"]'
         },
     )
 
