@@ -169,19 +169,25 @@ class TLSEvents(Object):
         )
         peer_certificates, peer_private_key = self.peer_certificate.get_assigned_certificates()
 
-        if client_certificates and client_certificates[0].certificate == cert:
-            cert_type = TLSType.CLIENT
-            cert = client_certificates[0]
-            private_key = client_private_key
-            tls_state = self.charm.state.unit_server.tls_client_state
-            tls_ca_rotation_state = self.charm.state.unit_server.tls_client_ca_rotation_state
-        elif peer_certificates and peer_certificates[0].certificate == cert:
-            cert_type = TLSType.PEER
-            cert = peer_certificates[0]
-            private_key = peer_private_key
-            tls_state = self.charm.state.unit_server.tls_peer_state
-            tls_ca_rotation_state = self.charm.state.unit_server.tls_peer_ca_rotation_state
-        else:
+        try:
+            if client_certificates and client_certificates[0].certificate == cert:
+                cert_type = TLSType.CLIENT
+                cert = client_certificates[0]
+                private_key = client_private_key
+                tls_state = self.charm.state.unit_server.tls_client_state
+                tls_ca_rotation_state = self.charm.state.unit_server.tls_client_ca_rotation_state
+            elif peer_certificates and peer_certificates[0].certificate == cert:
+                cert_type = TLSType.PEER
+                cert = peer_certificates[0]
+                private_key = peer_private_key
+                tls_state = self.charm.state.unit_server.tls_peer_state
+                tls_ca_rotation_state = self.charm.state.unit_server.tls_peer_ca_rotation_state
+            else:
+                logger.error(
+                    f"Received certificate does not match any assigned certificates: {cert}"
+                )
+                return
+        except IndexError:
             logger.error(f"Received certificate does not match any assigned certificates: {cert}")
             return
 
