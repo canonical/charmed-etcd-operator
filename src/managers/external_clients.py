@@ -145,7 +145,7 @@ class ExternalClientsManager:
 
         for relation in self.state.etcd_provides.relations:
             if not self.state.etcd_provides.fetch_relation_field(relation.id, "prefix"):
-                # Skip relations that are not ready yet
+                # Skip relations that have not requested a prefix yet
                 continue
 
             relation_data = self.state.etcd_provides.fetch_my_relation_data(
