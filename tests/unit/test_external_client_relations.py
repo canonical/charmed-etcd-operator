@@ -967,6 +967,8 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
 
         new_server_cert = MagicMock()
         new_server_cert.ca.raw = "new_test_ca_server"
+        cert = MagicMock()
+        new_server_cert.certificate = cert
 
         with (
             ctx(ctx.on.update_status(), state_out) as manager,
@@ -986,8 +988,6 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
         ):
             charm: EtcdOperatorCharm = manager.charm
             event = MagicMock(spec=CertificateAvailableEvent)
-            cert = MagicMock()
-            cert.organization = TLSType.CLIENT
             event.certificate = cert
             charm.tls_manager.set_ca_rotation_state(
                 TLSType.CLIENT, TLSCARotationState.NEW_CA_ADDED
