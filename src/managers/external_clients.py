@@ -13,7 +13,7 @@ from cryptography import x509
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import CLIENT_PORT, SUBSTRATES, Status
+from literals import CLIENT_PORT, SUBSTRATES, Status, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,10 @@ class ExternalClientsManager:
             uri.split("=")[0] for uri in self.state.cluster.cluster_members.split(",")
         }
         cluster_servers = {
-            server for server in self.state.servers if server.member_name in cluster_server_names
+            server
+            for server in self.state.servers
+            if server.member_name in cluster_server_names
+            and server.tls_client_state == TLSState.TLS
         }
 
         uris = {server.client_url for server in cluster_servers}
