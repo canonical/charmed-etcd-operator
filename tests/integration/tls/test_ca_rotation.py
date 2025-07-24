@@ -258,9 +258,9 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     )
     assert current_client_certificate, "Failed to get the current client certificate"
 
-    logger.info("Waiting ~6m for expiration of certificates - renewed certs will have a new CA")
-    # 6m + 30s for renewal to start
-    time.sleep(390)
+    logger.info("Waiting ~5.4m for expiration of certificates - renewed certs will have a new CA")
+    # the juju secret expires at 90% of the certificate validity; 360s * 0.9 = 324s
+    time.sleep(330)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
