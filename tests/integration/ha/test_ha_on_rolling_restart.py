@@ -100,8 +100,8 @@ async def test_tuning_config_options(ops_test: OpsTest) -> None:
     # set tuning parameters to reasonable values in high-latency environments
     await ops_test.model.applications[app_name].set_config(
         {
-            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
-            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: "5000",
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: "500",
         }
     )
 
