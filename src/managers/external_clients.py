@@ -147,7 +147,8 @@ class ExternalClientsManager:
             if not self.state.etcd_provides.fetch_relation_field(
                 relation.id, "prefix"
             ) or not self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert"):
-                # Skip relations with invalid paylods
+                # Skip relations with invalid payloads
+                logger.warning(f"Skipping relation {relation.id} with invalid payloads.")
                 continue
 
             relation_data = self.state.etcd_provides.fetch_my_relation_data(
