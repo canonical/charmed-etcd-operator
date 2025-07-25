@@ -198,6 +198,6 @@ class ExternalClientsEvents(Object):
         """Update the client truststore and Initiate a rolling restart of the cluster."""
         all_cas = self.charm.tls_manager.collect_client_cas()
         if all_cas != self.charm.tls_manager.load_trusted_ca(TLSType.CLIENT):
-            logger.debug("New CA detected, updating client truststore")
+            logger.debug("CAs have changed, updating client truststore")
             self.charm.tls_manager.update_cas(all_cas, TLSType.CLIENT)
             self.charm.rolling_restart()
