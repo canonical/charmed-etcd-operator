@@ -13,7 +13,7 @@ from cryptography import x509
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import CLIENT_PORT, SUBSTRATES, Status
+from literals import CLIENT_PORT, SUBSTRATES, Status, TLSState
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,10 @@ class ExternalClientsManager:
             uri.split("=")[0] for uri in self.state.cluster.cluster_members.split(",")
         }
         cluster_servers = {
-            server for server in self.state.servers if server.member_name in cluster_server_names
+            server
+            for server in self.state.servers
+            if server.member_name in cluster_server_names
+            and server.tls_client_state == TLSState.TLS
         }
 
         uris = {server.client_url for server in cluster_servers}
@@ -141,6 +144,13 @@ class ExternalClientsManager:
         server_ca = self.state.tls_client_certificate.ca.raw
 
         for relation in self.state.etcd_provides.relations:
+            if not self.state.etcd_provides.fetch_relation_field(
+                relation.id, "prefix"
+            ) or not self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert"):
+                # Skip relations with invalid payloads
+                logger.warning(f"Skipping relation {relation.id} with invalid payloads.")
+                continue
+
             relation_data = self.state.etcd_provides.fetch_my_relation_data(
                 [relation.id], ["uris", "endpoints", "tls-ca", "version"]
             )[relation.id]
