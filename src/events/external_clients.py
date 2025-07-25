@@ -152,9 +152,6 @@ class ExternalClientsEvents(Object):
             logger.error("New user not created yet")
             event.defer()
             return
-        logger.debug(
-            f"ECR|{event.relation.id} updated with user {relation_managed_user} old_mtls_cert {event.old_mtls_cert} new_mtls_cert {event.mtls_cert}"
-        )
         self._update_client_truststore()
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
