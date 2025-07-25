@@ -8,7 +8,7 @@ import pytest
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, TuningOptions
+from literals import INTERNAL_USER, PEER_RELATION, Status, TuningOptions
 
 from ..helpers import (
     APP_NAME,
@@ -107,6 +107,40 @@ async def test_tuning_config_options(ops_test: OpsTest) -> None:
 
     # wait for the rolling restart to apply the config changes
     await wait_until(ops_test, apps=[app_name], wait_for_exact_units=NUM_UNITS)
+
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    stop_continuous_writes()
+    assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+
+@pytest.mark.abort_on_fail
+async def test_invalid_tuning_config_options(ops_test: OpsTest) -> None:
+    """Ensure the cluster keeps running with invalid tuning options."""
+    app_name = (await existing_app(ops_test)) or APP_NAME
+    await wait_until(ops_test, apps=[app_name], wait_for_exact_units=NUM_UNITS)
+
+    # start writing data to the cluster
+    endpoints = get_cluster_endpoints(ops_test, app_name)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app_name}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+    # set tuning parameters to invalid values (election timeout must be >= 10x heartbeat interval)
+    await ops_test.model.applications[app_name].set_config(
+        {
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: "4000",
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: "500",
+        }
+    )
+
+    await wait_until(
+        ops_test,
+        apps=[app_name],
+        apps_full_statuses={
+            APP_NAME: {"blocked": [Status.TUNING_CONFIG_INVALID.value.status.message]},
+        },
+        wait_for_exact_units=NUM_UNITS,
+    )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
