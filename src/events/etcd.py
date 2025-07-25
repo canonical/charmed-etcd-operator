@@ -218,15 +218,14 @@ class EtcdEvents(Object):
             logger.info(f"New ip address: {ip_address}")
             self.charm.state.unit_server.update({"private_ip": ip_address})
 
-            # update cluster configuration
-            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
-            self.charm.config_manager.set_config_properties()
-
             # we need to update the client-urls by restarting etcd
+            self.charm.config_manager.set_config_properties()
             # after ip change, this member is unavailable, no need to acquire restart lock
             if not self.charm.cluster_manager.restart_member(move_leader=False):
                 raise HealthCheckFailedError("Failed to check health of the member after restart")
 
+            # update cluster configuration
+            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
             if self.charm.unit.is_leader():
                 self.charm.cluster_manager.update_cluster_member_state()
 
