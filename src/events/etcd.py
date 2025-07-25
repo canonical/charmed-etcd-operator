@@ -240,7 +240,7 @@ class EtcdEvents(Object):
             self.update_private_key(tls_client_private_key_id)
 
         if (
-            self.charm.config_manager.tuning_parameters_valid
+            self.charm.config_manager.are_tuning_parameters_valid()
             and self.charm.config_manager.requires_restart()
         ):
             # apply config and initiate restart

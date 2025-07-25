@@ -85,7 +85,7 @@ class ConfigManager:
             f"http://{self.state.unit_server.ip}:{METRICS_PORT}"
         )
 
-        if self.tuning_parameters_valid:
+        if self.are_tuning_parameters_valid():
             for option in TuningOptions:
                 # take over the config value set by users
                 config_properties[option.value] = self.config.get(option.value)
@@ -155,8 +155,7 @@ class ConfigManager:
             file=self.config_file,
         )
 
-    @property
-    def tuning_parameters_valid(self) -> bool:
+    def are_tuning_parameters_valid(self) -> bool:
         """Validate configuration values for tuning parameters.
 
         Returns:
@@ -191,7 +190,7 @@ class ConfigManager:
         """Compute the Cluster manager's statuses."""
         status_list = []
 
-        if not self.tuning_parameters_valid:
+        if not self.are_tuning_parameters_valid():
             status_list.append(Status.TUNING_CONFIG_INVALID)
 
         return status_list
