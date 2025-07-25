@@ -18,6 +18,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from ops import Object, RelationBrokenEvent
 
+from common.certificates import is_leaf_certificate_valid
 from common.exceptions import EtcdUserManagementError
 from literals import (
     CERTIFICATE_TRANSFER_RELATION,
@@ -97,7 +98,7 @@ class ExternalClientsEvents(Object):
         )
 
         # validate leaf certificate
-        if not self.charm.external_clients_manager.is_leaf_certificate_valid(event.mtls_cert):
+        if not is_leaf_certificate_valid(event.mtls_cert):
             logger.error("Invalid end-entity certificate")
             # clean the old user if exists
             if old_common_name:
@@ -151,7 +152,9 @@ class ExternalClientsEvents(Object):
             logger.error("New user not created yet")
             event.defer()
             return
-
+        logger.debug(
+            f"ECR|{event.relation.id} updated with user {relation_managed_user} old_mtls_cert {event.old_mtls_cert} new_mtls_cert {event.mtls_cert}"
+        )
         self._update_client_truststore()
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
@@ -180,10 +183,7 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
 
-        cas = self.certificate_transfer.get_all_certificates()
-        if self.certificate_transfer and self.charm.tls_manager.is_new_ca(
-            "\n".join(cas), TLSType.CLIENT
-        ):
+        if self.certificate_transfer.get_all_certificates():
             self._update_client_truststore()
 
     def _on_certificates_removed(self, event: CertificatesRemovedEvent) -> None:
@@ -199,7 +199,8 @@ class ExternalClientsEvents(Object):
 
     def _update_client_truststore(self) -> None:
         """Update the client truststore and Initiate a rolling restart of the cluster."""
-        self.charm.tls_manager.update_cas(
-            self.charm.tls_manager.collect_client_cas(), TLSType.CLIENT
-        )
-        self.charm.rolling_restart()
+        all_cas = self.charm.tls_manager.collect_client_cas()
+        if all_cas != self.charm.tls_manager.load_trusted_ca(TLSType.CLIENT):
+            logger.debug("New CA detected, updating client truststore")
+            self.charm.tls_manager.update_cas(all_cas, TLSType.CLIENT)
+            self.charm.rolling_restart()
