@@ -9,8 +9,8 @@ import logging
 from pathlib import Path
 
 from charms.tls_certificates_interface.v4.tls_certificates import Certificate
-from cryptography import x509
 
+from common.certificates import is_leaf_certificate_valid
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import CLIENT_PORT, SUBSTRATES, Status, TLSState
@@ -89,36 +89,6 @@ class ExternalClientsManager:
         cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
         return Certificate.from_string(cert).common_name
 
-    def is_leaf_certificate_valid(self, mtls_cert: str) -> bool:
-        """Validate the leaf certificate.
-
-        Args:
-            mtls_cert (str): The mtls chain.
-
-        Returns:
-            (bool): True if the certificate is not a CA.
-        """
-        # split the certificates by the end of the certificate marker and keep the marker in the cert
-        raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
-        # add the marker back to the certificate
-        leaf_cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
-        logger.debug(f"Leaf certificate is a CA? {Certificate.from_string(leaf_cert).is_ca}")
-        certificate = x509.load_pem_x509_certificate(data=leaf_cert.encode())
-        # check if the certificate is a CA
-        try:
-            basic_constraints = certificate.extensions.get_extension_for_class(
-                x509.BasicConstraints
-            ).value
-        except x509.ExtensionNotFound:
-            return False
-        # check if the certificate can sign other certificates
-        try:
-            key_usage = certificate.extensions.get_extension_for_class(x509.KeyUsage).value
-        except x509.ExtensionNotFound:
-            return not basic_constraints.ca
-
-        return not (key_usage.key_cert_sign or key_usage.crl_sign or basic_constraints.ca)
-
     def update_client_relations_data(self, etcd_version: str) -> None:
         """Update the ECR data."""
         if not self.state.etcd_provides.relations:
@@ -176,7 +146,7 @@ class ExternalClientsManager:
             # for client relation created hook
             if not mtls_cert:
                 continue
-            if not self.is_leaf_certificate_valid(mtls_cert):
+            if not is_leaf_certificate_valid(mtls_cert):
                 status_list.append(Status.EC_INVALID_CERTIFICATE)
 
         return status_list
