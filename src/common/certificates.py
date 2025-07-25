@@ -5,7 +5,6 @@
 
 import logging
 
-from charms.tls_certificates_interface.v4.tls_certificates import Certificate
 from cryptography import x509
 
 logger = logging.getLogger(__name__)
@@ -36,7 +35,6 @@ def is_leaf_certificate_valid(mtls_cert: str) -> bool:
         (bool): True if the certificate is not a CA.
     """
     leaf_cert = leaf_certificate(mtls_cert)
-    logger.debug(f"Leaf certificate is a CA? {Certificate.from_string(leaf_cert).is_ca}")
     certificate = x509.load_pem_x509_certificate(data=leaf_cert.encode())
     # check if the certificate is a CA
     try:
