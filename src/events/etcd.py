@@ -41,8 +41,6 @@ from literals import (
     SNAP_GROUP,
     SNAP_LOG_PATH,
     SNAP_USER,
-    TLS_CLIENT_PRIVATE_KEY_CONFIG,
-    TLS_PEER_PRIVATE_KEY_CONFIG,
     Status,
     TLSState,
     TLSType,
@@ -200,7 +198,7 @@ class EtcdEvents(Object):
         else:
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
 
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:  # noqa: C901
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
         if (
             self.charm.state.cluster.is_restore_in_progress
@@ -235,12 +233,6 @@ class EtcdEvents(Object):
                 TLSState.TLS,
             ) or self.charm.state.unit_server.tls_peer_state in (TLSState.TO_TLS, TLSState.TLS):
                 self.charm.tls_events.refresh_tls_certificates_event.emit()
-
-        if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
-            self.update_private_key(tls_peer_private_key_id)
-
-        if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
-            self.update_private_key(tls_client_private_key_id)
 
         if (
             self.charm.config_manager.are_tuning_parameters_valid()
@@ -420,17 +412,6 @@ class EtcdEvents(Object):
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
-        if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
-            if tls_peer_private_key_id == event.secret.id:
-                self.update_private_key(tls_peer_private_key_id)
-
-        if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
-            if tls_client_private_key_id == event.secret.id:
-                self.update_private_key(tls_client_private_key_id)
-
-        if not self.charm.unit.is_leader():
-            return
-
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
@@ -439,6 +420,9 @@ class EtcdEvents(Object):
                 "Cannot update credentials while a restore or cluster-rebuild operation is in progress."
             )
             event.defer()
+            return
+
+        if not self.charm.unit.is_leader():
             return
 
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
@@ -528,16 +512,6 @@ class EtcdEvents(Object):
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
             self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
-
-    def update_private_key(self, private_key_id: str) -> None:
-        """Update the private key in etcd."""
-        logger.debug("Updating TLS private key.")
-
-        if self.charm.tls_events.read_and_validate_private_key(private_key_id) is None:
-            self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
-            return
-
-        self.charm.tls_events.refresh_tls_certificates_event.emit()
 
     def _rebuild_cluster(self) -> None:  # noqa: C901
         """Rebuild cluster with new membership configuration, to recover from majority failure.

@@ -16,11 +16,13 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     TLSCertificatesRequiresV4,
 )
 from ops import (
+    ConfigChangedEvent,
     EventSource,
     Handle,
     ModelError,
     RelationBrokenEvent,
     RelationCreatedEvent,
+    SecretChangedEvent,
     SecretNotFoundError,
 )
 from ops.framework import EventBase, Object
@@ -134,6 +136,8 @@ class TLSEvents(Object):
             self.framework.observe(
                 self.charm.on[relation].relation_broken, self._on_certificates_broken
             )
+        self.framework.observe(self.charm.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.charm.on.secret_changed, self._on_secret_changed)
 
     def _on_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle the `relation-created` event.
@@ -318,6 +322,34 @@ class TLSEvents(Object):
                 "Waiting for all servers to update certificates before cleaning up old CAs"
             )
             event.defer()
+
+    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
+        """Handle TLS related config changes."""
+        if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
+            self.update_private_key(tls_peer_private_key_id)
+
+        if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
+            self.update_private_key(tls_client_private_key_id)
+
+    def _on_secret_changed(self, event: SecretChangedEvent) -> None:
+        """Handle TLS related secret changes."""
+        if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
+            if tls_peer_private_key_id == event.secret.id:
+                self.update_private_key(tls_peer_private_key_id)
+
+        if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
+            if tls_client_private_key_id == event.secret.id:
+                self.update_private_key(tls_client_private_key_id)
+
+    def update_private_key(self, private_key_id: str) -> None:
+        """Update the private key in etcd."""
+        logger.debug("Updating TLS private key.")
+
+        if self.read_and_validate_private_key(private_key_id) is None:
+            self.charm.set_status(Status.TLS_INVALID_PRIVATE_KEY)
+            return
+
+        self.refresh_tls_certificates_event.emit()
 
     def read_and_validate_private_key(
         self, private_key_secret_id: str | None
