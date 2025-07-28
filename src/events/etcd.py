@@ -200,7 +200,7 @@ class EtcdEvents(Object):
         else:
             self.charm.set_status(Status.SERVICE_NOT_RUNNING)
 
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:  # noqa: C901
         """Handle config_changed event."""
         if (
             self.charm.state.cluster.is_restore_in_progress
@@ -241,6 +241,13 @@ class EtcdEvents(Object):
 
         if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             self.update_private_key(tls_client_private_key_id)
+
+        if (
+            self.charm.config_manager.are_tuning_parameters_valid()
+            and self.charm.config_manager.requires_restart()
+        ):
+            # apply config and initiate restart
+            self.charm.rolling_restart()
 
         if not self.charm.unit.is_leader():
             return

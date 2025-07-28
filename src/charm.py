@@ -290,6 +290,10 @@ class EtcdOperatorCharm(ops.CharmBase):
         for status in self.cluster_manager.compute_component_status():
             event.add_status(status.value.status)
 
+        # compute config status
+        for status in self.config_manager.compute_component_status():
+            event.add_status(status.value.status)
+
         # compute TLS status
         for status in self.tls_manager.compute_component_status():
             event.add_status(status.value.status)

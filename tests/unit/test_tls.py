@@ -792,6 +792,8 @@ def test_set_tls_private_key():
         {"private-key": private_key},
         label=TLS_PEER_PRIVATE_KEY_CONFIG,
     )
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
     with (
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
@@ -802,6 +804,7 @@ def test_set_tls_private_key():
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("common.client.EtcdClient.broadcast_peer_url"),
         patch("workload.EtcdWorkload.write_file"),
@@ -957,6 +960,7 @@ def test_set_tls_private_key():
         {"private-key": private_key},
         label=TLS_CLIENT_PRIVATE_KEY_CONFIG,
     )
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
 
     with (
         patch(
@@ -968,6 +972,7 @@ def test_set_tls_private_key():
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
     ):
         # Configure client private key
         state_in = testing.State(
@@ -1046,14 +1051,16 @@ def test_set_tls_private_key():
         config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
         secrets={secret},
     )
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
 
     with (
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
         ) as cleanup,
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
     ):
         # Configure peer private key configured
-        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        ctx.run(ctx.on.config_changed(), state_in)
         cleanup.assert_not_called()
 
 
