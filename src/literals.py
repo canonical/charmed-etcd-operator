@@ -142,6 +142,12 @@ class Status(Enum):
         ),
         "WARNING",
     )
+    TUNING_CONFIG_INVALID = StatusLevel(
+        BlockedStatus(
+            "Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        ),
+        "ERROR",
+    )
     SERVICE_INSTALLING = StatusLevel(MaintenanceStatus("Installing etcd..."), "DEBUG")
     SERVICE_STARTING = StatusLevel(MaintenanceStatus("Waiting for etcd to start..."), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")
@@ -204,3 +210,10 @@ class RestoreStep(Enum):
     RESTORE = "restore_backup"
     START = "restart_workload"
     COMPLETED = "completed"
+
+
+class TuningOptions(Enum):
+    """Configuration options for tuning etcd performance."""
+
+    ELECTION_TIMEOUT_CONFIG = "election-timeout"
+    HEARTBEAT_INTERVAL_CONFIG = "heartbeat-interval"
