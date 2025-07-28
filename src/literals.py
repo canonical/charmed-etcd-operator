@@ -75,10 +75,10 @@ class Status(Enum):
     )
     BACKUP_IN_PROGRESS = StatusLevel(MaintenanceStatus("Creating database backup..."), "DEBUG")
     BACKUP_S3_PARAMETERS_MISSING = StatusLevel(
-        BlockedStatus("Missing required parameters in the s3 relation."), "ERROR"
+        BlockedStatus("Missing or invalid s3 credentials."), "ERROR"
     )
     BACKUP_AZURE_PARAMETERS_MISSING = StatusLevel(
-        BlockedStatus("Missing required parameters in the azure relation."), "ERROR"
+        BlockedStatus("Missing or invalid azure credentials."), "ERROR"
     )
     CLUSTER_INITIALIZING = StatusLevel(MaintenanceStatus("Initializing etcd cluster..."), "DEBUG")
     CLUSTER_FAILED = StatusLevel(
