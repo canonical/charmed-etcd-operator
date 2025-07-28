@@ -93,7 +93,9 @@ class BackupManager:
         bucket = self._get_bucket_resource(s3_parameters)
 
         try:
-            if region:
+            # setting the `LocationConstraint` to the default value of us-east-1 will fail
+            # https://github.com/aws/aws-sdk-js/issues/3647
+            if region and region != "us-east-1":
                 bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
             else:
                 bucket.create()
