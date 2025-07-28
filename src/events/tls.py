@@ -331,6 +331,24 @@ class TLSEvents(Object):
         if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             self.update_private_key(tls_client_private_key_id)
 
+        if self.charm.tls_manager.extra_sans_config_is_valid():
+            if (
+                self.charm.state.unit_server.tls_client_state == TLSState.TLS
+                and self.charm.tls_manager.certificate_sans_updated(TLSType.PEER)
+            ):
+                logger.debug(
+                    "Config change for `certificate-extra-sans` - request new TLS peer certificates"
+                )
+                self.refresh_tls_certificates_event.emit()
+
+            if (
+                self.charm.state.unit_server.tls_peer_state == TLSState.TLS
+                and self.charm.tls_manager.certificate_sans_updated(TLSType.CLIENT)
+            ):
+                logger.debug(
+                    "Config change for `certificate-extra-sans` - request new TLS client certificates"
+                )
+
     def _on_secret_changed(self, event: SecretChangedEvent) -> None:
         """Handle TLS related secret changes."""
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):

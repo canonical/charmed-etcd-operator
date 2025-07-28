@@ -47,6 +47,7 @@ class ClusterState(Object):
             self.model, relation_name=PEER_RELATION, additional_secret_fields=SECRETS_APP
         )
         self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_RELATION)
+        self.config = charm.config
 
     @property
     def peer_relation(self) -> Relation | None:

@@ -22,7 +22,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
-from ops import testing
+from ops import ActiveStatus, BlockedStatus, testing
 from scenario import Secret
 
 from charm import EtcdOperatorCharm
@@ -1473,3 +1473,109 @@ def test_ca_client_rotation(certificate_available_context):
                 == TLSCARotationState.NO_ROTATION.value
             )
             event.defer.assert_not_called()
+
+
+def test_set_extra_sans_config_options():
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+        local_unit_data={"private_ip": "my_ip"},
+    )
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    ctx = testing.Context(EtcdOperatorCharm)
+
+    # happy path
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, myhostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == ActiveStatus()
+
+    # allow {unit} placeholder
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, etcd-{unit}.hostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == ActiveStatus()
+
+    # invalid ip address
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.257.100, myhostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+
+    # invalid dns name
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "my hostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+
+    # first ip address valid, second one invalid
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, myhostname, 999.1.2.3",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+
+    # special characters in dns name
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, my$*hostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )

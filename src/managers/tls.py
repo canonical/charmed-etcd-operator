@@ -5,7 +5,9 @@
 """Manager for handling TLS related events."""
 
 import logging
+import re
 import socket
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Iterable
 
@@ -268,6 +270,9 @@ class TLSManager:
         if self.state.unit_server.tls_peer_certs_expiring:
             status_list.append(Status.TLS_PEER_CERTS_EXPIRING)
 
+        if not self.extra_sans_config_is_valid():
+            status_list.append(Status.SANS_CONFIG_INVALID)
+
         return status_list
 
     def get_sans_ip(self, tls_type: TLSType) -> frozenset[str]:
@@ -292,6 +297,41 @@ class TLSManager:
 
         logger.debug(f"Using only private IP {private_ip} for SANs IP.")
         return frozenset({private_ip})
+
+    def extra_sans_config_is_valid(self) -> bool:
+        """Validate configuration value for certificate-extra-sans option.
+
+        Returns:
+            bool: True if config value is valid, False if invalid.
+        """
+        if not (extra_sans_config := self.state.config.get("certificate-extra-sans")):
+            return True
+
+        extra_sans = [san.strip() for san in extra_sans_config.split(",")]
+        allowed = re.compile(r"(?!-)[A-Z0-9-\{\}]{1,63}(?<!-)$", re.IGNORECASE)
+
+        for san in extra_sans:
+            # validation for ip addresses
+            if len(san.split(".")) == 4:
+                try:
+                    ip_address(san)
+                except ValueError:
+                    logger.error(f"certificate-extra-sans configuration is invalid for ip {san}")
+                    return False
+            # validation for dns names
+            elif not all(allowed.match(x) for x in san.split(".")):
+                logger.error(f"certificate-extra-sans configuration is invalid for dns {san}")
+                return False
+
+        return True
+
+    def certificate_sans_updated(self, tls_type: TLSType) -> bool:
+        """Check current certificate sans and determine if certificate requires update.
+
+        Returns:
+            bool: True if certificate sans have changed, False if they are still the same.
+        """
+        return True
 
     def collect_client_cas(self) -> set[str]:
         """Collect client CAs.

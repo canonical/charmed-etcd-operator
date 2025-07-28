@@ -33,3 +33,10 @@ options:
       For best practices, the parameter should be set around round-trip time between members.
       The value must be between 10 and 5000 at most.
 
+  certificate-extra-sans:
+    type: string
+    description: |
+      Config options to add extra-sans to the ones used when requesting server certificates.
+      The extra-sans are specified by comma-separated names to be added when requesting signed certificates.
+      Use "{unit}" as a placeholder to be filled with the unit number, e.g. "worker-{unit}" will be translated as 
+      "worker-0" for unit 0 and "worker-1" for unit 1 when requesting the certificate.
