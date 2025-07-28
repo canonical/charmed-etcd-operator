@@ -6,8 +6,8 @@
 
 import base64
 import logging
-import socket
 import re
+import socket
 from pathlib import Path
 from typing import Iterable
 

@@ -868,8 +868,7 @@ def test_restore_workflow_synchronization():
                 "state": "started",
                 "restore_step": RestoreStep.VERIFY.value,
             }
-        }
-        
+        },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
     with (
