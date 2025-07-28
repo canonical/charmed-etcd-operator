@@ -669,14 +669,14 @@ test-randomorder = ["pytest-randomly"]
 
 [[package]]
 name = "data-platform-helpers"
-version = "0.1.5"
+version = "0.1.6"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main", "integration"]
 files = [
-    {file = "data_platform_helpers-0.1.5-py3-none-any.whl", hash = "sha256:bccf657400edb550094ecb10c8b0a54ceb3e3953f2d0dbb8fef7e9bca60d3a26"},
-    {file = "data_platform_helpers-0.1.5.tar.gz", hash = "sha256:a57ae1392964ccd3ae515f15b680d02f7a37af2b7306fb34fb7d61c03e0a1497"},
+    {file = "data_platform_helpers-0.1.6-py3-none-any.whl", hash = "sha256:5ba9ee88dbfcefcae5d94defcfbdc8c4e37a70f3cdc78534aa928d8bf3f50a3e"},
+    {file = "data_platform_helpers-0.1.6.tar.gz", hash = "sha256:086650821a1bc52b36e628b629b8665b6352da2c0a38ea591f430194b2b3cec2"},
 ]
 
 [package.dependencies]
@@ -2285,4 +2285,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "59b9075cdd7c6614d924c22f1f2181bcaf28185585717239e15c94b800ad5ed0"
+content-hash = "f851cea80456355ead980666de0848747aac3fc42df5ea978a302ab9b0d075d7"

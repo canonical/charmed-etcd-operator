@@ -113,7 +113,12 @@ class BackupEvents(Object):
         s3_parameters["path"] = s3_parameters["path"].strip("/")
         s3_parameters["bucket"] = s3_parameters["bucket"].strip("/")
 
-        self.charm.backup_manager.create_bucket(s3_parameters)
+        try:
+            self.charm.backup_manager.create_bucket(s3_parameters)
+        except EtcdBackupError:
+            logger.error("Cannot setup s3 object storage - check credentials and permissions")
+            return
+
         self.charm.state.cluster.update({"s3-credentials": json.dumps(s3_parameters)})
 
     def _on_s3_credentials_gone(self, event: CredentialsGoneEvent) -> None:
@@ -163,7 +168,12 @@ class BackupEvents(Object):
         azure_parameters["path"] = azure_parameters["path"].strip("/")
         azure_parameters["container"] = azure_parameters["container"].strip("/")
 
-        self.charm.backup_manager.create_container(azure_parameters)
+        try:
+            self.charm.backup_manager.create_container(azure_parameters)
+        except EtcdBackupError:
+            logger.error("Cannot setup azure object storage - check credentials and permissions")
+            return
+
         self.charm.state.cluster.update({"azure-credentials": json.dumps(azure_parameters)})
 
     def _on_azure_credentials_gone(self, event: StorageConnectionInfoGoneEvent) -> None:

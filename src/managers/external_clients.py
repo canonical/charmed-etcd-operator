@@ -9,11 +9,11 @@ import logging
 from pathlib import Path
 
 from charms.tls_certificates_interface.v4.tls_certificates import Certificate
-from cryptography import x509
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
 
+from common.certificates import is_leaf_certificate_valid
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import CLIENT_PORT, SUBSTRATES, TLSCARotationState, TLSState
@@ -96,36 +96,6 @@ class ExternalClientsManager(ManagerStatusProtocol):
         cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
         return Certificate.from_string(cert).common_name
 
-    def is_leaf_certificate_valid(self, mtls_cert: str) -> bool:
-        """Validate the leaf certificate.
-
-        Args:
-            mtls_cert (str): The mtls chain.
-
-        Returns:
-            (bool): True if the certificate is not a CA.
-        """
-        # split the certificates by the end of the certificate marker and keep the marker in the cert
-        raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
-        # add the marker back to the certificate
-        leaf_cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
-        logger.debug(f"Leaf certificate is a CA? {Certificate.from_string(leaf_cert).is_ca}")
-        certificate = x509.load_pem_x509_certificate(data=leaf_cert.encode())
-        # check if the certificate is a CA
-        try:
-            basic_constraints = certificate.extensions.get_extension_for_class(
-                x509.BasicConstraints
-            ).value
-        except x509.ExtensionNotFound:
-            return False
-        # check if the certificate can sign other certificates
-        try:
-            key_usage = certificate.extensions.get_extension_for_class(x509.KeyUsage).value
-        except x509.ExtensionNotFound:
-            return not basic_constraints.ca
-
-        return not (key_usage.key_cert_sign or key_usage.crl_sign or basic_constraints.ca)
-
     def update_client_relations_data(self, etcd_version: str) -> None:
         """Update the ECR data."""
         if not self.state.etcd_provides.relations:
@@ -139,7 +109,10 @@ class ExternalClientsManager(ManagerStatusProtocol):
             uri.split("=")[0] for uri in self.state.cluster.cluster_members.split(",")
         }
         cluster_servers = {
-            server for server in self.state.servers if server.member_name in cluster_server_names
+            server
+            for server in self.state.servers
+            if server.member_name in cluster_server_names
+            and server.tls_client_state == TLSState.TLS
         }
 
         uris = {server.client_url for server in cluster_servers}
@@ -148,6 +121,13 @@ class ExternalClientsManager(ManagerStatusProtocol):
         server_ca = self.state.tls_client_certificate.ca.raw
 
         for relation in self.state.etcd_provides.relations:
+            if not self.state.etcd_provides.fetch_relation_field(
+                relation.id, "prefix"
+            ) or not self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert"):
+                # Skip relations with invalid payloads
+                logger.warning(f"Skipping relation {relation.id} with invalid payloads.")
+                continue
+
             relation_data = self.state.etcd_provides.fetch_my_relation_data(
                 [relation.id], ["uris", "endpoints", "tls-ca", "version"]
             )[relation.id]
@@ -175,7 +155,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
             if not mtls_cert or not prefix:
                 status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
                 continue
-            if not self.is_leaf_certificate_valid(mtls_cert):
+            if not is_leaf_certificate_valid(mtls_cert):
                 status_list.append(ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value)
 
             common_name = self.get_common_name_from_chain(mtls_cert)

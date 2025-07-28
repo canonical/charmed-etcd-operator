@@ -104,3 +104,10 @@ class RestoreStep(Enum):
     RESTORE = "restore_backup"
     START = "restart_workload"
     COMPLETED = "completed"
+
+
+class TuningOptions(Enum):
+    """Configuration options for tuning etcd performance."""
+
+    ELECTION_TIMEOUT_CONFIG = "election-timeout"
+    HEARTBEAT_INTERVAL_CONFIG = "heartbeat-interval"

@@ -12,7 +12,14 @@ from ops.model import ConfigData
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import DATABASE_DIR, METRICS_PORT, RestoreStep, TLSState
+from literals import (
+    CONFIG_FILE,
+    DATABASE_DIR,
+    METRICS_PORT,
+    RestoreStep,
+    TLSState,
+    TuningOptions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +82,11 @@ class ConfigManager:
         config_properties["listen-metrics-urls"] = (
             f"http://{self.state.unit_server.ip}:{METRICS_PORT}"
         )
+
+        if self.are_tuning_parameters_valid():
+            for option in TuningOptions:
+                # take over the config value set by users
+                config_properties[option.value] = self.config.get(option.value)
 
         if self.state.unit_server.tls_client_state in [TLSState.TO_TLS, TLSState.TLS]:
             # replace http with https in listen-client-urls and advertise-client-urls
@@ -140,6 +152,46 @@ class ConfigManager:
             content=self.config_properties,
             file=self.config_file,
         )
+
+    def are_tuning_parameters_valid(self) -> bool:
+        """Validate configuration values for tuning parameters.
+
+        Returns:
+            bool: True if tuning config values are valid, False if invalid.
+        """
+        if heartbeat_interval := self.config.get(TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value):
+            if heartbeat_interval < 10 or heartbeat_interval > 5000:
+                return False
+
+        if election_timeout := self.config.get(TuningOptions.ELECTION_TIMEOUT_CONFIG.value):
+            if election_timeout < heartbeat_interval * 10 or election_timeout > 50000:
+                return False
+
+        return True
+
+    def requires_restart(self) -> bool:
+        """Check current configuration and determine if restart is required."""
+        try:
+            current_config_values = self.workload.load_yaml_file(CONFIG_FILE)
+        except yaml.YAMLError as e:
+            logger.error(f"Error loading current config: {e}")
+            return False
+
+        for option in TuningOptions:
+            if self.config.get(option.value) != current_config_values[option.value]:
+                logger.info(f"Config change to {option.value} requires restart")
+                return True
+
+        return False
+
+    # def compute_component_status(self) -> List[Status]:
+    #     """Compute the Cluster manager's statuses."""
+    #     status_list = []
+
+    #     if not self.are_tuning_parameters_valid():
+    #         status_list.append(Status.TUNING_CONFIG_INVALID)
+
+    #     return status_list
 
     def _get_cluster_endpoints(self) -> str:
         """Concatenate peer-urls of all cluster members.

@@ -70,7 +70,7 @@ class TLSEvents(Object):
     def __init__(self, charm: "EtcdOperatorCharm"):
         super().__init__(charm, "tls")
         self.charm: "EtcdOperatorCharm" = charm
-        host_mapping = self.charm.cluster_manager.get_host_mapping()
+        host_mapping = self.charm.workload.get_host_mapping()
         common_name = f"{self.charm.unit.name}-{self.charm.model.uuid}"
         peer_private_key = None
         client_private_key = None
@@ -117,9 +117,8 @@ class TLSEvents(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=frozenset({host_mapping["ip"]}),
+                    sans_ip=self.charm.tls_manager.get_sans_ip(TLSType.PEER),
                     sans_dns=frozenset({self.charm.unit.name, host_mapping["hostname"]}),
-                    organization=TLSType.PEER.value,
                 ),
             ],
             private_key=peer_private_key,
@@ -131,9 +130,8 @@ class TLSEvents(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=frozenset({host_mapping["ip"]}),
+                    sans_ip=self.charm.tls_manager.get_sans_ip(TLSType.CLIENT),
                     sans_dns=frozenset({self.charm.unit.name, host_mapping["hostname"]}),
-                    organization=TLSType.CLIENT.value,
                 ),
             ],
             private_key=client_private_key,
@@ -183,26 +181,35 @@ class TLSEvents(Object):
             return
 
         cert = event.certificate
-        cert_type = TLSType(cert.organization)
+
+        client_certificates, client_private_key = (
+            self.client_certificate.get_assigned_certificates()
+        )
+        peer_certificates, peer_private_key = self.peer_certificate.get_assigned_certificates()
+
+        try:
+            if client_certificates and client_certificates[0].certificate == cert:
+                cert_type = TLSType.CLIENT
+                cert = client_certificates[0]
+                private_key = client_private_key
+                tls_state = self.charm.state.unit_server.tls_client_state
+                tls_ca_rotation_state = self.charm.state.unit_server.tls_client_ca_rotation_state
+            elif peer_certificates and peer_certificates[0].certificate == cert:
+                cert_type = TLSType.PEER
+                cert = peer_certificates[0]
+                private_key = peer_private_key
+                tls_state = self.charm.state.unit_server.tls_peer_state
+                tls_ca_rotation_state = self.charm.state.unit_server.tls_peer_ca_rotation_state
+            else:
+                logger.error(
+                    f"Received certificate does not match any assigned certificates: {cert}"
+                )
+                return
+        except IndexError:
+            logger.error(f"Received certificate does not match any assigned certificates: {cert}")
+            return
+
         logger.debug(f"Received certificate for {cert_type}")
-
-        relation_requirer = (
-            self.peer_certificate if cert_type == TLSType.PEER else self.client_certificate
-        )
-
-        certs, private_key = relation_requirer.get_assigned_certificates()
-        cert = certs[0]
-
-        tls_state = (
-            self.charm.state.unit_server.tls_peer_state
-            if cert_type == TLSType.PEER
-            else self.charm.state.unit_server.tls_client_state
-        )
-        tls_ca_rotation_state = (
-            self.charm.state.unit_server.tls_peer_ca_rotation_state
-            if cert_type == TLSType.PEER
-            else self.charm.state.unit_server.tls_client_ca_rotation_state
-        )
 
         if (
             tls_state == TLSState.TLS
@@ -229,7 +236,7 @@ class TLSEvents(Object):
                 return
 
         # write certificates to disk
-        self.charm.tls_manager.write_certificate(cert, private_key)  # type: ignore
+        self.charm.tls_manager.write_certificate(cert, private_key, cert_type)  # type: ignore
         # if there are client relations add their CAs to the trusted client CAs
         if cert_type == TLSType.CLIENT and tls_state == TLSState.TO_TLS:
             self.charm.tls_manager.update_cas(

@@ -26,6 +26,7 @@ from literals import (
     PEER_RELATION,
     STATUS_PEERS_RELATION,
     TLSState,
+    TuningOptions,
 )
 from statuses import ClusterStatuses, EtcdServiceStatuses, TLSStatuses
 
@@ -186,7 +187,7 @@ def test_start():
             "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
             "authentication": "enabled",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0"},
     )
     state_in = testing.State(relations={relation, status_peer_relation})
     with (
@@ -207,7 +208,7 @@ def test_start():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
@@ -228,7 +229,7 @@ def test_start():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
@@ -250,7 +251,7 @@ def test_start():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0"},
     )
     state_in = testing.State(relations={relation, status_peer_relation})
     with (
@@ -485,7 +486,7 @@ def test_cluster_majority_failure():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"ip": "ip0"},
+        local_unit_data={"private_ip": "ip0"},
     )
     status_peer_relation = testing.PeerRelation(
         id=2,
@@ -531,13 +532,13 @@ def test_cluster_majority_failure():
 
 
 def test_peer_relation_created():
-    test_data = {"hostname": "my_hostname", "ip": "my_ip"}
+    test_data = {"hostname": "my_hostname", "private_ip": "my_ip"}
 
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation})
     with (
-        patch("managers.cluster.ClusterManager.get_host_mapping", return_value=test_data),
+        patch("core.workload.WorkloadBase.get_host_mapping", return_value=test_data),
         patch("managers.cluster.ClusterManager.leader"),
     ):
         state_out = ctx.run(ctx.on.relation_created(relation=relation), state_in)
@@ -582,7 +583,10 @@ def test_config_changed():
         leader=True,
     )
 
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
     with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("subprocess.run"),
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("common.client.EtcdClient.broadcast_peer_url"),
@@ -592,6 +596,117 @@ def test_config_changed():
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
         assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
+
+
+def test_set_config_options():
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"private_ip": "my_ip"},
+    )
+    ctx = testing.Context(EtcdOperatorCharm)
+
+    # happy path - leader
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_called_once()
+
+    # happy path - non-leader
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_called_once()
+
+    # config values are equal to current config -> no restart triggered
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_not_called()
+
+    # config values are invalid -> no restart triggered, blocked status
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 100,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 100,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_not_called()
+        assert status_is(
+            state_out,
+            ClusterStatuses.TUNING_CONFIG_INVALID.value,
+        )
+
+    # config values are invalid -> no restart triggered, blocked status
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 50001,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 100,
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_not_called()
+        assert state_out.unit_status == ops.BlockedStatus(
+            "Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        )
 
 
 def test_secret_changed():
@@ -637,9 +752,9 @@ def test_secret_changed():
         relations={relation, status_peer_relation},
         leader=True,
     )
-    with patch("subprocess.run") as run:
+    with patch("common.client.EtcdClient.update_password") as update_password:
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
-        run.assert_not_called()
+        update_password.assert_not_called()
         assert status_is(
             state_out,
             ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
@@ -652,8 +767,8 @@ def test_peer_relation_joined():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={
-                "hostname": "charmed-etcd0",
-                "ip": "ip0",
+            "hostname": "charmed-etcd0",
+            "private_ip": "ip0",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -664,13 +779,13 @@ def test_peer_relation_joined():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={
-                "hostname": "charmed-etcd0",
-                "ip": "ip0",
-            },
+            "hostname": "charmed-etcd0",
+            "private_ip": "ip0",
+        },
         peers_data={
             1: {
                 "hostname": "charmed-etcd1",
-                "ip": "ip1",
+                "private_ip": "ip1",
             },
         },
     )
@@ -711,7 +826,7 @@ def test_peer_relation_changed():
         endpoint=PEER_RELATION,
         local_unit_data={
             "hostname": "charmed-etcd0",
-            "ip": "ip0",
+            "private_ip": "ip0",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -724,7 +839,7 @@ def test_peer_relation_changed():
         peers_data={
             1: {
                 "hostname": "charmed-etcd1",
-                "ip": "ip1",
+                "private_ip": "ip1",
                 "state": "started",
             },
         },
@@ -734,7 +849,7 @@ def test_peer_relation_changed():
             "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
             "learning_member": "4477466968462020105",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation}, leader=True)
     with patch(
@@ -999,7 +1114,7 @@ def test_rebuild_cluster_workflow_synchronisation():
             "cluster_state": "existing",
             "cluster_members": "etcd0=http://ip0:2380,etcd1=http://ip1:2380",
         },
-        local_unit_data={"hostname": "etcd0", "ip": "ip0"},
+        local_unit_data={"hostname": "etcd0", "private_ip": "ip0"},
     )
     state_in = testing.State(relations={peer_relation}, leader=False)
 
@@ -1029,7 +1144,7 @@ def test_rebuild_cluster_workflow_synchronisation():
             "state": "started",
             "rebuild_completed": "True",
             "hostname": "etcd0",
-            "ip": "ip0",
+            "private_ip": "ip0",
         },
     )
     state_in = testing.State(relations={peer_relation}, leader=True)

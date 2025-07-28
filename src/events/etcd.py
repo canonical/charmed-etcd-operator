@@ -29,6 +29,7 @@ from common.exceptions import (
     RaftLeaderNotFoundError,
 )
 from literals import (
+    CLIENT_PORT,
     DATA_STORAGE,
     DATABASE_DIR,
     INTERNAL_USER,
@@ -201,14 +202,9 @@ class EtcdEvents(Object):
             event.defer()
             return
 
-        if not self.charm.workload.alive():
-            self.charm.status.set_running_status(
-                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
-                scope="unit",
-                component_name=self.charm.cluster_manager.name,
-                statuses_state=self.charm.state.statuses,
-            )
-        else:
+        if self.charm.workload.alive():
+            logger.info("Workload started successfully. Opening client port")
+            self.charm.unit.open_port("tcp", CLIENT_PORT)
             self.charm.state.statuses.delete(
                 EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
                 scope="unit",
@@ -219,8 +215,15 @@ class EtcdEvents(Object):
                 scope="unit",
                 component=self.charm.cluster_manager.name,
             )
+        else:
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
 
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:  # noqa: C901
         """Handle config_changed event."""
         if (
             self.charm.state.cluster.is_restore_in_progress
@@ -233,20 +236,19 @@ class EtcdEvents(Object):
             return
 
         # refresh the host information and cluster membership in case of ip change
-        ip_address = self.charm.cluster_manager.get_host_mapping().get("ip")
-        if ip_address != self.charm.state.unit_server.ip:
+        ip_address = self.charm.workload.get_host_mapping().get("private_ip")
+        if ip_address and ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
-            self.charm.state.unit_server.update({"ip": ip_address})
-
-            # update cluster configuration
-            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
-            self.charm.config_manager.set_config_properties()
+            self.charm.state.unit_server.update({"private_ip": ip_address})
 
             # we need to update the client-urls by restarting etcd
+            self.charm.config_manager.set_config_properties()
             # after ip change, this member is unavailable, no need to acquire restart lock
             if not self.charm.cluster_manager.restart_member(move_leader=False):
                 raise HealthCheckFailedError("Failed to check health of the member after restart")
 
+            # update cluster configuration
+            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
             if self.charm.unit.is_leader():
                 self.charm.cluster_manager.update_cluster_member_state()
 
@@ -263,6 +265,13 @@ class EtcdEvents(Object):
         if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             self.update_private_key(tls_client_private_key_id)
 
+        if (
+            self.charm.config_manager.are_tuning_parameters_valid()
+            and self.charm.config_manager.requires_restart()
+        ):
+            # apply config and initiate restart
+            self.charm.rolling_restart()
+
         if not self.charm.unit.is_leader():
             return
 
@@ -271,7 +280,7 @@ class EtcdEvents(Object):
 
     def _on_peer_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
-        self.charm.state.unit_server.update(self.charm.cluster_manager.get_host_mapping())
+        self.charm.state.unit_server.update(self.charm.workload.get_host_mapping())
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle all events related to the cluster-peer relation."""

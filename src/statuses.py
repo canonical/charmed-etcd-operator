@@ -24,10 +24,10 @@ class BackupStatuses(Enum):
 
     BACKUP_IN_PROGRESS = StatusObject(status="maintenance", message="Creating database backup...")
     BACKUP_S3_PARAMETERS_MISSING = StatusObject(
-        status="blocked", message="Missing required parameters in the s3 relation."
+        status="blocked", message="Missing or invalid s3 credentials."
     )
     BACKUP_AZURE_PARAMETERS_MISSING = StatusObject(
-        status="blocked", message="Missing required parameters in the azure relation."
+        status="blocked", message="Missing or invalid azure credentials."
     )
     RESTORE_FAILED = StatusObject(status="blocked", message="failed to restore backup")
     RESTORE_VERIFICATION_FAILED = StatusObject(
@@ -75,6 +75,10 @@ class ClusterStatuses(Enum):
     HEALTH_CHECK_FAILED = StatusObject(status="maintenance", message="health check failed")
     REMOVED = StatusObject(status="blocked", message="unit removed from cluster", running="async")
     PASSWORD_UPDATE_FAILED = StatusObject(status="blocked", message="failed to update password")
+    TUNING_CONFIG_INVALID = StatusObject(
+        status="blocked",
+        message="Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+    )
 
 
 class TLSStatuses(Enum):

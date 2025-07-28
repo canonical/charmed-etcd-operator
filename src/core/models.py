@@ -101,7 +101,7 @@ class EtcdServer(RelationState):
     @property
     def ip(self) -> str:
         """The IP address for the unit."""
-        return self.relation_data.get("ip", "")
+        return self.relation_data.get("private_ip", "")
 
     @property
     def peer_url(self) -> str:

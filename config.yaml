@@ -19,3 +19,17 @@ options:
     type: secret
     description: |
       A Juju secret URI of a secret containing the private key for client-to-server TLS certificates.
+  
+  election-timeout:
+    type: int
+    default: 1000
+    description: How long, in milliseconds, a follower node will go without hearing a heartbeat before attempting to become leader itself.
+      The value should be at least 10x the value of <heartbeat-interval>, and must not exceed 50000.
+
+  heartbeat-interval:
+    type: int
+    default: 100
+    description: The frequency, in milliseconds, with which the leader will notify followers that it is still the leader. 
+      For best practices, the parameter should be set around round-trip time between members.
+      The value must be between 10 and 5000 at most.
+

@@ -6,8 +6,10 @@
 
 import base64
 import logging
+import socket
 import re
 from pathlib import Path
+from typing import Iterable
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
@@ -18,6 +20,7 @@ from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtoc
 from data_platform_helpers.advanced_statuses.types import Scope
 from ops import ModelError, SecretNotFoundError
 
+from common.certificates import is_leaf_certificate_valid, leaf_certificate
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import (
@@ -58,16 +61,18 @@ class TLSManager(ManagerStatusProtocol):
             }
         )
 
-    def write_certificate(self, certificate: ProviderCertificate, private_key: PrivateKey) -> None:
+    def write_certificate(
+        self, certificate: ProviderCertificate, private_key: PrivateKey, cert_type: TLSType
+    ) -> None:
         """Write certificates to disk.
 
         Args:
             certificate (ProviderCertificate): The certificate.
             private_key (PrivateKey): The private key.
+            cert_type (TLSType): The certificate type (client or peer).
         """
         logger.debug("Writing certificates to disk")
         ca_cert = certificate.ca
-        cert_type = TLSType(certificate.certificate.organization)
         if cert_type == TLSType.CLIENT:
             certificate_path = self.workload.paths.tls.client_cert
             private_key_path = self.workload.paths.tls.client_key
@@ -80,18 +85,18 @@ class TLSManager(ManagerStatusProtocol):
         self.workload.write_file(certificate.certificate.raw, certificate_path)
         self.set_cert_state(cert_type, is_ready=True)
 
-    def is_new_ca(self, ca_chain: str, tls_type: TLSType) -> bool:
-        """Check if all certificates in the CA chain are trusted.
+    def is_new_ca(self, certificate: str, tls_type: TLSType) -> bool:
+        """Check if the certificate is a new CA.
 
         Args:
-            ca_chain (str): The CA certificate.
+            certificate (str): The certificate to check.
             tls_type (TLSType): The TLS type.
 
         Returns:
-            bool: True if the CA is new, False otherwise.
+            bool: True if the certificate is not stored in the client trusted CA store, False otherwise.
         """
         trusted_cas = self.load_trusted_ca(tls_type)
-        return any(ca_cert not in trusted_cas for ca_cert in self.separate_certificates(ca_chain))
+        return certificate not in trusted_cas
 
     def add_trusted_ca(self, ca_cert: str, tls_type: TLSType = TLSType.PEER) -> None:
         """Add trusted CA to the system.
@@ -107,10 +112,10 @@ class TLSManager(ManagerStatusProtocol):
 
         cas = self.load_trusted_ca(tls_type)
         if ca_cert not in cas:
-            cas.append(ca_cert)
+            cas.add(ca_cert)
             self.workload.write_file("\n".join(cas), ca_certs_path)
 
-    def load_trusted_ca(self, tls_type) -> list[str]:
+    def load_trusted_ca(self, tls_type: TLSType) -> set[str]:
         """Load trusted CA from the system.
 
         Args:
@@ -122,7 +127,7 @@ class TLSManager(ManagerStatusProtocol):
             ca_certs_path = Path(self.workload.paths.tls.peer_ca)
 
         if not ca_certs_path.exists():
-            return []
+            return set()
 
         return self.separate_certificates(ca_certs_path.read_text())
 
@@ -196,25 +201,25 @@ class TLSManager(ManagerStatusProtocol):
                 return False
         return True
 
-    def separate_certificates(self, concatenated_certs: str) -> list[str]:
+    def separate_certificates(self, concatenated_certs: str) -> set[str]:
         """Separate certificates from the concatenated certificates.
 
         Args:
             concatenated_certs (str): The concatenated certificates.
 
         Returns:
-            list[str]: The list of certificates.
+            set[str]: The set of certificates.
         """
         # split the certificates by the end of the certificate marker and keep the marker in the cert
         raw_cas = concatenated_certs.split("-----END CERTIFICATE-----")
         # add the marker back to the certificate
-        return [cert.strip() + "\n-----END CERTIFICATE-----" for cert in raw_cas if cert.strip()]
+        return {cert.strip() + "\n-----END CERTIFICATE-----" for cert in raw_cas if cert.strip()}
 
-    def update_cas(self, cas: list[str], tls_type: TLSType) -> None:
+    def update_cas(self, cas: Iterable[str], tls_type: TLSType) -> None:
         """Update the CAs.
 
         Args:
-            cas (list[str]): The list of CAs.
+            cas (Iterable[str]): The list/set of CAs.
             tls_type (TLSType): The TLS type.
         """
         self.workload.write_file(
@@ -252,13 +257,36 @@ class TLSManager(ManagerStatusProtocol):
                 ]
             )
 
-    def collect_client_cas(self) -> list[str]:
+    def get_sans_ip(self, tls_type: TLSType) -> frozenset[str]:
+        """Get the SANs IP for the TLS certificate.
+
+        Returns:
+            frozenset[str]: The SANs IP.
+        """
+        private_ip = self.workload.get_private_ip()
+        if not private_ip:
+            logger.warning("No private IP found using unit-get. Using socket instead.")
+            return frozenset({socket.gethostbyname(socket.gethostname())})
+
+        if tls_type == TLSType.PEER:
+            logger.debug(f"Using private IP {private_ip} for peer SANs IP.")
+            return frozenset({private_ip})
+
+        # For client TLS, we use both private and public IPs if available
+        if public_ip := self.workload.get_public_ip():
+            logger.debug("Using public and private IPs for SANs.")
+            return frozenset({private_ip, public_ip})
+
+        logger.debug(f"Using only private IP {private_ip} for SANs IP.")
+        return frozenset({private_ip})
+
+    def collect_client_cas(self) -> set[str]:
         """Collect client CAs.
 
         Returns:
-            list[str]: The client CAs.
+            set[str]: The client CAs.
         """
-        cas: list[str] = [self.state.tls_client_certificate.ca.raw]
+        cas: set[str] = {self.state.tls_client_certificate.ca.raw}
 
         # managed users cas
         for relation in self.state.etcd_provides.relations:
@@ -266,11 +294,11 @@ class TLSManager(ManagerStatusProtocol):
             logger.debug(
                 f"Collecting CA from relation {relation.id}, chain exists: {bool(mtls_cert)}"
             )
-            if mtls_cert:
-                cas.extend(self.separate_certificates(mtls_cert))
+            if mtls_cert and is_leaf_certificate_valid(mtls_cert):
+                cas.add(leaf_certificate(mtls_cert))
 
         # certificate transfer cas
-        cas.extend(self.state.tls_certificate_transfer_certificates)
+        cas.update(self.state.tls_certificate_transfer_certificates)
 
         return cas
 

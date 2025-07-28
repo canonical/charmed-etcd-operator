@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 
 import boto3
-from azure.core.exceptions import ResourceExistsError
+from azure.core.exceptions import AzureError, ResourceExistsError
 from azure.storage.blob import ContainerClient
 from botocore.client import Config
 from botocore.exceptions import ClientError
@@ -98,7 +98,9 @@ class BackupManager(ManagerStatusProtocol):
         bucket = self._get_bucket_resource(s3_parameters)
 
         try:
-            if region:
+            # setting the `LocationConstraint` to the default value of us-east-1 will fail
+            # https://github.com/aws/aws-sdk-js/issues/3647
+            if region and region != "us-east-1":
                 bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
             else:
                 bucket.create()
@@ -127,6 +129,9 @@ class BackupManager(ManagerStatusProtocol):
             logger.info(f"Container {azure_parameters['container']} created")
         except ResourceExistsError:
             logger.info(f"Container {azure_parameters['container']} already exists")
+        except AzureError as e:
+            logger.error(e)
+            raise EtcdBackupError(e)
 
     def create_backup(self) -> str:
         """Create a backup of etcd and upload it to object storage.
