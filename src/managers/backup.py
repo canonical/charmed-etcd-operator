@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List
 
 import boto3
-from azure.core.exceptions import ResourceExistsError
+from azure.core.exceptions import AzureError, ResourceExistsError
 from azure.storage.blob import ContainerClient
 from botocore.client import Config
 from botocore.exceptions import ClientError
@@ -124,6 +124,9 @@ class BackupManager:
             logger.info(f"Container {azure_parameters['container']} created")
         except ResourceExistsError:
             logger.info(f"Container {azure_parameters['container']} already exists")
+        except AzureError as e:
+            logger.error(e)
+            raise EtcdBackupError(e)
 
     def create_backup(self) -> str:
         """Create a backup of etcd and upload it to object storage.
