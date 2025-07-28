@@ -28,7 +28,7 @@ from literals import (
     TLSState,
     TuningOptions,
 )
-from statuses import ClusterStatuses, EtcdServiceStatuses, TLSStatuses
+from statuses import ClusterStatuses, ConfigStatuses, EtcdServiceStatuses, TLSStatuses
 
 from .helpers import status_is
 
@@ -683,7 +683,7 @@ def test_set_config_options():
         rolling_restart.assert_not_called()
         assert status_is(
             state_out,
-            ClusterStatuses.TUNING_CONFIG_INVALID.value,
+            ConfigStatuses.TUNING_CONFIG_INVALID.value,
         )
 
     # config values are invalid -> no restart triggered, blocked status
@@ -704,8 +704,9 @@ def test_set_config_options():
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         rolling_restart.assert_not_called()
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        assert status_is(
+            state_out,
+            ConfigStatuses.TUNING_CONFIG_INVALID.value,
         )
 
 

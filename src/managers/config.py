@@ -8,6 +8,9 @@ import logging
 from pathlib import Path
 
 import yaml
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 from ops.model import ConfigData
 
 from core.cluster import ClusterState
@@ -20,14 +23,18 @@ from literals import (
     TLSState,
     TuningOptions,
 )
+from statuses import CharmStatuses, ConfigStatuses
 
 logger = logging.getLogger(__name__)
 
 WORKING_DIR = Path(__file__).absolute().parent
 
 
-class ConfigManager:
+class ConfigManager(ManagerStatusProtocol):
     """Handle the configuration of etcd."""
+
+    name: str = "config"
+    state: ClusterState
 
     def __init__(
         self,
@@ -184,14 +191,14 @@ class ConfigManager:
 
         return False
 
-    # def compute_component_status(self) -> List[Status]:
-    #     """Compute the Cluster manager's statuses."""
-    #     status_list = []
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+        """Compute the Cluster manager's statuses."""
+        status_list: list[StatusObject] = []
 
-    #     if not self.are_tuning_parameters_valid():
-    #         status_list.append(Status.TUNING_CONFIG_INVALID)
+        if not self.are_tuning_parameters_valid():
+            status_list.append(ConfigStatuses.TUNING_CONFIG_INVALID.value)
 
-    #     return status_list
+        return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 
     def _get_cluster_endpoints(self) -> str:
         """Concatenate peer-urls of all cluster members.

@@ -58,6 +58,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.status = StatusHandler(  # priority order
             self,
             self.cluster_manager,
+            self.config_manager,
             self.tls_manager,
             self.external_clients_manager,
             self.backup_manager,

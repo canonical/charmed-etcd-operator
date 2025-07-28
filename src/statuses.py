@@ -75,9 +75,14 @@ class ClusterStatuses(Enum):
     HEALTH_CHECK_FAILED = StatusObject(status="maintenance", message="health check failed")
     REMOVED = StatusObject(status="blocked", message="unit removed from cluster", running="async")
     PASSWORD_UPDATE_FAILED = StatusObject(status="blocked", message="failed to update password")
+
+
+class ConfigStatuses(Enum):
+    """Collection of config related statuses."""
+
     TUNING_CONFIG_INVALID = StatusObject(
         status="blocked",
-        message="Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        message="Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'",
     )
 
 
