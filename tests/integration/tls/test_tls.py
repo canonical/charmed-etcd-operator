@@ -255,12 +255,13 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
 
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
+    # this will download the client cert from application.units[0]
     await download_client_certificate_from_unit(ops_test, APP_NAME)
     client_cert_sans = subprocess.getoutput(
         "openssl x509 -noout -ext subjectAltName -in client.pem "
     )
     unit = ops_test.model.applications[APP_NAME].units[0]
-    expected_sans = config_value.replace("{unit}", unit.id)
+    expected_sans = config_value.replace("{unit}", unit.name.split("/")[-1])
     assert expected_sans in client_cert_sans, (
         f"expected sans {expected_sans} not found in certificate sans {client_cert_sans}"
     )
