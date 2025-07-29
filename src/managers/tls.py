@@ -303,7 +303,6 @@ class TLSManager:
             logger.debug("Using public and private IPs for SANs.")
             sans_ip.add(public_ip)
 
-        logger.info(sans_ip)
         return frozenset(sans_ip)
 
     def build_sans_dns(self) -> frozenset[str]:
