@@ -308,7 +308,7 @@ class TLSManager:
             return True
 
         extra_sans = [san.strip() for san in extra_sans_config.split(",")]
-        allowed = re.compile(r"(?!-)[A-Z0-9-\{\}]{1,63}(?<!-)$", re.IGNORECASE)
+        allowed = re.compile(r"(?!-)[A-Z0-9-{}]{1,63}(?<!-)$", re.IGNORECASE)
 
         for san in extra_sans:
             # validation for ip addresses

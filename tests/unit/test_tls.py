@@ -27,6 +27,7 @@ from scenario import Secret
 
 from charm import EtcdOperatorCharm
 from core.models import Member
+from events.tls import RefreshTLSCertificatesEvent
 from literals import (
     CLIENT_TLS_RELATION_NAME,
     PEER_RELATION,
@@ -1475,7 +1476,7 @@ def test_ca_client_rotation(certificate_available_context):
             event.defer.assert_not_called()
 
 
-def test_set_extra_sans_config_options():
+def test_set_extra_sans_config_option():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
@@ -1483,12 +1484,16 @@ def test_set_extra_sans_config_options():
             "authentication": "enabled",
             "cluster_state": "existing",
         },
-        local_unit_data={"private_ip": "my_ip"},
+        local_unit_data={
+            "private_ip": "my_ip",
+            "tls_peer_state": TLSState.TLS.value,
+            "tls_client_state": TLSState.TLS.value,
+        },
     )
     current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
-    ctx = testing.Context(EtcdOperatorCharm)
 
     # happy path
+    ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
         config={
             "certificate-extra-sans": "192.168.1.100, myhostname",
@@ -1500,9 +1505,11 @@ def test_set_extra_sans_config_options():
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
         assert state_out.unit_status == ActiveStatus()
 
     # allow {unit} placeholder
+    ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
         config={
             "certificate-extra-sans": "192.168.1.100, etcd-{unit}.hostname",
@@ -1514,9 +1521,11 @@ def test_set_extra_sans_config_options():
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
         assert state_out.unit_status == ActiveStatus()
 
     # invalid ip address
+    ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
         config={
             "certificate-extra-sans": "192.168.257.100, myhostname",
@@ -1531,11 +1540,14 @@ def test_set_extra_sans_config_options():
         assert state_out.unit_status == BlockedStatus(
             "Invalid value set for the config options 'certificate-extra-sans'"
         )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
 
     # invalid dns name
+    ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
         config={
-            "certificate-extra-sans": "my hostname",
+            "certificate-extra-sans": "-myhostname",
         },
         relations={relation},
     )
@@ -1547,8 +1559,30 @@ def test_set_extra_sans_config_options():
         assert state_out.unit_status == BlockedStatus(
             "Invalid value set for the config options 'certificate-extra-sans'"
         )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
+
+    # another invalid dns name
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "myhostname-",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
 
     # first ip address valid, second one invalid
+    ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
         config={
             "certificate-extra-sans": "192.168.1.100, myhostname, 999.1.2.3",
@@ -1563,8 +1597,11 @@ def test_set_extra_sans_config_options():
         assert state_out.unit_status == BlockedStatus(
             "Invalid value set for the config options 'certificate-extra-sans'"
         )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
 
     # special characters in dns name
+    ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
         config={
             "certificate-extra-sans": "192.168.1.100, my$*hostname",
@@ -1579,3 +1616,5 @@ def test_set_extra_sans_config_options():
         assert state_out.unit_status == BlockedStatus(
             "Invalid value set for the config options 'certificate-extra-sans'"
         )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
