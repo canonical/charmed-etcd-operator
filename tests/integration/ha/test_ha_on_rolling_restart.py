@@ -8,7 +8,7 @@ import pytest
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, Status, TuningOptions
+from literals import INTERNAL_USER, PEER_RELATION, TuningOptions
 
 from ..helpers import (
     APP_NAME,

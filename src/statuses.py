@@ -105,10 +105,12 @@ class TLSStatuses(Enum):
     TLS_CLIENT_CERTS_EXPIRING = StatusObject(
         status="maintenance",
         message="TLS client certificates expiring soon. Please ensure new certificates are provided.",
+        short_message="TLS client certificates expiring soon.",
     )
     TLS_PEER_CERTS_EXPIRING = StatusObject(
         status="maintenance",
         message="TLS peer certificates expiring soon. Please ensure new certificates are provided.",
+        short_message="TLS peer certificates expiring soon.",
     )
 
 

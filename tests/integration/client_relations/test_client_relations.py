@@ -346,7 +346,7 @@ async def test_requirer_sends_ca(ops_test: OpsTest) -> None:
         # idle_period=10,
         apps_full_statuses={
             APP_NAME: {
-                "maintenance": [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value.message],
+                "blocked": [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value.message],
             },
             REQUIRER_NAME: {"active": []},
             TLS_NAME: {"active": []},
@@ -354,7 +354,7 @@ async def test_requirer_sends_ca(ops_test: OpsTest) -> None:
         units_full_statuses={
             APP_NAME: {
                 "units": {
-                    "maintenance": [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value.message]
+                    "blocked": [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value.message]
                 }
             },
             REQUIRER_NAME: {"units": {"active": []}},
