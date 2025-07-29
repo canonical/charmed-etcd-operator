@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import subprocess
 from time import sleep
 
 import pytest
@@ -216,6 +217,66 @@ async def test_enable_tls(ops_test: OpsTest) -> None:
         )
         == TEST_VALUE
     ), "Failed to read new key"
+
+
+@pytest.mark.abort_on_fail
+async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
+    """Configure extra sans for the TLS certificates."""
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+
+    logger.info("Set config to invalid sans value")
+    config_value = "-my.hostname"
+    await ops_test.model.applications[APP_NAME].set_config(
+        {"certificates-extra-sans": config_value}
+    )
+
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME, TLS_NAME],
+        apps_full_statuses={
+            APP_NAME: {"blocked": [Status.SANS_CONFIG_INVALID.value.status.message]},
+        },
+        wait_for_exact_units=NUM_UNITS,
+    )
+
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    client_cert_sans = subprocess.getoutput(
+        "openssl x509 -noout -ext subjectAltName -in client.pem "
+    )
+    assert config_value not in client_cert_sans, (
+        f"config value {config_value} found in certificate sans {client_cert_sans}"
+    )
+
+    logger.info("Configure valid extra-sans")
+    config_value = "server-{unit}.etcd-cluster"
+    await ops_test.model.applications[APP_NAME].set_config(
+        {"certificates-extra-sans": config_value}
+    )
+
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], wait_for_exact_units=NUM_UNITS)
+
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    client_cert_sans = subprocess.getoutput(
+        "openssl x509 -noout -ext subjectAltName -in client.pem "
+    )
+    unit = ops_test.model.applications[APP_NAME].units[0].name
+    expected_sans = config_value.replace("{unit}", unit.id)
+    assert expected_sans in client_cert_sans, (
+        f"expected sans {expected_sans} not found in certificate sans {client_cert_sans}"
+    )
+
+    logger.info("Resetting configuration for extra-sans")
+    await ops_test.model.applications[APP_NAME].reset_config(["certificates-extra-sans"])
+
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], wait_for_exact_units=NUM_UNITS)
+
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    client_cert_sans = subprocess.getoutput(
+        "openssl x509 -noout -ext subjectAltName -in client.pem "
+    )
+    assert expected_sans not in client_cert_sans, (
+        f"expected sans {expected_sans} found in certificate sans {client_cert_sans}"
+    )
 
 
 @pytest.mark.abort_on_fail

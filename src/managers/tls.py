@@ -324,7 +324,6 @@ class TLSManager:
 
         sans_dns.add(self.state.unit_server.unit_name)
         sans_dns.add(self.workload.get_host_mapping()["hostname"])
-        logger.info(sans_dns)
         return frozenset(sans_dns)
 
     def extra_sans_config_is_valid(self) -> bool:
