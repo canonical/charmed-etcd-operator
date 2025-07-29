@@ -227,7 +227,7 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
     logger.info("Set config to invalid sans value")
     config_value = "-my.hostname"
     await ops_test.model.applications[APP_NAME].set_config(
-        {"certificates-extra-sans": config_value}
+        {"certificate-extra-sans": config_value}
     )
 
     await wait_until(
@@ -250,7 +250,7 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
     logger.info("Configure valid extra-sans")
     config_value = "server-{unit}.etcd-cluster"
     await ops_test.model.applications[APP_NAME].set_config(
-        {"certificates-extra-sans": config_value}
+        {"certificate-extra-sans": config_value}
     )
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], wait_for_exact_units=NUM_UNITS)
@@ -266,7 +266,7 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
     )
 
     logger.info("Resetting configuration for extra-sans")
-    await ops_test.model.applications[APP_NAME].reset_config(["certificates-extra-sans"])
+    await ops_test.model.applications[APP_NAME].reset_config(["certificate-extra-sans"])
 
     await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], wait_for_exact_units=NUM_UNITS)
 
