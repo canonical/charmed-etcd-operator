@@ -1638,11 +1638,13 @@ def test_set_extra_sans_config_option():
         relations={relation},
     )
 
-    current_sans_value = "X509v3 Subject Alternative Name: \n    DNS:myhostname, DNS:my_hostname, DNS:charmed-etcd/0, IP Address:127.0.1.1, IP Address:192.168.1.100"
+    current_sans_value = "X509v3 Subject Alternative Name: \n    DNS:myhostname, DNS:charmed-etcd/0, IP Address:127.0.1.1, IP Address:192.168.1.100"
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("workload.EtcdWorkload.exec", return_value=current_sans_value),
+        patch("workload.EtcdWorkload.get_host_mapping", return_value={"hostname": "myhostname"}),
+        patch("workload.EtcdWorkload.get_private_ip", return_value="127.0.1.1"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         # no RefreshTLSCertificatesEvent must be emitted
