@@ -259,7 +259,7 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
     client_cert_sans = subprocess.getoutput(
         "openssl x509 -noout -ext subjectAltName -in client.pem "
     )
-    unit = ops_test.model.applications[APP_NAME].units[0].name
+    unit = ops_test.model.applications[APP_NAME].units[0]
     expected_sans = config_value.replace("{unit}", unit.id)
     assert expected_sans in client_cert_sans, (
         f"expected sans {expected_sans} not found in certificate sans {client_cert_sans}"
