@@ -232,7 +232,7 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
 
     await wait_until(
         ops_test,
-        apps=[APP_NAME, TLS_NAME],
+        apps=[APP_NAME],
         apps_full_statuses={
             APP_NAME: {"blocked": [Status.SANS_CONFIG_INVALID.value.status.message]},
         },
@@ -253,7 +253,7 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
         {"certificate-extra-sans": config_value}
     )
 
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], wait_for_exact_units=NUM_UNITS)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     await download_client_certificate_from_unit(ops_test, APP_NAME)
     client_cert_sans = subprocess.getoutput(
@@ -268,7 +268,7 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
     logger.info("Resetting configuration for extra-sans")
     await ops_test.model.applications[APP_NAME].reset_config(["certificate-extra-sans"])
 
-    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME], wait_for_exact_units=NUM_UNITS)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     await download_client_certificate_from_unit(ops_test, APP_NAME)
     client_cert_sans = subprocess.getoutput(

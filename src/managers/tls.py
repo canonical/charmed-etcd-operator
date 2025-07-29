@@ -360,6 +360,8 @@ class TLSManager:
         else:
             cert_file = self.workload.paths.tls.peer_cert
 
+        sans_ip = set()
+        sans_dns = set()
         if not (
             san_lines := self.workload.exec(
                 [
@@ -373,20 +375,18 @@ class TLSManager:
                 ]
             ).splitlines()
         ):
-            return {"sans_ip": set(), "sans_dns": set()}
+            return {"sans_ip": sans_ip, "sans_dns": sans_dns}
 
-        sans_ip = []
-        sans_dns = []
         for line in san_lines:
             for sans in line.split(", "):
                 san_type, san_value = sans.split(":")
 
                 if san_type.strip() == "DNS":
-                    sans_dns.append(san_value)
+                    sans_dns.add(san_value)
                 if san_type.strip() == "IP Address":
-                    sans_ip.append(san_value)
+                    sans_ip.add(san_value)
 
-        return {"sans_ip": set(sans_ip), "sans_dns": set(sans_dns)}
+        return {"sans_ip": sans_ip, "sans_dns": sans_dns}
 
     def certificate_sans_updated(self, tls_type: TLSType) -> bool:
         """Check current certificate sans and determine if certificate requires update.
