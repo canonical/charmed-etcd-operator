@@ -806,6 +806,7 @@ def test_set_tls_private_key():
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("common.client.EtcdClient.broadcast_peer_url"),
         patch("workload.EtcdWorkload.write_file"),
@@ -974,6 +975,7 @@ def test_set_tls_private_key():
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         # Configure client private key
         state_in = testing.State(
@@ -1059,6 +1061,7 @@ def test_set_tls_private_key():
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
         ) as cleanup,
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         # Configure peer private key configured
         ctx.run(ctx.on.config_changed(), state_in)
@@ -1503,6 +1506,7 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
@@ -1519,6 +1523,7 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
@@ -1535,6 +1540,7 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert state_out.unit_status == BlockedStatus(
@@ -1554,6 +1560,7 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert state_out.unit_status == BlockedStatus(
@@ -1573,6 +1580,7 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert state_out.unit_status == BlockedStatus(
@@ -1592,6 +1600,7 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert state_out.unit_status == BlockedStatus(
@@ -1611,6 +1620,7 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert state_out.unit_status == BlockedStatus(
@@ -1618,3 +1628,23 @@ def test_set_extra_sans_config_option():
         )
         # no RefreshTLSCertificatesEvent must be emitted
         assert len(ctx.emitted_events) == 1
+
+    # no update -> no certificate refresh
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, myhostname",
+        },
+        relations={relation},
+    )
+
+    current_sans_value = "X509v3 Subject Alternative Name: \n    DNS:myhostname, DNS:my_hostname, DNS:charmed-etcd/0, IP Address:127.0.1.1, IP Address:192.168.1.100"
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("workload.EtcdWorkload.exec", return_value=current_sans_value),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
+        assert state_out.unit_status == ActiveStatus()

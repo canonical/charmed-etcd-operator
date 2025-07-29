@@ -164,7 +164,7 @@ class WorkloadBase(ABC):
         pass
 
     @abstractmethod
-    def exec(self, command: List[str]) -> None:
+    def exec(self, command: List[str]) -> str:
         """Run a command on the workload substrate."""
         pass
 

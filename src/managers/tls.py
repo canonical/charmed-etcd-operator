@@ -9,7 +9,7 @@ import re
 import socket
 from ipaddress import ip_address
 from pathlib import Path
-from typing import Iterable
+from typing import Dict, Iterable
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
@@ -275,28 +275,58 @@ class TLSManager:
 
         return status_list
 
-    def get_sans_ip(self, tls_type: TLSType) -> frozenset[str]:
-        """Get the SANs IP for the TLS certificate.
+    def build_sans_ip(self, tls_type: TLSType) -> frozenset[str]:
+        """Build the SANs IP for the TLS certificate.
 
         Returns:
             frozenset[str]: The SANs IP.
         """
-        private_ip = self.workload.get_private_ip()
-        if not private_ip:
+        sans_ip = set()
+        if self.extra_sans_config_is_valid() and (
+            extra_sans_config := self.state.config.get("certificate-extra-sans")
+        ):
+            extra_sans = [san.strip() for san in extra_sans_config.split(",")]
+            sans_ip = {san for san in extra_sans if len(san.split(".")) == 4}
+
+        if private_ip := self.workload.get_private_ip():
+            sans_ip.add(private_ip)
+        else:
             logger.warning("No private IP found using unit-get. Using socket instead.")
-            return frozenset({socket.gethostbyname(socket.gethostname())})
+            sans_ip.add(socket.gethostbyname(socket.gethostname()))
 
         if tls_type == TLSType.PEER:
             logger.debug(f"Using private IP {private_ip} for peer SANs IP.")
-            return frozenset({private_ip})
+            return frozenset(sans_ip)
 
         # For client TLS, we use both private and public IPs if available
         if public_ip := self.workload.get_public_ip():
             logger.debug("Using public and private IPs for SANs.")
-            return frozenset({private_ip, public_ip})
+            sans_ip.add(public_ip)
 
-        logger.debug(f"Using only private IP {private_ip} for SANs IP.")
-        return frozenset({private_ip})
+        logger.info(sans_ip)
+        return frozenset(sans_ip)
+
+    def build_sans_dns(self) -> frozenset[str]:
+        """Build the SANs DNS for the TLS certificate.
+
+        Returns:
+            frozenset[str]: The SANs DNS.
+        """
+        sans_dns = set()
+        if self.extra_sans_config_is_valid() and (
+            extra_sans_config := self.state.config.get("certificate-extra-sans")
+        ):
+            extra_sans = [san.strip() for san in extra_sans_config.split(",")]
+            sans_dns = {
+                san.replace("{unit}", str(self.state.unit_server.unit_id))
+                for san in extra_sans
+                if len(san.split(".")) != 4
+            }
+
+        sans_dns.add(self.state.unit_server.unit_name)
+        sans_dns.add(self.workload.get_host_mapping()["hostname"])
+        logger.info(sans_dns)
+        return frozenset(sans_dns)
 
     def extra_sans_config_is_valid(self) -> bool:
         """Validate configuration value for certificate-extra-sans option.
@@ -325,13 +355,55 @@ class TLSManager:
 
         return True
 
+    def get_current_sans(self, tls_type: TLSType) -> Dict[str, set[str]]:
+        """Get the current SANs for a unit's cert."""
+        if tls_type == TLSType.CLIENT:
+            cert_file = self.workload.paths.tls.client_cert
+        else:
+            cert_file = self.workload.paths.tls.peer_cert
+
+        if not (
+            san_lines := self.workload.exec(
+                [
+                    "openssl",
+                    "x509",
+                    "-ext",
+                    "subjectAltName",
+                    "-noout",
+                    "-in",
+                    cert_file,
+                ]
+            ).splitlines()
+        ):
+            return {"sans_ip": set(), "sans_dns": set()}
+
+        sans_ip = []
+        sans_dns = []
+        for line in san_lines:
+            for sans in line.split(", "):
+                san_type, san_value = sans.split(":")
+
+                if san_type.strip() == "DNS":
+                    sans_dns.append(san_value)
+                if san_type.strip() == "IP Address":
+                    sans_ip.append(san_value)
+
+        return {"sans_ip": set(sans_ip), "sans_dns": set(sans_dns)}
+
     def certificate_sans_updated(self, tls_type: TLSType) -> bool:
         """Check current certificate sans and determine if certificate requires update.
 
         Returns:
             bool: True if certificate sans have changed, False if they are still the same.
         """
-        return True
+        current_sans = self.get_current_sans(tls_type)
+        new_sans_ip = self.build_sans_ip(tls_type)
+        new_sans_dns = self.build_sans_dns()
+
+        if new_sans_ip ^ current_sans["sans_ip"] or new_sans_dns ^ current_sans["sans_dns"]:
+            return True
+
+        return False
 
     def collect_client_cas(self) -> set[str]:
         """Collect client CAs.
