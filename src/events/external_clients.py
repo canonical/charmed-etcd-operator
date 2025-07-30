@@ -65,11 +65,13 @@ class ExternalClientsEvents(Object):
             logger.error("CA chain, keys prefix, or common name not provided")
             self.charm.set_status(Status.EC_MISSING_CREDENTIALS)
             return
+
         if self.charm.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
             logger.error("TLS is not enabled")
             self.charm.set_status(Status.EC_TLS_IS_DISABLED)
             event.defer()
             return
+
         if self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS:
             logger.error("TLS is not ready")
             self.charm.set_status(Status.TLS_NOT_READY)
@@ -82,6 +84,12 @@ class ExternalClientsEvents(Object):
         ):
             logger.debug("CA rotation is in progress")
             self.charm.set_status(Status.TLS_CLIENT_CA_ROTATING)
+            event.defer()
+            return
+
+        if not self.charm.state.cluster.auth_enabled:
+            logger.error("Cluster authentication is not enabled")
+            self.charm.set_status(Status.CLUSTER_NOT_INITIALIZED)
             event.defer()
             return
 
