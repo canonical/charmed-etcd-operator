@@ -15,4 +15,5 @@ def status_is(state_out: State, to_status: StatusObject, is_app: bool = False) -
         status.message == juju_status.message
         or status.message.startswith(juju_status.message)
         or juju_status.message.startswith(f"{status.message:.40}")
+        or (to_status.short_message is not None and to_status.short_message in status.message)
     )

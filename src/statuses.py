@@ -24,10 +24,10 @@ class BackupStatuses(Enum):
 
     BACKUP_IN_PROGRESS = StatusObject(status="maintenance", message="Creating database backup...")
     BACKUP_S3_PARAMETERS_MISSING = StatusObject(
-        status="blocked", message="Missing or invalid s3 credentials."
+        status="blocked", message="Missing or invalid s3 credentials"
     )
     BACKUP_AZURE_PARAMETERS_MISSING = StatusObject(
-        status="blocked", message="Missing or invalid azure credentials."
+        status="blocked", message="Missing or invalid azure credentials"
     )
     RESTORE_FAILED = StatusObject(status="blocked", message="failed to restore backup")
     RESTORE_VERIFICATION_FAILED = StatusObject(
@@ -54,7 +54,7 @@ class ClusterStatuses(Enum):
     )
     CLUSTER_FAILED = StatusObject(
         status="blocked",
-        message="Cluster failure - majority of cluster members lost.",
+        message="Cluster failure - majority of cluster members lost",
         running="async",
         action="rebuild-cluster",
     )
@@ -104,13 +104,13 @@ class TLSStatuses(Enum):
     TLS_CLIENT_CA_ROTATING = StatusObject(status="maintenance", message="Rotating client CA...")
     TLS_CLIENT_CERTS_EXPIRING = StatusObject(
         status="maintenance",
-        message="TLS client certificates expiring soon. Please ensure new certificates are provided.",
-        short_message="TLS client certificates expiring soon.",
+        message="TLS client certificates expiring soon. Please ensure new certificates are provided",
+        short_message="TLS client certificates expiring soon",
     )
     TLS_PEER_CERTS_EXPIRING = StatusObject(
         status="maintenance",
-        message="TLS peer certificates expiring soon. Please ensure new certificates are provided.",
-        short_message="TLS peer certificates expiring soon.",
+        message="TLS peer certificates expiring soon. Please ensure new certificates are provided",
+        short_message="TLS peer certificates expiring soon",
     )
 
 
@@ -122,7 +122,7 @@ class ExternalClientsStatuses(Enum):
         message="Client relation: The certificate provided is a CA certificate. Please provide an end-entity certificate",
     )
     EC_MISSING_CREDENTIALS = StatusObject(
-        status="blocked", message="Client relation: Missing certificate or prefix."
+        status="blocked", message="Client relation: Missing certificate or prefix"
     )
     EC_USERNAME_EXISTS = StatusObject(
         status="blocked",
