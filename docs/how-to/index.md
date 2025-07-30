@@ -11,5 +11,6 @@ Enable monitoring <enable-monitoring>
 Integrate with an application <client-relations>
 TLS encryption <tls/index>
 Back up and restore <backup-and-restore/index>
+Tuning in Production <tuning>
 Disaster recovery <disaster-recovery>
 ```
