@@ -375,7 +375,8 @@ class EtcdEvents(Object):
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
         if (
-            self.charm.state.cluster.is_restore_in_progress
+            not self.charm.state.cluster.cluster_state
+            or self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
             return
