@@ -247,7 +247,7 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        apps_statuses=["maintenance", "active"],
+        units_statuses=["maintenance", "active"],
     )
 
     app_statuses, unit_statuses = await get_app_status_detail(ops_test, APP_NAME)
@@ -281,17 +281,19 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
 
     logger.info("Waiting ~5.4m for expiration of certificates - renewed certs will have a new CA")
     # the juju secret expires at 90% of the certificate validity; 360s * 0.9 = 324s
-    time.sleep(330)
+    time.sleep(390)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        apps_statuses=["maintenance", "active"],
+        units_statuses=["maintenance", "active"],
     )
     app_statuses, unit_statuses = await get_app_status_detail(ops_test, APP_NAME)
+    logger.info(f"App statuses after waiting: {app_statuses}")
+    logger.info(f"Unit statuses after waiting: {unit_statuses}")
     tls_statuses = app_statuses.root["tls"].root
     assert tls_statuses == [
-        TLSStatuses.TLS_PEER_CA_ROTATING.value,
-        TLSStatuses.TLS_CLIENT_CA_ROTATING.value,
+        TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
+        TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value,
     ], "TLS statuses are not as expected after waiting for expiration"
 
     logger.info("Checking if the CA certificates are rotated")

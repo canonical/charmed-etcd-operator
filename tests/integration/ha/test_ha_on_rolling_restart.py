@@ -9,6 +9,7 @@ from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION, TuningOptions
+from statuses import ConfigStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -137,7 +138,7 @@ async def test_invalid_tuning_config_options(ops_test: OpsTest) -> None:
         ops_test,
         apps=[app_name],
         apps_full_statuses={
-            APP_NAME: {"blocked": [Status.TUNING_CONFIG_INVALID.value.status.message]},
+            APP_NAME: {"blocked": [ConfigStatuses.TUNING_CONFIG_INVALID.value.message]},
         },
         wait_for_exact_units=NUM_UNITS,
     )
