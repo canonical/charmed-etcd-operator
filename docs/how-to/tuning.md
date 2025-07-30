@@ -101,4 +101,4 @@ those.
 
 If it is required to include the unit number of each unit, this can be done by using the `{unit}` placeholder. For example,
 a configuration of `certificate-extra-sans="etcd{unit}.my-external-domain.com"` would result in `etcd0.my-external-domain.com`
-as an addition SAN in the TLS certificates for unit `charmed-etcd/0`.
+as an additional SAN in the TLS certificates for unit `charmed-etcd/0`.
