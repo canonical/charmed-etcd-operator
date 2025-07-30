@@ -81,4 +81,24 @@ to decide the correct adjustments to the parameters for your specific requiremen
 
 ## Certificate SANs configuration
 
-...
+In X.509 TLS certificates, a `Subject Alternative Name` (SAN) allows a certificate subject to be associated with the 
+service name and domain name components of a DNS Record. If charmed etcd is deployed in an environment where the DNS 
+resolution on the client side does not correspond to the DNS resolution on the server side, it might be required to add 
+custom SANs to the TLS certificates used for client- and/or peer-communication.
+
+See more about TLS in charmed etcd: [TLS encryption](tls/index.md)
+
+To add different IP addresses or hostnames to the SANs of charmed etcd's TLS certificates, configure the `certificate-extra-sans`
+option. It is possible to add a comma-separated list of multiple values, as long as each of them is a valid IP address 
+or hostname:
+
+```text
+juju config charmed-etcd certificate-extra-sans="10.241.9.34, etcd-production-cluster.mycompany.com"
+```
+
+If the configured sans are valid and not yet included in charmed etcd's certificates, it will automatically refresh
+those.
+
+If it is required to include the unit number of each unit, this can be done by using the `{unit}` placeholder. For example,
+a configuration of `certificate-extra-sans="etcd{unit}.my-external-domain.com"` would result in `etcd0.my-external-domain.com`
+as an addition SAN in the TLS certificates for unit `charmed-etcd/0`.
