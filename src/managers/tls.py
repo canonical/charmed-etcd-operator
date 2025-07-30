@@ -365,11 +365,11 @@ class TLSManager(ManagerStatusProtocol):
         if self.state.unit_server.tls_client_ca_rotation_state != TLSCARotationState.NO_ROTATION:
             status_list.append(TLSStatuses.TLS_CLIENT_CA_ROTATING.value)
 
-        if self.state.unit_server.tls_client_certs_expiring:
-            status_list.append(TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value)
-
         if self.state.unit_server.tls_peer_certs_expiring:
             status_list.append(TLSStatuses.TLS_PEER_CERTS_EXPIRING.value)
+
+        if self.state.unit_server.tls_client_certs_expiring:
+            status_list.append(TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value)
 
         if (
             (peer_private_key_id := self.state.config.get(TLS_PEER_PRIVATE_KEY_CONFIG))
