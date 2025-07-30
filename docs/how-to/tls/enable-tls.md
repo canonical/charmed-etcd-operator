@@ -155,9 +155,9 @@ You can use the `etcdctl` command to connect to the server using the `https` end
 Let's grab the client certificate and key from one of the units and provide them to the server via `etcdctl`:
 ```{terminal}
 :scroll:
-:input: juju ssh charmed-etcd/0 "cat /var/snap/charmed-etcd/common/tls/client.key" > ./client.key
+:input: juju ssh charmed-etcd/0 "cat /var/snap/charmed-etcd/current/tls/client.key" > ./client.key
 
-:input: juju ssh charmed-etcd/0 "cat /var/snap/charmed-etcd/common/tls/client.pem" > ./client.pem
+:input: juju ssh charmed-etcd/0 "cat /var/snap/charmed-etcd/current/tls/client.pem" > ./client.pem
 
 :input: etcdctl member list --endpoints https://10.73.32.122:2379 -w table --cacert ca.crt --cert ./client.pem --key ./client.key
 
