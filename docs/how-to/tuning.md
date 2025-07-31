@@ -99,6 +99,10 @@ juju config charmed-etcd certificate-extra-sans="10.241.9.34, etcd-production-cl
 If the configured sans are valid and not yet included in charmed etcd's certificates, it will automatically refresh
 those.
 
+```{caution}
+Wildcards (`*`) are not allowed as part of the `certificate-extra-sans` configuration.
+```
+
 If it is required to include the unit number of each unit, this can be done by using the `{unit}` placeholder. For example,
 a configuration of `certificate-extra-sans="etcd{unit}.my-external-domain.com"` would result in `etcd0.my-external-domain.com`
 as an additional SAN in the TLS certificates for unit `charmed-etcd/0`.
