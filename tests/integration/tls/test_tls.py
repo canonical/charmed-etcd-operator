@@ -10,7 +10,7 @@ from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
-from statuses import TLSStatuses
+from statuses import CharmStatuses, TLSStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -542,13 +542,8 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
         ops_test,
         apps=[APP_NAME, TLS_NAME],
         units_full_statuses={
-            APP_NAME: {
-                "units": {
-                    "maintenance": [TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value.message],
-                    "active": [],
-                }
-            },
-            TLS_NAME: {"units": {"active": []}},
+            APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
+            TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
         },
     )
 

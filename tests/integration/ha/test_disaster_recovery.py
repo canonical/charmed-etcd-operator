@@ -136,7 +136,7 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
         await wait_until(
             ops_test,
             apps=[APP_NAME],
-            apps_full_statuses={
+            units_full_statuses={
                 APP_NAME: [ClusterStatuses.CLUSTER_FAILED.value],
             },
             wait_for_exact_units=2,
