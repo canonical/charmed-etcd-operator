@@ -63,10 +63,12 @@ class ExternalClientsEvents(Object):
         if not event.mtls_cert or not event.prefix:
             logger.error("CA chain, keys prefix, or common name not provided")
             return
+
         if self.charm.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
             logger.error("TLS is not enabled")
             event.defer()
             return
+
         if self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS:
             logger.error("TLS is not ready")
             event.defer()
@@ -77,6 +79,12 @@ class ExternalClientsEvents(Object):
             != TLSCARotationState.NO_ROTATION
         ):
             logger.debug("CA rotation is in progress")
+            event.defer()
+            return
+
+        if not self.charm.state.cluster.auth_enabled:
+            logger.error("Cluster authentication is not enabled")
+            self.charm.set_status(Status.CLUSTER_NOT_INITIALIZED)
             event.defer()
             return
 
