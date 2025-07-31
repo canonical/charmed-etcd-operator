@@ -17,7 +17,7 @@ from common.certificates import is_leaf_certificate_valid
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import CLIENT_PORT, SUBSTRATES, TLSCARotationState, TLSState
-from statuses import CharmStatuses, ExternalClientsStatuses, TLSStatuses
+from statuses import CharmStatuses, ClusterStatuses, ExternalClientsStatuses, TLSStatuses
 
 logger = logging.getLogger(__name__)
 
@@ -175,5 +175,8 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 != TLSCARotationState.NO_ROTATION
             ):
                 status_list.append(TLSStatuses.TLS_CLIENT_CA_ROTATING.value)
+
+            if not self.state.cluster.auth_enabled:
+                status_list.append(ClusterStatuses.CLUSTER_NOT_INITIALIZED.value)
 
         return status_list or [CharmStatuses.ACTIVE_IDLE.value]

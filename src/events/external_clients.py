@@ -84,7 +84,6 @@ class ExternalClientsEvents(Object):
 
         if not self.charm.state.cluster.auth_enabled:
             logger.error("Cluster authentication is not enabled")
-            self.charm.set_status(Status.CLUSTER_NOT_INITIALIZED)
             event.defer()
             return
 
