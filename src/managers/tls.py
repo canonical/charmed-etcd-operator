@@ -5,7 +5,6 @@
 """Manager for handling TLS related events."""
 
 import logging
-import socket
 from ipaddress import ip_address
 from pathlib import Path
 from typing import Dict, Iterable
@@ -310,14 +309,10 @@ class TLSManager:
             extra_sans = [san.strip() for san in extra_sans_config.split(",")]
             sans_ip = {san for san in extra_sans if self._is_ip_address(san)}
 
-        if private_ip := self.workload.get_private_ip():
-            sans_ip.add(private_ip)
-        else:
-            logger.warning("No private IP found using unit-get. Using socket instead.")
-            sans_ip.add(socket.gethostbyname(socket.gethostname()))
+        sans_ip.add(self.workload.get_private_ip())
 
         if tls_type == TLSType.PEER:
-            logger.debug(f"Using private IP {private_ip} for peer SANs IP.")
+            logger.debug("Using private IP for peer SANs IP.")
             return frozenset(sans_ip)
 
         # For client TLS, we use both private and public IPs if available
