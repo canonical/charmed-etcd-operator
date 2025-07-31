@@ -349,7 +349,7 @@ def test_update_status():
         ),
     ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
-        assert status_is(state_out, TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value)
+        assert status_is(state_out, TLSStatuses.TLS_PEER_CERTS_EXPIRING.value)
         assert (
             state_out.get_relation(1).local_unit_data.get("tls_client_certificates_expiring")
             == "True"
