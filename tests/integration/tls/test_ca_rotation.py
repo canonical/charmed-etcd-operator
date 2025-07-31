@@ -10,7 +10,7 @@ from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
-from statuses import TLSStatuses
+from statuses import CharmStatuses, TLSStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -247,15 +247,15 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        units_statuses=["maintenance", "active"],
+        apps_full_statuses={
+            APP_NAME: [
+                TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
+            ],
+            TLS_NAME: [
+                CharmStatuses.ACTIVE_IDLE.value,
+            ],
+        },
     )
-
-    app_statuses, unit_statuses = await get_app_status_detail(ops_test, APP_NAME)
-    tls_statuses = app_statuses.root["tls"].root
-    assert tls_statuses == [
-        TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
-        TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value,
-    ], "TLS statuses are not as expected"
 
     logger.info("Getting the current CA certificates")
     leader_unit = await get_juju_leader_unit_name(ops_test, APP_NAME)
@@ -281,20 +281,19 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
 
     logger.info("Waiting ~5.4m for expiration of certificates - renewed certs will have a new CA")
     # the juju secret expires at 90% of the certificate validity; 360s * 0.9 = 324s
-    time.sleep(390)
+    time.sleep(330)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        units_statuses=["maintenance", "active"],
+        apps_full_statuses={
+            APP_NAME: [
+                TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
+            ],
+            TLS_NAME: [
+                CharmStatuses.ACTIVE_IDLE.value,
+            ],
+        },
     )
-    app_statuses, unit_statuses = await get_app_status_detail(ops_test, APP_NAME)
-    logger.info(f"App statuses after waiting: {app_statuses}")
-    logger.info(f"Unit statuses after waiting: {unit_statuses}")
-    tls_statuses = app_statuses.root["tls"].root
-    assert tls_statuses == [
-        TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
-        TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value,
-    ], "TLS statuses are not as expected after waiting for expiration"
 
     logger.info("Checking if the CA certificates are rotated")
     new_peer_ca = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER, is_ca=True)
