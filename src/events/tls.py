@@ -333,9 +333,9 @@ class TLSEvents(Object):
         if self.charm.tls_manager.extra_sans_config_is_valid():
             if (
                 self.charm.state.unit_server.tls_client_state == TLSState.TLS
-                and self.charm.tls_manager.certificate_sans_updated(TLSType.CLIENT)
+                and self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT)
                 or self.charm.state.unit_server.tls_peer_state == TLSState.TLS
-                and self.charm.tls_manager.certificate_sans_updated(TLSType.PEER)
+                and self.charm.tls_manager.certificate_sans_require_update(TLSType.PEER)
             ):
                 logger.debug("Config change for certificate-extra-sans, refresh TLS certificates")
                 self.refresh_tls_certificates_event.emit()

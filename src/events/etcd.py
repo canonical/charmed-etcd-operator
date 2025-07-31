@@ -412,6 +412,9 @@ class EtcdEvents(Object):
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
+        if not self.charm.unit.is_leader():
+            return
+
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
@@ -420,9 +423,6 @@ class EtcdEvents(Object):
                 "Cannot update credentials while a restore or cluster-rebuild operation is in progress."
             )
             event.defer()
-            return
-
-        if not self.charm.unit.is_leader():
             return
 
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):

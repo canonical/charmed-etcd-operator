@@ -388,7 +388,7 @@ class TLSManager:
 
         return {"sans_ip": sans_ip, "sans_dns": sans_dns}
 
-    def certificate_sans_updated(self, tls_type: TLSType) -> bool:
+    def certificate_sans_require_update(self, tls_type: TLSType) -> bool:
         """Check current certificate sans and determine if certificate requires update.
 
         Returns:
