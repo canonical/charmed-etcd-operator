@@ -5,7 +5,6 @@
 """Manager for handling TLS related events."""
 
 import logging
-import re
 import socket
 from ipaddress import ip_address
 from pathlib import Path
@@ -15,6 +14,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
     ProviderCertificate,
 )
+from validators import ValidationError, hostname
 
 from common.certificates import is_leaf_certificate_valid, leaf_certificate
 from core.cluster import ClusterState
@@ -275,6 +275,28 @@ class TLSManager:
 
         return status_list
 
+    def _is_ip_address(self, input_value: str) -> bool:
+        """Validate a given str and return True if it is an IP address, False if not."""
+        try:
+            ip_address(input_value)
+            return True
+        except ValueError:
+            return False
+
+    def _is_hostname(self, input_value: str) -> bool:
+        """Validate a given str and return True if it is a hostname, False if not."""
+        try:
+            # Hostname string may only be hyphens and alpha-numerals.
+            return hostname(
+                input_value,
+                skip_ipv4_addr=True,
+                skip_ipv6_addr=True,
+                may_have_port=False,
+                maybe_simple=True,
+            )
+        except ValidationError:
+            return False
+
     def build_sans_ip(self, tls_type: TLSType) -> frozenset[str]:
         """Build the SANs IP for the TLS certificate.
 
@@ -286,7 +308,7 @@ class TLSManager:
             extra_sans_config := self.state.config.get("certificate-extra-sans")
         ):
             extra_sans = [san.strip() for san in extra_sans_config.split(",")]
-            sans_ip = {san for san in extra_sans if len(san.split(".")) == 4}
+            sans_ip = {san for san in extra_sans if self._is_ip_address(san)}
 
         if private_ip := self.workload.get_private_ip():
             sans_ip.add(private_ip)
@@ -319,7 +341,7 @@ class TLSManager:
             sans_dns = {
                 san.replace("{unit}", str(self.state.unit_server.unit_id))
                 for san in extra_sans
-                if len(san.split(".")) != 4
+                if not self._is_ip_address(san)
             }
 
         sans_dns.add(self.state.unit_server.unit_name)
@@ -336,20 +358,14 @@ class TLSManager:
             return True
 
         extra_sans = [san.strip() for san in extra_sans_config.split(",")]
-        allowed = re.compile(r"(?!-)[A-Z0-9-{}]{1,63}(?<!-)$", re.IGNORECASE)
 
         for san in extra_sans:
-            # validation for ip addresses
-            if len(san.split(".")) == 4:
-                try:
-                    ip_address(san)
-                except ValueError:
-                    logger.error(f"certificate-extra-sans configuration is invalid for ip {san}")
+            if not self._is_ip_address(san):
+                if not self._is_hostname(
+                    san.replace("{unit}", str(self.state.unit_server.unit_id))
+                ):
+                    logger.error(f"certificate-extra-sans configuration is invalid for {san}")
                     return False
-            # validation for dns names
-            elif not all(allowed.match(x) for x in san.split(".")):
-                logger.error(f"certificate-extra-sans configuration is invalid for dns {san}")
-                return False
 
         return True
 
