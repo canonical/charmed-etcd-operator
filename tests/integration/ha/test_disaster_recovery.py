@@ -33,7 +33,7 @@ NUM_UNITS = 5
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm."""
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS - 1)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
