@@ -282,16 +282,10 @@ def _is_every_condition_on_units_met(
                 return False
         else:
             unit_statuses = units_full_statuses.get(app, [])
+            unit_message = unit.workload_status.message or ""
             if not unit_statuses:
-                return (
-                    unit.workload_status.message is not None and unit.workload_status.message != ""
-                )
-            if unit.workload_status.message is None:
-                return unit_statuses is None
-            return any(
-                _does_message_match(unit.workload_status.message, status)
-                for status in unit_statuses
-            )
+                return unit_message != ""
+            return any(_does_message_match(unit_message, status) for status in unit_statuses)
 
         if unit.agent_status.since + timedelta(seconds=idle_period) > datetime.now():
             return False
