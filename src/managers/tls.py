@@ -405,8 +405,10 @@ class TLSManager(ManagerStatusProtocol):
             set[str]: The client CAs.
         """
         cas: set[str] = set()
-        if self.state.unit_server.tls_client_state == TLSState.TLS:
+        try:
             cas.add(self.state.tls_client_certificate.ca.raw)
+        except IndexError:
+            logger.warning("No client CA found in the TLS client certificate.")
 
         # managed users cas
         for relation in self.state.etcd_provides.relations:
