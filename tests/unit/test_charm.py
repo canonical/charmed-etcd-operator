@@ -718,7 +718,15 @@ def test_secret_changed():
     secret_value = "123"
     secret_content = {secret_key: secret_value}
     secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
-    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://:2380",
+        },
+    )
     status_peer_relation = testing.PeerRelation(
         id=2,
         endpoint=STATUS_PEERS_RELATION,
@@ -741,10 +749,7 @@ def test_secret_changed():
     with patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="failed")):
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
 
-        assert status_is(
-            state_out,
-            ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
-        )
+        assert status_is(state_out, ClusterStatuses.PASSWORD_UPDATE_FAILED.value, is_app=True)
 
     # no update should happen if the user-name is invalid, charm status has to be blocked
     secret_key = "invalid-user-name"
@@ -762,6 +767,7 @@ def test_secret_changed():
         assert status_is(
             state_out,
             ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+            is_app=True,
         )
 
 
