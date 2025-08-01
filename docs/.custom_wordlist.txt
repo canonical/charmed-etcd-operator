@@ -21,6 +21,7 @@ gyre
 hostname
 hostnames
 https
+Integrations
 Intersphinx
 IPv
 lang
