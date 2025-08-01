@@ -5,7 +5,7 @@ This guide outlines the steps required to migrate an existing etcd to charmed et
 ## Prerequisites
 
 - a Juju VM controller with a model
-- TLS Provider deployed to that model, in our case we use `self-signed-certificates` (see: [](tls/enable-tls.md))
+- TLS Provider deployed to that model, in our case we use `self-signed-certificates` (see [](tls/enable-tls.md))
 - Object Storage Provider deployed to that model, in our case we use `s3-integrator` (see [](backup-and-restore/configure-object-storage-provider.md))
 - your existing etcd cluster must be at least of version 3.0
 
@@ -45,8 +45,8 @@ Snapshot saved at etcd-backup.db
 
 ### Upload the backup to object storage
 
-For restoring backup files, charmed etcd supports S3-compatible or Azure object storage. In our example, we upload the
-backup file that we just created to a self-hosted MicroCeph (S3-compatible) by using the `S3cmd` tool.
+For restoring backup files, charmed etcd supports S3-compatible (for example AWS, GCS, MinIO or MicroCeph) or Azure 
+object storage. In our example, we upload the backup file that we just created to S3-storage by using the `S3cmd` tool.
 
 If not yet installed, execute the following command to install `S3cmd`:
 
@@ -373,7 +373,7 @@ the applications:
 juju integrate charmed-etcd <your-charm>
 ```
 
-The interface requires you to provide a key prefix (the key space in the etcd database you will need access to) and a 
+The interface requires you to provide a key prefix (the key space in the etcd database you request access to) and a 
 client certificate (for mTLS authentication). Please refer to [charm-relation-interfaces/etcd_client](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/etcd_client/v0)
 for detailed information.
 

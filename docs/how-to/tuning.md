@@ -82,7 +82,7 @@ to decide the correct adjustments to the parameters for your specific requiremen
 ## Certificate SANs configuration
 
 In X.509 TLS certificates, a `Subject Alternative Name` (SAN) allows a certificate subject to be associated with the 
-service name and domain name components of a DNS Record. If charmed etcd is deployed in an environment where the DNS 
+service name and domain name components of a DNS record. If charmed etcd is deployed in an environment where the DNS 
 resolution on the client side does not correspond to the DNS resolution on the server side, it might be required to add 
 custom SANs to the TLS certificates used for client- and/or peer-communication.
 
