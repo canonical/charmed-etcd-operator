@@ -177,9 +177,8 @@ def test_start():
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run"),
     ):
-        with raises(testing.errors.UncaughtCharmError) as e:
-            ctx.run(ctx.on.start(), state_in)
-        assert isinstance(e.value.__cause__, EtcdServiceError)
+        state_out = ctx.run(ctx.on.start(), state_in)
+        assert status_is(state_out, EtcdServiceStatuses.SERVICE_NOT_RUNNING.value)
 
     # non leader waiting promoted
     relation = testing.PeerRelation(
