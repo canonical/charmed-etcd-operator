@@ -380,17 +380,8 @@ class TLSEvents(Object):
         logger.debug("Updating TLS private key.")
 
         if self.read_and_validate_private_key(private_key_id) is None:
-            self.charm.state.statuses.add(
-                TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
-                scope="unit",
-                component=self.charm.cluster_manager.name,
-            )
+            logger.error("Invalid private key provided, cannot update TLS certificates.")
             return
-        self.charm.state.statuses.delete(
-            TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
-            scope="unit",
-            component=self.charm.cluster_manager.name,
-        )
 
         self.refresh_tls_certificates_event.emit()
 
