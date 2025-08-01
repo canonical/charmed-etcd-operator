@@ -157,7 +157,7 @@ s3-integrator:s3-integrator-peers  s3-integrator:s3-integrator-peers  s3-integra
 
 ### Integrate with TLS provider
 
-Because charmed etcd relies on mTLS for client authentication and authorization, it is mandatory to set up client TLS in 
+Because charmed etcd relies on mTLS for client authentication and authorisation, it is mandatory to set up client TLS in 
 charmed etcd. To do so, integrate with the deployed TLS provider over the `tls-certificates` interface. In our case, 
 this is with the `self-signed-certificates` operator.
 
