@@ -14,6 +14,6 @@ The following guides contain technical specifications, release notes, and other 
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:glob:
 
 Versions <versions>
+```
