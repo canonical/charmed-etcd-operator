@@ -358,6 +358,11 @@ class EtcdEvents(Object):
                 component=self.charm.cluster_manager.name,
             )
             return
+        self.charm.state.statuses.delete(
+            CharmStatuses.NO_PEER_RELATION.value,
+            scope="unit",
+            component=self.charm.cluster_manager.name,
+        )
 
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
