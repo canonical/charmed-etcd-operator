@@ -141,11 +141,7 @@ async def test_restore_verification_failed(ops_test: OpsTest):
         ops_test,
         apps=[APP_NAME],
         units_full_statuses={
-            APP_NAME: {
-                "units": {
-                    "blocked": [BackupStatuses.RESTORE_VERIFICATION_FAILED.value.message],
-                }
-            },
+            APP_NAME: [BackupStatuses.RESTORE_VERIFICATION_FAILED.value],
         },
     )
 
