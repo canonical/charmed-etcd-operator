@@ -148,6 +148,10 @@ class Status(Enum):
         ),
         "ERROR",
     )
+    SANS_CONFIG_INVALID = StatusLevel(
+        BlockedStatus("Invalid value set for the config options 'certificate-extra-sans'"),
+        "ERROR",
+    )
     SERVICE_INSTALLING = StatusLevel(MaintenanceStatus("Installing etcd..."), "DEBUG")
     SERVICE_STARTING = StatusLevel(MaintenanceStatus("Waiting for etcd to start..."), "DEBUG")
     SERVICE_NOT_INSTALLED = StatusLevel(BlockedStatus("unable to install etcd snap"), "ERROR")

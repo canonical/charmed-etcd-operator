@@ -85,7 +85,7 @@ class EtcdServer(RelationState):
 
     @property
     def unit_name(self) -> str:
-        """The id of the unit from the unit name."""
+        """The unit's name."""
         return self.unit.name
 
     @property

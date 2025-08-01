@@ -22,11 +22,12 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
-from ops import testing
+from ops import ActiveStatus, BlockedStatus, testing
 from scenario import Secret
 
 from charm import EtcdOperatorCharm
 from core.models import Member
+from events.tls import RefreshTLSCertificatesEvent
 from literals import (
     CLIENT_TLS_RELATION_NAME,
     PEER_RELATION,
@@ -805,6 +806,7 @@ def test_set_tls_private_key():
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("common.client.EtcdClient.broadcast_peer_url"),
         patch("workload.EtcdWorkload.write_file"),
@@ -973,6 +975,7 @@ def test_set_tls_private_key():
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         # Configure client private key
         state_in = testing.State(
@@ -1058,6 +1061,7 @@ def test_set_tls_private_key():
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
         ) as cleanup,
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
     ):
         # Configure peer private key configured
         ctx.run(ctx.on.config_changed(), state_in)
@@ -1473,3 +1477,176 @@ def test_ca_client_rotation(certificate_available_context):
                 == TLSCARotationState.NO_ROTATION.value
             )
             event.defer.assert_not_called()
+
+
+def test_set_extra_sans_config_option():
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+        },
+        local_unit_data={
+            "private_ip": "my_ip",
+            "tls_peer_state": TLSState.TLS.value,
+            "tls_client_state": TLSState.TLS.value,
+        },
+    )
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
+    # happy path
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, myhostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
+        assert state_out.unit_status == ActiveStatus()
+
+    # allow {unit} placeholder
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, etcd-{unit}.hostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
+        assert state_out.unit_status == ActiveStatus()
+
+    # invalid ip address
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.257.100, myhostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
+
+    # invalid dns name
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "-myhostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
+
+    # another invalid dns name
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "myhostname-",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
+
+    # first ip address valid, second one invalid
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, myhostname, 999.1.2.3",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
+
+    # special characters in dns name
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, my$*hostname",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert state_out.unit_status == BlockedStatus(
+            "Invalid value set for the config options 'certificate-extra-sans'"
+        )
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
+
+    # no update -> no certificate refresh
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "certificate-extra-sans": "192.168.1.100, myhostname",
+        },
+        relations={relation},
+    )
+
+    current_sans_value = "X509v3 Subject Alternative Name: \n    DNS:myhostname, DNS:charmed-etcd/0, IP Address:127.0.1.1, IP Address:192.168.1.100"
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("workload.EtcdWorkload.exec", return_value=current_sans_value),
+        patch("workload.EtcdWorkload.get_host_mapping", return_value={"hostname": "myhostname"}),
+        patch("workload.EtcdWorkload.get_private_ip", return_value="127.0.1.1"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
+        assert state_out.unit_status == ActiveStatus()
