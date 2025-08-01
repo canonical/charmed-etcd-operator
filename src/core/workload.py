@@ -164,7 +164,7 @@ class WorkloadBase(ABC):
         pass
 
     @abstractmethod
-    def exec(self, command: List[str]) -> None:
+    def exec(self, command: List[str]) -> str:
         """Run a command on the workload substrate."""
         pass
 
@@ -209,7 +209,7 @@ class WorkloadBase(ABC):
 
         return output.stdout.strip()
 
-    def get_private_ip(self) -> str | None:
+    def get_private_ip(self) -> str:
         """Get the Private IP address of the current unit."""
         cmd = "unit-get private-address"
         try:
@@ -221,14 +221,12 @@ class WorkloadBase(ABC):
                 capture_output=True,
                 timeout=10,
             )
+            if output.returncode == 0:
+                return output.stdout.strip()
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             logger.error(f"Error executing command '{cmd}': {e}")
-            return None
 
-        if output.returncode != 0:
-            return None
-
-        return output.stdout.strip()
+        return socket.gethostbyname(socket.gethostname())
 
     def get_host_mapping(self) -> dict[str, str]:
         """Collect hostname mapping for current unit.

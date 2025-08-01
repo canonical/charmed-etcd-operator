@@ -677,14 +677,14 @@ test-randomorder = ["pytest-randomly"]
 
 [[package]]
 name = "data-platform-helpers"
-version = "0.1.6"
+version = "0.1.7"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main", "integration"]
 files = [
-    {file = "data_platform_helpers-0.1.6-py3-none-any.whl", hash = "sha256:5ba9ee88dbfcefcae5d94defcfbdc8c4e37a70f3cdc78534aa928d8bf3f50a3e"},
-    {file = "data_platform_helpers-0.1.6.tar.gz", hash = "sha256:086650821a1bc52b36e628b629b8665b6352da2c0a38ea591f430194b2b3cec2"},
+    {file = "data_platform_helpers-0.1.7-py3-none-any.whl", hash = "sha256:cf01caef414a4c07911ecf2c009c19b8f69cae154b540dd578ddbe2af8fd3b98"},
+    {file = "data_platform_helpers-0.1.7.tar.gz", hash = "sha256:04445f3f4309730bb1c569a04464caeb27390b0d6e07829d09dacd8882fcfcd1"},
 ]
 
 [package.dependencies]
@@ -2161,6 +2161,21 @@ socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
+name = "validators"
+version = "0.35.0"
+description = "Python Data Validation for Humans™"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "validators-0.35.0-py3-none-any.whl", hash = "sha256:e8c947097eae7892cb3d26868d637f79f47b4a0554bc6b80065dfe5aac3705dd"},
+    {file = "validators-0.35.0.tar.gz", hash = "sha256:992d6c48a4e77c81f1b4daba10d16c3a9bb0dbb79b3a19ea847ff0928e70497a"},
+]
+
+[package.extras]
+crypto-eth-addresses = ["eth-hash[pycryptodome] (>=0.7.0)"]
+
+[[package]]
 name = "wcwidth"
 version = "0.2.13"
 description = "Measures the displayed width of unicode strings in a terminal"
@@ -2291,4 +2306,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "add064a0980430d0431ea8e002559336139bb4209dcc0c52e471e39f1e186a40"
+content-hash = "d39efd409c37d6fd028a7be182fe0a64d1bcde56073a00f0667fb1d5ad786555"

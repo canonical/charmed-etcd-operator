@@ -4,19 +4,26 @@
 
 """TLS related event handlers."""
 
+import base64
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
     CertificateRequestAttributes,
+    PrivateKey,
     TLSCertificatesRequiresV4,
 )
 from ops import (
+    ConfigChangedEvent,
     EventSource,
     Handle,
+    ModelError,
     RelationBrokenEvent,
     RelationCreatedEvent,
+    SecretChangedEvent,
+    SecretNotFoundError,
 )
 from ops.framework import EventBase, Object
 
@@ -70,7 +77,6 @@ class TLSEvents(Object):
     def __init__(self, charm: "EtcdOperatorCharm"):
         super().__init__(charm, "tls")
         self.charm: "EtcdOperatorCharm" = charm
-        host_mapping = self.charm.workload.get_host_mapping()
         common_name = f"{self.charm.unit.name}-{self.charm.model.uuid}"
         peer_private_key = None
         client_private_key = None
@@ -117,8 +123,8 @@ class TLSEvents(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=self.charm.tls_manager.get_sans_ip(TLSType.PEER),
-                    sans_dns=frozenset({self.charm.unit.name, host_mapping["hostname"]}),
+                    sans_ip=self.charm.tls_manager.build_sans_ip(TLSType.PEER),
+                    sans_dns=self.charm.tls_manager.build_sans_dns(),
                 ),
             ],
             private_key=peer_private_key,
@@ -130,8 +136,8 @@ class TLSEvents(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=self.charm.tls_manager.get_sans_ip(TLSType.CLIENT),
-                    sans_dns=frozenset({self.charm.unit.name, host_mapping["hostname"]}),
+                    sans_ip=self.charm.tls_manager.build_sans_ip(TLSType.CLIENT),
+                    sans_dns=self.charm.tls_manager.build_sans_dns(),
                 ),
             ],
             private_key=client_private_key,
@@ -152,6 +158,8 @@ class TLSEvents(Object):
             self.framework.observe(
                 self.charm.on[relation].relation_broken, self._on_certificates_broken
             )
+        self.framework.observe(self.charm.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.charm.on.secret_changed, self._on_secret_changed)
 
     def _on_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle the `relation-created` event.
@@ -338,3 +346,85 @@ class TLSEvents(Object):
                 "Waiting for all servers to update certificates before cleaning up old CAs"
             )
             event.defer()
+
+    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
+        """Handle TLS related config changes."""
+        if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
+            self.update_private_key(tls_peer_private_key_id)
+
+        if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
+            self.update_private_key(tls_client_private_key_id)
+
+        if self.charm.tls_manager.extra_sans_config_is_valid():
+            if (
+                self.charm.state.unit_server.tls_client_state == TLSState.TLS
+                and self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT)
+                or self.charm.state.unit_server.tls_peer_state == TLSState.TLS
+                and self.charm.tls_manager.certificate_sans_require_update(TLSType.PEER)
+            ):
+                logger.debug("Config change for certificate-extra-sans, refresh TLS certificates")
+                self.refresh_tls_certificates_event.emit()
+
+    def _on_secret_changed(self, event: SecretChangedEvent) -> None:
+        """Handle TLS related secret changes."""
+        if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
+            if tls_peer_private_key_id == event.secret.id:
+                self.update_private_key(tls_peer_private_key_id)
+
+        if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
+            if tls_client_private_key_id == event.secret.id:
+                self.update_private_key(tls_client_private_key_id)
+
+    def update_private_key(self, private_key_id: str) -> None:
+        """Update the private key in etcd."""
+        logger.debug("Updating TLS private key.")
+
+        if self.read_and_validate_private_key(private_key_id) is None:
+            self.charm.state.statuses.add(
+                TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
+                scope="unit",
+                component=self.charm.cluster_manager.name,
+            )
+            return
+        self.charm.state.statuses.delete(
+            TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
+            scope="unit",
+            component=self.charm.cluster_manager.name,
+        )
+
+        self.refresh_tls_certificates_event.emit()
+
+    def read_and_validate_private_key(
+        self, private_key_secret_id: str | None
+    ) -> PrivateKey | None:
+        """Read and validate the private key.
+
+        Args:
+            private_key_secret_id (str): The private key secret ID.
+
+        Returns:
+            PrivateKey: The private key.
+        """
+        try:
+            secret_content = self.charm.state.get_secret_from_id(private_key_secret_id).get(
+                "private-key"
+            )
+        except (ModelError, SecretNotFoundError) as e:
+            logger.error(e)
+            return None
+
+        if secret_content is None:
+            logger.error(f"Secret {private_key_secret_id} does not contain a private key.")
+            return None
+
+        private_key = (
+            secret_content
+            if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
+            else base64.b64decode(secret_content).decode("utf-8").strip()
+        )
+        private_key = PrivateKey(raw=private_key)
+        if not private_key.is_valid():
+            logger.error("Invalid private key format.")
+            return None
+
+        return private_key

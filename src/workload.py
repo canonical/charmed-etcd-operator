@@ -111,7 +111,7 @@ class EtcdWorkload(WorkloadBase):
         return False
 
     @override
-    def exec(self, command: List[str]) -> None:
+    def exec(self, command: List[str]) -> str:
         try:
             output = subprocess.run(
                 command,
@@ -121,6 +121,7 @@ class EtcdWorkload(WorkloadBase):
                 timeout=10,
             ).stdout.strip()
             logger.debug(output)
+            return output
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             logger.error(e)
             raise
