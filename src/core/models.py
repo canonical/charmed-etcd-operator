@@ -185,7 +185,7 @@ class EtcdServer(RelationState):
         return RestoreStep(self.relation_data.get("restore_step", ""))
 
     @property
-    def is_leader(self) -> bool:
+    def is_juju_leader(self) -> bool:
         """Check if the current unit is the leader of the cluster."""
         return self.unit.is_leader()
 

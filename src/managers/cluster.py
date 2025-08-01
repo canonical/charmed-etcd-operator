@@ -395,7 +395,7 @@ class ClusterManager(ManagerStatusProtocol):
             if self.state.cluster.rebuild_cluster_in_progress:
                 status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
 
-            if self.state.cluster.learning_member and self.state.unit_server.is_leader:
+            if self.state.cluster.learning_member and self.state.unit_server.is_juju_leader:
                 status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
