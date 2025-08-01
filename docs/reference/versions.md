@@ -42,4 +42,4 @@ Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.c
 
 ### Limitations
 
-We currently do not support upgrades without downtime. This is scheduled to be implemented until the `candidate` release.
+We currently do not support upgrades without downtime. This is scheduled to be implemented for the `candidate` release.
