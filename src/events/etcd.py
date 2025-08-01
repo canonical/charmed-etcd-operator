@@ -44,7 +44,7 @@ from literals import (
     TLSState,
     TLSType,
 )
-from statuses import CharmStatuses, ClusterStatuses, EtcdServiceStatuses
+from statuses import ClusterStatuses, EtcdServiceStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -99,10 +99,11 @@ class EtcdEvents(Object):
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
         if not self.charm.workload.install():
-            self.charm.state.statuses.add(
+            self.charm.status.set_running_status(
                 EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
                 scope="unit",
-                component=self.charm.cluster_manager.name,
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
             )
             raise EtcdServiceError(
                 "Failed to install the etcd snap. Check the logs for more details."
@@ -346,19 +347,6 @@ class EtcdEvents(Object):
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""
-        if not self.charm.state.peer_relation:
-            self.charm.state.statuses.add(
-                CharmStatuses.NO_PEER_RELATION.value,
-                scope="unit",
-                component=self.charm.cluster_manager.name,
-            )
-            return
-        self.charm.state.statuses.delete(
-            CharmStatuses.NO_PEER_RELATION.value,
-            scope="unit",
-            component=self.charm.cluster_manager.name,
-        )
-
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
                 try:
@@ -394,10 +382,11 @@ class EtcdEvents(Object):
 
         if not self.charm.workload.alive():
             if not self.charm.cluster_manager.restart_member():
-                self.charm.state.statuses.add(
+                self.charm.status.set_running_status(
                     EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
                     scope="unit",
-                    component=self.charm.cluster_manager.name,
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
                 )
                 return
 
@@ -425,10 +414,11 @@ class EtcdEvents(Object):
                 EtcdUserManagementError,
             ) as e:
                 logger.error(e)
-                self.charm.state.statuses.add(
+                self.charm.status.set_running_status(
                     ClusterStatuses.CLUSTER_MANAGEMENT_ERROR.value,
                     scope="unit",
-                    component=self.charm.cluster_manager.name,
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
                 )
 
         for tls_type in TLSType:
@@ -515,10 +505,11 @@ class EtcdEvents(Object):
 
         self.charm.workload.stop()
         self.charm.state.unit_server.update({"state": ""})
-        self.charm.state.statuses.add(
+        self.charm.status.set_running_status(
             ClusterStatuses.REMOVED.value,
             scope="unit",
-            component=self.charm.cluster_manager.name,
+            component_name=self.charm.cluster_manager.name,
+            statuses_state=self.charm.state.statuses,
         )
 
     def update_admin_password(self, admin_secret_id: str) -> None:
@@ -542,26 +533,29 @@ class EtcdEvents(Object):
                         )
                     except EtcdUserManagementError as e:
                         logger.error(e)
-                        self.charm.state.statuses.add(
+                        self.charm.status.set_running_status(
                             ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
                             scope="app",
-                            component=self.charm.cluster_manager.name,
+                            component_name=self.charm.cluster_manager.name,
+                            statuses_state=self.charm.state.statuses,
                         )
                         errored = True
             else:
                 logger.error(f"Invalid username in secret {admin_secret_id}.")
-                self.charm.state.statuses.add(
+                self.charm.status.set_running_status(
                     ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
                     scope="app",
-                    component=self.charm.cluster_manager.name,
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
                 )
                 errored = True
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
-            self.charm.state.statuses.add(
+            self.charm.status.set_running_status(
                 ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
                 scope="app",
-                component=self.charm.cluster_manager.name,
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
             )
             errored = True
 

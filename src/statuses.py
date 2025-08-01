@@ -55,10 +55,11 @@ class ClusterStatuses(Enum):
     CLUSTER_FAILED = StatusObject(
         status="blocked",
         message="Cluster failure - majority of cluster members lost",
-        running="async",
         action="Run action rebuild-cluster",
     )
-    CLUSTER_MANAGEMENT_ERROR = StatusObject(status="blocked", message="cluster management error")
+    CLUSTER_MANAGEMENT_ERROR = StatusObject(
+        status="blocked", message="cluster management error", running="async"
+    )
     CLUSTER_NOT_INITIALIZED = StatusObject(
         status="blocked", message="Waiting for cluster initialization"
     )
@@ -74,7 +75,9 @@ class ClusterStatuses(Enum):
     )
     HEALTH_CHECK_FAILED = StatusObject(status="maintenance", message="health check failed")
     REMOVED = StatusObject(status="blocked", message="unit removed from cluster", running="async")
-    PASSWORD_UPDATE_FAILED = StatusObject(status="blocked", message="failed to update password")
+    PASSWORD_UPDATE_FAILED = StatusObject(
+        status="blocked", message="failed to update password", running="async"
+    )
 
 
 class ConfigStatuses(Enum):
@@ -142,7 +145,8 @@ class EtcdServiceStatuses(Enum):
     """Collection of etcd service related statuses."""
 
     SERVICE_INSTALLING = StatusObject(
-        status="maintenance", message="Installing etcd...", running="async"
+        status="maintenance",
+        message="Installing etcd...",
     )
     SERVICE_STARTING = StatusObject(
         status="maintenance", message="Waiting for etcd to start...", running="async"

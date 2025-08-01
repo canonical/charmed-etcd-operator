@@ -365,7 +365,7 @@ class ClusterManager(ManagerStatusProtocol):
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:  # noqa: C901
         """Compute the Cluster manager's statuses."""
         status_list: list[StatusObject] = self.state.statuses.get(
-            scope=scope, component=self.name
+            scope=scope, component=self.name, running_status_only=True, running_status_type="async"
         ).root
 
         if self.state.unit_server.unit.status == BlockedStatus(

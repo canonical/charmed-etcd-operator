@@ -240,8 +240,8 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     # cert validity should be enough time for the rotation to happen
     # even with health checks failing because of invalid certs
     # CA validity must be 2x cert validity to be considered valid
-    logger.info("Adjusting validity of the CA to 12 min and certificates to 6 min")
-    tls_config = {"root-ca-validity": "12m", "certificate-validity": "6m"}
+    logger.info("Adjusting validity of the CA to 14 min and certificates to 6 min")
+    tls_config = {"root-ca-validity": "14m", "certificate-validity": "6m"}
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
     await wait_until(
