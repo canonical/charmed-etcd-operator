@@ -404,7 +404,9 @@ class TLSManager(ManagerStatusProtocol):
         Returns:
             set[str]: The client CAs.
         """
-        cas: set[str] = {self.state.tls_client_certificate.ca.raw}
+        cas: set[str] = set()
+        if self.state.unit_server.tls_client_state == TLSState.TLS:
+            cas.add(self.state.tls_client_certificate.ca.raw)
 
         # managed users cas
         for relation in self.state.etcd_provides.relations:
