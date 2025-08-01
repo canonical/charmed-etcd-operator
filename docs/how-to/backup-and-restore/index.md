@@ -7,5 +7,5 @@
 Configure object storage provider <configure-object-storage-provider>
 Create backup <create-backup>
 Restore backup <restore-backup>
-Migrate a cluster <migrate-etcd>
+Migrate an etcd cluster <migrate-etcd>
 ```

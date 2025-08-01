@@ -1,4 +1,4 @@
-# How to tune in production
+# How to tune etcd settings
 
 Charmed etcd includes default configuration settings that work well in most deployment settings. In some cases though,
 it might be required to adjust the configuration. This guide will show how to tune charmed etcd to match specific requirements.

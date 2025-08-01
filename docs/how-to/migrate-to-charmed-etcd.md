@@ -1,38 +1,40 @@
 # How To migrate to charmed etcd
 
-This guide outlines the steps required to migrate an existing etcd to charmed etcd.
+This guide outlines the steps required to migrate an existing etcd cluster to a charmed etcd cluster.
 
 ## Prerequisites
 
-- a Juju VM controller with a model
-- TLS Provider deployed to that model, in our case we use `self-signed-certificates` (see [](tls/enable-tls.md))
-- Object Storage Provider deployed to that model, in our case we use `s3-integrator` (see [](backup-and-restore/configure-object-storage-provider.md))
-- your existing etcd cluster must be at least of version 3.0
+- A Juju VM controller with a model
+- A TLS Provider deployed to that model, in our case we use `self-signed-certificates` (see [](tls/enable-tls.md))
+- An Object Storage Provider deployed to that model, in our case we use `s3-integrator` (see [](backup-and-restore/configure-object-storage-provider.md))
+- Your existing etcd cluster must be at least of version 3.0
 
-## Migration Guide
+## Summary
 
-Migrating to charmed etcd includes the following steps:
-- create a backup of your existing cluster
-- upload the backup to object storage
-- deploy charmed etcd
-- integrate charmed etcd with object storage provider
-- integrate charmed etcd with TLS provider
-- optional: apply cluster credentials
-- restore the backup to charmed etcd
-- switch your application over to charmed etcd
+These are the steps you will need to follow to migrate to charmed etcd:
+- Create a backup of your existing cluster
+- Upload the backup to an object storage (s3-compatible or Azure blob storage)
+- Deploy charmed etcd
+- Integrate charmed etcd with an object storage provider
+- Integrate charmed etcd with a TLS provider
+- [_optional_]: Apply cluster credentials
+- Restore the backup to charmed etcd
+- Switch your application over to charmed etcd
 
-### Create a backup
+## Create a backup
 
-Migrating your existing etcd cluster to charmed etcd happens via backup and restore. First, create a backup of your
-existing etcd cluster. The following command is an example for a snap-based installation of [etcd](https://snapcraft.io/etcd)
-in version `3.4.36`. It connects to etcd via `localhost` and creates a backup file called `etcd-backup.db` in the current
-working directory:
+Migrating your existing etcd cluster to charmed etcd happens via backup and restore.
+
+First, create a backup of your existing etcd cluster. The following command is an example for a snap-based installation 
+of [etcd](https://snapcraft.io/etcd) in version `3.4.36`. It connects to etcd via `localhost` and creates a backup file 
+called `etcd-backup.db` in the current working directory:
 
 ```text
 etcdctl snapshot save etcd-backup.db
 ```
 
 This will prompt the following output (or similar):
+
 ```text
 {"level":"info","ts":1754036152.734727,"caller":"snapshot/v3_snapshot.go:119","msg":"created temporary db file","path":"etcd-backup.db.part"}
 {"level":"info","ts":"2025-08-01T08:15:52.736886Z","caller":"clientv3/maintenance.go:212","msg":"opened snapshot stream; downloading"}
@@ -43,7 +45,7 @@ This will prompt the following output (or similar):
 Snapshot saved at etcd-backup.db
 ```
 
-### Upload the backup to object storage
+## Upload the backup to object storage
 
 For restoring backup files, charmed etcd supports S3-compatible (for example AWS, GCS, MinIO or MicroCeph) or Azure 
 object storage. In our example, we upload the backup file that we just created to S3-storage by using the `S3cmd` tool.
@@ -62,6 +64,7 @@ s3cmd ls s3://etcd-backups-test-bucket/ --access_key=<your-access-key> --secret_
 ```
 
 You should see your bucket listing all available directories:
+
 ```text
 DIR  s3://etcd-backups-test-bucket/etcd-backups/
 ```
@@ -73,7 +76,7 @@ If the storage bucket you want to use does not exist yet, create a bucket `etcd-
 s3cmd mb s3://etcd-backups-test-bucket/ --access_key=<your-access-key> --secret_key=<your-secret>
 ```
 
-With the following command, you can upload the backup file `etcd-backup.db` to the just created bucket 
+With the following command, you can upload the backup file `etcd-backup.db` to the newly created bucket 
 (replace placeholders with your credentials again):
 
 ```text
@@ -86,7 +89,7 @@ Ensure your backup file was uploaded correctly by repeating the `s3cmd ls s3://e
 2025-08-01 08:24        20512  s3://etcd-backups-test-bucket/etcd-backups/etcd-backup.db
 ```
 
-### Deploy charmed etcd
+## Deploy charmed etcd
 
 Now it's time to deploy charmed etcd. Run the following command to deploy a 3-unit cluster:
 
@@ -113,7 +116,7 @@ s3-integrator/0*             active    idle   4        10.143.229.157
 self-signed-certificates/0*  active    idle   3        10.143.229.160
 ```
 
-### Integrate with object storage provider
+## Integrate with object storage provider
 
 After charmed etcd has been deployed, integrate it with the deployed object storage provider to provide access 
 the object storage. In our case, this happens with `s3-integrator` over the `s3-credentials` interface.
@@ -128,26 +131,9 @@ juju integrate s3-integrator charmed-etcd
 Ensure s3-integrator is configured correctly. Please refer to [](backup-and-restore/configure-object-storage-provider.md) for more information.
 ```
 
-Shortly after the relation between them should be established:
+Shortly after, the relation between them should be established:
 
 ```text
-Model          Controller      Cloud/Region         Version  SLA          Timestamp
-backend-store  dev-controller  localhost/localhost  3.6.5    unsupported  08:38:22Z
-
-App                       Version  Status  Scale  Charm                     Channel   Rev  Exposed  Message
-charmed-etcd                       active      3  charmed-etcd              3.6/edge   68  no       
-s3-integrator                      active      1  s3-integrator             1/stable  145  no       
-self-signed-certificates           active      1  self-signed-certificates  1/stable  317  no       
-
-Unit                         Workload  Agent  Machine  Public address  Ports     Message
-charmed-etcd/0*              active    idle   0        10.143.229.222  2379/tcp  
-charmed-etcd/1               active    idle   1        10.143.229.119  2379/tcp  
-charmed-etcd/2               active    idle   2        10.143.229.81   2379/tcp  
-s3-integrator/0*             active    idle   4        10.143.229.157            
-self-signed-certificates/0*  active    idle   3        10.143.229.160            
-
-[...]
-
 Integration provider               Requirer                           Interface            Type     Message
 charmed-etcd:etcd-peers            charmed-etcd:etcd-peers            etcd_peers           peer     
 charmed-etcd:restart               charmed-etcd:restart               rolling_op           peer     
@@ -155,7 +141,7 @@ s3-integrator:s3-credentials       charmed-etcd:s3-credentials        s3        
 s3-integrator:s3-integrator-peers  s3-integrator:s3-integrator-peers  s3-integrator-peers  peer     
 ```
 
-### Integrate with TLS provider
+## Integrate with TLS provider
 
 Because charmed etcd relies on mTLS for client authentication and authorisation, it is mandatory to set up client TLS in 
 charmed etcd. To do so, integrate with the deployed TLS provider over the `tls-certificates` interface. In our case, 
@@ -208,23 +194,6 @@ Charmed etcd will enable peer TLS on all units with a rolling restart. After a f
 established and charmed etcd should be settled again:
 
 ```text
-Model          Controller      Cloud/Region         Version  SLA          Timestamp
-backend-store  dev-controller  localhost/localhost  3.6.5    unsupported  08:46:21Z
-
-App                       Version  Status  Scale  Charm                     Channel   Rev  Exposed  Message
-charmed-etcd                       active      3  charmed-etcd              3.6/edge   68  no       
-s3-integrator                      active      1  s3-integrator             1/stable  145  no       
-self-signed-certificates           active      1  self-signed-certificates  1/stable  317  no       
-
-Unit                         Workload  Agent  Machine  Public address  Ports     Message
-charmed-etcd/0*              active    idle   0        10.143.229.222  2379/tcp  
-charmed-etcd/1               active    idle   1        10.143.229.119  2379/tcp  
-charmed-etcd/2               active    idle   2        10.143.229.81   2379/tcp  
-s3-integrator/0*             active    idle   4        10.143.229.157            
-self-signed-certificates/0*  active    idle   3        10.143.229.160            
-
-[...]
-
 Integration provider                   Requirer                           Interface            Type     Message
 charmed-etcd:etcd-peers                charmed-etcd:etcd-peers            etcd_peers           peer     
 charmed-etcd:restart                   charmed-etcd:restart               rolling_op           peer     
@@ -234,7 +203,7 @@ self-signed-certificates:certificates  charmed-etcd:client-certificates   tls-ce
 self-signed-certificates:certificates  charmed-etcd:peer-certificates     tls-certificates     regular  
 ```
 
-### Optional: apply cluster credentials to charmed etcd
+## Optional: apply cluster credentials to charmed etcd
 
 If your previous etcd cluster did not have authentication enabled, this step can be skipped.
 
@@ -263,7 +232,7 @@ you noted earlier:
 juju config charmed-etcd system-users=secret:<your-secret-URI>
 ```
 
-After a few moments, charmed etcd will have updated the credentials internally. Check the status:
+After a few moments, charmed etcd will have updated the credentials internally and be `active/idle` again. Check the status:
 
 ```text
 Model          Controller      Cloud/Region         Version  SLA          Timestamp
@@ -282,7 +251,7 @@ s3-integrator/0*             active    idle   4        10.143.229.157
 self-signed-certificates/0*  active    idle   3        10.143.229.160            
 ```
 
-### Restore the backup to charmed etcd
+## Restore the backup to charmed etcd
 
 After applying your cluster credentials (if needed), it is time to migrate your data to charmed etcd by restoring the 
 previously taken backup.
@@ -343,7 +312,7 @@ s3-integrator/0*             active       idle       4        10.143.229.157
 self-signed-certificates/0*  active       idle       3        10.143.229.160            
 ```
 
-After the restore was completed, the status will be `active/idle` again:
+Once the restore is complete, the status will be `active/idle` again:
 
 ```text
 Model          Controller      Cloud/Region         Version  SLA          Timestamp
@@ -364,7 +333,7 @@ self-signed-certificates/0*  active    idle   3        10.143.229.160
 
 Congratulations: You have migrated your etcd data to charmed etcd!
 
-### Switch your application over to charmed etcd
+## Switch your application over to charmed etcd
 
 Now it's time to connect your application to charmed etcd. This happens over the `etcd_client` interface by integrating
 the applications:

@@ -1,4 +1,4 @@
-# How To migrate an etcd cluster
+# How to migrate an etcd cluster
 This guide will show how to restore a backup that was made from a different etcd cluster (i.e. cluster migration via restore).
 
 You can migrate different types of etcd clusters to charmed etcd:
