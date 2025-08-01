@@ -6,9 +6,11 @@ cjk
 cryptographically
 CSR
 etcd
+etcd's
 dvipng
 defragmentation
 defragment
+failover
 fonts
 freefont
 fsync
@@ -16,6 +18,8 @@ github
 GPG
 gRPC
 gyre
+hostname
+hostnames
 https
 Intersphinx
 IPv
@@ -43,6 +47,8 @@ wordlist
 txt
 checksum
 checksums
+SAN
+SANs
 SHA
 durations
 URI
@@ -52,5 +58,6 @@ GCP
 CSR
 CSRs
 TLS
+mTLS
 CIS
 RadosGateway
