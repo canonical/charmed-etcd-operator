@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import time
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -32,7 +33,7 @@ NUM_UNITS = 5
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """Build and deploy the charm."""
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
+    await ops_test.model.deploy(charm, num_units=NUM_UNITS - 1)
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
@@ -141,10 +142,15 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
             },
             wait_for_exact_units=2,
         )
+        leader_unit = None
+        while leader_unit is None:
+            for unit in ops_test.model.applications[APP_NAME].units:
+                if await unit.is_leader_from_status():
+                    leader_unit = unit
 
-    for unit in ops_test.model.applications[APP_NAME].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
+            if leader_unit is None:
+                logger.info("Waiting for a leader to be elected")
+                time.sleep(10)
 
     logger.info("Rebuilding cluster after majority failure")
     rebuild_action = await leader_unit.run_action("rebuild-cluster")

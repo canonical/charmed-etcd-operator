@@ -64,7 +64,7 @@ tenacity = "*"
 pydantic = ">= 1.0"
 boto3 = "^1.37.12"
 mypy-boto3-s3 = "^1.37.0"
-data-platform-helpers = ">=0.1.6"
+data-platform-helpers = ">=0.1.7"
 
 [tool.coverage.run]
 branch = true

@@ -16,6 +16,7 @@ from requests.exceptions import RequestException
 from charm import EtcdOperatorCharm
 from common.exceptions import (
     EtcdClusterManagementError,
+    EtcdServiceError,
     EtcdUserManagementError,
 )
 from core.models import Member
@@ -56,8 +57,9 @@ def test_install_failure_blocked_status():
     state_in = testing.State()
 
     with patch("workload.EtcdWorkload.install", return_value=False):
-        state_out = ctx.run(ctx.on.install(), state_in)
-        assert status_is(state_out, EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value)
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.install(), state_in)
+        assert isinstance(e.value.__cause__, EtcdServiceError)
 
 
 def test_internal_user_creation():
@@ -166,7 +168,7 @@ def test_start():
         assert state_out.unit_status != ops.ActiveStatus()
         assert state_out.get_relation(1).local_unit_data.get("state") != "started"
 
-    # if the etcd daemon can't start, the charm should display blocked status
+    # if the etcd daemon can't start, the charm should raise an exception
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
@@ -175,8 +177,9 @@ def test_start():
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run"),
     ):
-        state_out = ctx.run(ctx.on.start(), state_in)
-        assert status_is(state_out, EtcdServiceStatuses.SERVICE_NOT_RUNNING.value)
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.start(), state_in)
+        assert isinstance(e.value.__cause__, EtcdServiceError)
 
     # non leader waiting promoted
     relation = testing.PeerRelation(
@@ -1050,6 +1053,7 @@ def test_rebuild_cluster_action_happy_path():
     )
     state_in = testing.State(relations={peer_relation, status_peer_relation}, leader=True)
     with (
+        patch("managers.cluster.EtcdClient.get_metric", return_value="0"),
         patch("workload.EtcdWorkload.stop") as stop_etcd,
         patch("workload.EtcdWorkload.disable_service") as disable_etcd,
     ):

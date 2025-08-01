@@ -12,6 +12,7 @@ from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
 from ops import BlockedStatus
+from requests import RequestException
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
 from common.client import EtcdClient
@@ -397,6 +398,12 @@ class ClusterManager(ManagerStatusProtocol):
 
             if self.state.cluster.learning_member and self.state.unit_server.is_juju_leader:
                 status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
+
+            try:
+                if self.is_cluster_failed:
+                    status_list.append(ClusterStatuses.CLUSTER_FAILED.value)
+            except RequestException as e:
+                logger.error(f"Could not determine if cluster failed: {e}")
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 

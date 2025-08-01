@@ -24,6 +24,7 @@ from requests.exceptions import RequestException
 from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
+    EtcdServiceError,
     EtcdUserManagementError,
     HealthCheckFailedError,
     RaftLeaderNotFoundError,
@@ -98,13 +99,14 @@ class EtcdEvents(Object):
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
         if not self.charm.workload.install():
-            self.charm.status.set_running_status(
+            self.charm.state.statuses.add(
                 EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
                 scope="unit",
-                component_name=self.charm.cluster_manager.name,
-                statuses_state=self.charm.state.statuses,
+                component=self.charm.cluster_manager.name,
             )
-            return
+            raise EtcdServiceError(
+                "Failed to install the etcd snap. Check the logs for more details."
+            )
 
     def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
@@ -204,21 +206,13 @@ class EtcdEvents(Object):
             logger.info("Workload started successfully. Opening client port")
             self.charm.unit.open_port("tcp", CLIENT_PORT)
             self.charm.state.statuses.delete(
-                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
-                scope="unit",
-                component=self.charm.cluster_manager.name,
-            )
-            self.charm.state.statuses.delete(
                 EtcdServiceStatuses.SERVICE_STARTING.value,
                 scope="unit",
                 component=self.charm.cluster_manager.name,
             )
         else:
-            self.charm.status.set_running_status(
-                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
-                scope="unit",
-                component_name=self.charm.cluster_manager.name,
-                statuses_state=self.charm.state.statuses,
+            raise EtcdServiceError(
+                "Failed to start the etcd service. Check the logs for more details."
             )
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
@@ -381,12 +375,6 @@ class EtcdEvents(Object):
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
-                self.charm.status.set_running_status(
-                    ClusterStatuses.CLUSTER_FAILED.value,
-                    scope="unit",
-                    component_name=self.charm.cluster_manager.name,
-                    statuses_state=self.charm.state.statuses,
-                )
                 return
         except RequestException:
             # if anything fails with the metrics request, we don't want to panic
@@ -406,22 +394,15 @@ class EtcdEvents(Object):
 
         if not self.charm.workload.alive():
             if not self.charm.cluster_manager.restart_member():
-                self.charm.status.set_running_status(
+                self.charm.state.statuses.add(
                     EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
                     scope="unit",
-                    component_name=self.charm.cluster_manager.name,
-                    statuses_state=self.charm.state.statuses,
+                    component=self.charm.cluster_manager.name,
                 )
                 return
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
-                self.charm.status.set_running_status(
-                    ClusterStatuses.CLUSTER_FAILED.value,
-                    scope="unit",
-                    component_name=self.charm.cluster_manager.name,
-                    statuses_state=self.charm.state.statuses,
-                )
                 return
         except RequestException:
             # if anything fails with the metrics request, we don't want to panic
@@ -534,11 +515,10 @@ class EtcdEvents(Object):
 
         self.charm.workload.stop()
         self.charm.state.unit_server.update({"state": ""})
-        self.charm.status.set_running_status(
+        self.charm.state.statuses.add(
             ClusterStatuses.REMOVED.value,
             scope="unit",
-            component_name=self.charm.cluster_manager.name,
-            statuses_state=self.charm.state.statuses,
+            component=self.charm.cluster_manager.name,
         )
 
     def update_admin_password(self, admin_secret_id: str) -> None:
