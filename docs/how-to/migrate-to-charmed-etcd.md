@@ -1,4 +1,4 @@
-# How To migrate to charmed etcd
+# How to migrate to charmed etcd
 
 This guide outlines the steps required to migrate an existing etcd cluster to a charmed etcd cluster.
 
@@ -116,7 +116,7 @@ s3-integrator/0*             active    idle   4        10.143.229.157
 self-signed-certificates/0*  active    idle   3        10.143.229.160
 ```
 
-## Integrate with object storage provider
+## Integrate charmed etcd with an object storage provider
 
 After charmed etcd has been deployed, integrate it with the deployed object storage provider to provide access 
 the object storage. In our case, this happens with `s3-integrator` over the `s3-credentials` interface.
@@ -141,7 +141,7 @@ s3-integrator:s3-credentials       charmed-etcd:s3-credentials        s3        
 s3-integrator:s3-integrator-peers  s3-integrator:s3-integrator-peers  s3-integrator-peers  peer     
 ```
 
-## Integrate with TLS provider
+## Integrate charmed etcd with a TLS provider
 
 Because charmed etcd relies on mTLS for client authentication and authorisation, it is mandatory to set up client TLS in 
 charmed etcd. To do so, integrate with the deployed TLS provider over the `tls-certificates` interface. In our case, 
@@ -203,7 +203,7 @@ self-signed-certificates:certificates  charmed-etcd:client-certificates   tls-ce
 self-signed-certificates:certificates  charmed-etcd:peer-certificates     tls-certificates     regular  
 ```
 
-## Optional: apply cluster credentials to charmed etcd
+## [_optional_]: Apply cluster credentials
 
 If your previous etcd cluster did not have authentication enabled, this step can be skipped.
 
