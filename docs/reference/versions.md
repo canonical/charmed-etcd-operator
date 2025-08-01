@@ -15,7 +15,7 @@ Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.c
 * Automated deployment on VM
 * [Scaling a cluster up and down](/how-to/scale-horizontally)
 * High Availability and automated rolling restarts
-* Authentication and authorization by default
+* Authentication and authorisation by default
   * Automated user and permission management for client applications
 * [Backup and restore](/how-to/backup-and-restore/index.md)
   * Integration with any AWS S3-compatible or Azure object storage
@@ -36,7 +36,7 @@ Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.c
 * LXD v6.4+
   * Older LXD versions may be compatible, but are not officially supported. 
 * Integration with a TLS provider charm
-  * [tls-certificates interface](https://charmhub.io/integrations/tls-certificates) v4
+  * `tls-certificates` interface v4
 
 ### Limitations
 
