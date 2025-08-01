@@ -36,6 +36,7 @@ rst
 tex
 texlive
 th
+Terraform
 TOC
 toctree
 utils

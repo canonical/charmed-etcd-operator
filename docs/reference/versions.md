@@ -13,6 +13,8 @@ Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.c
 ### Supported features
 
 * Automated deployment on VM
+  * [Terraform charm module](https://github.com/canonical/charmed-etcd-operator/blob/3.6/edge/terraform/charm/README.md)
+  * [Terraform product module](https://github.com/canonical/charmed-etcd-operator/blob/3.6/edge/terraform/product/README.md)
 * [Scaling a cluster up and down](/how-to/scale-horizontally)
 * High Availability and automated rolling restarts
 * Authentication and authorisation by default
