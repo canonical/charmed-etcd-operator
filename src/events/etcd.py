@@ -134,6 +134,12 @@ class EtcdEvents(Object):
         if not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
             # this is the very first cluster start, this unit starts without being added as member
             # all subsequent units will have to be added as member before starting the workload
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_STARTING.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
             self.charm.cluster_manager.start_member()
 
             if storage_reuse:
@@ -212,8 +218,12 @@ class EtcdEvents(Object):
                 component=self.charm.cluster_manager.name,
             )
         else:
-            raise EtcdServiceError(
-                "Failed to start the etcd service. Check the logs for more details."
+            logger.error("Workload failed to start.")
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
             )
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
@@ -347,6 +357,9 @@ class EtcdEvents(Object):
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""
+        if not self.charm.state.peer_relation:
+            event.defer()
+            return
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
                 try:

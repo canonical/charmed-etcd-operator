@@ -275,10 +275,18 @@ class BackupEvents(Object):
                     self.charm.state.statuses.add(
                         BackupStatuses.RESTORE_FAILED.value, "unit", self.charm.backup_manager.name
                     )
+                    self.charm.state.statuses.add(
+                        BackupStatuses.RESTORE_FAILED.value, "app", self.charm.backup_manager.name
+                    )
                     pass
                 self.charm.state.statuses.delete(
                     BackupStatuses.RESTORE_IN_PROGRESS.value,
                     "unit",
+                    self.charm.backup_manager.name,
+                )
+                self.charm.state.statuses.delete(
+                    BackupStatuses.RESTORE_IN_PROGRESS.value,
+                    "app",
                     self.charm.backup_manager.name,
                 )
             case RestoreStep.STOP, RestoreStep.DOWNLOAD:
@@ -300,10 +308,20 @@ class BackupEvents(Object):
                             "unit",
                             self.charm.backup_manager.name,
                         )
+                        self.charm.state.statuses.delete(
+                            BackupStatuses.RESTORE_FAILED.value,
+                            "app",
+                            self.charm.backup_manager.name,
+                        )
                     except EtcdBackupError:
                         self.charm.state.statuses.add(
                             BackupStatuses.RESTORE_FAILED.value,
                             "unit",
+                            self.charm.backup_manager.name,
+                        )
+                        self.charm.state.statuses.add(
+                            BackupStatuses.RESTORE_FAILED.value,
+                            "app",
                             self.charm.backup_manager.name,
                         )
             case RestoreStep.START, RestoreStep.RESTORE:
@@ -324,10 +342,20 @@ class BackupEvents(Object):
                         "unit",
                         self.charm.backup_manager.name,
                     )
+                    self.charm.state.statuses.add(
+                        BackupStatuses.RESTORE_UNHEALTHY.value,
+                        "app",
+                        self.charm.backup_manager.name,
+                    )
                     return
                 self.charm.state.statuses.delete(
                     BackupStatuses.RESTORE_IN_PROGRESS.value,
                     "unit",
+                    self.charm.backup_manager.name,
+                )
+                self.charm.state.statuses.delete(
+                    BackupStatuses.RESTORE_IN_PROGRESS.value,
+                    "app",
                     self.charm.backup_manager.name,
                 )
                 self.charm.backup_manager.clean_up_after_restore()
