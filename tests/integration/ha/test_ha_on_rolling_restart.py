@@ -138,7 +138,7 @@ async def test_invalid_tuning_config_options(ops_test: OpsTest) -> None:
         ops_test,
         apps=[app_name],
         apps_full_statuses={
-            APP_NAME: {"blocked": [ConfigStatuses.TUNING_CONFIG_INVALID.value.message]},
+            APP_NAME: [ConfigStatuses.TUNING_CONFIG_INVALID.value],
         },
         wait_for_exact_units=NUM_UNITS,
     )

@@ -18,7 +18,7 @@ from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 
 from literals import EXTERNAL_CLIENTS_RELATION, INTERNAL_USER, PEER_RELATION, TLSType
-from statuses import ExternalClientsStatuses
+from statuses import CharmStatuses, ExternalClientsStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -345,19 +345,13 @@ async def test_requirer_sends_ca(ops_test: OpsTest) -> None:
         apps=[APP_NAME, REQUIRER_NAME],
         # idle_period=10,
         apps_full_statuses={
-            APP_NAME: {
-                "blocked": [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value.message],
-            },
-            REQUIRER_NAME: {"active": []},
-            TLS_NAME: {"active": []},
+            APP_NAME: [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value],
+            REQUIRER_NAME: [CharmStatuses.ACTIVE_IDLE.value],
+            TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
         },
         units_full_statuses={
-            APP_NAME: {
-                "units": {
-                    "blocked": [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value.message]
-                }
-            },
-            REQUIRER_NAME: {"units": {"active": []}},
-            TLS_NAME: {"units": {"active": []}},
+            APP_NAME: [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value],
+            REQUIRER_NAME: [CharmStatuses.ACTIVE_IDLE.value],
+            TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
         },
     )
