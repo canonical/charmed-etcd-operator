@@ -55,6 +55,8 @@ URI
 URIs
 programmatically
 GCP
+GCS
+MinIO
 CSR
 CSRs
 TLS
