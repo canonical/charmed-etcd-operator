@@ -528,6 +528,7 @@ class EtcdEvents(Object):
 
     def update_admin_password(self, admin_secret_id: str) -> None:
         """Compare current admin password and update in etcd if required."""
+        errored = False
         try:
             if new_password := self.charm.state.get_secret_from_id(admin_secret_id).get(
                 INTERNAL_USER
@@ -544,30 +545,35 @@ class EtcdEvents(Object):
                         self.charm.state.cluster.update(
                             {f"{INTERNAL_USER}-password": new_password}
                         )
-                        self.charm.state.statuses.delete(
-                            ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
-                            scope="unit",
-                            component=self.charm.cluster_manager.name,
-                        )
                     except EtcdUserManagementError as e:
                         logger.error(e)
                         self.charm.state.statuses.add(
                             ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
-                            scope="unit",
+                            scope="app",
                             component=self.charm.cluster_manager.name,
                         )
+                        errored = True
             else:
                 logger.error(f"Invalid username in secret {admin_secret_id}.")
                 self.charm.state.statuses.add(
                     ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
-                    scope="unit",
+                    scope="app",
                     component=self.charm.cluster_manager.name,
                 )
+                errored = True
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
             self.charm.state.statuses.add(
                 ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
-                scope="unit",
+                scope="app",
+                component=self.charm.cluster_manager.name,
+            )
+            errored = True
+
+        if not errored:
+            self.charm.state.statuses.delete(
+                ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+                scope="app",
                 component=self.charm.cluster_manager.name,
             )
 
