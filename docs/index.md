@@ -9,7 +9,7 @@ Etcd is a distributed, reliable key-value store for the most critical data of di
 Charmed etcd is equipped with several features to securely store and scale complicated data workloads, including TLS encryption, horizontal scaling, password rotation, and easy integration with client applications.
 
 ```{note}
-This new charm is still under development on the [`edge` track](https://charmhub.io/charmed-etcd). You're welcome to explore it and share your feedback as we continue to improve it.
+This new charm is still under development on the [`beta` track](https://charmhub.io/charmed-etcd?channel=3.6/beta). You're welcome to explore it and share your feedback as we continue to improve it.
 
 **Please wait for the upcoming stable release before deploying charmed etcd in production environments.**
 ```
