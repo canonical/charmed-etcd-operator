@@ -4,26 +4,21 @@
 
 """TLS related event handlers."""
 
-import base64
 import logging
-import re
 from typing import TYPE_CHECKING
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
     CertificateRequestAttributes,
-    PrivateKey,
     TLSCertificatesRequiresV4,
 )
 from ops import (
     ConfigChangedEvent,
     EventSource,
     Handle,
-    ModelError,
     RelationBrokenEvent,
     RelationCreatedEvent,
     SecretChangedEvent,
-    SecretNotFoundError,
 )
 from ops.framework import EventBase, Object
 
@@ -379,43 +374,8 @@ class TLSEvents(Object):
         """Update the private key in etcd."""
         logger.debug("Updating TLS private key.")
 
-        if self.read_and_validate_private_key(private_key_id) is None:
+        if self.charm.tls_manager.read_and_validate_private_key(private_key_id) is None:
             logger.error("Invalid private key provided, cannot update TLS certificates.")
             return
 
         self.refresh_tls_certificates_event.emit()
-
-    def read_and_validate_private_key(
-        self, private_key_secret_id: str | None
-    ) -> PrivateKey | None:
-        """Read and validate the private key.
-
-        Args:
-            private_key_secret_id (str): The private key secret ID.
-
-        Returns:
-            PrivateKey: The private key.
-        """
-        try:
-            secret_content = self.charm.state.get_secret_from_id(private_key_secret_id).get(
-                "private-key"
-            )
-        except (ModelError, SecretNotFoundError) as e:
-            logger.error(e)
-            return None
-
-        if secret_content is None:
-            logger.error(f"Secret {private_key_secret_id} does not contain a private key.")
-            return None
-
-        private_key = (
-            secret_content
-            if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
-            else base64.b64decode(secret_content).decode("utf-8").strip()
-        )
-        private_key = PrivateKey(raw=private_key)
-        if not private_key.is_valid():
-            logger.error("Invalid private key format.")
-            return None
-
-        return private_key
