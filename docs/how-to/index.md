@@ -13,4 +13,5 @@ TLS encryption <tls/index>
 Back up and restore <backup-and-restore/index>
 Tuning in Production <tuning>
 Disaster recovery <disaster-recovery>
+Migrate to charmed etcd <migrate-to-charmed-etcd>
 ```
