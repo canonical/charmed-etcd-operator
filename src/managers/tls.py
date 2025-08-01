@@ -461,7 +461,7 @@ class TLSManager(ManagerStatusProtocol):
 
         return private_key
 
-    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:  # noqa: C901
         """Compute the component status."""
         status_list: list[StatusObject] = []
 
