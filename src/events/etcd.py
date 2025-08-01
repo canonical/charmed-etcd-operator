@@ -296,12 +296,13 @@ class EtcdEvents(Object):
             # reflect membership updates in the cluster state, e.g. ip change or tls switchover
             self.charm.cluster_manager.update_cluster_member_state()
 
-            try:
-                self.charm.external_clients_manager.update_client_relations_data(
-                    etcd_version=self.charm.cluster_manager.get_version()
-                )
-            except KeyError as e:
-                logger.warning(f"Error updating client relations data: {e}")
+            if self.charm.state.unit_server.tls_client_state == TLSState.TLS:
+                try:
+                    self.charm.external_clients_manager.update_client_relations_data(
+                        etcd_version=self.charm.cluster_manager.get_version()
+                    )
+                except KeyError as e:
+                    logger.warning(f"Error updating client relations data: {e}")
 
         for tls_type in TLSType:
             try:
