@@ -39,5 +39,6 @@ The charmed etcd operator is an open-source project that welcomes community cont
 Home <self>
 /tutorial/index
 /how-to/index
+/reference/index
 /explanation/index
 ```
