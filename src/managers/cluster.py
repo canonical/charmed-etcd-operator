@@ -402,6 +402,12 @@ class ClusterManager(ManagerStatusProtocol):
             try:
                 if self.is_cluster_failed:
                     status_list.append(ClusterStatuses.CLUSTER_FAILED.value)
+                else:
+                    self.state.statuses.delete(
+                        ClusterStatuses.CLUSTER_FAILED.value,
+                        scope=scope,
+                        component=self.name,
+                    )
             except RequestException as e:
                 logger.error(f"Could not determine if cluster failed: {e}")
 
