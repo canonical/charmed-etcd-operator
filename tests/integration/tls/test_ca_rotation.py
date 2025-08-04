@@ -224,6 +224,9 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     tls_config = {"root-ca-validity": "12m", "certificate-validity": "6m"}
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
+
+    # the config change will trigger a CA rotation because of config-change
+    # wait for this to be completed before the actual awaited expiration can happen
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
@@ -234,6 +237,8 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
             },
             TLS_NAME: {"active": []},
         },
+        wait_for_exact_units={APP_NAME: 3, TLS_NAME: 1},
+        idle_period=10,
     )
 
     logger.info("Getting the current CA certificates")
@@ -273,6 +278,8 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
             },
             TLS_NAME: {"units": {"active": []}},
         },
+        wait_for_exact_units={APP_NAME: 3, TLS_NAME: 1},
+        idle_period=10,
     )
 
     logger.info("Checking if the CA certificates are rotated")
