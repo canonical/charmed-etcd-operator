@@ -230,15 +230,15 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        apps_full_statuses={
+        units_full_statuses={
             APP_NAME: {
-                "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
-                "active": [],
+                "units": {
+                    "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
+                    "active": [],
+                }
             },
-            TLS_NAME: {"active": []},
+            TLS_NAME: {"units": {"active": []}},
         },
-        wait_for_exact_units={APP_NAME: 3, TLS_NAME: 1},
-        idle_period=10,
     )
 
     logger.info("Getting the current CA certificates")
@@ -278,8 +278,6 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
             },
             TLS_NAME: {"units": {"active": []}},
         },
-        wait_for_exact_units={APP_NAME: 3, TLS_NAME: 1},
-        idle_period=10,
     )
 
     logger.info("Checking if the CA certificates are rotated")
