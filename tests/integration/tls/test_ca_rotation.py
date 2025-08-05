@@ -240,14 +240,14 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     # cert validity should be enough time for the rotation to happen
     # even with health checks failing because of invalid certs
     # CA validity must be 2x cert validity to be considered valid
-    logger.info("Adjusting validity of the CA to 12 min and certificates to 6 min")
-    tls_config = {"root-ca-validity": "12m", "certificate-validity": "6m"}
+    logger.info("Adjusting validity of the CA to 40 min and certificates to 20 min")
+    tls_config = {"root-ca-validity": "40m", "certificate-validity": "20m"}
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        apps_full_statuses={
+        units_full_statuses={
             APP_NAME: [
                 TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
             ],
@@ -279,15 +279,17 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     )
     assert current_client_certificate, "Failed to get the current client certificate"
 
+    # CA certificate will be renewed at ca validity - certificate validity = 40-20 = 20 minutes
+    # the juju secret expires at 90% of the certificate validity; 20 * 0.9 = 18 minutes
+    # The first certificate after CA renewal will be coming in 36m (18m after CA renewal)
     logger.info(
-        "Waiting ~10.8m for expiration of CA certificates - renewed certs will have a new CA"
+        "Waiting 36m for expiration of CA certificates and getting new certificates - renewed certs will have a new CA"
     )
-    # the juju secret expires at 90% of the certificate validity; 720s * 0.9 = 648s
-    time.sleep(660)
+    time.sleep(2160)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        apps_full_statuses={
+        units_full_statuses={
             APP_NAME: [
                 TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
             ],
