@@ -114,7 +114,7 @@ json-output:
 
 This output provides a comprehensive view of statuses, detailing component names, messages, actions, and reasons for each status. The `json-output` section at the end offers a structured format, which is ideal for parsing by automation tools and scripts.
 
-### Developing with advanced statuses
+## Developing with advanced statuses
 
 With advanced statuses, the charm never sets statuses directly but goes through the [Data Platform Helpers](https://pypi.org/project/data-platform-helpers/) advanced statuses module.
 
