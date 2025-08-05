@@ -1,12 +1,12 @@
-# Charmed etcd Advanced Statuses
+# Advanced Statuses
 
-Charmed etcd utilises Advanced Statuses to provide detailed, component-specific status information. This interface supports more complex and multiple statuses, though it introduces additional complexity.
+Charmed etcd utilises Advanced Statuses to provide detailed, component-specific status information. This interface supports more complex and multiple statuses.
 
-## Advanced Statuses: basics
+## Basics
 
 Advanced Statuses are implemented in the home-brewed [Data Platform Helpers](https://pypi.org/project/data-platform-helpers/) library.
 
-Each component of the charm recomputes its statuses on every `status-update` event, and will sort the statuses by order of importance.
+Each component of the charm recomputes its statuses on every `update-status` event, and will sort the statuses by order of importance.
 
 They are firstly ordered like `ops` does: `Error > Blocked > Maintenance > Waiting > Active  > Unknown` and then by component priority if the status levels are equal.
 
@@ -16,7 +16,7 @@ If multiple important (`Blocked`, `Maintenance` or `Waiting`) statuses are repor
 "<status message>. Run `status-detail`: X action required; Y additional statuses")
 ```
 
-For example, the following juju status output shows an aggregated status for the charmed-etcd application:
+For example, the following `juju status` output shows an aggregated status for the charmed-etcd application:
 
 ```{terminal}
 :input: juju status
@@ -44,7 +44,7 @@ Due to their extended structure, advanced statuses contain more information than
 
 Statuses can be set as critical so that they override the regular flow and are displayed no matter what happens if they require immediate action.
 
-## Advanced Statuses: `status-detail` action
+## `status-detail` action
 
 The `status-detail` action is a helper that provides extended access to the charm statuses.
 Running this action will display all application and unit statuses. It includes an optional `recompute` argument that allows for status re-evaluation. When `recompute` is used, the system re-computes statuses for non-leader units and all statuses for leader units.
@@ -114,7 +114,7 @@ json-output:
 
 This output provides a comprehensive view of statuses, detailing component names, messages, actions, and reasons for each status. The `json-output` section at the end offers a structured format, which is ideal for parsing by automation tools and scripts.
 
-### For developers: Developing with advanced statuses
+### Developing with advanced statuses
 
 With advanced statuses, the charm never sets statuses directly but goes through the [Data Platform Helpers](https://pypi.org/project/data-platform-helpers/) advanced statuses module.
 
