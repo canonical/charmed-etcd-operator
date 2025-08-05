@@ -65,3 +65,4 @@ TLS
 mTLS
 CIS
 RadosGateway
+parsable
