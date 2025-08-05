@@ -3,11 +3,13 @@
 # See LICENSE file for licensing details.
 
 import logging
+import time
 
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, Status
+from literals import INTERNAL_USER, PEER_RELATION
+from statuses import ClusterStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -135,15 +137,20 @@ async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
         await wait_until(
             ops_test,
             apps=[APP_NAME],
-            apps_full_statuses={
-                APP_NAME: {"blocked": [Status.CLUSTER_FAILED.value.status.message]},
+            units_full_statuses={
+                APP_NAME: [ClusterStatuses.CLUSTER_FAILED.value],
             },
             wait_for_exact_units=2,
         )
+        leader_unit = None
+        while leader_unit is None:
+            for unit in ops_test.model.applications[APP_NAME].units:
+                if await unit.is_leader_from_status():
+                    leader_unit = unit
 
-    for unit in ops_test.model.applications[APP_NAME].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
+            if leader_unit is None:
+                logger.info("Waiting for a leader to be elected")
+                time.sleep(10)
 
     logger.info("Rebuilding cluster after majority failure")
     rebuild_action = await leader_unit.run_action("rebuild-cluster")

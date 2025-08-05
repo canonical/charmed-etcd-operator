@@ -2,6 +2,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+
 import pytest
 from ops import testing
 
@@ -119,4 +120,12 @@ def mock_get_host_mapping(mocker):
             "private_ip": "my_ip",
             "public_ip": "my_public_ip",
         },
+    )
+
+
+@pytest.fixture(autouse=True)  # autouse=True makes this fixture run for all tests in the module
+def mock_is_cluster_failed(mocker):
+    mocker.patch(
+        "managers.cluster.EtcdClient.get_metric",
+        return_value="1",
     )

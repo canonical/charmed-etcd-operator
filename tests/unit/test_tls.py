@@ -22,7 +22,8 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
-from ops import ActiveStatus, BlockedStatus, testing
+from data_platform_helpers.advanced_statuses.utils import as_status
+from ops import testing
 from scenario import Secret
 
 from charm import EtcdOperatorCharm
@@ -35,11 +36,13 @@ from literals import (
     RESTART_RELATION,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
-    Status,
     TLSCARotationState,
     TLSState,
 )
 from managers.tls import TLSType
+from statuses import CharmStatuses, TLSStatuses
+
+from .helpers import status_is
 
 MEMBER_LIST_DICT = {
     "charmed-etcd0": Member(
@@ -190,6 +193,9 @@ def test_enable_tls_on_start():
             local_unit_data={
                 "private_ip": "localhost",
             },
+            local_app_data={
+                "cluster_members": "charmed-etcd0=http://localhost:2380",
+            },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
         client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
@@ -200,7 +206,7 @@ def test_enable_tls_on_start():
         # no tls
         state_out = ctx.run(ctx.on.start(), state_in)
         peer_relation = state_out.get_relation(peer_relation.id)
-        assert state_out.unit_status == Status.ACTIVE.value.status
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
         assert peer_relation.local_unit_data["state"] == "started"
         assert peer_relation.local_app_data["cluster_state"] == "existing"
 
@@ -215,6 +221,7 @@ def test_enable_tls_on_start():
             local_app_data={
                 "authentication": "enabled",
                 "cluster_state": "existing",
+                "cluster_members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -225,7 +232,7 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         assert "start" in [event.name for event in state_out.deferred]
-        assert state_out.app_status == Status.TLS_ENABLING_PEER_TLS.value.status
+        assert state_out.app_status == as_status(TLSStatuses.TLS_ENABLING_PEER_TLS.value)
 
         peer_relation = testing.PeerRelation(
             id=1,
@@ -237,6 +244,7 @@ def test_enable_tls_on_start():
             local_app_data={
                 "authentication": "enabled",
                 "cluster_state": "existing",
+                "cluster_members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -247,7 +255,7 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         assert "start" in [event.name for event in state_out.deferred]
-        assert state_out.app_status == Status.TLS_ENABLING_CLIENT_TLS.value.status
+        assert state_out.app_status == as_status(TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
 
         peer_relation = testing.PeerRelation(
             id=1,
@@ -256,6 +264,9 @@ def test_enable_tls_on_start():
                 "private_ip": "localhost",
                 "tls_peer_state": TLSState.TLS.value,
                 "tls_client_state": TLSState.TLS.value,
+            },
+            local_app_data={
+                "cluster_members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -266,10 +277,10 @@ def test_enable_tls_on_start():
         )
         state_out = ctx.run(ctx.on.start(), state_in)
         peer_relation = state_out.get_relation(peer_relation.id)
-        assert state_out.unit_status == Status.ACTIVE.value.status
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
         assert peer_relation.local_unit_data["state"] == "started"
         assert peer_relation.local_app_data["cluster_state"] == "existing"
-        assert state_out.app_status == Status.ACTIVE.value.status
+        assert state_out.app_status == as_status(CharmStatuses.ACTIVE_IDLE.value)
 
 
 def test_certificates_broken():
@@ -662,6 +673,7 @@ def test_certificates_relation_created():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -672,7 +684,7 @@ def test_certificates_relation_created():
 
     with patch("workload.EtcdWorkload.alive", return_value=True):
         state_out = ctx.run(ctx.on.relation_created(relation=peer_tls_relation), state_in)
-        assert state_out.unit_status == Status.TLS_ENABLING_PEER_TLS.value.status
+        assert status_is(state_out, TLSStatuses.TLS_ENABLING_PEER_TLS.value)
         assert (
             state_out.get_relation(peer_relation.id).local_unit_data["tls_peer_state"]
             == TLSState.TO_TLS.value
@@ -684,6 +696,7 @@ def test_certificates_relation_created():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
     client_tls_relation = testing.Relation(id=2, endpoint=CLIENT_TLS_RELATION_NAME)
@@ -694,7 +707,7 @@ def test_certificates_relation_created():
 
     with patch("workload.EtcdWorkload.alive", return_value=True):
         state_out = ctx.run(ctx.on.relation_created(relation=client_tls_relation), state_in)
-        assert state_out.unit_status == Status.TLS_ENABLING_CLIENT_TLS.value.status
+        assert status_is(state_out, TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
         assert (
             state_out.get_relation(peer_relation.id).local_unit_data["tls_client_state"]
             == TLSState.TO_TLS.value
@@ -919,7 +932,7 @@ def test_set_tls_private_key():
             },
         )
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_out)
-        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert status_is(state_out, TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
         secret = dataclasses.replace(
             secret,
@@ -950,12 +963,12 @@ def test_set_tls_private_key():
             config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
         )
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
-        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert status_is(state_out, TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
         state_in.config[TLS_PEER_PRIVATE_KEY_CONFIG] = "secret:cu9ibpp34trs4baf20c0"
 
         state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert state_out.unit_status == Status.TLS_INVALID_PRIVATE_KEY.value.status
+        assert status_is(state_out, TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
 
     # client private key
     secret = Secret(
@@ -1486,6 +1499,7 @@ def test_set_extra_sans_config_option():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=https://my_ip:2380",
         },
         local_unit_data={
             "private_ip": "my_ip",
@@ -1510,7 +1524,7 @@ def test_set_extra_sans_config_option():
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
-        assert state_out.unit_status == ActiveStatus()
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
 
     # allow {unit} placeholder
     ctx = testing.Context(EtcdOperatorCharm)
@@ -1527,7 +1541,7 @@ def test_set_extra_sans_config_option():
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
-        assert state_out.unit_status == ActiveStatus()
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
 
     # invalid ip address
     ctx = testing.Context(EtcdOperatorCharm)
@@ -1543,9 +1557,7 @@ def test_set_extra_sans_config_option():
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert state_out.unit_status == BlockedStatus(
-            "Invalid value set for the config options 'certificate-extra-sans'"
-        )
+        assert status_is(state_out, TLSStatuses.SANS_CONFIG_INVALID.value)
         # no RefreshTLSCertificatesEvent must be emitted
         assert len(ctx.emitted_events) == 1
 
@@ -1563,9 +1575,7 @@ def test_set_extra_sans_config_option():
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert state_out.unit_status == BlockedStatus(
-            "Invalid value set for the config options 'certificate-extra-sans'"
-        )
+        assert status_is(state_out, TLSStatuses.SANS_CONFIG_INVALID.value)
         # no RefreshTLSCertificatesEvent must be emitted
         assert len(ctx.emitted_events) == 1
 
@@ -1583,9 +1593,7 @@ def test_set_extra_sans_config_option():
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert state_out.unit_status == BlockedStatus(
-            "Invalid value set for the config options 'certificate-extra-sans'"
-        )
+        assert status_is(state_out, TLSStatuses.SANS_CONFIG_INVALID.value)
         # no RefreshTLSCertificatesEvent must be emitted
         assert len(ctx.emitted_events) == 1
 
@@ -1603,9 +1611,7 @@ def test_set_extra_sans_config_option():
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert state_out.unit_status == BlockedStatus(
-            "Invalid value set for the config options 'certificate-extra-sans'"
-        )
+        assert status_is(state_out, TLSStatuses.SANS_CONFIG_INVALID.value)
         # no RefreshTLSCertificatesEvent must be emitted
         assert len(ctx.emitted_events) == 1
 
@@ -1623,9 +1629,7 @@ def test_set_extra_sans_config_option():
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert state_out.unit_status == BlockedStatus(
-            "Invalid value set for the config options 'certificate-extra-sans'"
-        )
+        assert status_is(state_out, TLSStatuses.SANS_CONFIG_INVALID.value)
         # no RefreshTLSCertificatesEvent must be emitted
         assert len(ctx.emitted_events) == 1
 
@@ -1649,4 +1653,4 @@ def test_set_extra_sans_config_option():
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         # no RefreshTLSCertificatesEvent must be emitted
         assert len(ctx.emitted_events) == 1
-        assert state_out.unit_status == ActiveStatus()
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)

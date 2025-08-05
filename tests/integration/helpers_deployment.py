@@ -10,6 +10,7 @@ from hashlib import md5
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
+from data_platform_helpers.advanced_statuses.models import StatusObject
 from dateutil.parser import parse
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 class Status:
     """Model class for status."""
 
-    def __init__(self, value: str, since: str, message: Optional[str] = None):
+    def __init__(self, value: str, since: str, message: str = ""):
         self.value = value
         self.since = parse(since, ignoretz=True)
         self.message = message
@@ -224,7 +225,7 @@ def _is_every_condition_on_app_met(
     app: str,
     units: Optional[List[Unit]],
     apps_statuses: Optional[List[str]],
-    apps_full_statuses: Optional[Dict[str, Dict[str, List[str]]]],
+    apps_full_statuses: Optional[Dict[str, List[StatusObject]]],
 ) -> bool:
     """Evaluate if all the conditions of an application are met."""
     if units:
@@ -234,22 +235,29 @@ def _is_every_condition_on_app_met(
         app_status = Status(
             value=app_status["current"],
             since=app_status["since"],
-            message=app_status.get("message"),
+            message=app_status.get("message", ""),
         )
 
     if apps_statuses:
         if app_status.value not in apps_statuses:
             return False
     else:
-        any_match = False
-        for status_val, messages in apps_full_statuses[app].items():
-            any_match = any_match or (
-                app_status.value == status_val and app_status.message in (messages or ["", None])
-            )
-        if not any_match:
-            return False
+        app_statuses = apps_full_statuses.get(app, [])
+        if not app_statuses:
+            return app_status.message != ""
+        return any(_does_message_match(app_status.message, status) for status in app_statuses)
 
     return True
+
+
+def _does_message_match(status_message: str, status: StatusObject) -> bool:
+    """Check if the status message matches the expected message."""
+    return (
+        status_message == status.message
+        or status_message.startswith(status.message)
+        or status_message.startswith(f"{status.message:.40}")
+        or (status.short_message is not None and status_message.startswith(status.short_message))
+    )
 
 
 def _is_every_condition_on_units_met(
@@ -257,7 +265,7 @@ def _is_every_condition_on_units_met(
     app: str,
     units: List[Unit],
     units_statuses: Optional[List[str]],
-    units_full_statuses: Optional[Dict[str, Dict[str, Dict[str, List[str]]]]],
+    units_full_statuses: Optional[Dict[str, List[StatusObject]]],
     idle_period: int,
 ) -> bool:
     """Evaluate if all the conditions of a unit are met."""
@@ -273,13 +281,11 @@ def _is_every_condition_on_units_met(
             if unit.workload_status.value not in units_statuses:
                 return False
         else:
-            any_match = False
-            for status_val, messages in units_full_statuses[app]["units"].items():
-                any_match = any_match or (
-                    unit.workload_status.value == status_val
-                    and unit.workload_status.message in (messages or ["", None])
-                )
-            if not any_match:
+            unit_statuses = units_full_statuses.get(app, [])
+            unit_message = unit.workload_status.message or ""
+            if not unit_statuses:
+                return unit_message != ""
+            if not any(_does_message_match(unit_message, status) for status in unit_statuses):
                 return False
 
         if unit.agent_status.since + timedelta(seconds=idle_period) > datetime.now():
@@ -293,9 +299,9 @@ async def _is_every_condition_met(
     apps: List[str],
     wait_for_exact_units: Dict[str, int],
     apps_statuses: Optional[List[str]] = None,
-    apps_full_statuses: Optional[Dict[str, Dict[str, List[str]]]] = None,
+    apps_full_statuses: Optional[Dict[str, List[StatusObject]]] = None,
     units_statuses: Optional[List[str]] = None,
-    units_full_statuses: Optional[Dict[str, Dict[str, Dict[str, List[str]]]]] = None,
+    units_full_statuses: Optional[Dict[str, List[StatusObject]]] = None,
     idle_period: int = 30,
 ) -> bool:
     """Evaluate if all the deployment status conditions are met."""
@@ -350,9 +356,9 @@ async def wait_until(  # noqa: C901
     ops_test: OpsTest,
     apps: List[str],
     apps_statuses: Optional[List[str]] = None,
-    apps_full_statuses: Optional[Dict[str, Dict[str, List[str]]]] = None,
+    apps_full_statuses: Optional[Dict[str, List[StatusObject]]] = None,
     units_statuses: Optional[List[str]] = None,
-    units_full_statuses: Optional[Dict[str, Dict[str, Dict[str, List[str]]]]] = None,
+    units_full_statuses: Optional[Dict[str, List[StatusObject]]] = None,
     wait_for_exact_units: Optional[Union[int, Dict[str, int]]] = -1,
     idle_period: int = 30,
     timeout: int = 1200,
@@ -365,11 +371,11 @@ async def wait_until(  # noqa: C901
         apps_statuses: List of acceptable application statuses to wait for, for all apps.
             ["blocked", "active", ...]
         apps_full_statuses: List of acceptable unit statuses to wait for, for all apps with more
-            granularity: {"app1": {"blocked": ["msg1", "msg2"], "active": []}, "app2": ...}
+            granularity: {"app1": [status1, status2]}, "app2": ...}
         units_statuses: List of acceptable statuses to wait for, for all units of all apps.
             ["blocked", "active", ...]
         units_full_statuses: List of acceptable statuses to wait for, for all apps with more
-            granularity: {"app1": "units": {"blocked": ["msg1", "msg2"], "active": []}}, "app2"...}
+            granularity: {"app1": [status1, status2]}, "app2": ...}
         wait_for_exact_units: The desired number of units to wait for, can be >= to -1
             if set as int, this value is expected for all apps but if more granularity is needed to
             be set, pass a dictionary such as: {"app1": 2, "app2": 1, ...}, if set to -1, the check
