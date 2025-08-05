@@ -66,7 +66,7 @@ version = "4.9.0"
 description = "High level compatibility layer for multiple asynchronous event loop implementations"
 optional = false
 python-versions = ">=3.9"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "anyio-4.9.0-py3-none-any.whl", hash = "sha256:9f76d541cad6e36af7beb62e978876f3b41e3e04f2c1fbf0884604c0a9c4d93c"},
     {file = "anyio-4.9.0.tar.gz", hash = "sha256:673c0c244e15788651a4ff38710fea9675823028a6f08a5eda409e0c9840a028"},
@@ -385,6 +385,55 @@ markers = {main = "platform_python_implementation != \"PyPy\"", charm-libs = "pl
 pycparser = "*"
 
 [[package]]
+name = "charm-api"
+version = "0.1.2"
+description = ""
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "charm_api-0.1.2-py3-none-any.whl", hash = "sha256:f76806f8d8e1e39ae4a812711350399168cd26b319a01e73a5816ef8fb9f7ed4"},
+    {file = "charm_api-0.1.2.tar.gz", hash = "sha256:5d74418a3ffdee189dec1eaf648ba1bd7cff7449c3cdd2334a724e6722204c9d"},
+]
+
+[[package]]
+name = "charm-json"
+version = "0.1.1"
+description = ""
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "charm_json-0.1.1-py3-none-any.whl", hash = "sha256:a3fac62d45821d1a8c14058632e21333ec4e2cd41d0d00d6a73d00fc9a656eef"},
+    {file = "charm_json-0.1.1.tar.gz", hash = "sha256:cb2eb24f6135d226ad04b0a17288ca2e027160d8af288083ef701bf4b137154e"},
+]
+
+[package.dependencies]
+charm-api = ">=0.1.1"
+
+[[package]]
+name = "charm-refresh"
+version = "3.1.0.0"
+description = "In-place rolling refreshes (upgrades) of stateful charmed applications"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "charm_refresh-3.1.0.0-py3-none-any.whl", hash = "sha256:c673077b56700bb255a05b81e215e6de042707f2037f84579ae513a48e37c80c"},
+    {file = "charm_refresh-3.1.0.0.tar.gz", hash = "sha256:20c61a4365d762fa8fd378b4e57312d94e7e52c9100bcf1ffdcbdefc68271467"},
+]
+
+[package.dependencies]
+charm-api = ">=0.1.1"
+charm-json = ">=0.1.1"
+httpx = ">=0.28.1"
+lightkube = ">=0.15.4"
+ops = ">=2.9.0"
+packaging = ">=24.1"
+pyyaml = ">=6.0.2"
+tomli = ">=2.0.1"
+
+[[package]]
 name = "charset-normalizer"
 version = "3.4.1"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
@@ -692,7 +741,7 @@ version = "1.2.2"
 description = "Backport of PEP 654 (exception groups)"
 optional = false
 python-versions = ">=3.7"
-groups = ["charm-libs", "integration", "unit"]
+groups = ["main", "charm-libs", "integration", "unit"]
 markers = "python_version < \"3.11\""
 files = [
     {file = "exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b"},
@@ -750,7 +799,7 @@ version = "0.16.0"
 description = "A pure-Python, bring-your-own-I/O implementation of HTTP/1.1"
 optional = false
 python-versions = ">=3.8"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86"},
     {file = "h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1"},
@@ -762,7 +811,7 @@ version = "1.0.9"
 description = "A minimal low-level HTTP client."
 optional = false
 python-versions = ">=3.8"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55"},
     {file = "httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8"},
@@ -784,7 +833,7 @@ version = "0.28.1"
 description = "The next generation HTTP client."
 optional = false
 python-versions = ">=3.8"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad"},
     {file = "httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc"},
@@ -1080,7 +1129,7 @@ version = "0.17.1"
 description = "Lightweight kubernetes client library"
 optional = false
 python-versions = "*"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "lightkube-0.17.1-py3-none-any.whl", hash = "sha256:3d046c2c46191b3745471763710ef4ed2df4259a7405f798b577df2ae390358a"},
     {file = "lightkube-0.17.1.tar.gz", hash = "sha256:e0d6b71476a4fa7cbda7080da1f0943e43c7e747212db9f2ec7d87415bf8d23e"},
@@ -1100,7 +1149,7 @@ version = "1.32.0.8"
 description = "Models and Resources for lightkube module"
 optional = false
 python-versions = "*"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "lightkube-models-1.32.0.8.tar.gz", hash = "sha256:97f6c2ab554a23a69554dd56ffbd94173fb416af6490c3a21b1e0b8e13a2bafe"},
     {file = "lightkube_models-1.32.0.8-py3-none-any.whl", hash = "sha256:73786dac63085521f4c88aa69d86bfdc76a67da997c1770e5bdcef8482e4b2a0"},
@@ -1298,7 +1347,7 @@ version = "25.0"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.8"
-groups = ["integration", "unit"]
+groups = ["main", "integration", "unit"]
 files = [
     {file = "packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"},
     {file = "packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f"},
@@ -2007,7 +2056,7 @@ version = "1.3.1"
 description = "Sniff out which async library your code is running under"
 optional = false
 python-versions = ">=3.7"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2"},
     {file = "sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc"},
@@ -2055,7 +2104,7 @@ version = "2.2.1"
 description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
-groups = ["integration", "unit"]
+groups = ["main", "integration", "unit"]
 files = [
     {file = "tomli-2.2.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:678e4fa69e4575eb77d103de3df8a895e1591b48e740211bd1067378c69e8249"},
     {file = "tomli-2.2.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:023aa114dd824ade0100497eb2318602af309e5a55595f76b626d6d9f3b7b0a6"},
@@ -2292,4 +2341,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "6f35e35a537ec4e7cab8ee175f1e0eb78d84e4fea0a0c6fe99af3912a9850cea"
+content-hash = "59e9abdf1472c2d969ebe139409ef1795e92a3c8248f46df6f1db90366223584"

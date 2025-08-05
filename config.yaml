@@ -40,3 +40,10 @@ options:
       The extra-sans are specified by comma-separated names to be added when requesting signed certificates.
       Use "{unit}" as a placeholder to be filled with the unit number, e.g. "worker-{unit}" will be translated as 
       "worker-0" for unit 0 and "worker-1" for unit 1 when requesting the certificate.
+
+  pause-after-unit-refresh:
+    type: string
+    default: first
+    description: |
+      Wait for manual confirmation to resume refresh after these units refresh
+      Allowed values: "all", "first", "none"
