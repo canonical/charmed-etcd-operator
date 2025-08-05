@@ -7,6 +7,7 @@
 import logging
 from subprocess import CalledProcessError
 
+import charm_refresh
 import ops
 import ops.log
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -18,6 +19,7 @@ from core.cluster import ClusterState
 from events.backup import BackupEvents
 from events.etcd import EtcdEvents
 from events.external_clients import ExternalClientsEvents
+from events.refresh import MachinesEtcdRefresh
 from events.tls import TLSEvents
 from literals import (
     METRICS_PORT,
@@ -72,6 +74,12 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.tls_events = TLSEvents(self)
         self.backup_events = BackupEvents(self)
         self.external_clients_events = ExternalClientsEvents(self)
+        try:
+            self.refresh = charm_refresh.Machines(
+                MachinesEtcdRefresh(workload_name="etcd", charm_name="charmed-etcd", charm=self)
+            )
+        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            self.refresh = None
 
         # --- LIB EVENT HANDLERS ---
         self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)
