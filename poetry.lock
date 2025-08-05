@@ -54,7 +54,7 @@ version = "0.7.0"
 description = "Reusable constraint types to use with typing.Annotated"
 optional = false
 python-versions = ">=3.8"
-groups = ["charm-libs", "integration"]
+groups = ["main", "charm-libs", "integration"]
 files = [
     {file = "annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53"},
     {file = "annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89"},
@@ -740,6 +740,27 @@ test = ["certifi (>=2024)", "cryptography-vectors (==44.0.2)", "pretend (>=0.7)"
 test-randomorder = ["pytest-randomly"]
 
 [[package]]
+name = "data-platform-helpers"
+version = "0.1.7"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.10"
+groups = ["main", "integration"]
+files = [
+    {file = "data_platform_helpers-0.1.7-py3-none-any.whl", hash = "sha256:cf01caef414a4c07911ecf2c009c19b8f69cae154b540dd578ddbe2af8fd3b98"},
+    {file = "data_platform_helpers-0.1.7.tar.gz", hash = "sha256:04445f3f4309730bb1c569a04464caeb27390b0d6e07829d09dacd8882fcfcd1"},
+]
+
+[package.dependencies]
+ops = ">=2.15.0"
+pydantic = ">=2.0"
+rich = "*"
+
+[package.extras]
+all = ["pytest_operator (==0.36.0)"]
+tests = ["pytest_operator (==0.36.0)"]
+
+[[package]]
 name = "decorator"
 version = "5.2.1"
 description = "Decorators for Humans"
@@ -1207,6 +1228,31 @@ requests = ">=2.18.1,<3.0"
 six = ">=1.11.0,<2.0"
 
 [[package]]
+name = "markdown-it-py"
+version = "3.0.0"
+description = "Python port of markdown-it. Markdown parsing, done right!"
+optional = false
+python-versions = ">=3.8"
+groups = ["main", "integration"]
+files = [
+    {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
+    {file = "markdown_it_py-3.0.0-py3-none-any.whl", hash = "sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1"},
+]
+
+[package.dependencies]
+mdurl = ">=0.1,<1.0"
+
+[package.extras]
+benchmarking = ["psutil", "pytest", "pytest-benchmark"]
+code-style = ["pre-commit (>=3.0,<4.0)"]
+compare = ["commonmark (>=0.9,<1.0)", "markdown (>=3.4,<4.0)", "mistletoe (>=1.0,<2.0)", "mistune (>=2.0,<3.0)", "panflute (>=2.3,<3.0)"]
+linkify = ["linkify-it-py (>=1,<3)"]
+plugins = ["mdit-py-plugins"]
+profiling = ["gprof2dot"]
+rtd = ["jupyter_sphinx", "mdit-py-plugins", "myst-parser", "pyyaml", "sphinx", "sphinx-copybutton", "sphinx-design", "sphinx_book_theme"]
+testing = ["coverage", "pytest", "pytest-cov", "pytest-regressions"]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.2"
 description = "Safely add untrusted strings to HTML/XML markup."
@@ -1291,6 +1337,18 @@ files = [
 
 [package.dependencies]
 traitlets = "*"
+
+[[package]]
+name = "mdurl"
+version = "0.1.2"
+description = "Markdown URL utilities"
+optional = false
+python-versions = ">=3.7"
+groups = ["main", "integration"]
+files = [
+    {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
+    {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
+]
 
 [[package]]
 name = "mypy-boto3-s3"
@@ -1589,7 +1647,7 @@ version = "2.9.1"
 description = "Data validation using Python type hints"
 optional = false
 python-versions = ">=3.8"
-groups = ["charm-libs", "integration"]
+groups = ["main", "charm-libs", "integration"]
 files = [
     {file = "pydantic-2.9.1-py3-none-any.whl", hash = "sha256:7aff4db5fdf3cf573d4b3c30926a510a10e19a0774d38fc4967f78beb6deb612"},
     {file = "pydantic-2.9.1.tar.gz", hash = "sha256:1363c7d975c7036df0db2b4a61f2e062fbc0aa5ab5f2772e0ffc7191a4f4bce2"},
@@ -1613,7 +1671,7 @@ version = "2.23.3"
 description = "Core functionality for Pydantic validation and serialization"
 optional = false
 python-versions = ">=3.8"
-groups = ["charm-libs", "integration"]
+groups = ["main", "charm-libs", "integration"]
 files = [
     {file = "pydantic_core-2.23.3-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:7f10a5d1b9281392f1bf507d16ac720e78285dfd635b05737c3911637601bae6"},
     {file = "pydantic_core-2.23.3-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:3c09a7885dd33ee8c65266e5aa7fb7e2f23d49d8043f089989726391dd7350c5"},
@@ -1715,7 +1773,7 @@ version = "2.19.1"
 description = "Pygments is a syntax highlighting package written in Python."
 optional = false
 python-versions = ">=3.8"
-groups = ["integration"]
+groups = ["main", "integration"]
 files = [
     {file = "pygments-2.19.1-py3-none-any.whl", hash = "sha256:9ea1544ad55cecf4b8242fab6dd35a93bbce657034b0611ee383099054ab6d8c"},
     {file = "pygments-2.19.1.tar.gz", hash = "sha256:61c16d2a8576dc0649d9f39e089b5f02bcd27fba10d8fb4dcc28173f7a45151f"},
@@ -1807,22 +1865,22 @@ dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "pygments
 
 [[package]]
 name = "pytest-asyncio"
-version = "0.26.0"
+version = "0.21.2"
 description = "Pytest support for asyncio"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.7"
 groups = ["integration", "unit"]
 files = [
-    {file = "pytest_asyncio-0.26.0-py3-none-any.whl", hash = "sha256:7b51ed894f4fbea1340262bdae5135797ebbe21d8638978e35d31c6d19f72fb0"},
-    {file = "pytest_asyncio-0.26.0.tar.gz", hash = "sha256:c4df2a697648241ff39e7f0e4a73050b03f123f760673956cf0d72a4990e312f"},
+    {file = "pytest_asyncio-0.21.2-py3-none-any.whl", hash = "sha256:ab664c88bb7998f711d8039cacd4884da6430886ae8bbd4eded552ed2004f16b"},
+    {file = "pytest_asyncio-0.21.2.tar.gz", hash = "sha256:d67738fc232b94b326b9d060750beb16e0074210b98dd8b58a5239fa2a154f45"},
 ]
 
 [package.dependencies]
-pytest = ">=8.2,<9"
+pytest = ">=7.0.0"
 
 [package.extras]
-docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1)"]
-testing = ["coverage (>=6.2)", "hypothesis (>=5.7.1)"]
+docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1.0)"]
+testing = ["coverage (>=6.2)", "flaky (>=3.5.0)", "hypothesis (>=5.7.1)", "mypy (>=0.931)", "pytest-trio (>=0.7.0)"]
 
 [[package]]
 name = "pytest-mock"
@@ -1844,14 +1902,14 @@ dev = ["pre-commit", "pytest-asyncio", "tox"]
 
 [[package]]
 name = "pytest-operator"
-version = "0.28.0"
-description = "Fixtures for Operators"
+version = "0.43.1"
+description = "Fixtures for Charmed Operators"
 optional = false
-python-versions = "*"
+python-versions = ">=3.8"
 groups = ["integration"]
 files = [
-    {file = "pytest-operator-0.28.0.tar.gz", hash = "sha256:efac98697da71558790eb5d4c9d42f11f3d5fb43dff22a802aee69e1801edce8"},
-    {file = "pytest_operator-0.28.0-py3-none-any.whl", hash = "sha256:b3cb5a8ebf838f890133a25ee520c25c8be259b54341e42e39f64a6d97735d9f"},
+    {file = "pytest_operator-0.43.1-py3-none-any.whl", hash = "sha256:092e010fef884ea6166c3f71ec4ca717ed9158cf09de67f28e23cfdd780c46fa"},
+    {file = "pytest_operator-0.43.1.tar.gz", hash = "sha256:fd76c7e34c56624176405b47f981de3fe0c3efb71d7875109483cc01f221be99"},
 ]
 
 [package.dependencies]
@@ -1859,7 +1917,7 @@ ipdb = "*"
 jinja2 = "*"
 juju = "*"
 pytest = "*"
-pytest-asyncio = "*"
+pytest-asyncio = "<0.23"
 pyyaml = "*"
 
 [[package]]
@@ -1992,6 +2050,25 @@ requests = ">=2.0.0"
 
 [package.extras]
 rsa = ["oauthlib[signedtoken] (>=3.0.0)"]
+
+[[package]]
+name = "rich"
+version = "14.1.0"
+description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
+optional = false
+python-versions = ">=3.8.0"
+groups = ["main", "integration"]
+files = [
+    {file = "rich-14.1.0-py3-none-any.whl", hash = "sha256:536f5f1785986d6dbdea3c75205c473f970777b4a0d6c6dd1b696aa05a3fa04f"},
+    {file = "rich-14.1.0.tar.gz", hash = "sha256:e497a48b844b0320d45007cdebfeaeed8db2a4f4bcf49f15e455cfc4af11eaa8"},
+]
+
+[package.dependencies]
+markdown-it-py = ">=2.2.0"
+pygments = ">=2.13.0,<3.0.0"
+
+[package.extras]
+jupyter = ["ipywidgets (>=7.5.1,<9)"]
 
 [[package]]
 name = "rsa"
@@ -2384,4 +2461,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "12a765b73c81884133095f0dc4f78a20073881035c8b3c1d833b1aa8b1caffa1"
+content-hash = "13690bd0a4f05fdb00f9690a83781b0d78d80f93dc30ad234afbb8398beee797"
