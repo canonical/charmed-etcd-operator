@@ -17,6 +17,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 )
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
+from data_platform_helpers.advanced_statuses.utils import as_status
 from ops import testing
 from scenario import Secret, State
 
@@ -25,11 +26,13 @@ from common.exceptions import EtcdUserManagementError
 from literals import (
     CERTIFICATE_TRANSFER_RELATION,
     EXTERNAL_CLIENTS_RELATION,
-    Status,
     TLSCARotationState,
     TLSState,
     TLSType,
 )
+from statuses import ExternalClientsStatuses
+
+from .helpers import status_is
 
 CLIENT_COMMON_NAME = "test-common-name"
 server_cert = MagicMock()
@@ -382,7 +385,9 @@ def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context, 
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        assert state_out.app_status == Status.EC_MISSING_CREDENTIALS.value.status
+        assert status_is(
+            state_out, ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value, is_app=True
+        )
         assert ecr_relation.id not in charm.state.cluster.managed_users
 
 
@@ -1206,7 +1211,9 @@ def test_add_ecr_invalid_cert(cluster_tls_context, ca_cert):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         assert ecr_relation.id not in charm.state.cluster.managed_users
-        assert state_out.app_status == Status.EC_INVALID_CERTIFICATE.value.status
+        assert state_out.app_status == as_status(
+            ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value
+        )
 
 
 def test_add_ecr_invalid_cert_no_basic_constraints(
@@ -1243,7 +1250,9 @@ def test_add_ecr_invalid_cert_no_basic_constraints(
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         assert ecr_relation.id not in charm.state.cluster.managed_users
-        assert state_out.app_status == Status.EC_INVALID_CERTIFICATE.value.status
+        assert state_out.app_status == as_status(
+            ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value
+        )
 
 
 def test_ecr_update_chain_invalid_new_value(cluster_tls_context, mtls_cert, ca_cert):
@@ -1331,7 +1340,9 @@ def test_ecr_update_chain_invalid_new_value(cluster_tls_context, mtls_cert, ca_c
             assert ecr_relation.id not in charm.state.cluster.managed_users
             remove_role.assert_called_once_with(old_common_name)
             remove_user.assert_called_once_with(old_common_name)
-            assert state_out.app_status == Status.EC_INVALID_CERTIFICATE.value.status
+            assert state_out.app_status == as_status(
+                ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value
+            )
 
 
 def test_certificate_transfer_new_ca(cluster_tls_context, ca_cert):

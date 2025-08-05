@@ -12,7 +12,7 @@ import ops
 import ops.log
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
-from ops import StatusBase
+from data_platform_helpers.advanced_statuses.handler import StatusHandler
 
 from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
@@ -25,8 +25,6 @@ from literals import (
     METRICS_PORT,
     RESTART_RELATION,
     SUBSTRATE,
-    DebugLevel,
-    Status,
     TLSCARotationState,
     TLSState,
     TLSType,
@@ -56,7 +54,6 @@ class EtcdOperatorCharm(ops.CharmBase):
 
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
-        self.pending_inactive_statuses: list[Status] = []
 
         # --- MANAGERS ---
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
@@ -67,6 +64,15 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.backup_manager = BackupManager(state=self.state, workload=self.workload)
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE
+        )
+
+        self.status = StatusHandler(  # priority order
+            self,
+            self.cluster_manager,
+            self.config_manager,
+            self.tls_manager,
+            self.external_clients_manager,
+            self.backup_manager,
         )
 
         # --- EVENT HANDLERS ---
@@ -98,17 +104,6 @@ class EtcdOperatorCharm(ops.CharmBase):
                 }
             ],
         )
-
-        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
-        self.framework.observe(self.on.collect_app_status, self._on_collect_status)
-
-    def set_status(self, key: Status) -> None:
-        """Set charm status."""
-        status: StatusBase = key.value.status
-        log_level: DebugLevel = key.value.log_level
-
-        getattr(logger, log_level.lower())(status.message)
-        self.pending_inactive_statuses.append(key)
 
     def _restart(self, _) -> None:
         """Restart callback for the rolling ips lib."""
@@ -291,40 +286,6 @@ class EtcdOperatorCharm(ops.CharmBase):
                 raise HealthCheckFailedError("Failed to check health of the member after restart")
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
-
-    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
-        """Compute the current status for this unit.
-
-        Ops framework will choose the highest-priority status and set that as the status.
-        If there are multiple statuses with the same priority, the first one added wins.
-        Component statuses should be computed in their respective priority.
-        """
-        if self.app.planned_units() == 0:
-            event.add_status(Status.REMOVED.value.status)
-            return
-
-        # compute cluster status
-        for status in self.cluster_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        # compute config status
-        for status in self.config_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        # compute TLS status
-        for status in self.tls_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        for status in self.external_clients_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        # compute backup status
-        for status in self.backup_manager.compute_component_status():
-            event.add_status(status.value.status)
-
-        # add all other statuses collected during the current hook
-        for status in self.pending_inactive_statuses + [Status.ACTIVE]:
-            event.add_status(status.value.status)
 
 
 if __name__ == "__main__":  # pragma: nocover

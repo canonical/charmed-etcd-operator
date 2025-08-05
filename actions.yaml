@@ -27,6 +27,14 @@ rebuild-cluster:
       type: boolean
       description: Force the rebuild of a cluster even if the majority was not lost.
 
+status-detail:
+  description: Gets statuses of the charm
+  params:
+    recompute:
+      type: boolean
+      default: false
+      description: a boolean indicating whether a unit should recompute all statuses.
+
 pre-refresh-check:
   description: Check if charm is ready to refresh
   additionalProperties: false

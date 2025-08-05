@@ -10,7 +10,8 @@ import pytest
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, Status, TLSType
+from literals import INTERNAL_USER, PEER_RELATION, TLSType
+from statuses import CharmStatuses, TLSStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -234,7 +235,7 @@ async def test_extra_sans_config_option(ops_test: OpsTest) -> None:
         ops_test,
         apps=[APP_NAME],
         apps_full_statuses={
-            APP_NAME: {"blocked": [Status.SANS_CONFIG_INVALID.value.status.message]},
+            APP_NAME: [TLSStatuses.SANS_CONFIG_INVALID.value],
         },
         wait_for_exact_units=NUM_UNITS,
     )
@@ -603,13 +604,8 @@ async def test_certificate_expiration(ops_test: OpsTest) -> None:
         ops_test,
         apps=[APP_NAME, TLS_NAME],
         units_full_statuses={
-            APP_NAME: {
-                "units": {
-                    "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
-                    "active": [],
-                }
-            },
-            TLS_NAME: {"units": {"active": []}},
+            APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
+            TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
         },
     )
 

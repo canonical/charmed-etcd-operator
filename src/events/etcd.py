@@ -24,11 +24,11 @@ from requests.exceptions import RequestException
 from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
+    EtcdServiceError,
     EtcdUserManagementError,
     HealthCheckFailedError,
     RaftLeaderNotFoundError,
 )
-from common.secrets import get_secret_from_id
 from literals import (
     CLIENT_PORT,
     DATA_STORAGE,
@@ -41,10 +41,10 @@ from literals import (
     SNAP_GROUP,
     SNAP_LOG_PATH,
     SNAP_USER,
-    Status,
     TLSState,
     TLSType,
 )
+from statuses import ClusterStatuses, EtcdServiceStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -99,8 +99,15 @@ class EtcdEvents(Object):
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
         if not self.charm.workload.install():
-            self.charm.set_status(Status.SERVICE_NOT_INSTALLED)
-            return
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
+            raise EtcdServiceError(
+                "Failed to install the etcd snap. Check the logs for more details."
+            )
 
     def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
@@ -127,6 +134,12 @@ class EtcdEvents(Object):
         if not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
             # this is the very first cluster start, this unit starts without being added as member
             # all subsequent units will have to be added as member before starting the workload
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_STARTING.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
             self.charm.cluster_manager.start_member()
 
             if storage_reuse:
@@ -183,20 +196,35 @@ class EtcdEvents(Object):
                         # if removing fails, we cannot start the workload or the member would crash
                         raise
 
-                self.charm.set_status(Status.SERVICE_STARTING)
+                self.charm.status.set_running_status(
+                    EtcdServiceStatuses.SERVICE_STARTING.value,
+                    scope="unit",
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
+                )
                 self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
-            self.charm.set_status(Status.CLUSTER_NOT_JOINED)
             event.defer()
             return
 
         if self.charm.workload.alive():
             logger.info("Workload started successfully. Opening client port")
             self.charm.unit.open_port("tcp", CLIENT_PORT)
+            self.charm.state.statuses.delete(
+                EtcdServiceStatuses.SERVICE_STARTING.value,
+                scope="unit",
+                component=self.charm.cluster_manager.name,
+            )
         else:
-            self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+            logger.error("Workload failed to start.")
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config_changed event."""
@@ -273,19 +301,13 @@ class EtcdEvents(Object):
                     self.charm.cluster_manager.promote_learning_member()
                 except EtcdClusterManagementError as e:
                     logger.warning(e)
-                    self.charm.set_status(Status.CLUSTER_MEMBER_NOT_PROMOTED)
                     event.defer()
                     return
 
             # reflect membership updates in the cluster state, e.g. ip change or tls switchover
             self.charm.cluster_manager.update_cluster_member_state()
 
-            try:
-                self.charm.external_clients_manager.update_client_relations_data(
-                    etcd_version=self.charm.cluster_manager.get_version()
-                )
-            except KeyError as e:
-                logger.warning(f"Error updating client relations data: {e}")
+            self._update_client_relations()
 
         for tls_type in TLSType:
             try:
@@ -336,13 +358,12 @@ class EtcdEvents(Object):
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle all events in the 'cluster' peer relation."""
         if not self.charm.state.peer_relation:
-            self.charm.set_status(Status.NO_PEER_RELATION)
+            event.defer()
             return
-
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
                 try:
-                    password = get_secret_from_id(self.charm.model, admin_secret_id).get(
+                    password = self.charm.state.get_secret_from_id(str(admin_secret_id)).get(
                         INTERNAL_USER
                     )
                 except (ModelError, SecretNotFoundError) as e:
@@ -355,7 +376,6 @@ class EtcdEvents(Object):
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
-                self.charm.set_status(Status.CLUSTER_FAILED)
                 return
         except RequestException:
             # if anything fails with the metrics request, we don't want to panic
@@ -375,12 +395,16 @@ class EtcdEvents(Object):
 
         if not self.charm.workload.alive():
             if not self.charm.cluster_manager.restart_member():
-                self.charm.set_status(Status.SERVICE_NOT_RUNNING)
+                self.charm.status.set_running_status(
+                    EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                    scope="unit",
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
+                )
                 return
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
-                self.charm.set_status(Status.CLUSTER_FAILED)
                 return
         except RequestException:
             # if anything fails with the metrics request, we don't want to panic
@@ -390,6 +414,11 @@ class EtcdEvents(Object):
             try:
                 self.charm.cluster_manager.clean_users()
                 self.charm.cluster_manager.remove_inconsistent_members_if_required()
+                self.charm.state.statuses.delete(
+                    ClusterStatuses.CLUSTER_MANAGEMENT_ERROR.value,
+                    scope="unit",
+                    component=self.charm.cluster_manager.name,
+                )
             except (
                 AttributeError,
                 KeyError,
@@ -398,7 +427,12 @@ class EtcdEvents(Object):
                 EtcdUserManagementError,
             ) as e:
                 logger.error(e)
-                self.charm.set_status(Status.CLUSTER_MANAGEMENT_ERROR)
+                self.charm.status.set_running_status(
+                    ClusterStatuses.CLUSTER_MANAGEMENT_ERROR.value,
+                    scope="unit",
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
+                )
 
         for tls_type in TLSType:
             try:
@@ -484,12 +518,18 @@ class EtcdEvents(Object):
 
         self.charm.workload.stop()
         self.charm.state.unit_server.update({"state": ""})
-        self.charm.set_status(Status.REMOVED)
+        self.charm.status.set_running_status(
+            ClusterStatuses.REMOVED.value,
+            scope="unit",
+            component_name=self.charm.cluster_manager.name,
+            statuses_state=self.charm.state.statuses,
+        )
 
     def update_admin_password(self, admin_secret_id: str) -> None:
         """Compare current admin password and update in etcd if required."""
+        errored = False
         try:
-            if new_password := get_secret_from_id(self.charm.model, admin_secret_id).get(
+            if new_password := self.charm.state.get_secret_from_id(admin_secret_id).get(
                 INTERNAL_USER
             ):
                 # only update admin credentials if the password has changed
@@ -506,13 +546,38 @@ class EtcdEvents(Object):
                         )
                     except EtcdUserManagementError as e:
                         logger.error(e)
-                        self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
+                        self.charm.status.set_running_status(
+                            ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+                            scope="app",
+                            component_name=self.charm.cluster_manager.name,
+                            statuses_state=self.charm.state.statuses,
+                        )
+                        errored = True
             else:
                 logger.error(f"Invalid username in secret {admin_secret_id}.")
-                self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
+                self.charm.status.set_running_status(
+                    ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+                    scope="app",
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
+                )
+                errored = True
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
-            self.charm.set_status(Status.PASSWORD_UPDATE_FAILED)
+            self.charm.status.set_running_status(
+                ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+                scope="app",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
+            errored = True
+
+        if not errored:
+            self.charm.state.statuses.delete(
+                ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+                scope="app",
+                component=self.charm.cluster_manager.name,
+            )
 
     def _rebuild_cluster(self) -> None:  # noqa: C901
         """Rebuild cluster with new membership configuration, to recover from majority failure.
@@ -612,3 +677,12 @@ class EtcdEvents(Object):
             return "Restore in progress, cannot perform action."
 
         return ""
+
+    def _update_client_relations(self) -> None:
+        if self.charm.state.unit_server.tls_client_state == TLSState.TLS:
+            try:
+                self.charm.external_clients_manager.update_client_relations_data(
+                    etcd_version=self.charm.cluster_manager.get_version()
+                )
+            except KeyError as e:
+                logger.warning(f"Error updating client relations data: {e}")

@@ -9,19 +9,26 @@ import logging
 from pathlib import Path
 
 from charms.tls_certificates_interface.v4.tls_certificates import Certificate
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 
 from common.certificates import is_leaf_certificate_valid
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import CLIENT_PORT, SUBSTRATES, Status, TLSState
+from literals import CLIENT_PORT, SUBSTRATES, TLSCARotationState, TLSState
+from statuses import CharmStatuses, ClusterStatuses, ExternalClientsStatuses, TLSStatuses
 
 logger = logging.getLogger(__name__)
 
 WORKING_DIR = Path(__file__).absolute().parent
 
 
-class ExternalClientsManager:
+class ExternalClientsManager(ManagerStatusProtocol):
     """Handle the external clients related logic."""
+
+    name = "external_clients"
+    state: ClusterState
 
     def __init__(
         self,
@@ -137,16 +144,39 @@ class ExternalClientsManager:
             if relation_data.get("version") != etcd_version:
                 self.state.etcd_provides.set_version(relation.id, etcd_version)
 
-    def compute_component_status(self) -> list[Status]:
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the component status."""
-        status_list = []
+        status_list: list[StatusObject] = []
 
         for relation in self.state.etcd_provides.relations:
             mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
+            prefix = self.state.etcd_provides.fetch_relation_field(relation.id, "prefix")
             # for client relation created hook
-            if not mtls_cert:
+            if not mtls_cert or not prefix:
+                status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
                 continue
             if not is_leaf_certificate_valid(mtls_cert):
-                status_list.append(Status.EC_INVALID_CERTIFICATE)
+                status_list.append(ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value)
 
-        return status_list
+            common_name = self.get_common_name_from_chain(mtls_cert)
+            relation_managed_user = self.get_relation_managed_user(relation.id)
+            if relation_managed_user and relation_managed_user != common_name:
+                status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
+
+        if self.state.etcd_provides.relations:
+            if self.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
+                status_list.append(ExternalClientsStatuses.EC_TLS_IS_DISABLED.value)
+
+            if self.state.unit_server.tls_client_state == TLSState.TO_TLS:
+                status_list.append(TLSStatuses.TLS_NOT_READY.value)
+
+            if (
+                self.state.unit_server.tls_client_ca_rotation_state
+                != TLSCARotationState.NO_ROTATION
+            ):
+                status_list.append(TLSStatuses.TLS_CLIENT_CA_ROTATING.value)
+
+            if not self.state.cluster.auth_enabled:
+                status_list.append(ClusterStatuses.CLUSTER_NOT_INITIALIZED.value)
+
+        return status_list or [CharmStatuses.ACTIVE_IDLE.value]

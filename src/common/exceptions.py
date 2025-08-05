@@ -31,3 +31,7 @@ class EtcdClusterManagementError(Exception):
 
 class EtcdBackupError(Exception):
     """Custom Exception if backup or restore operation fail."""
+
+
+class EtcdServiceError(Exception):
+    """Custom Exception if the etcd service has an error."""

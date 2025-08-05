@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-
 import logging
 import time
 
 import pytest
+from data_platform_helpers.advanced_statuses import StatusObjectDict
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION, Status, TLSType
+from literals import INTERNAL_USER, PEER_RELATION, TLSType
+from statuses import CharmStatuses, TLSStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -31,6 +32,25 @@ NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 90
+
+
+async def get_app_status_detail(
+    ops_test: OpsTest, app_name: str
+) -> tuple[StatusObjectDict, StatusObjectDict]:
+    """Get the status detail of the application."""
+    for unit in ops_test.model.applications[app_name].units:
+        if await unit.is_leader_from_status():
+            leader_unit = unit
+            break
+    else:
+        raise ValueError(f"No leader unit found for {app_name}")
+
+    status_detail = await leader_unit.run_action("status-detail")
+    response = await status_detail.wait()
+    json_output = response.results.get("json-output", {})
+    app_statuses = StatusObjectDict.model_validate_json(json_output["app"])
+    unit_statuses = StatusObjectDict.model_validate_json(json_output["unit"])
+    return app_statuses, unit_statuses
 
 
 @pytest.mark.abort_on_fail
@@ -228,11 +248,12 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
         ops_test,
         apps=[APP_NAME, TLS_NAME],
         apps_full_statuses={
-            APP_NAME: {
-                "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
-                "active": [],
-            },
-            TLS_NAME: {"active": []},
+            APP_NAME: [
+                TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
+            ],
+            TLS_NAME: [
+                CharmStatuses.ACTIVE_IDLE.value,
+            ],
         },
     )
 
@@ -258,20 +279,21 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     )
     assert current_client_certificate, "Failed to get the current client certificate"
 
-    logger.info("Waiting ~5.4m for expiration of certificates - renewed certs will have a new CA")
-    # the juju secret expires at 90% of the certificate validity; 360s * 0.9 = 324s
-    time.sleep(330)
+    logger.info(
+        "Waiting ~10.8m for expiration of CA certificates - renewed certs will have a new CA"
+    )
+    # the juju secret expires at 90% of the certificate validity; 720s * 0.9 = 648s
+    time.sleep(660)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        units_full_statuses={
-            APP_NAME: {
-                "units": {
-                    "maintenance": [Status.TLS_CLIENT_CERTS_EXPIRING.value.status.message],
-                    "active": [],
-                }
-            },
-            TLS_NAME: {"units": {"active": []}},
+        apps_full_statuses={
+            APP_NAME: [
+                TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
+            ],
+            TLS_NAME: [
+                CharmStatuses.ACTIVE_IDLE.value,
+            ],
         },
     )
 

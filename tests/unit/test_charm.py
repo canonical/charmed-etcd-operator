@@ -16,6 +16,7 @@ from requests.exceptions import RequestException
 from charm import EtcdOperatorCharm
 from common.exceptions import (
     EtcdClusterManagementError,
+    EtcdServiceError,
     EtcdUserManagementError,
 )
 from core.models import Member
@@ -24,9 +25,13 @@ from literals import (
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
+    STATUS_PEERS_RELATION,
     TLSState,
     TuningOptions,
 )
+from statuses import ClusterStatuses, ConfigStatuses, EtcdServiceStatuses, TLSStatuses
+
+from .helpers import status_is
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -52,8 +57,9 @@ def test_install_failure_blocked_status():
     state_in = testing.State()
 
     with patch("workload.EtcdWorkload.install", return_value=False):
-        state_out = ctx.run(ctx.on.install(), state_in)
-        assert state_out.unit_status == ops.BlockedStatus("unable to install etcd snap")
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.install(), state_in)
+        assert isinstance(e.value.__cause__, EtcdServiceError)
 
 
 def test_internal_user_creation():
@@ -70,7 +76,8 @@ def test_internal_user_creation():
 def test_start():
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
-    state_in = testing.State(leader=True, relations={relation})
+    status_peer_relation = testing.PeerRelation(id=2, endpoint=STATUS_PEERS_RELATION)
+    state_in = testing.State(leader=True, relations={relation, status_peer_relation})
 
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -90,7 +97,7 @@ def test_start():
             "cluster_state": "existing",
         },
     )
-    state_in = testing.State(leader=False, relations={relation})
+    state_in = testing.State(leader=False, relations={relation, status_peer_relation})
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
@@ -98,7 +105,7 @@ def test_start():
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status == ops.MaintenanceStatus("Waiting to join cluster")
+        assert status_is(state_out, ClusterStatuses.CLUSTER_NOT_JOINED.value)
         start.assert_not_called()
 
     # if authentication cannot be enabled, the charm should error out
@@ -106,7 +113,7 @@ def test_start():
         id=1,
         endpoint=PEER_RELATION,
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
@@ -121,7 +128,7 @@ def test_start():
 
     # if the cluster is new, the leader should immediately start and enable auth
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.exists", return_value=False),
@@ -136,7 +143,7 @@ def test_start():
 
     # if the cluster is reusing storage, the workload should start and broadcast its peer URL
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.exists", return_value=True),
@@ -155,15 +162,15 @@ def test_start():
     relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_app_data={"cluster_state": "existing"}
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with patch("workload.EtcdWorkload.write_file"):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status != ops.ActiveStatus()
         assert state_out.get_relation(1).local_unit_data.get("state") != "started"
 
-    # if the etcd daemon can't start, the charm should display blocked status
+    # if the etcd daemon can't start, the charm should raise an exception
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
@@ -171,7 +178,7 @@ def test_start():
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
+        assert status_is(state_out, EtcdServiceStatuses.SERVICE_NOT_RUNNING.value)
 
     # non leader waiting promoted
     relation = testing.PeerRelation(
@@ -184,14 +191,14 @@ def test_start():
         },
         local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0"},
     )
-    state_in = testing.State(relations={relation})
+    state_in = testing.State(relations={relation, status_peer_relation})
     with (
         patch("workload.EtcdWorkload.start") as start,
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
-        assert state_out.unit_status == ops.MaintenanceStatus("Waiting for etcd to start...")
+        assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
         start.assert_called_once()
 
@@ -205,7 +212,7 @@ def test_start():
         },
         local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.start") as start,
         patch("workload.EtcdWorkload.write_file"),
@@ -226,7 +233,7 @@ def test_start():
         },
         local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
     )
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
         patch("workload.EtcdWorkload.start") as start,
         patch("workload.EtcdWorkload.write_file"),
@@ -248,7 +255,7 @@ def test_start():
         },
         local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0"},
     )
-    state_in = testing.State(relations={relation})
+    state_in = testing.State(relations={relation, status_peer_relation})
     with (
         patch("workload.EtcdWorkload.start") as start,
         patch("workload.EtcdWorkload.write_file"),
@@ -267,9 +274,14 @@ def test_update_status():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
-    state_in = testing.State(relations={relation})
+    status_peer_relation = testing.PeerRelation(
+        id=2,
+        endpoint=STATUS_PEERS_RELATION,
+    )
+    state_in = testing.State(relations={relation, status_peer_relation})
 
     # restart workload if not running
     with (
@@ -287,7 +299,7 @@ def test_update_status():
         patch("managers.cluster.ClusterManager.clean_users"),
     ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
-        assert state_out.unit_status == ops.BlockedStatus("etcd service not running")
+        assert status_is(state_out, EtcdServiceStatuses.SERVICE_NOT_RUNNING.value)
 
     # test data storage
     # Set up storage with some content:
@@ -318,6 +330,7 @@ def test_update_status():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=https://:2380",
         },
         local_unit_data={
             "tls_peer_state": TLSState.TLS.value,
@@ -327,7 +340,7 @@ def test_update_status():
         },
     )
 
-    state_in = testing.State(relations={relation})
+    state_in = testing.State(relations={relation, status_peer_relation})
 
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -338,9 +351,7 @@ def test_update_status():
         ),
     ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
-        assert state_out.unit_status == ops.MaintenanceStatus(
-            "TLS client certificates expiring soon. Please ensure new certificates are provided."
-        )
+        assert status_is(state_out, TLSStatuses.TLS_PEER_CERTS_EXPIRING.value)
         assert (
             state_out.get_relation(1).local_unit_data.get("tls_client_certificates_expiring")
             == "True"
@@ -357,6 +368,7 @@ def test_update_status():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=https://:2380",
         },
         local_unit_data={
             "tls_peer_state": TLSState.TLS.value,
@@ -366,7 +378,7 @@ def test_update_status():
         },
     )
 
-    state_in = testing.State(relations={relation})
+    state_in = testing.State(relations={relation, status_peer_relation})
 
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
@@ -410,9 +422,13 @@ def test_removal_of_inconsistent_members():
             "cluster_members": "remote0=http://ip0:2380,remote1=http://ip1:2380",
         },
     )
+    status_peers_relation = testing.PeerRelation(
+        id=2,
+        endpoint=STATUS_PEERS_RELATION,
+    )
 
     # leader should clean up inconsistent cluster members
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peers_relation}, leader=True)
     with (
         patch("common.client.EtcdClient.member_list", return_value=cluster_member_list),
         patch("common.client.EtcdClient.remove_member") as remove_member,
@@ -428,7 +444,7 @@ def test_removal_of_inconsistent_members():
         update_cluster_member_state.assert_called_once()
 
     # error case: clean up fails
-    state_in = testing.State(relations={relation}, leader=True)
+    state_in = testing.State(relations={relation, status_peers_relation}, leader=True)
     with (
         patch("common.client.EtcdClient.member_list", return_value=cluster_member_list),
         patch(
@@ -444,10 +460,10 @@ def test_removal_of_inconsistent_members():
         state_out = ctx.run(ctx.on.update_status(), state_in)
         remove_member.assert_called()
         update_cluster_member_state.assert_not_called()
-        assert state_out.unit_status == ops.BlockedStatus("cluster management error")
+        assert status_is(state_out, ClusterStatuses.CLUSTER_MANAGEMENT_ERROR.value)
 
     # no clean-up on non-leader units
-    state_in = testing.State(relations={relation}, leader=False)
+    state_in = testing.State(relations={relation, status_peers_relation}, leader=False)
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("managers.cluster.ClusterManager.clean_users"),
@@ -470,10 +486,15 @@ def test_cluster_majority_failure():
         local_app_data={
             "authentication": "enabled",
             "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
         local_unit_data={"private_ip": "ip0"},
     )
-    state_in = testing.State(relations={relation})
+    status_peer_relation = testing.PeerRelation(
+        id=2,
+        endpoint=STATUS_PEERS_RELATION,
+    )
+    state_in = testing.State(relations={relation, status_peer_relation})
 
     # happy path: metric "etcd_server_has_leader" == 1
     with (
@@ -509,9 +530,7 @@ def test_cluster_majority_failure():
         patch("managers.cluster.EtcdClient.get_metric", return_value="0"),
     ):
         state_out = ctx.run(ctx.on.update_status(), state_in)
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Cluster failure - majority of cluster members lost. Run action `rebuild-cluster` to recover."
-        )
+        assert status_is(state_out, ClusterStatuses.CLUSTER_FAILED.value)
 
 
 def test_peer_relation_created():
@@ -664,8 +683,9 @@ def test_set_config_options():
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         rolling_restart.assert_not_called()
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        assert status_is(
+            state_out,
+            ConfigStatuses.TUNING_CONFIG_INVALID.value,
         )
 
     # config values are invalid -> no restart triggered, blocked status
@@ -686,8 +706,9 @@ def test_set_config_options():
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         rolling_restart.assert_not_called()
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'"
+        assert status_is(
+            state_out,
+            ConfigStatuses.TUNING_CONFIG_INVALID.value,
         )
 
 
@@ -696,14 +717,26 @@ def test_secret_changed():
     secret_value = "123"
     secret_content = {secret_key: secret_value}
     secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
-    relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=http://:2380",
+        },
+    )
+    status_peer_relation = testing.PeerRelation(
+        id=2,
+        endpoint=STATUS_PEERS_RELATION,
+    )
 
     # test the happy path
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
         secrets=[secret],
         config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
-        relations={relation},
+        relations={relation, status_peer_relation},
         leader=True,
     )
     with patch("subprocess.run"):
@@ -715,7 +748,7 @@ def test_secret_changed():
     with patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="failed")):
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
 
-        assert state_out.unit_status == ops.BlockedStatus("failed to update password")
+        assert status_is(state_out, ClusterStatuses.PASSWORD_UPDATE_FAILED.value, is_app=True)
 
     # no update should happen if the user-name is invalid, charm status has to be blocked
     secret_key = "invalid-user-name"
@@ -724,13 +757,17 @@ def test_secret_changed():
     state_in = testing.State(
         secrets=[secret],
         config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
-        relations={relation},
+        relations={relation, status_peer_relation},
         leader=True,
     )
     with patch("common.client.EtcdClient.update_password") as update_password:
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
         update_password.assert_not_called()
-        assert state_out.unit_status == ops.BlockedStatus("failed to update password")
+        assert status_is(
+            state_out,
+            ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+            is_app=True,
+        )
 
 
 def test_peer_relation_joined():
@@ -738,11 +775,9 @@ def test_peer_relation_joined():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        peers_data={
-            0: {
-                "hostname": "charmed-etcd0",
-                "private_ip": "ip0",
-            },
+        local_unit_data={
+            "hostname": "charmed-etcd0",
+            "private_ip": "ip0",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -752,11 +787,11 @@ def test_peer_relation_joined():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
+        local_unit_data={
+            "hostname": "charmed-etcd0",
+            "private_ip": "ip0",
+        },
         peers_data={
-            0: {
-                "hostname": "charmed-etcd0",
-                "private_ip": "ip0",
-            },
             1: {
                 "hostname": "charmed-etcd1",
                 "private_ip": "ip1",
@@ -798,11 +833,9 @@ def test_peer_relation_changed():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        peers_data={
-            0: {
-                "hostname": "charmed-etcd0",
-                "private_ip": "ip0",
-            },
+        local_unit_data={
+            "hostname": "charmed-etcd0",
+            "private_ip": "ip0",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -866,11 +899,15 @@ def test_unit_removal():
         local_app_data={
             "cluster_state": "existing",
             "authentication": "enabled",
-            "cluster_members": "abc",
+            "cluster_members": "charmed-etcd0=http://:2380",
         },
     )
+    status_peer_relation = testing.PeerRelation(
+        id=2,
+        endpoint=STATUS_PEERS_RELATION,
+    )
     data_storage = testing.Storage("data")
-    state_in = testing.State(storages=[data_storage], relations={relation})
+    state_in = testing.State(storages=[data_storage], relations={relation, status_peer_relation})
 
     # test the happy path
     with (
@@ -881,7 +918,7 @@ def test_unit_removal():
         patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
-        assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
+        assert status_is(state_out, ClusterStatuses.REMOVED.value)
         assert state_out.get_relation(1).local_app_data.get("authentication")
         assert state_out.get_relation(1).local_app_data.get("cluster_state")
         assert state_out.get_relation(1).local_app_data.get("cluster_members")
@@ -903,7 +940,10 @@ def test_unit_removal():
 
     # if all units are removed, cluster state data should be cleaned from application databag
     state_in = testing.State(
-        storages=[data_storage], relations={relation}, planned_units=0, leader=True
+        storages=[data_storage],
+        relations={relation, status_peer_relation},
+        planned_units=0,
+        leader=True,
     )
     with (
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
@@ -912,7 +952,7 @@ def test_unit_removal():
         patch("workload.EtcdWorkload.stop"),
     ):
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
-        assert state_out.unit_status == ops.BlockedStatus("unit removed from cluster")
+        assert status_is(state_out, ClusterStatuses.REMOVED.value)
         assert not state_out.get_relation(1).local_app_data.get("authentication")
         assert not state_out.get_relation(1).local_app_data.get("cluster_state")
         assert not state_out.get_relation(1).local_app_data.get("cluster_members")
@@ -990,8 +1030,12 @@ def test_rebuild_cluster_action_error_cases():
 def test_rebuild_cluster_action_happy_path():
     ctx = testing.Context(EtcdOperatorCharm)
     peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    status_peer_relation = testing.PeerRelation(
+        id=2,
+        endpoint=STATUS_PEERS_RELATION,
+    )
 
-    state_in = testing.State(relations={peer_relation}, leader=True)
+    state_in = testing.State(relations={peer_relation, status_peer_relation}, leader=True)
     with (
         patch("managers.cluster.EtcdClient.get_metric", return_value="0"),
         patch("workload.EtcdWorkload.stop") as stop_etcd,
@@ -1002,9 +1046,7 @@ def test_rebuild_cluster_action_happy_path():
         stop_etcd.assert_called_once()
         disable_etcd.assert_called_once()
         assert ctx.action_results == {"result": "cluster rebuild in progress"}
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Rebuilding with new cluster configuration..."
-        )
+        assert status_is(state_out, ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
         assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
         assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
 
@@ -1014,17 +1056,16 @@ def test_rebuild_cluster_action_happy_path():
         endpoint=PEER_RELATION,
         local_app_data={"rebuild_cluster": "True"},
     )
-    state_in = testing.State(relations={peer_relation}, leader=True)
+    state_in = testing.State(relations={peer_relation, status_peer_relation}, leader=True)
     with (
+        patch("managers.cluster.EtcdClient.get_metric", return_value="0"),
         patch("workload.EtcdWorkload.stop") as stop_etcd,
         patch("workload.EtcdWorkload.disable_service") as disable_etcd,
     ):
         state_out = ctx.run(ctx.on.action("rebuild-cluster"), state_in)
 
         assert ctx.action_results == {"result": "cluster rebuild in progress"}
-        assert state_out.unit_status == ops.BlockedStatus(
-            "Rebuilding with new cluster configuration..."
-        )
+        assert status_is(state_out, ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
         assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
 
 

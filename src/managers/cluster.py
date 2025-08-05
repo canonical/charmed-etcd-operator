@@ -8,6 +8,11 @@ import logging
 from json import JSONDecodeError
 from typing import List
 
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
+from ops import BlockedStatus
+from requests import RequestException
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
 from common.client import EtcdClient
@@ -20,13 +25,17 @@ from common.exceptions import (
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, Status, TLSState
+from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, TLSState
+from statuses import CharmStatuses, ClusterStatuses, EtcdServiceStatuses
 
 logger = logging.getLogger(__name__)
 
 
-class ClusterManager:
+class ClusterManager(ManagerStatusProtocol):
     """Manage cluster members, quorum and authorization."""
+
+    name: str = "cluster"
+    state: ClusterState
 
     def __init__(self, state: ClusterState, workload: WorkloadBase):
         self.state = state
@@ -353,9 +362,16 @@ class ClusterManager:
             # we should not have errors here, but if we do, we don't want the error to raise
             logger.warning(f"Error updating the cluster member state: {e}")
 
-    def compute_component_status(self) -> List[Status]:
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:  # noqa: C901
         """Compute the Cluster manager's statuses."""
-        status_list = []
+        status_list: list[StatusObject] = self.state.statuses.get(
+            scope=scope, component=self.name, running_status_only=True, running_status_type="async"
+        ).root
+
+        if self.state.unit_server.unit.status == BlockedStatus(
+            EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value.message
+        ):
+            return [EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value]
 
         if self.state.unit_server.is_started:
             if (
@@ -363,21 +379,39 @@ class ClusterManager:
                 and not self.state.cluster.is_restore_in_progress
                 and not self.state.cluster.rebuild_cluster_in_progress
             ):
-                status_list.append(Status.CLUSTER_NOT_INITIALIZED)
+                status_list.append(ClusterStatuses.CLUSTER_NOT_INITIALIZED.value)
 
             if not self.state.cluster.auth_enabled:
-                status_list.append(Status.AUTHENTICATION_NOT_ENABLED)
+                status_list.append(ClusterStatuses.AUTHENTICATION_NOT_ENABLED.value)
 
         if not self.state.peer_relation:
-            status_list.append(Status.SERVICE_INSTALLING)
+            status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
+        else:
+            if not self.state.cluster.cluster_state:
+                status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
 
-        if not self.state.cluster.cluster_state:
-            status_list.append(Status.CLUSTER_INITIALIZING)
+            if self.state.unit_server.member_endpoint not in self.state.cluster.cluster_members:
+                status_list.append(ClusterStatuses.CLUSTER_NOT_JOINED.value)
 
-        if self.state.cluster.rebuild_cluster_in_progress:
-            status_list.append(Status.CLUSTER_REBUILD_IN_PROGRESS)
+            if self.state.cluster.rebuild_cluster_in_progress:
+                status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
 
-        return status_list
+            if self.state.cluster.learning_member and self.state.unit_server.is_juju_leader:
+                status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
+
+            try:
+                if self.is_cluster_failed:
+                    status_list.append(ClusterStatuses.CLUSTER_FAILED.value)
+                else:
+                    self.state.statuses.delete(
+                        ClusterStatuses.CLUSTER_FAILED.value,
+                        scope=scope,
+                        component=self.name,
+                    )
+            except RequestException as e:
+                logger.error(f"Could not determine if cluster failed: {e}")
+
+        return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 
     def get_user(self, username: str) -> dict | None:
         """Get the user information.

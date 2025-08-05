@@ -20,6 +20,8 @@ peers:
     interface: etcd_peers
   restart:
     interface: rolling_op
+  status-peers:
+    interface: status_peers
   refresh-v-three:
     interface: refresh
 

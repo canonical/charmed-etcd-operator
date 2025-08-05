@@ -4,7 +4,9 @@
 
 """Manager for handling TLS related events."""
 
+import base64
 import logging
+import re
 from ipaddress import ip_address
 from pathlib import Path
 from typing import Dict, Iterable
@@ -13,18 +15,33 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
     ProviderCertificate,
 )
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
+from ops import ModelError, SecretNotFoundError
 from validators import ValidationError, hostname
 
 from common.certificates import is_leaf_certificate_valid, leaf_certificate
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from literals import SUBSTRATES, Status, TLSCARotationState, TLSState, TLSType
+from literals import (
+    SUBSTRATES,
+    TLS_CLIENT_PRIVATE_KEY_CONFIG,
+    TLS_PEER_PRIVATE_KEY_CONFIG,
+    TLSCARotationState,
+    TLSState,
+    TLSType,
+)
+from statuses import CharmStatuses, TLSStatuses
 
 logger = logging.getLogger(__name__)
 
 
-class TLSManager:
+class TLSManager(ManagerStatusProtocol):
     """Manage all TLS related events."""
+
+    name: str = "tls"
+    state: ClusterState
 
     def __init__(self, state: ClusterState, workload: WorkloadBase, substrate: SUBSTRATES):
         self.state = state
@@ -241,39 +258,6 @@ class TLSManager:
                 ]
             )
 
-    def compute_component_status(self) -> list[Status]:
-        """Compute the component status."""
-        status_list = []
-
-        if self.state.unit_server.tls_peer_state == TLSState.TO_TLS:
-            status_list.append(Status.TLS_ENABLING_PEER_TLS)
-
-        if self.state.unit_server.tls_client_state == TLSState.TO_TLS:
-            status_list.append(Status.TLS_ENABLING_CLIENT_TLS)
-
-        if self.state.unit_server.tls_peer_state == TLSState.TO_NO_TLS:
-            status_list.append(Status.TLS_DISABLING_PEER_TLS)
-
-        if self.state.unit_server.tls_client_state == TLSState.TO_NO_TLS:
-            status_list.append(Status.TLS_DISABLING_CLIENT_TLS)
-
-        if self.state.unit_server.tls_peer_ca_rotation_state != TLSCARotationState.NO_ROTATION:
-            status_list.append(Status.TLS_PEER_CA_ROTATING)
-
-        if self.state.unit_server.tls_client_ca_rotation_state != TLSCARotationState.NO_ROTATION:
-            status_list.append(Status.TLS_CLIENT_CA_ROTATING)
-
-        if self.state.unit_server.tls_client_certs_expiring:
-            status_list.append(Status.TLS_CLIENT_CERTS_EXPIRING)
-
-        if self.state.unit_server.tls_peer_certs_expiring:
-            status_list.append(Status.TLS_PEER_CERTS_EXPIRING)
-
-        if not self.extra_sans_config_is_valid():
-            status_list.append(Status.SANS_CONFIG_INVALID)
-
-        return status_list
-
     def _is_ip_address(self, input_value: str) -> bool:
         """Validate a given str and return True if it is an IP address, False if not."""
         try:
@@ -420,7 +404,11 @@ class TLSManager:
         Returns:
             set[str]: The client CAs.
         """
-        cas: set[str] = {self.state.tls_client_certificate.ca.raw}
+        cas: set[str] = set()
+        try:
+            cas.add(self.state.tls_client_certificate.ca.raw)
+        except IndexError:
+            logger.warning("No client CA found in the TLS client certificate.")
 
         # managed users cas
         for relation in self.state.etcd_provides.relations:
@@ -443,3 +431,78 @@ class TLSManager:
             str: The peer CA.
         """
         return self.state.tls_peer_certificate.ca.raw
+
+    def read_and_validate_private_key(self, private_key_secret_id: str) -> PrivateKey | None:
+        """Read and validate the private key.
+
+        Args:
+            private_key_secret_id (str): The private key secret ID.
+
+        Returns:
+            PrivateKey: The private key.
+        """
+        try:
+            secret_content = self.state.get_secret_from_id(private_key_secret_id).get(
+                "private-key"
+            )
+        except (ModelError, SecretNotFoundError) as e:
+            logger.error(e)
+            return None
+
+        if secret_content is None:
+            logger.error(f"Secret {private_key_secret_id} does not contain a private key.")
+            return None
+
+        private_key = (
+            secret_content
+            if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
+            else base64.b64decode(secret_content).decode("utf-8").strip()
+        )
+        private_key = PrivateKey(raw=private_key)
+        if not private_key.is_valid():
+            logger.error("Invalid private key format.")
+            return None
+
+        return private_key
+
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:  # noqa: C901
+        """Compute the component status."""
+        status_list: list[StatusObject] = []
+
+        if self.state.unit_server.tls_peer_state == TLSState.TO_TLS:
+            status_list.append(TLSStatuses.TLS_ENABLING_PEER_TLS.value)
+
+        if self.state.unit_server.tls_client_state == TLSState.TO_TLS:
+            status_list.append(TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
+
+        if self.state.unit_server.tls_peer_state == TLSState.TO_NO_TLS:
+            status_list.append(TLSStatuses.TLS_DISABLING_PEER_TLS.value)
+
+        if self.state.unit_server.tls_client_state == TLSState.TO_NO_TLS:
+            status_list.append(TLSStatuses.TLS_DISABLING_CLIENT_TLS.value)
+
+        if self.state.unit_server.tls_peer_ca_rotation_state != TLSCARotationState.NO_ROTATION:
+            status_list.append(TLSStatuses.TLS_PEER_CA_ROTATING.value)
+
+        if self.state.unit_server.tls_client_ca_rotation_state != TLSCARotationState.NO_ROTATION:
+            status_list.append(TLSStatuses.TLS_CLIENT_CA_ROTATING.value)
+
+        if self.state.unit_server.tls_peer_certs_expiring:
+            status_list.append(TLSStatuses.TLS_PEER_CERTS_EXPIRING.value)
+
+        if self.state.unit_server.tls_client_certs_expiring:
+            status_list.append(TLSStatuses.TLS_CLIENT_CERTS_EXPIRING.value)
+
+        if (
+            (peer_private_key_id := self.state.config.get(TLS_PEER_PRIVATE_KEY_CONFIG))
+            and self.read_and_validate_private_key(str(peer_private_key_id)) is None
+        ) or (
+            (client_private_key_id := self.state.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG))
+            and self.read_and_validate_private_key(str(client_private_key_id)) is None
+        ):
+            status_list.append(TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
+
+        if not self.extra_sans_config_is_valid():
+            status_list.append(TLSStatuses.SANS_CONFIG_INVALID.value)
+
+        return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
