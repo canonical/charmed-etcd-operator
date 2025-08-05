@@ -14,6 +14,7 @@ description: |
 
   To learn more about its deployment and operation, see the 
   [official Charmed etcd documentation](https://canonical-charmed-etcd.readthedocs-hosted.com/).
+docs: https://canonical-charmed-etcd.readthedocs-hosted.com
 
 peers:
   etcd-peers:
