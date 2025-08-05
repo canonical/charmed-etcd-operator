@@ -16,6 +16,9 @@ azure-core = "^1.33.0"
 validators = ">=0.35.0"
 charm-refresh = "^3.1.0.0"
 
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
+
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
 ops = ">=2.0.0"
@@ -25,9 +28,6 @@ poetry-core = "*"
 cryptography = "==44.0.2"
 pydantic = ">= 1.0"
 cosl = ">= 0.0.50"
-
-[tool.poetry.requires-plugins]
-poetry-plugin-export = ">=1.8"
 
 [tool.poetry.group.format]
 optional = true
@@ -64,6 +64,12 @@ tenacity = "*"
 pydantic = ">= 1.0"
 boto3 = "^1.37.12"
 mypy-boto3-s3 = "^1.37.0"
+
+[tool.poetry.group.build-refresh-version]
+optional = true
+
+[tool.poetry.group.build-refresh-version.dependencies]
+charm-refresh-build-version = "^0.2.0"
 
 [tool.coverage.run]
 branch = true

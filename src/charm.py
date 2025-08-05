@@ -8,6 +8,7 @@ import logging
 from subprocess import CalledProcessError
 
 import ops
+import ops.log
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops import StatusBase
@@ -36,6 +37,8 @@ from managers.tls import TLSManager
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 class EtcdOperatorCharm(ops.CharmBase):
@@ -43,6 +46,12 @@ class EtcdOperatorCharm(ops.CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+        # Show logger name (module name) in logs
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            if isinstance(handler, ops.log.JujuLogHandler):
+                handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
+
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
         self.pending_inactive_statuses: list[Status] = []
