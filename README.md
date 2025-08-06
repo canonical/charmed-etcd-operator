@@ -11,7 +11,7 @@ including TLS encryption, horizontal scaling, password rotation, and easy integr
 
 ## Basic usage
 
-Bootstrap a [lxd controller](https://juju.is/docs/olm/lxd#heading--create-a-controller) and create a new Juju model:
+Bootstrap an [lxd controller](https://juju.is/docs/olm/lxd#heading--create-a-controller) and create a new Juju model:
 
 ```shell
 juju add-model sample-model
