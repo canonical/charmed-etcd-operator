@@ -65,7 +65,11 @@ def is_workload_compatible(
     old_workload_version: str,
     new_workload_version: str,
 ) -> bool:
-    """Check if the workload versions are compatible."""
+    """Check if the workload versions are compatible.
+
+    This method is called on the new charm code version. This means that it is responsible for
+    determining which versions the charm code supports refreshing from - not refreshing to.
+    """
     try:
         old_major, old_minor, old_patch, *_ = (
             int(component) for component in old_workload_version.split(".")
