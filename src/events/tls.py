@@ -176,9 +176,11 @@ class TLSEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            # todo: can we allow pure-cert rotation while upgrade is in progress?
+            or self.charm.refresh.in_progress
         ):
             logger.warning(
-                "Cannot update certificates while a restore or cluster-rebuild operation is in progress."
+                "Cannot update certificates while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
             )
             event.defer()
             return
@@ -302,9 +304,10 @@ class TLSEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh.in_progress
         ):
             logger.warning(
-                "Cannot update certificates while a restore or cluster-rebuild operation is in progress."
+                "Cannot update certificates while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
             )
             event.defer()
             return

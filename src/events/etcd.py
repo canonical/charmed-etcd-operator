@@ -231,9 +231,10 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh.in_progress
         ):
             logger.warning(
-                "Cannot update config while a restore or cluster-rebuild operation is in progress."
+                "Cannot update config while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
             )
             event.defer()
             return
@@ -390,6 +391,7 @@ class EtcdEvents(Object):
             not self.charm.state.cluster.cluster_state
             or self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh.in_progress
         ):
             return
 
@@ -453,9 +455,10 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh.in_progress
         ):
             logger.warning(
-                "Cannot update credentials while a restore or cluster-rebuild operation is in progress."
+                "Cannot update credentials while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
             )
             event.defer()
             return
@@ -669,6 +672,9 @@ class EtcdEvents(Object):
         """
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
+
+        if self.charm.refresh.in_progress:
+            return "Upgrade in progress, cannot perform action."
 
         if self.charm.state.cluster.is_backup_in_progress:
             return "Backup in progress, cannot perform action."
