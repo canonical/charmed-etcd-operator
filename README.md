@@ -55,7 +55,7 @@ It is based on the following platform:
 ## Documentation
 
 The [charmed etcd documentation](https://canonical-charmed-etcd.readthedocs-hosted.com) provides a 
-tutorial for basic usage, multiple How-To's for guidance operational topics as well as detailed 
+tutorial for basic usage, multiple how-to guides about operational topics, and detailed 
 information about supported interfaces and integrations.
 
 ## Community and support
