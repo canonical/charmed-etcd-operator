@@ -98,7 +98,9 @@ class EtcdEvents(Object):
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
-        if not self.charm.workload.install():
+        if not self.charm.workload.install(
+            revision=self.charm.refresh.Machines().pinned_snap_revision
+        ):
             self.charm.status.set_running_status(
                 EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
                 scope="unit",

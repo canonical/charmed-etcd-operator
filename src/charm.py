@@ -113,7 +113,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             self._post_snap_refresh()
 
     def _post_snap_refresh(self) -> None:
-        """Comment"""
+        """Handle post-snap refresh health checks and set next_unit_allowed_to_refresh."""
         if not self.refresh.in_progress:
             self.refresh.next_unit_allowed_to_refresh = True
             self.state.statuses.delete(

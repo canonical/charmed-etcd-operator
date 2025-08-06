@@ -5,7 +5,6 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
-import platform
 import subprocess
 from os.path import exists
 from pathlib import Path
@@ -19,7 +18,7 @@ from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
 from core.workload import WorkloadBase
-from literals import SNAP_NAME, SNAP_REVISIONS, SNAP_SERVICE
+from literals import SNAP_NAME, SNAP_SERVICE
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +39,14 @@ class EtcdWorkload(WorkloadBase):
             logger.exception(str(e))
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True)
-    def install(self) -> bool:
+    def install(self, revision: str) -> bool:
         """Install the etcd snap from the snap store.
 
         Returns:
             True if successfully installed, False if any error occurs.
         """
         try:
-            self.etcd.ensure(
-                snap.SnapState.Present, revision=str(SNAP_REVISIONS[platform.machine()])
-            )
+            self.etcd.ensure(snap.SnapState.Present, revision=revision)
             self.etcd.hold()
             return True
         except snap.SnapError as e:

@@ -36,5 +36,6 @@ class EtcdBackupError(Exception):
 class EtcdServiceError(Exception):
     """Custom Exception if the etcd service has an error."""
 
+
 class EtcdUpgradeError(Exception):
     """Exception raised when upgrading etcd fails."""
