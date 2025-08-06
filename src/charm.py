@@ -34,6 +34,7 @@ from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.external_clients import ExternalClientsManager
 from managers.tls import TLSManager
+from managers.upgrades import UpgradesManager
 from statuses import EtcdServiceStatuses
 from workload import EtcdWorkload
 
@@ -56,6 +57,14 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
+        # --- UPGRADES ---
+        try:
+            self.refresh = charm_refresh.Machines(
+                MachinesEtcdRefresh(workload_name="etcd", charm_name="charmed-etcd", charm=self)
+            )
+        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            self.refresh = None
+
         # --- MANAGERS ---
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
         self.config_manager = ConfigManager(
@@ -66,10 +75,12 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE
         )
+        self.upgrades_manager = UpgradesManager(workload=self.workload, refresh=self.refresh)
 
         # --- STATUS HANDLER ---
         self.status = StatusHandler(  # priority order
             self,
+            self.upgrades_manager,
             self.cluster_manager,
             self.config_manager,
             self.tls_manager,
@@ -100,14 +111,6 @@ class EtcdOperatorCharm(ops.CharmBase):
                 }
             ],
         )
-
-        # --- UPGRADES ---
-        try:
-            self.refresh = charm_refresh.Machines(
-                MachinesEtcdRefresh(workload_name="etcd", charm_name="charmed-etcd", charm=self)
-            )
-        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
-            self.refresh = None
 
         if self.refresh and not self.refresh.next_unit_allowed_to_refresh:
             self._post_snap_refresh()
