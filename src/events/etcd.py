@@ -41,6 +41,7 @@ from literals import (
     SNAP_GROUP,
     SNAP_LOG_PATH,
     SNAP_USER,
+    TLSCARotationState,
     TLSState,
     TLSType,
 )
@@ -390,6 +391,10 @@ class EtcdEvents(Object):
             not self.charm.state.cluster.cluster_state
             or self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.state.unit_server.tls_client_ca_rotation_state
+            != TLSCARotationState.NO_ROTATION
+            or self.charm.state.unit_server.tls_peer_ca_rotation_state
+            != TLSCARotationState.NO_ROTATION
         ):
             return
 
