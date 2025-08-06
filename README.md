@@ -1,6 +1,7 @@
 ## Charmed etcd operator
 [![CharmHub Badge](https://charmhub.io/charmed-etcd/badge.svg)](https://charmhub.io/charmed-etcd)
 [![docs badge](https://app.readthedocs.com/projects/canonical-charmed-etcd/badge/?version=3.6-edge)](https://canonical-charmed-etcd.readthedocs-hosted.com/)
+
 The Charmed etcd Operator deploys and operates the [etcd](https://etcd.io) 
 software on VMs and machine clusters. This charm is a 
 Python project that installs etcd from the [charmed-etcd snap](https://snapcraft.io/charmed-etcd),
