@@ -143,3 +143,7 @@ class EtcdWorkload(WorkloadBase):
     def enable_database(self) -> None:
         self.enable_service()
         self.start()
+
+    def snap_revision(self) -> str:
+        """Get the snap revision that is currently installed."""
+        return self.etcd.revision

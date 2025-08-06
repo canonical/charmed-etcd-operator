@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 import charm_refresh
 
+from common.exceptions import EtcdUpgradeError
+
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
 
@@ -54,7 +56,23 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
         refresh: charm_refresh.Machines,
     ) -> None:
         """Refresh the snap for the etcd charm."""
-        pass
+        self.charm.cluster_manager.move_leader_if_required()
+        self.charm.workload.stop()
+
+        revision_before_refresh = self.charm.workload.snap_revision
+        assert snap_revision != revision_before_refresh
+
+        if not self.charm.workload.install():
+            logger.exception("Snap refresh failed")
+
+            if self.charm.workload.snap_revision == revision_before_refresh:
+                self.charm.workload.start()
+            else:
+                refresh.update_snap_revision()
+
+            raise EtcdUpgradeError("Snap refresh failed")
+
+        refresh.update_snap_revision()
 
     def run_pre_refresh_checks_after_1_unit_refreshed(self) -> None:
         """Implement pre-refresh checks after 1 unit refreshed."""
