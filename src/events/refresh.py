@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import charm_refresh
 
 from common.exceptions import EtcdUpgradeError
+from statuses import EtcdServiceStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -62,6 +63,7 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
         revision_before_refresh = self.charm.workload.snap_revision
         assert snap_revision != revision_before_refresh
 
+        logger.info("Updating snap installation")
         if not self.charm.workload.install():
             logger.exception("Snap refresh failed")
 
@@ -70,9 +72,24 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
             else:
                 refresh.update_snap_revision()
 
+            # must raise an uncaught exception her to ensure the unit receives another Juju event
             raise EtcdUpgradeError("Snap refresh failed")
 
         refresh.update_snap_revision()
+        logger.info(f"Updated snap to revision {snap_revision}")
+
+        logger.info("Restarting workload")
+        self.charm.config_manager.set_config_properties()
+        self.charm.workload.start()
+        if self.charm.cluster_manager.is_healthy():
+            refresh.next_unit_allowed_to_refresh = True
+        else:
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
 
     def run_pre_refresh_checks_after_1_unit_refreshed(self) -> None:
         """Implement pre-refresh checks after 1 unit refreshed."""

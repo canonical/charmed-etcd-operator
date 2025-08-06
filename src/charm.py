@@ -34,6 +34,7 @@ from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.external_clients import ExternalClientsManager
 from managers.tls import TLSManager
+from statuses import EtcdServiceStatuses
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.state, self.workload, SUBSTRATE
         )
 
+        # --- STATUS HANDLER ---
         self.status = StatusHandler(  # priority order
             self,
             self.cluster_manager,
@@ -80,12 +82,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.tls_events = TLSEvents(self)
         self.backup_events = BackupEvents(self)
         self.external_clients_events = ExternalClientsEvents(self)
-        try:
-            self.refresh = charm_refresh.Machines(
-                MachinesEtcdRefresh(workload_name="etcd", charm_name="charmed-etcd", charm=self)
-            )
-        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
-            self.refresh = None
 
         # --- LIB EVENT HANDLERS ---
         self.restart = RollingOpsManager(self, relation=RESTART_RELATION, callback=self._restart)
@@ -103,6 +99,40 @@ class EtcdOperatorCharm(ops.CharmBase):
                     ],
                 }
             ],
+        )
+
+        # --- UPGRADES ---
+        try:
+            self.refresh = charm_refresh.Machines(
+                MachinesEtcdRefresh(workload_name="etcd", charm_name="charmed-etcd", charm=self)
+            )
+        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            self.refresh = None
+
+        if self.refresh and not self.refresh.next_unit_allowed_to_refresh:
+            self._post_snap_refresh()
+
+    def _post_snap_refresh(self) -> None:
+        """Comment"""
+        if not self.refresh.in_progress:
+            self.refresh.next_unit_allowed_to_refresh = True
+            self.state.statuses.delete(
+                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                scope="unit",
+                component=self.cluster_manager.name,
+            )
+            return
+
+        logger.info("Restarting workload after snap refresh")
+        self.workload.restart()
+        if not self.cluster_manager.is_healthy():
+            return
+
+        self.refresh.next_unit_allowed_to_refresh = True
+        self.state.statuses.delete(
+            EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+            scope="unit",
+            component=self.cluster_manager.name,
         )
 
     def _restart(self, _) -> None:
