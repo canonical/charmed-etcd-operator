@@ -89,15 +89,24 @@ def is_workload_compatible(
         return False
 
     if new_minor != old_minor:
-        # todo: also allow new_minor == old_minor + 1
-        # if base stays the same and for specific revisions
+        # Minor version upgrades are treated like major version upgrades in etcd (separate track).
+        # Technically it is possible to allow minor version upgrades from a different track.
+        # Restriction: base operating system must be kept the same
+        # Recommendation from charm-refresh: only allow upgrades from a different track for a
+        # specific set of workload versions
+        # Once we move to a new track, this part should be adjusted to allow upgrade to this track.
+        # The condition should then be:
+        # if not (new_minor == old_minor)
+        # or (new_minor == old_minor + 1 and old_patch == specific_patch_version)
+        # return False
         logger.info(
             "Refreshing to a different minor version workload is not supported. "
             f"Got {old_major}.{old_minor}.{old_patch} to {new_major}.{new_minor}.{new_patch}"
         )
         return False
 
-    if not new_patch >= old_patch:
+    if new_patch < old_patch:
+        # Once we move to a new track, adjust here to allow upgrades to lower patch version.
         logger.info(
             "Downgrading to a previous patch version workload is not supported. "
             f"Got {old_major}.{old_minor}.{old_patch} to {new_major}.{new_minor}.{new_patch}"
