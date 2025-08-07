@@ -42,6 +42,7 @@ class UpgradesManager(ManagerStatusProtocol):
         of higher priority than any other status.
 
         This logic ignores all statuses set directly by the refresh lib, as of refresh v3.1.0.
+        For more information: see https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/status/
         """
         status_list: list[StatusObject] = []
 
