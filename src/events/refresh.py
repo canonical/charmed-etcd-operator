@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import charm_refresh
 
 from common.exceptions import EtcdUpgradeError
+from literals import TLSCARotationState, TLSState
 from statuses import EtcdServiceStatuses
 
 if TYPE_CHECKING:
@@ -92,8 +93,33 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
             )
 
     def run_pre_refresh_checks_after_1_unit_refreshed(self) -> None:
-        """Implement pre-refresh checks after 1 unit refreshed."""
-        pass
+        """Implement pre-refresh checks."""
+        if self.charm.state.cluster.is_backup_in_progress:
+            raise charm_refresh.PrecheckFailed("Backup in progress")
+
+        if self.charm.state.cluster.is_restore_in_progress:
+            raise charm_refresh.PrecheckFailed("Restore in progress")
+
+        if self.charm.state.cluster.rebuild_cluster_in_progress:
+            raise charm_refresh.PrecheckFailed("Cluster rebuild in progress")
+
+        if (
+            self.charm.state.unit_server.tls_client_ca_rotation_state
+            != TLSCARotationState.NO_ROTATION
+            or self.charm.state.unit_server.tls_peer_ca_rotation_state
+            != TLSCARotationState.NO_ROTATION
+        ):
+            raise charm_refresh.PrecheckFailed("TLS CA rotation is in progress")
+
+        tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
+        if (
+            self.charm.state.unit_server.tls_client_state in tls_transition_states
+            or self.charm.state.unit_server.tls_peer_state in tls_transition_states
+        ):
+            raise charm_refresh.PrecheckFailed("TLS transition is in progress")
+
+        if not self.charm.cluster_manager.is_healthy():
+            raise charm_refresh.PrecheckFailed("Cluster is not healthy")
 
 
 def is_workload_compatible(
