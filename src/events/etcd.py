@@ -98,9 +98,7 @@ class EtcdEvents(Object):
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
-        if not self.charm.workload.install(
-            revision=self.charm.refresh.Machines().pinned_snap_revision
-        ):
+        if not self.charm.workload.install():
             self.charm.status.set_running_status(
                 EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
                 scope="unit",
@@ -233,7 +231,7 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            or self.charm.refresh.in_progress
+            or self.charm.refresh_not_ready
         ):
             logger.warning(
                 "Cannot update config while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
@@ -393,7 +391,7 @@ class EtcdEvents(Object):
             not self.charm.state.cluster.cluster_state
             or self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            or self.charm.refresh.in_progress
+            or self.charm.refresh_not_ready
         ):
             return
 
@@ -457,7 +455,7 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            or self.charm.refresh.in_progress
+            or self.charm.refresh_not_ready
         ):
             logger.warning(
                 "Cannot update credentials while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
@@ -675,7 +673,7 @@ class EtcdEvents(Object):
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
 
-        if self.charm.refresh.in_progress:
+        if self.charm.refresh_not_ready:
             return "Upgrade in progress, cannot perform action."
 
         if self.charm.state.cluster.is_backup_in_progress:

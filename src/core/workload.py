@@ -110,6 +110,18 @@ class WorkloadBase(ABC):
         pass
 
     @abstractmethod
+    def load_toml_file(self, file: str) -> Dict[str, Any]:
+        """Read toml content from a file.
+
+        Args:
+            file (str): Path to the file.
+
+        Returns:
+            The content of a TOML file as a dict.
+        """
+        pass
+
+    @abstractmethod
     def stop(self) -> None:
         """Stop the workload service."""
         pass

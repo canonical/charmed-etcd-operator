@@ -23,6 +23,7 @@ TLS_ROOT_DIR = "/var/snap/charmed-etcd/current/tls"
 DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
 BACKUP_FILE_NAME = "/var/snap/charmed-etcd/common/archive/charmed-etcd_snapshot.db"
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+VERSIONS_FILE = "refresh_versions.toml"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"

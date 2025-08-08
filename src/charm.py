@@ -117,6 +117,11 @@ class EtcdOperatorCharm(ops.CharmBase):
         if self.refresh and not self.refresh.next_unit_allowed_to_refresh:
             self._post_snap_refresh()
 
+    @property
+    def refresh_not_ready(self) -> bool:
+        """Check if charm-refresh is not available or currently in progress."""
+        return not self.refresh or self.refresh.in_progress
+
     def _post_snap_refresh(self) -> None:
         """Handle post-snap refresh health checks and set next_unit_allowed_to_refresh."""
         if not self.refresh.in_progress:

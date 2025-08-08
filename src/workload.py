@@ -8,9 +8,11 @@ import logging
 import subprocess
 from os.path import exists
 from pathlib import Path
+from platform import machine
 from shutil import copyfile, rmtree
 from typing import Any, Dict, List
 
+import toml
 import yaml
 from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
 from charms.operator_libs_linux.v2 import snap
@@ -18,9 +20,11 @@ from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
 from core.workload import WorkloadBase
-from literals import SNAP_NAME, SNAP_SERVICE
+from literals import SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
 
 logger = logging.getLogger(__name__)
+
+WORKING_DIR = Path(__file__).absolute().parent
 
 
 class EtcdWorkload(WorkloadBase):
@@ -39,12 +43,20 @@ class EtcdWorkload(WorkloadBase):
             logger.exception(str(e))
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True)
-    def install(self, revision: str) -> bool:
+    def install(self, revision: str | None = None) -> bool:
         """Install the etcd snap from the snap store.
+
+        Args:
+            revision (str | None): the snap revision to install. Will be loaded from the
+                `refresh_versions.toml` file if None.
 
         Returns:
             True if successfully installed, False if any error occurs.
         """
+        if not revision:
+            versions = self.load_toml_file(f"{WORKING_DIR}/../{VERSIONS_FILE}")
+            revision = versions["snap"]["revisions"][machine()]
+
         try:
             self.etcd.ensure(snap.SnapState.Present, revision=revision)
             self.etcd.hold()
@@ -73,6 +85,14 @@ class EtcdWorkload(WorkloadBase):
 
         with open(file, "r") as f:
             return yaml.safe_load(f)
+
+    @override
+    def load_toml_file(self, file: str) -> Dict[str, Any]:
+        if not exists(file):
+            return {}
+
+        with open(file, "r") as f:
+            return toml.load(f)
 
     @override
     def stop(self) -> None:

@@ -430,7 +430,7 @@ class BackupEvents(Object):
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
 
-        if self.charm.refresh.in_progress:
+        if self.charm.refresh_not_ready:
             return "Upgrade in progress, cannot perform action."
 
         if self.charm.state.azure_relation and self.charm.state.s3_relation:
