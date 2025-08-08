@@ -75,7 +75,9 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE
         )
-        self.upgrades_manager = UpgradesManager(workload=self.workload, refresh=self.refresh)
+        self.upgrades_manager = UpgradesManager(
+            state=self.state, workload=self.workload, refresh=self.refresh
+        )
 
         # --- STATUS HANDLER ---
         self.status = StatusHandler(  # priority order

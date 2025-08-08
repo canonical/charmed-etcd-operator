@@ -13,6 +13,7 @@ from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtoc
 from data_platform_helpers.advanced_statuses.types import Scope
 from ops import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 
+from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from statuses import CharmStatuses
 
@@ -24,7 +25,10 @@ class UpgradesManager(ManagerStatusProtocol):
 
     name: str = "upgrades"
 
-    def __init__(self, workload: WorkloadBase, refresh: charm_refresh.Machines):
+    def __init__(
+        self, state: ClusterState, workload: WorkloadBase, refresh: charm_refresh.Machines
+    ):
+        self.state = state
         self.workload = workload
         self.refresh = refresh
 
