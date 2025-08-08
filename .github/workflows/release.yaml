@@ -50,6 +50,7 @@ jobs:
   release:
     name: Release charm
     needs:
+      - tag
       - ci-tests
     uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v32.1.0
     with:
