@@ -384,6 +384,18 @@ class ClusterManager(ManagerStatusProtocol):
             if not self.state.cluster.auth_enabled:
                 status_list.append(ClusterStatuses.AUTHENTICATION_NOT_ENABLED.value)
 
+            try:
+                if self.is_cluster_failed:
+                    status_list.append(ClusterStatuses.CLUSTER_FAILED.value)
+                else:
+                    self.state.statuses.delete(
+                        ClusterStatuses.CLUSTER_FAILED.value,
+                        scope=scope,
+                        component=self.name,
+                    )
+            except RequestException as e:
+                logger.error(f"Could not determine if cluster failed: {e}")
+
         if not self.state.peer_relation:
             status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
         else:
@@ -398,18 +410,6 @@ class ClusterManager(ManagerStatusProtocol):
 
             if self.state.cluster.learning_member and self.state.unit_server.is_juju_leader:
                 status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
-
-            try:
-                if self.is_cluster_failed:
-                    status_list.append(ClusterStatuses.CLUSTER_FAILED.value)
-                else:
-                    self.state.statuses.delete(
-                        ClusterStatuses.CLUSTER_FAILED.value,
-                        scope=scope,
-                        component=self.name,
-                    )
-            except RequestException as e:
-                logger.error(f"Could not determine if cluster failed: {e}")
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 
