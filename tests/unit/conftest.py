@@ -134,7 +134,7 @@ def mock_is_cluster_failed(mocker):
 
 @pytest.fixture(autouse=True)
 def mock_refresh():
-    """Fixture to shunt refresh logic and events."""
+    """Fixture for refresh logic and events."""
     refresh_mock = Mock()
     refresh_mock.in_progress = False
     refresh_mock.app_status_higher_priority = None

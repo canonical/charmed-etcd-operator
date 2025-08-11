@@ -61,14 +61,14 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
         self.charm.cluster_manager.move_leader_if_required()
         self.charm.workload.stop()
 
-        revision_before_refresh = self.charm.workload.snap_revision
+        revision_before_refresh = self.charm.workload.snap_revision()
         assert snap_revision != revision_before_refresh
 
         logger.info("Updating snap installation")
         if not self.charm.workload.install(revision=snap_revision):
             logger.exception("Snap refresh failed")
 
-            if self.charm.workload.snap_revision == revision_before_refresh:
+            if self.charm.workload.snap_revision() == revision_before_refresh:
                 self.charm.workload.start()
             else:
                 refresh.update_snap_revision()
