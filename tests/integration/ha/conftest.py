@@ -12,4 +12,4 @@ from literals import SNAP_NAME
 @pytest.fixture
 def etcd_process() -> str:
     versions = toml.load("./refresh_versions.toml")
-    return f"/snap/{SNAP_NAME}/{versions['snap.revisions'][machine()]}/bin/etcd"
+    return f"/snap/{SNAP_NAME}/{versions['snap']['revisions'][machine()]}/bin/etcd"
