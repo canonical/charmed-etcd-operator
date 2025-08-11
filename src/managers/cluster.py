@@ -396,7 +396,11 @@ class ClusterManager(ManagerStatusProtocol):
             if not self.state.cluster.cluster_state:
                 status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
 
-            if self.state.unit_server.member_endpoint not in self.state.cluster.cluster_members:
+            if (
+                self.state.unit_server.member_endpoint not in self.state.cluster.cluster_members
+                and self.state.unit_server.tls_peer_state
+                not in [TLSState.TO_TLS, TLSState.TO_NO_TLS]
+            ):
                 status_list.append(ClusterStatuses.CLUSTER_NOT_JOINED.value)
 
             if self.state.cluster.rebuild_cluster_in_progress:
