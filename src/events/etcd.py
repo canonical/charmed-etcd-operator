@@ -196,13 +196,14 @@ class EtcdEvents(Object):
                         # if removing fails, we cannot start the workload or the member would crash
                         raise
 
-                self.charm.status.set_running_status(
-                    EtcdServiceStatuses.SERVICE_STARTING.value,
-                    scope="unit",
-                    component_name=self.charm.cluster_manager.name,
-                    statuses_state=self.charm.state.statuses,
-                )
-                self.charm.cluster_manager.start_member()
+            # if the flag `unit_server.is_started` is missing, this was an uncontrolled reboot
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_STARTING.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
+            self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
