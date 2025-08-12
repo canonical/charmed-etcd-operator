@@ -595,3 +595,23 @@ async def test_reboot_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(
         endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
     )
+
+    # continue writing data
+    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    time.sleep(10)
+
+    # now reboot all units
+    units_count = len(ops_test.model.applications[app].units)
+    for unit in ops_test.model.applications[app].units:
+        await reboot_unit(ops_test, unit_name=unit.name)
+
+    await wait_until(
+        ops_test,
+        apps=[app],
+        apps_statuses=["active"],
+        units_statuses=["active"],
+        wait_for_exact_units=units_count,
+    )
+
+    # ensure data is written in the cluster
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
