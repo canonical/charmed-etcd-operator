@@ -57,14 +57,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
-        # --- UPGRADES ---
-        try:
-            self.refresh = charm_refresh.Machines(
-                MachinesEtcdRefresh(workload_name="etcd", charm_name="charmed-etcd", charm=self)
-            )
-        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
-            self.refresh = None
-
         # --- MANAGERS ---
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
         self.config_manager = ConfigManager(
@@ -75,6 +67,15 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE
         )
+
+        # --- UPGRADES ---
+        try:
+            self.refresh = charm_refresh.Machines(
+                MachinesEtcdRefresh(workload_name="etcd", charm_name="charmed-etcd", charm=self)
+            )
+        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            self.refresh = None
+
         self.upgrades_manager = UpgradesManager(
             state=self.state, workload=self.workload, refresh=self.refresh
         )
