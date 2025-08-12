@@ -488,7 +488,7 @@ def test_cluster_majority_failure():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"private_ip": "ip0"},
+        local_unit_data={"private_ip": "ip0", "state": "started"},
     )
     status_peer_relation = testing.PeerRelation(
         id=2,

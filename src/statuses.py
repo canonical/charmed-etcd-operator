@@ -67,6 +67,9 @@ class ClusterStatuses(Enum):
     CLUSTER_MEMBER_NOT_PROMOTED = StatusObject(
         status="maintenance", message="Waiting to promote learning member"
     )
+    CLUSTER_MEMBER_RECONFIGURATION = StatusObject(
+        status="maintenance", message="Refreshing cluster membership information"
+    )
     CLUSTER_REBUILD_IN_PROGRESS = StatusObject(
         status="blocked", message="Rebuilding with new cluster configuration..."
     )
