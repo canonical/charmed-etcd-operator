@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from charm_refresh import PrecheckFailed
-from ops import testing
+from ops import BlockedStatus, testing
 
 from charm import EtcdOperatorCharm
 from common.exceptions import EtcdUpgradeError
@@ -261,3 +261,43 @@ def test_post_snap_refresh_unhealthy_cluster() -> None:
             charm._post_snap_refresh()
 
             assert not mock_refresh.next_unit_allowed_to_refresh
+
+
+def test_statuses() -> None:
+    ctx = testing.Context(EtcdOperatorCharm)
+    peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+
+    state_in = testing.State(relations={peer_relation})
+
+    # higher app status
+    refresh_mock = MagicMock()
+    refresh_mock.app_status_higher_priority = BlockedStatus("123")
+    refresh_mock.unit_status_higher_priority = None
+    with patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+
+        assert state_out.unit_status == BlockedStatus("123")
+
+    # higher unit status
+    refresh_mock = MagicMock()
+    refresh_mock.app_status_higher_priority = None
+    refresh_mock.unit_status_higher_priority = BlockedStatus("456")
+    with patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+
+        assert state_out.unit_status == BlockedStatus("456")
+
+    # lower unit status
+    refresh_mock = MagicMock()
+    refresh_mock.app_status_higher_priority = None
+    refresh_mock.unit_status_higher_priority = None
+    # refresh_mock.unit_status_lower_priority = BlockedStatus("789")
+    with (
+        patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)),
+        patch(
+            "charm_refresh.Machines.unit_status_lower_priority", return_value=BlockedStatus("789")
+        ),
+    ):
+        state_out = ctx.run(ctx.on.update_status(), state_in)
+
+        assert state_out.unit_status != BlockedStatus("789")

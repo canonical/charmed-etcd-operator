@@ -137,9 +137,6 @@ def mock_refresh():
     """Fixture for refresh logic and events."""
     refresh_mock = Mock()
     refresh_mock.in_progress = False
-    refresh_mock.app_status_higher_priority = None
-    refresh_mock.unit_status_higher_priority = None
-    refresh_mock.unit_status_lower_priority.return_value = None
     refresh_mock.next_unit_allowed_to_refresh = True
     refresh_mock.workload_allowed_to_start = True
 
