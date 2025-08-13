@@ -27,7 +27,7 @@ Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.c
 * [Support for client relations](/how-to/client-relations) 
 * [Observability with Canonical Observability Stack (COS)](/how-to/enable-monitoring)
 * [Persistent Storage](/how-to/manage-persistent-storage)
-* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for charm [internal passwords](/how-to/manage-passwords)
+* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user-secret) for charm [internal passwords](/how-to/manage-passwords)
 * [Recovery from majority failure](/how-to/disaster-recovery)
 * [Tuning for configuration settings](/how-to/tune-settings)
 
