@@ -11,7 +11,6 @@ import ops
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
-from ops import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
@@ -94,24 +93,30 @@ class UpgradesManager(ManagerStatusProtocol):
                             `approved_critical_component` set to True or False
         """
         # this code may not be very concise, focus is on readability
-        if isinstance(ops_status, BlockedStatus):
-            return StatusObject(
-                status="blocked", message=ops_status.message, approved_critical_component=critical
-            )
+        match ops_status:
+            case ops.BlockedStatus():
+                return StatusObject(
+                    status="blocked",
+                    message=ops_status.message,
+                    approved_critical_component=critical,
+                )
 
-        if isinstance(ops_status, MaintenanceStatus):
-            return StatusObject(
-                status="maintenance",
-                message=ops_status.message,
-                approved_critical_component=critical,
-            )
+            case ops.MaintenanceStatus():
+                return StatusObject(
+                    status="maintenance",
+                    message=ops_status.message,
+                    approved_critical_component=critical,
+                )
 
-        if isinstance(ops_status, WaitingStatus):
-            return StatusObject(
-                status="waiting", message=ops_status.message, approved_critical_component=critical
-            )
+            case ops.WaitingStatus():
+                return StatusObject(
+                    status="waiting",
+                    message=ops_status.message,
+                    approved_critical_component=critical,
+                )
 
-        if isinstance(ops_status, ActiveStatus):
-            return StatusObject(status="active", message=ops_status.message)
+            case ops.ActiveStatus():
+                return StatusObject(status="active", message=ops_status.message)
 
-        raise ValueError(f"Unknown status type: {ops_status.name}: {ops_status.message}")
+            case _:
+                raise ValueError(f"Unknown status type: {ops_status.name}: {ops_status.message}")

@@ -62,7 +62,9 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
         self.charm.workload.stop()
 
         revision_before_refresh = self.charm.workload.snap_revision()
-        assert snap_revision != revision_before_refresh
+        assert snap_revision != revision_before_refresh, (
+            "current snap revision and target revision are equal"
+        )
 
         logger.info("Updating snap installation")
         if not self.charm.workload.install(revision=snap_revision):
