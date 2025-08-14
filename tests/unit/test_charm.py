@@ -243,7 +243,7 @@ def test_start():
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
-        start.assert_not_called()
+        start.assert_called_once()
 
     # non leader must not start if auth not enabled
     relation = testing.PeerRelation(
