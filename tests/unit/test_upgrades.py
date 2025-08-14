@@ -16,7 +16,7 @@ from src.events.refresh import MachinesEtcdRefresh
 
 
 @pytest.mark.parametrize(
-    "old_version,new_version,expected",
+    "old_version, new_version, expected",
     [
         ("3.6.0", "3.6.1", True),  # Patch upgrade allowed
         ("3.6.0", "3.7.0", False),  # Minor upgrade not allowed
@@ -31,14 +31,24 @@ def test_is_workload_compatible(old_version: str, new_version: str, expected: bo
     assert is_workload_compatible(old_version, new_version) == expected
 
 
-def test_pre_refresh_checks() -> None:
+@pytest.mark.parametrize(
+    "app_data, unit_data, pre_check_result",
+    [
+        ({"backup_id": "XYZ"}, {}, "Backup in progress"),
+        ({"restore_id": "XYZ"}, {}, "Restore in progress"),
+        ({"rebuild_cluster": "True"}, {}, "Cluster rebuild in progress"),
+        ({}, {"tls_client_state": "to-tls"}, "TLS transition is in progress"),
+        ({}, {"tls_peer_ca_rotation": "new-ca-detected"}, "TLS CA rotation is in progress"),
+    ],
+)
+def test_pre_refresh_checks(app_data, unit_data, pre_check_result) -> None:
     ctx = testing.Context(EtcdOperatorCharm)
 
-    # check fails because backup in progress
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"backup_id": "XYZ"},
+        local_app_data=app_data,
+        local_unit_data=unit_data,
     )
 
     state_in = testing.State(relations={peer_relation})
@@ -53,30 +63,11 @@ def test_pre_refresh_checks() -> None:
             with pytest.raises(PrecheckFailed) as e:
                 refresh.run_pre_refresh_checks_after_1_unit_refreshed()
 
-            assert str(e.value) == "Backup in progress"
+            assert str(e.value) == pre_check_result
 
-    # check fails because restore in progress
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_app_data={"restore_id": "XYZ"},
-    )
 
-    state_in = testing.State(relations={peer_relation})
-
-    with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
-        charm: EtcdOperatorCharm = manager.charm
-
-        # Mock the refresh constructor to avoid version checks
-        with patch("events.refresh.MachinesEtcdRefresh.__init__", return_value=None):
-            refresh = MachinesEtcdRefresh.__new__(MachinesEtcdRefresh)
-            refresh.charm = charm
-            with pytest.raises(PrecheckFailed) as e:
-                refresh.run_pre_refresh_checks_after_1_unit_refreshed()
-
-            assert str(e.value) == "Restore in progress"
-
-    # check fails because unit not healthy
+def test_pre_refresh_checks_unhealthy_cluster() -> None:
+    ctx = testing.Context(EtcdOperatorCharm)
     peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
 
     state_in = testing.State(relations={peer_relation})
@@ -93,70 +84,6 @@ def test_pre_refresh_checks() -> None:
                     refresh.run_pre_refresh_checks_after_1_unit_refreshed()
 
                 assert str(e.value) == "Cluster is not healthy"
-
-    # check fails because cluster-rebuild in progress
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True"},
-    )
-
-    state_in = testing.State(relations={peer_relation})
-
-    with patch("managers.cluster.ClusterManager.is_healthy", return_value=True):
-        with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
-            charm: EtcdOperatorCharm = manager.charm
-
-            # Mock the refresh constructor to avoid version checks
-            with patch("events.refresh.MachinesEtcdRefresh.__init__", return_value=None):
-                refresh = MachinesEtcdRefresh.__new__(MachinesEtcdRefresh)
-                refresh.charm = charm
-                with pytest.raises(PrecheckFailed) as e:
-                    refresh.run_pre_refresh_checks_after_1_unit_refreshed()
-
-                assert str(e.value) == "Cluster rebuild in progress"
-
-    # check fails because TLS transition in progress
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_unit_data={"tls_client_state": "to-tls"},
-    )
-
-    state_in = testing.State(relations={peer_relation})
-
-    with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
-        charm: EtcdOperatorCharm = manager.charm
-
-        # Mock the refresh constructor to avoid version checks
-        with patch("events.refresh.MachinesEtcdRefresh.__init__", return_value=None):
-            refresh = MachinesEtcdRefresh.__new__(MachinesEtcdRefresh)
-            refresh.charm = charm
-            with pytest.raises(PrecheckFailed) as e:
-                refresh.run_pre_refresh_checks_after_1_unit_refreshed()
-
-            assert str(e.value) == "TLS transition is in progress"
-
-    # check fails because TLS CA rotation in progress
-    peer_relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_unit_data={"tls_peer_ca_rotation": "new-ca-detected"},
-    )
-
-    state_in = testing.State(relations={peer_relation})
-
-    with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
-        charm: EtcdOperatorCharm = manager.charm
-
-        # Mock the refresh constructor to avoid version checks
-        with patch("events.refresh.MachinesEtcdRefresh.__init__", return_value=None):
-            refresh = MachinesEtcdRefresh.__new__(MachinesEtcdRefresh)
-            refresh.charm = charm
-            with pytest.raises(PrecheckFailed) as e:
-                refresh.run_pre_refresh_checks_after_1_unit_refreshed()
-
-            assert str(e.value) == "TLS CA rotation is in progress"
 
 
 def test_snap_refresh_successful() -> None:
