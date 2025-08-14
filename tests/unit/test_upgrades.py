@@ -22,6 +22,7 @@ from src.events.refresh import MachinesEtcdRefresh
         ("3.6.0", "3.7.0", False),  # Minor upgrade not allowed
         ("3.6.0", "4.0.0", False),  # Major upgrade not allowed
         ("3.6.0", "3.5.0", False),  # Downgrade not allowed
+        ("3.6.1", "3.6.0", False),  # Downgrade not allowed
         ("invalid", "3.6.0", False),  # Invalid version format
         ("3.6.0", "invalid", False),  # Invalid version format
     ],
