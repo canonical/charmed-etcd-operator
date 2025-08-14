@@ -80,6 +80,8 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
         logger.info(f"Updated snap to revision {snap_revision}")
 
         logger.info("Restarting workload")
+        # always apply the current charm revision's config -> no need to "migrate" configuration
+        # this charm revision's config is the one supported by the targeted workload version
         self.charm.config_manager.set_config_properties()
         self.charm.workload.start()
         if self.charm.cluster_manager.is_healthy():
@@ -176,5 +178,6 @@ def is_workload_compatible(
             "Downgrading to a previous patch version workload is not supported. "
             f"Got {old_major}.{old_minor}.{old_patch} to {new_major}.{new_minor}.{new_patch}"
         )
+        return False
 
     return True
