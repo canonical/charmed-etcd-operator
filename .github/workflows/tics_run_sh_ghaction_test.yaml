@@ -29,9 +29,9 @@ jobs:
         run: |
           python3 -m venv .venv
           . .venv/bin/activate
-          pipx install tox poetry pytest
-          poetry install --all-groups
           echo PATH="$PATH" >> "$GITHUB_ENV"
+          pipx install tox poetry pytest pylint flake8
+          poetry install --all-groups
 
       - name: Run tox tests to create coverage.xml
         run: tox run -e unit
