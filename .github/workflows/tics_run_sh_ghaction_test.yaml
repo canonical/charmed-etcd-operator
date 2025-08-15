@@ -29,7 +29,7 @@ jobs:
         run: |
           python3 -m venv .venv
           . .venv/bin/activate
-          pipx install tox poetry flake8 pylint pytest
+          pipx install tox poetry pytest
           poetry install --all-groups
           echo PATH="$PATH" >> "$GITHUB_ENV"
 
