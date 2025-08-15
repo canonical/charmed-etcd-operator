@@ -36,7 +36,7 @@ jobs:
           . .venv/bin/activate
           poetry install --all-groups
           pipx install pylint flake8
-          echo "PATH=$PATH" >> "$GITHUB_ENV"
+          echo "PATH=$PATH" >> "$GITHUB_PATH"
 
       - name: Run tox tests to create coverage.xml
         run: tox run -e unit
