@@ -30,6 +30,14 @@ jobs:
           pipx install tox
           pipx install poetry
 
+      - name: Activate virtual environment and install dependencies
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          poetry install --all-groups
+          pipx install pylint flake8
+          echo "PATH=$PATH" >> "$GITHUB_PATH"
+
       - name: Run tox tests to create coverage.xml
         run: tox run -e unit
 
