@@ -35,7 +35,7 @@ from managers.config import ConfigManager
 from managers.external_clients import ExternalClientsManager
 from managers.tls import TLSManager
 from managers.upgrades import UpgradesManager
-from statuses import EtcdServiceStatuses
+from statuses import ClusterStatuses, EtcdServiceStatuses
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.refresh.in_progress:
             self.refresh.next_unit_allowed_to_refresh = True
             self.state.statuses.delete(
-                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                ClusterStatuses.HEALTH_CHECK_FAILED.value,
                 scope="unit",
                 component=self.cluster_manager.name,
             )

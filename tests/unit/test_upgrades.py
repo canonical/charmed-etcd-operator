@@ -10,7 +10,6 @@ from ops import BlockedStatus, testing
 
 from charm import EtcdOperatorCharm
 from common.exceptions import EtcdUpgradeError
-from events.refresh import is_workload_compatible
 from literals import PEER_RELATION
 from src.events.refresh import MachinesEtcdRefresh
 
@@ -28,7 +27,7 @@ from src.events.refresh import MachinesEtcdRefresh
     ],
 )
 def test_is_workload_compatible(old_version: str, new_version: str, expected: bool) -> None:
-    assert is_workload_compatible(old_version, new_version) == expected
+    assert MachinesEtcdRefresh.is_workload_compatible(old_version, new_version) == expected
 
 
 @pytest.mark.parametrize(
