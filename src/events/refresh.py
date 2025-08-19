@@ -144,7 +144,7 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
             )
         except ValueError:
             # Not enough values to unpack or cannot convert
-            logger.info(
+            logger.error(
                 "Unable to parse workload versions."
                 f"Got {old_workload_version} to {new_workload_version}"
             )
@@ -166,7 +166,10 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
             # Once we move to a new track, this part should be adjusted to allow upgrade to this track.
             # The condition should then be:
             # if not (new_minor == old_minor)
-            # or (new_minor == old_minor + 1 and old_patch == specific_patch_version)
+            # or (new_minor == old_minor + 1
+            #   and old_patch == specific_old_patch_version
+            #   and new_patch == specific_new_patch_version
+            # )
             # return False
             logger.info(
                 "Refreshing to a different minor version workload is not supported. "

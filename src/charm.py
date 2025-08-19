@@ -119,9 +119,14 @@ class EtcdOperatorCharm(ops.CharmBase):
             self._post_snap_refresh()
 
     @property
-    def refresh_not_ready(self) -> bool:
-        """Check if charm-refresh is not available or currently in progress."""
-        return not self.refresh or self.refresh.in_progress
+    def refresh_in_progress(self) -> bool:
+        """Check if charm-refresh is currently in progress."""
+        try:
+            return self.refresh.in_progress
+        except AttributeError:
+            # if charm_refresh.UnitTearingDown or charm_refresh.PeerRelationNotReady, this raises
+            # we consider a refresh to NOT be in progress
+            return False
 
     def _post_snap_refresh(self) -> None:
         """Handle post-snap refresh health checks and set next_unit_allowed_to_refresh."""

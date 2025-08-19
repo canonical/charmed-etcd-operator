@@ -63,7 +63,7 @@ class ExternalClientsEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            or self.charm.refresh_not_ready
+            or self.charm.refresh_in_progress
         ):
             logger.warning(
                 "Cannot update certificates while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
@@ -171,7 +171,7 @@ class ExternalClientsEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            or self.charm.refresh_not_ready
+            or self.charm.refresh_in_progress
         ):
             logger.warning(
                 "Cannot remove client relation while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
@@ -197,7 +197,7 @@ class ExternalClientsEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            or self.charm.refresh_not_ready
+            or self.charm.refresh_in_progress
         ):
             logger.warning(
                 "Cannot update certificates while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
@@ -222,7 +222,7 @@ class ExternalClientsEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            or self.charm.refresh_not_ready
+            or self.charm.refresh_in_progress
         ):
             logger.warning(
                 "Cannot update certificates while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"

@@ -46,4 +46,5 @@ options:
     default: first
     description: |
       Wait for manual confirmation to resume refresh after these units refresh
+
       Allowed values: "all", "first", "none"

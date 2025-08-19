@@ -16,7 +16,7 @@ import tomllib
 import yaml
 from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
 from charms.operator_libs_linux.v2 import snap
-from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
 from core.workload import WorkloadBase
@@ -42,7 +42,6 @@ class EtcdWorkload(WorkloadBase):
         except snap.SnapError as e:
             logger.exception(str(e))
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True)
     def install(self, revision: str | None = None) -> bool:
         """Install the etcd snap from the snap store.
 
