@@ -12,7 +12,7 @@ from platform import machine
 from shutil import copyfile, rmtree
 from typing import Any, Dict, List
 
-import toml
+import tomllib
 import yaml
 from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
 from charms.operator_libs_linux.v2 import snap
@@ -91,8 +91,8 @@ class EtcdWorkload(WorkloadBase):
         if not exists(file):
             return {}
 
-        with open(file, "r") as f:
-            return toml.load(f)
+        with open(file, "rb") as f:
+            return tomllib.load(f)
 
     @override
     def stop(self) -> None:

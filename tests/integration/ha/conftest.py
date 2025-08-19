@@ -4,12 +4,13 @@
 from platform import machine
 
 import pytest
-import toml
+import tomllib
 
 from literals import SNAP_NAME
 
 
 @pytest.fixture
 def etcd_process() -> str:
-    versions = toml.load("./refresh_versions.toml")
+    with open("./refresh_versions.toml", "rb") as f:
+        versions = tomllib.load(f)
     return f"/snap/{SNAP_NAME}/{versions['snap']['revisions'][machine()]}/bin/etcd"
