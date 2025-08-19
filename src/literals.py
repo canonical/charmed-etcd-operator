@@ -5,7 +5,7 @@
 """Collection of global literals for the etcd charm."""
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from ops.model import StatusBase
@@ -61,7 +61,7 @@ class StatusLevel:
     log_level: DebugLevel
 
 
-class EtcdClusterState(Enum):
+class EtcdClusterState(StrEnum):
     """Enum for Cluster state in etcd."""
 
     EXISTING = "existing"
@@ -69,7 +69,7 @@ class EtcdClusterState(Enum):
 
 
 # enum for TLS state
-class TLSState(Enum):
+class TLSState(StrEnum):
     """Enum for TLS state."""
 
     NO_TLS = "no-tls"
@@ -78,14 +78,14 @@ class TLSState(Enum):
     TO_NO_TLS = "to-no-tls"
 
 
-class TLSType(Enum):
+class TLSType(StrEnum):
     """TLS types."""
 
     PEER = "peer"
     CLIENT = "client"
 
 
-class TLSCARotationState(Enum):
+class TLSCARotationState(StrEnum):
     """TLS CA Rotation state."""
 
     NO_ROTATION = "no-rotation"
@@ -95,7 +95,7 @@ class TLSCARotationState(Enum):
 
 
 # enum for Backup state
-class RestoreStep(Enum):
+class RestoreStep(StrEnum):
     """Backup / Restore workflow step representation."""
 
     NOT_STARTED = ""
@@ -107,7 +107,7 @@ class RestoreStep(Enum):
     COMPLETED = "completed"
 
 
-class TuningOptions(Enum):
+class TuningOptions(StrEnum):
     """Configuration options for tuning etcd performance."""
 
     ELECTION_TIMEOUT_CONFIG = "election-timeout"

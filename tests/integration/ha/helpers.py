@@ -160,3 +160,10 @@ async def remove_database_file(ops_test: OpsTest, unit_name: str) -> None:
     # see: https://etcd.io/docs/v3.5/learning/persistent-storage-files/#logical-content
     await ops_test.juju(*delete_db_cmd.split(), check=True)
     logger.info(f"etcd database file deleted on {unit_name}.")
+
+
+async def reboot_unit(ops_test: OpsTest, unit_name: str) -> None:
+    """Reboot the VM of a unit."""
+    reboot_cmd = f"exec --unit {unit_name} -- sudo reboot"
+    await ops_test.juju(*reboot_cmd.split(), check=True)
+    logger.info(f"Rebooted unit {unit_name}.")
