@@ -85,6 +85,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         # `lower_priority` statuses should only be set it if there is no other status at all.
         # We achieve this by having `upgrades_manager` last in the component priority order,
         # but setting the field `approved_critical_component` for `higher priority` statuses.
+        # This approach needs to be changed if any other critical status is added.
         self.status = StatusHandler(  # priority order
             self,
             self.cluster_manager,
