@@ -139,6 +139,9 @@ def mock_refresh():
     refresh_mock.in_progress = False
     refresh_mock.next_unit_allowed_to_refresh = True
     refresh_mock.workload_allowed_to_start = True
+    refresh_mock.app_status_higher_priority = False
+    refresh_mock.unit_status_higher_priority = False
+    refresh_mock.unit_status_lower_priority.return_value = False
 
     with (
         patch("charm_refresh.Machines", Mock(return_value=refresh_mock)),

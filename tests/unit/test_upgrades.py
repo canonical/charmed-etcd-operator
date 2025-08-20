@@ -200,6 +200,7 @@ def test_statuses() -> None:
     refresh_mock = MagicMock()
     refresh_mock.app_status_higher_priority = BlockedStatus("123")
     refresh_mock.unit_status_higher_priority = None
+    refresh_mock.unit_status_lower_priority.return_value = False
     with patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)):
         state_out = ctx.run(ctx.on.update_status(), state_in)
 
@@ -209,6 +210,7 @@ def test_statuses() -> None:
     refresh_mock = MagicMock()
     refresh_mock.app_status_higher_priority = None
     refresh_mock.unit_status_higher_priority = BlockedStatus("456")
+    refresh_mock.unit_status_lower_priority.return_value = False
     with patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)):
         state_out = ctx.run(ctx.on.update_status(), state_in)
 
@@ -218,13 +220,19 @@ def test_statuses() -> None:
     refresh_mock = MagicMock()
     refresh_mock.app_status_higher_priority = None
     refresh_mock.unit_status_higher_priority = None
-    # refresh_mock.unit_status_lower_priority = BlockedStatus("789")
-    with (
-        patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)),
-        patch(
-            "charm_refresh.Machines.unit_status_lower_priority", return_value=BlockedStatus("789")
-        ),
-    ):
+    refresh_mock.unit_status_lower_priority.return_value = BlockedStatus("789")
+    with patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)):
         state_out = ctx.run(ctx.on.update_status(), state_in)
 
         assert state_out.unit_status != BlockedStatus("789")
+
+    # invalid status - this must raise to avoid downtime because of overridden refresh-status
+    refresh_mock = MagicMock()
+    refresh_mock.app_status_higher_priority = "invalid_status"
+    refresh_mock.unit_status_higher_priority = None
+    refresh_mock.unit_status_lower_priority.return_value = False
+    with patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)):
+        with pytest.raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.update_status(), state_in)
+
+        assert isinstance(e.value.__cause__, AttributeError)

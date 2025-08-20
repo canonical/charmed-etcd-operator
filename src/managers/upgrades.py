@@ -53,29 +53,20 @@ class UpgradesManager(ManagerStatusProtocol):
             return [CharmStatuses.ACTIVE_IDLE.value]
 
         if refresh_app_status := self.refresh.app_status_higher_priority:
-            try:
-                app_status = self._convert_ops_status_to_advanced_status(refresh_app_status)
-                status_list.append(app_status)
-            except ValueError as e:
-                logger.error(e)
+            app_status = self._convert_ops_status_to_advanced_status(refresh_app_status)
+            status_list.append(app_status)
 
         if refresh_unit_status := self.refresh.unit_status_higher_priority:
-            try:
-                unit_status = self._convert_ops_status_to_advanced_status(refresh_unit_status)
-                status_list.append(unit_status)
-            except ValueError as e:
-                logger.error(e)
+            unit_status = self._convert_ops_status_to_advanced_status(refresh_unit_status)
+            status_list.append(unit_status)
 
         if refresh_lower_unit_status := self.refresh.unit_status_lower_priority(
             workload_is_running=self.workload.alive()
         ):
-            try:
-                lower_unit_status = self._convert_ops_status_to_advanced_status(
-                    refresh_lower_unit_status, critical=False
-                )
-                status_list.append(lower_unit_status)
-            except ValueError as e:
-                logger.error(e)
+            lower_unit_status = self._convert_ops_status_to_advanced_status(
+                refresh_lower_unit_status, critical=False
+            )
+            status_list.append(lower_unit_status)
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 
