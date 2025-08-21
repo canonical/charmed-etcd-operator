@@ -266,7 +266,7 @@ class EtcdEvents(Object):
         # we can only handle this now as we must update ip addresses during long-running upgrades
         if self.charm.refresh_in_progress:
             logger.warning(
-                "Cannot update config while cluster is in vulnerable state because of upgrades"
+                "Cannot update config while cluster is in vulnerable state because of refresh"
             )
             event.defer()
             return
@@ -466,7 +466,7 @@ class EtcdEvents(Object):
             or self.charm.refresh_in_progress
         ):
             logger.warning(
-                "Cannot update credentials while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
+                "Cannot update credentials while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
             )
             event.defer()
             return
@@ -682,7 +682,7 @@ class EtcdEvents(Object):
             return "Action must be performed on the leader unit."
 
         if self.charm.refresh_in_progress:
-            return "Upgrade in progress, cannot perform action."
+            return "Refresh in progress, cannot perform action."
 
         if self.charm.state.cluster.is_backup_in_progress:
             return "Backup in progress, cannot perform action."

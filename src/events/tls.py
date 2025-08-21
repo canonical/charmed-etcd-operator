@@ -314,7 +314,7 @@ class TLSEvents(Object):
             or self.charm.refresh_in_progress
         ):
             logger.warning(
-                "Cannot update certificates while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
+                "Cannot update certificates while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
             )
             event.defer()
             return

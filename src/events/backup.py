@@ -431,7 +431,7 @@ class BackupEvents(Object):
             return "Action must be performed on the leader unit."
 
         if self.charm.refresh_in_progress:
-            return "Upgrade in progress, cannot perform action."
+            return "Refresh in progress, cannot perform action."
 
         if self.charm.state.azure_relation and self.charm.state.s3_relation:
             return "Azure and S3 storages configured - please remove one."
