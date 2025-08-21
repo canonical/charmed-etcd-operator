@@ -162,6 +162,11 @@ class TLSEvents(Object):
         Args:
             event (RelationCreatedEvent): The event object.
         """
+        if self.charm.refresh_in_progress:
+            logger.warning("Cannot enable TLS while refresh is in progress")
+            event.defer()
+            return
+
         if event.relation.name == PEER_TLS_RELATION_NAME:
             self.charm.tls_manager.set_tls_state(state=TLSState.TO_TLS, tls_type=TLSType.PEER)
         else:
@@ -176,11 +181,9 @@ class TLSEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            # todo: can we allow pure-cert rotation while upgrade is in progress?
-            or self.charm.refresh_in_progress
         ):
             logger.warning(
-                "Cannot update certificates while cluster is in vulnerable state because of restore, upgrade or cluster-rebuild"
+                "Cannot update certificates while cluster is in vulnerable state because of restore or cluster-rebuild"
             )
             event.defer()
             return
@@ -221,6 +224,10 @@ class TLSEvents(Object):
             and self.charm.tls_manager.is_new_ca(cert.ca.raw, cert_type)
             and tls_ca_rotation_state == TLSCARotationState.NO_ROTATION
         ):
+            if self.charm.refresh_in_progress:
+                logger.warning("Cannot update CA certificates while refresh is in progress")
+                event.defer()
+                return
             logger.debug(f"New {cert_type} CA detected, updating trusted CAs")
             self.charm.tls_manager.add_trusted_ca(cert.ca.raw, cert_type)
             self.charm.tls_manager.set_ca_rotation_state(
