@@ -67,7 +67,7 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
         )
 
         logger.info("Updating snap installation")
-        if not self.charm.workload.install(revision=snap_revision):
+        if not self.charm.workload.install(revision=snap_revision, retry_and_raise=False):
             logger.exception("Snap refresh failed")
 
             if self.charm.workload.snap_revision() == revision_before_refresh:

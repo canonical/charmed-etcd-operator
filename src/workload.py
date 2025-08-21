@@ -19,6 +19,7 @@ from charms.operator_libs_linux.v2 import snap
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
+from common.exceptions import EtcdServiceError
 from core.workload import WorkloadBase
 from literals import SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
 
@@ -43,15 +44,17 @@ class EtcdWorkload(WorkloadBase):
             logger.exception(str(e))
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True)
-    def install(self, revision: str | None = None) -> bool:
+    def install(self, revision: str | None = None, retry_and_raise: bool = True) -> bool:
         """Install the etcd snap from the snap store.
 
         Args:
             revision (str | None): the snap revision to install. Will be loaded from the
                 `refresh_versions.toml` file if None.
+            retry_and_raise (bool): whether to retry in case of errors. Will raise if the error
+                persists.
 
         Returns:
-            True if successfully installed, False if any error occurs.
+            True if successfully installed, False if errors occur and `retry_and_raise` is False.
         """
         if not revision:
             versions = self.load_toml_file(f"{WORKING_DIR}/../{VERSIONS_FILE}")
@@ -63,6 +66,8 @@ class EtcdWorkload(WorkloadBase):
             return True
         except snap.SnapError as e:
             logger.error(str(e))
+            if retry_and_raise:
+                raise EtcdServiceError(e)
             return False
 
     @override
