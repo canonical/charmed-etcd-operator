@@ -1642,7 +1642,7 @@ def test_set_extra_sans_config_option():
         relations={relation},
     )
 
-    current_sans_value = "X509v3 Subject Alternative Name: \n    DNS:myhostname, DNS:charmed-etcd/0, IP Address:127.0.1.1, IP Address:192.168.1.100"
+    current_sans_value = "X509v3 Subject Alternative Name: \n    DNS:myhostname, DNS:charmed-etcd0, IP Address:127.0.1.1, IP Address:192.168.1.100"
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
