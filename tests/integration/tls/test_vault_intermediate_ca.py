@@ -174,7 +174,11 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", VAULT_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", VAULT_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, VAULT_NAME], idle_period=60)
+
+    # need to wait for next `update_status`
+    # https://github.com/canonical/vault-k8s-operator/issues/720
+    async with ops_test.fast_forward("5s"):
+        await wait_until(ops_test, apps=[APP_NAME, VAULT_NAME], idle_period=60)
 
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
