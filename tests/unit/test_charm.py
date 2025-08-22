@@ -52,11 +52,11 @@ MEMBER_LIST_DICT = {
 }
 
 
-def test_install_failure_blocked_status():
+def test_install_failure():
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State()
 
-    with patch("workload.EtcdWorkload.install", return_value=False):
+    with patch("workload.EtcdWorkload.install", side_effect=EtcdServiceError()):
         with raises(testing.errors.UncaughtCharmError) as e:
             ctx.run(ctx.on.install(), state_in)
         assert isinstance(e.value.__cause__, EtcdServiceError)

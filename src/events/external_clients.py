@@ -60,6 +60,17 @@ class ExternalClientsEvents(Object):
 
     def _on_mtls_cert_updated(self, event: MTLSCertUpdatedEvent) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh_in_progress
+        ):
+            logger.warning(
+                "Cannot update certificates while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
+            )
+            event.defer()
+            return
+
         if not event.mtls_cert or not event.prefix:
             logger.error("CA chain, keys prefix, or common name not provided")
             return
@@ -157,6 +168,17 @@ class ExternalClientsEvents(Object):
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle the relation broken event."""
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh_in_progress
+        ):
+            logger.warning(
+                "Cannot remove client relation while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
+            )
+            event.defer()
+            return
+
         relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
             event.relation.id
         )
@@ -172,6 +194,17 @@ class ExternalClientsEvents(Object):
 
     def _on_certificates_available(self, event: CertificatesAvailableEvent) -> None:
         """Handle the certificates available event."""
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh_in_progress
+        ):
+            logger.warning(
+                "Cannot update certificates while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
+            )
+            event.defer()
+            return
+
         logger.debug("Certificates available event")
         if (
             self.charm.state.unit_server.tls_client_ca_rotation_state
@@ -186,6 +219,17 @@ class ExternalClientsEvents(Object):
 
     def _on_certificates_removed(self, event: CertificatesRemovedEvent) -> None:
         """Handle the certificates removed event."""
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh_in_progress
+        ):
+            logger.warning(
+                "Cannot update certificates while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
+            )
+            event.defer()
+            return
+
         if (
             self.charm.state.unit_server.tls_client_ca_rotation_state
             != TLSCARotationState.NO_ROTATION

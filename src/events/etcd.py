@@ -98,7 +98,9 @@ class EtcdEvents(Object):
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
-        if not self.charm.workload.install():
+        try:
+            self.charm.workload.install()
+        except EtcdServiceError:
             self.charm.status.set_running_status(
                 EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
                 scope="unit",
@@ -234,7 +236,7 @@ class EtcdEvents(Object):
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
             logger.warning(
-                "Cannot update config while a restore or cluster-rebuild operation is in progress."
+                "Cannot update config while cluster is in vulnerable state because of restore or cluster-rebuild"
             )
             event.defer()
             return
@@ -262,6 +264,14 @@ class EtcdEvents(Object):
                 TLSState.TLS,
             ) or self.charm.state.unit_server.tls_peer_state in (TLSState.TO_TLS, TLSState.TLS):
                 self.charm.tls_events.refresh_tls_certificates_event.emit()
+
+        # we can only handle this now as we must update ip addresses during long-running upgrades
+        if self.charm.refresh_in_progress:
+            logger.warning(
+                "Cannot update config while cluster is in vulnerable state because of refresh"
+            )
+            event.defer()
+            return
 
         if (
             self.charm.config_manager.are_tuning_parameters_valid()
@@ -391,6 +401,7 @@ class EtcdEvents(Object):
             not self.charm.state.cluster.cluster_state
             or self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh_in_progress
         ):
             return
 
@@ -454,9 +465,10 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh_in_progress
         ):
             logger.warning(
-                "Cannot update credentials while a restore or cluster-rebuild operation is in progress."
+                "Cannot update credentials while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
             )
             event.defer()
             return
@@ -670,6 +682,9 @@ class EtcdEvents(Object):
         """
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
+
+        if self.charm.refresh_in_progress:
+            return "Refresh in progress, cannot perform action."
 
         if self.charm.state.cluster.is_backup_in_progress:
             return "Backup in progress, cannot perform action."

@@ -2,6 +2,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from unittest.mock import Mock, patch
 
 import pytest
 from ops import testing
@@ -129,3 +130,21 @@ def mock_is_cluster_failed(mocker):
         "managers.cluster.EtcdClient.get_metric",
         return_value="1",
     )
+
+
+@pytest.fixture(autouse=True)
+def mock_refresh():
+    """Fixture for refresh logic and events."""
+    refresh_mock = Mock()
+    refresh_mock.in_progress = False
+    refresh_mock.next_unit_allowed_to_refresh = True
+    refresh_mock.workload_allowed_to_start = True
+    refresh_mock.app_status_higher_priority = False
+    refresh_mock.unit_status_higher_priority = False
+    refresh_mock.unit_status_lower_priority.return_value = False
+
+    with (
+        patch("charm_refresh.Machines", Mock(return_value=refresh_mock)),
+        patch("charm.MachinesEtcdRefresh", Mock(return_value=None)),
+    ):
+        yield

@@ -7,7 +7,9 @@
 import logging
 from subprocess import CalledProcessError
 
+import charm_refresh
 import ops
+import ops.log
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from data_platform_helpers.advanced_statuses.handler import StatusHandler
@@ -17,6 +19,7 @@ from core.cluster import ClusterState
 from events.backup import BackupEvents
 from events.etcd import EtcdEvents
 from events.external_clients import ExternalClientsEvents
+from events.refresh import MachinesEtcdRefresh
 from events.tls import TLSEvents
 from literals import (
     METRICS_PORT,
@@ -31,9 +34,13 @@ from managers.cluster import ClusterManager
 from managers.config import ConfigManager
 from managers.external_clients import ExternalClientsManager
 from managers.tls import TLSManager
+from managers.upgrades import UpgradesManager
+from statuses import ClusterStatuses
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 class EtcdOperatorCharm(ops.CharmBase):
@@ -41,6 +48,12 @@ class EtcdOperatorCharm(ops.CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+        # Show logger name (module name) in logs
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            if isinstance(handler, ops.log.JujuLogHandler):
+                handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
+
         self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
@@ -55,6 +68,24 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.state, self.workload, SUBSTRATE
         )
 
+        # --- UPGRADES ---
+        try:
+            self.refresh = charm_refresh.Machines(
+                MachinesEtcdRefresh(workload_name="etcd", charm_name="charmed-etcd", charm=self)
+            )
+        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            self.refresh = None
+
+        self.upgrades_manager = UpgradesManager(
+            state=self.state, workload=self.workload, refresh=self.refresh
+        )
+
+        # --- STATUS HANDLER ---
+        # `higher_priority` statuses from refresh must be of higher priority than any other status
+        # `lower_priority` statuses should only be set it if there is no other status at all.
+        # We achieve this by having `upgrades_manager` last in the component priority order,
+        # but setting the field `approved_critical_component` for `higher priority` statuses.
+        # This approach needs to be changed if any other critical status is added.
         self.status = StatusHandler(  # priority order
             self,
             self.cluster_manager,
@@ -62,6 +93,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             self.tls_manager,
             self.external_clients_manager,
             self.backup_manager,
+            self.upgrades_manager,
         )
 
         # --- EVENT HANDLERS ---
@@ -86,6 +118,42 @@ class EtcdOperatorCharm(ops.CharmBase):
                     ],
                 }
             ],
+        )
+
+        if self.refresh and not self.refresh.next_unit_allowed_to_refresh:
+            self._post_snap_refresh()
+
+    @property
+    def refresh_in_progress(self) -> bool:
+        """Check if charm-refresh is currently in progress."""
+        try:
+            return self.refresh.in_progress
+        except AttributeError:
+            # if charm_refresh.UnitTearingDown or charm_refresh.PeerRelationNotReady, this raises
+            # we consider a refresh to NOT be in progress
+            return False
+
+    def _post_snap_refresh(self) -> None:
+        """Handle post-snap refresh health checks and set next_unit_allowed_to_refresh."""
+        if not self.refresh.in_progress:
+            self.refresh.next_unit_allowed_to_refresh = True
+            self.state.statuses.delete(
+                ClusterStatuses.HEALTH_CHECK_FAILED.value,
+                scope="unit",
+                component=self.cluster_manager.name,
+            )
+            return
+
+        logger.info("Restarting workload after snap refresh")
+        self.workload.restart()
+        if not self.cluster_manager.is_healthy():
+            return
+
+        self.refresh.next_unit_allowed_to_refresh = True
+        self.state.statuses.delete(
+            ClusterStatuses.HEALTH_CHECK_FAILED.value,
+            scope="unit",
+            component=self.cluster_manager.name,
         )
 
     def _restart(self, _) -> None:
