@@ -28,8 +28,8 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 NUM_UNITS = 3
-PREVIOUS_REVISIONS = {"x86_64": 15, "aarch64": 16}
-WORKLOAD_VERSIONS = {"previous": "3.6.1", "target": "3.6.2"}
+CHARM_REVISIONS_TO_DEPLOY = {"x86_64": 89, "aarch64": 88}
+WORKLOAD_VERSION_TARGET = "3.6.2"
 
 
 async def test_deploy_previous_etcd_version(ops_test: OpsTest) -> None:
@@ -38,7 +38,7 @@ async def test_deploy_previous_etcd_version(ops_test: OpsTest) -> None:
         APP_NAME,
         num_units=NUM_UNITS,
         channel="3.6/edge",
-        revision=PREVIOUS_REVISIONS[machine()],
+        revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000, wait_for_exact_units=NUM_UNITS)
@@ -113,7 +113,7 @@ async def test_upgrade_to_local(charm: str, ops_test: OpsTest) -> None:
         unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
-            == WORKLOAD_VERSIONS["target"]
+            == WORKLOAD_VERSION_TARGET
         ), f"unit {unit.name} was not upgraded"
 
         assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
