@@ -76,9 +76,7 @@ class ClusterStatuses(Enum):
     AUTHENTICATION_NOT_ENABLED = StatusObject(
         status="blocked", message="failed to enable authentication in etcd"
     )
-    HEALTH_CHECK_FAILED = StatusObject(
-        status="maintenance", message="health check failed", running="async"
-    )
+    HEALTH_CHECK_FAILED = StatusObject(status="maintenance", message="health check failed")
     REMOVED = StatusObject(status="blocked", message="unit removed from cluster", running="async")
     PASSWORD_UPDATE_FAILED = StatusObject(
         status="blocked", message="failed to update password", running="async"

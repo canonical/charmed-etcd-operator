@@ -8,7 +8,6 @@ from platform import machine
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION
-from statuses import ClusterStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -22,7 +21,8 @@ from ..helpers_deployment import wait_until
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
-    send_process_control_signal,
+    disable_etcd_service,
+    enable_etcd_service,
     start_continuous_writes,
     stop_continuous_writes,
 )
@@ -47,7 +47,7 @@ async def test_deploy(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000, wait_for_exact_units=NUM_UNITS)
 
 
-async def test_fail_upgrade_and_rollback(charm: str, etcd_process: str, ops_test: OpsTest) -> None:
+async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
     """Run a refresh, fail and roll back."""
     etcd_application = ops_test.model.applications[APP_NAME]
 
@@ -81,32 +81,20 @@ async def test_fail_upgrade_and_rollback(charm: str, etcd_process: str, ops_test
     logger.info("Running `force-refresh-start` action with check-compatibility=false")
     await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
 
-    logger.info(f"Pause etcd service on unit {refresh_order[-1]} to force upgrade to fail")
-    send_process_control_signal(
-        unit_name=refresh_order[-1].name,
-        model_full_name=ops_test.model_full_name,
-        signal="SIGSTOP",
-        etcd_process=etcd_process,
-    )
+    logger.info(f"Pause etcd service on unit {refresh_order[-1].name} to force upgrade to fail")
+    await disable_etcd_service(ops_test, unit_name=refresh_order[-1].name)
 
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME],
-        units_full_statuses={
-            APP_NAME: [ClusterStatuses.HEALTH_CHECK_FAILED.value],
-        },
-        wait_for_exact_units=1,
+    # no chance to know exactly which status messages to look for here, so we use `wait_for_idle`
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+
+    assert "health check failed" in refresh_order[0].workload_status_message, (
+        "Health check after upgrade should have failed"
     )
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info(f"Upgrade failed - roll back to previous version v{WORKLOAD_VERSION['previous']}")
-    logger.info(f"Continue etcd service on unit {refresh_order[-1]}")
-    send_process_control_signal(
-        unit_name=refresh_order[-1].name,
-        model_full_name=ops_test.model_full_name,
-        signal="SIGCONT",
-        etcd_process=etcd_process,
-    )
+    logger.info(f"Continue etcd service on unit {refresh_order[-1].name}")
+    await enable_etcd_service(ops_test, unit_name=refresh_order[-1].name)
 
     await etcd_application.refresh(switch=APP_NAME, channel=CHARM_CHANNEL)
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
