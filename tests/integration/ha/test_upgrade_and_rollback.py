@@ -101,7 +101,8 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
     logger.info(f"Continue etcd service on unit {refresh_order[-1].name}")
     await enable_etcd_service(ops_test, unit_name=refresh_order[-1].name)
 
-    await etcd_application.refresh(APP_NAME, switch=APP_NAME)
+    refresh_cmd = f"refresh {APP_NAME} --model={ops_test.model.info.name} --switch {APP_NAME} --channel {CHARM_CHANNEL}"
+    return_code, _, std_err = await ops_test.juju(*refresh_cmd.split())
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     logger.info("Check etcd versions and cluster membership")
