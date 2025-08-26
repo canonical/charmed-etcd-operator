@@ -125,7 +125,10 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
-    assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    # while the upgrade failure was forced, the cluster was shortly not available
+    assert_continuous_writes_consistent(
+        endpoints=endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
+    )
 
 
 @pytest.mark.abort_on_fail
