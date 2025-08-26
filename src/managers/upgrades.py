@@ -14,7 +14,7 @@ from data_platform_helpers.advanced_statuses.types import Scope
 
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
-from statuses import CharmStatuses
+from statuses import CharmStatuses, ClusterStatuses
 
 logger = logging.getLogger(__name__)
 
@@ -40,17 +40,18 @@ class UpgradesManager(ManagerStatusProtocol):
 
         While `refresh.[app|unit]_status_higher_priority` must be of higher priority than any other
         status, `refresh.unit_status_lower_priority()` should only be set it if there is no other
-        status at all. We achieve this by having `upgrades_manager` last in the component priority
-        order, but setting the field `approved_critical_component` to True if the refresh_status is
-        of higher priority than any other status.
+        status at all. We achieve this by setting the field `approved_critical_component` to True
+        if the refresh_status is of higher priority than any other status.
 
-        This logic ignores all statuses set directly by the refresh lib, as of refresh v3.1.0.
         For more information: see https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/status/
         """
         status_list: list[StatusObject] = []
 
         if not self.refresh:
             return [CharmStatuses.ACTIVE_IDLE.value]
+
+        if self.refresh.in_progress and not self.refresh.next_unit_allowed_to_refresh:
+            status_list.append(ClusterStatuses.HEALTH_CHECK_FAILED.value)
 
         if refresh_app_status := self.refresh.app_status_higher_priority:
             app_status = self._convert_ops_status_to_advanced_status(refresh_app_status)
