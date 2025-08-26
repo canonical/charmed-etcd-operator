@@ -5,6 +5,7 @@
 import logging
 from platform import machine
 
+import pytest
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION
@@ -35,6 +36,7 @@ CHARM_REVISIONS_TO_DEPLOY = {"x86_64": 89, "aarch64": 88}
 WORKLOAD_VERSION = {"previous": "3.6.1", "target": "3.6.2"}
 
 
+@pytest.mark.abort_on_fail
 async def test_deploy(ops_test: OpsTest) -> None:
     """Deploy the charm with the previously released workload version of etcd."""
     await ops_test.model.deploy(
@@ -47,6 +49,7 @@ async def test_deploy(ops_test: OpsTest) -> None:
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000, wait_for_exact_units=NUM_UNITS)
 
 
+@pytest.mark.abort_on_fail
 async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
     """Run a refresh, fail and roll back."""
     etcd_application = ops_test.model.applications[APP_NAME]
@@ -79,7 +82,9 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
 
     logger.info(f"Continue refresh on unit {refresh_order[0].name}")
     logger.info("Running `force-refresh-start` action with check-compatibility=false")
-    await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
+    await refresh_order[0].run_action(
+        "force-refresh-start", **{"check-compatibility": False, "run-pre-refresh-checks": False}
+    )
 
     logger.info(f"Pause etcd service on unit {refresh_order[-1].name} to force upgrade to fail")
     await disable_etcd_service(ops_test, unit_name=refresh_order[-1].name)
@@ -99,11 +104,26 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
     await etcd_application.refresh(switch=APP_NAME, channel=CHARM_CHANNEL)
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
+    logger.info("Check etcd versions and cluster membership")
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
+    for unit in etcd_application.units:
+        unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
+        assert (
+            get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
+            == WORKLOAD_VERSION["previous"]
+        ), f"unit {unit.name} was not rolled back"
+
+        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
+            f"{unit.name} is not in {cluster_members}"
+        )
+    logger.info("Successfully rolled back after failed upgrade")
+
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
+@pytest.mark.abort_on_fail
 async def test_upgrade_to_local(charm: str, ops_test: OpsTest) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
     etcd_application = ops_test.model.applications[APP_NAME]
