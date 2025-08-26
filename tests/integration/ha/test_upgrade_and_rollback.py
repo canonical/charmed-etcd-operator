@@ -103,6 +103,10 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
 
     refresh_cmd = f"refresh {APP_NAME} --model={ops_test.model.info.name} --switch {APP_NAME} --channel {CHARM_CHANNEL}"
     return_code, _, std_err = await ops_test.juju(*refresh_cmd.split())
+
+    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
+    await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
+
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     logger.info("Check etcd versions and cluster membership")
