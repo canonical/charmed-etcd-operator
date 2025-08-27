@@ -50,12 +50,13 @@ class UpgradesManager(ManagerStatusProtocol):
         if not self.refresh:
             return [CharmStatuses.ACTIVE_IDLE.value]
 
-        if self.refresh.in_progress and not self.refresh.next_unit_allowed_to_refresh:
-            status_list.append(ClusterStatuses.HEALTH_CHECK_FAILED.value)
-
-        if refresh_app_status := self.refresh.app_status_higher_priority:
+        if scope == "app" and (refresh_app_status := self.refresh.app_status_higher_priority):
             app_status = self._convert_ops_status_to_advanced_status(refresh_app_status)
             status_list.append(app_status)
+            return status_list
+
+        if self.refresh.in_progress and not self.refresh.next_unit_allowed_to_refresh:
+            status_list.append(ClusterStatuses.HEALTH_CHECK_FAILED.value)
 
         if refresh_unit_status := self.refresh.unit_status_higher_priority:
             unit_status = self._convert_ops_status_to_advanced_status(refresh_unit_status)
