@@ -103,14 +103,21 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
     await enable_etcd_service(ops_test, unit_name=refresh_order[-1].name)
 
     # ops_test.application.refresh can't refresh from local to published charm, use command line
+    # in `juju refresh`, --switch and --revision are mutually exclusive
+    # we can only roll back to the latest released revision from a local charm
     refresh_cmd = f"refresh {APP_NAME} --model={ops_test.model.info.name} --switch {APP_NAME} --channel {CHARM_CHANNEL}"
     return_code, _, std_err = await ops_test.juju(*refresh_cmd.split())
 
-    # versions will always be marked "incompatible" if refresh with a local version
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
-    await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
+    # will be marked "incompatible" if rollback is not to the same revision as initially deployed
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
+    if "incompatible" in etcd_application.status_message:
+        logger.info("Rollback is blocked due to incompatibility")
+
+        logger.info("Running `force-refresh-start` action with check-compatibility=false")
+        await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
 
     # wait for rollback to complete
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     logger.info("Check etcd versions and cluster membership")
@@ -157,18 +164,6 @@ async def test_upgrade_to_local(charm: str, ops_test: OpsTest) -> None:
     pre_refresh_response = await pre_refresh_action.wait()
     assert pre_refresh_response.results.get("return-code") == 0, "action failed"
 
-    # initiate the upgrade
-    logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
-    await etcd_application.refresh(path=charm)
-
-    # versions will always be marked "incompatible" if refresh to a local version
-    # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    logger.info("Wait for refresh to block as incompatible")
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
-    assert "incompatible" in etcd_application.status_message, (
-        "Refresh should be marked incompatible when using locally built charm"
-    )
-
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
         etcd_application.units,
@@ -176,13 +171,24 @@ async def test_upgrade_to_local(charm: str, ops_test: OpsTest) -> None:
         reverse=True,
     )
 
-    logger.info(f"Continue refresh on unit {refresh_order[0].name}")
-    logger.info("Running `force-refresh-start` action with check-compatibility=false")
-    force_refresh_action = await refresh_order[0].run_action(
-        "force-refresh-start", **{"check-compatibility": False}
-    )
-    force_refresh_response = await force_refresh_action.wait()
-    assert force_refresh_response.results.get("return-code") == 0, "action failed"
+    # initiate the upgrade
+    logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
+    await etcd_application.refresh(path=charm)
+
+    # versions will always be marked "incompatible" if refresh to a local version
+    # this will not be the case when the PR is released
+    # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
+    if "incompatible" in etcd_application.status_message:
+        logger.info("Upgrade is blocked due to incompatibility")
+
+        logger.info(f"Continue refresh on unit {refresh_order[0].name}")
+        logger.info("Running `force-refresh-start` action with check-compatibility=false")
+        force_refresh_action = await refresh_order[0].run_action(
+            "force-refresh-start", **{"check-compatibility": False}
+        )
+        force_refresh_response = await force_refresh_action.wait()
+        assert force_refresh_response.results.get("return-code") == 0, "action failed"
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
