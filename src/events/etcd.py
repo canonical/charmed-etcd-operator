@@ -401,11 +401,10 @@ class EtcdEvents(Object):
             not self.charm.state.cluster.cluster_state
             or self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
-            or self.charm.refresh_in_progress
         ):
             return
 
-        if not self.charm.workload.alive():
+        if not self.charm.workload.alive() and not self.charm.refresh_in_progress:
             if not self.charm.cluster_manager.restart_member():
                 self.charm.status.set_running_status(
                     EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
@@ -422,7 +421,7 @@ class EtcdEvents(Object):
             # if anything fails with the metrics request, we don't want to panic
             pass
 
-        if self.charm.unit.is_leader():
+        if self.charm.unit.is_leader() and not self.charm.refresh_in_progress:
             try:
                 self.charm.cluster_manager.clean_users()
                 self.charm.cluster_manager.remove_inconsistent_members_if_required()
@@ -682,9 +681,6 @@ class EtcdEvents(Object):
         """
         if not self.charm.unit.is_leader():
             return "Action must be performed on the leader unit."
-
-        if self.charm.refresh_in_progress:
-            return "Refresh in progress, cannot perform action."
 
         if self.charm.state.cluster.is_backup_in_progress:
             return "Backup in progress, cannot perform action."
