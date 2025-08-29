@@ -1,9 +1,9 @@
 
 ## Description of issue or feature:
-<!--- Please describe in detail what this PR is about. -->
+<!--- Please describe in detail what this PR is about. And a reference link to a Github issue or Jira ticket.  -->
 
 ## Solution:
-<!--- Please describe in detail what the solution implemented in this PR is about. -->
+<!--- Please describe in detail what the solution implemented in this PR is. The changes made etc. -->
 
 ## How was this change tested?
 - [ ] Manually
