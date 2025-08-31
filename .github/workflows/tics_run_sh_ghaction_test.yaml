@@ -20,7 +20,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y python3-venv
 
       - name: Install pipx
-        run: sudo apt install pipx && pipx ensurepath
+        run: sudo apt install -y pipx && pipx ensurepath
 
       - name: Add pipx to PATH
         run: echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
