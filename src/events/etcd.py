@@ -152,6 +152,8 @@ class EtcdEvents(Object):
                         self.charm.state.unit_server.peer_url
                     )
                     self.charm.state.cluster.update({"authentication": "enabled"})
+                    # overwrite the `force-new-cluster` config after cluster has been initialized
+                    self.charm.config_manager.set_config_properties()
                 except ValueError:
                     logger.error("Failed to update member configuration")
                     event.defer()
@@ -245,7 +247,7 @@ class EtcdEvents(Object):
         ip_address = self.charm.workload.get_host_mapping().get("private_ip")
         if ip_address and ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
-            self.charm.state.unit_server.update({"private_ip": ip_address})
+            self.charm.state.unit_server.update(self.charm.workload.get_host_mapping())
 
             # we need to update the client-urls by restarting etcd
             self.charm.config_manager.set_config_properties()
