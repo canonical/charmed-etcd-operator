@@ -83,8 +83,9 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
 
         logger.info(f"Continue refresh on unit {refresh_order[0].name}")
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        force_refresh_action = await refresh_order[0].run_action(
-            "force-refresh-start", **{"check-compatibility": False, "run-pre-refresh-checks": False}
+        await refresh_order[0].run_action(
+            "force-refresh-start",
+            **{"check-compatibility": False, "run-pre-refresh-checks": False},
         )
 
     # wait for the first unit to settle
