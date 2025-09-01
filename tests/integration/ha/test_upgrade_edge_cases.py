@@ -69,7 +69,7 @@ async def test_upgrade_single_unit_cluster(charm: str, ops_test: OpsTest) -> Non
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    await wait_until(ops_test, apps=[APP_NAME])
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
     if "incompatible" in etcd_application.status_message:
         logger.info("Upgrade is blocked due to incompatibility")
 
@@ -123,7 +123,7 @@ async def test_disaster_recovery_during_upgrade(charm: str, ops_test: OpsTest) -
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], wait_for_exact_units=2, idle_period=30)
     if "incompatible" in etcd_application.status_message:
         logger.info("Upgrade is blocked due to incompatibility")
 
@@ -230,7 +230,11 @@ async def test_ip_address_change_during_upgrade(charm: str, ops_test: OpsTest) -
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME],
+        wait_for_exact_units=NUM_UNITS,
+        idle_period=30,
+    )
 
     if "incompatible" in etcd_application.status_message:
         logger.info("Upgrade is blocked due to incompatibility")
