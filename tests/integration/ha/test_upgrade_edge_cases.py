@@ -15,22 +15,23 @@ from ..helpers import (
     get_cluster_endpoints,
     get_cluster_members,
     get_etcd_version,
+    get_remaining_endpoints,
     get_secret_by_label,
     get_unit_endpoint,
-    is_endpoint_up,
 )
 from ..helpers_deployment import wait_until
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
-    disable_etcd_service,
     start_continuous_writes,
     stop_continuous_writes,
 )
 from .helpers_network import (
     cut_network_from_unit_with_ip_change,
+    get_controller_hostname,
     hostname_from_unit,
     ip_address_from_unit,
+    is_unit_reachable,
     restore_network_for_unit_with_ip_change,
 )
 
@@ -132,43 +133,33 @@ async def test_disaster_recovery_during_upgrade(charm: str, ops_test: OpsTest) -
             "force-refresh-start", **{"check-compatibility": False}
         )
 
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
-
-    # the cluster looses consensus if one of two units is unavailable
-    logger.info(f"Pause etcd on unit {etcd_application.units[0].name} to force cluster failure")
-    await disable_etcd_service(ops_test, unit_name=etcd_application.units[0].name)
-
-    # cluster failure will be detected on `update_status`
-    async with ops_test.fast_forward("30s"):
-        await wait_until(
-            ops_test, apps=[APP_NAME], wait_for_exact_units=2, units_statuses=["active", "blocked"]
-        )
-
-    assert "Cluster failure" in etcd_application.units[-1].workload_status_message, (
-        "Cluster failure not detected"
-    )
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], wait_for_exact_units=2, idle_period=30)
 
     for unit in etcd_application.units:
         if await unit.is_leader_from_status():
             leader_unit = unit
 
-    logger.info("Rebuilding cluster after majority failure")
-    rebuild_action = await leader_unit.run_action("rebuild-cluster")
+    logger.info("Rebuilding cluster to simulate recovery after majority failure")
+    rebuild_action = await leader_unit.run_action("rebuild-cluster", **{"force": True})
     rebuild_response = await rebuild_action.wait()
     assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
 
-    async with ops_test.fast_forward("30s"):
-        await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2, idle_period=10)
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], wait_for_exact_units=2)
 
     # cluster should be recovered again
     assert "Cluster failure" not in etcd_application.units[-1].workload_status_message, (
         "Cluster could not be recovered"
     )
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
+    for unit in etcd_application.units:
+        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
+            f"{unit.name} is not in {cluster_members}"
+        )
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
     assert "resume-refresh" in etcd_application.status_message, (
         "Refresh should wait for user to continue with `resume-refresh` action"
     )
-
     logger.info("Continue refresh on all other units with `resume-refresh` action")
     resume_refresh_action = await etcd_application.units[0].run_action("resume-refresh")
     resume_refresh_response = await resume_refresh_action.wait()
@@ -179,17 +170,13 @@ async def test_disaster_recovery_during_upgrade(charm: str, ops_test: OpsTest) -
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info("Check etcd versions and cluster membership")
-    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
+
     for unit in etcd_application.units:
         unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]
         ), f"unit {unit.name} was not upgraded"
-
-        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
-            f"{unit.name} is not in {cluster_members}"
-        )
 
     # clean up and remove the application to allow for further upgrade tests
     stop_continuous_writes()
@@ -252,18 +239,34 @@ async def test_ip_address_change_during_upgrade(charm: str, ops_test: OpsTest) -
     logger.info(f"Force new ip address for {refresh_order[-1].name}")
     ip_renewal_hostname = await hostname_from_unit(ops_test, unit_name=refresh_order[-1].name)
     old_unit_ip = await ip_address_from_unit(ops_test, unit_name=refresh_order[-1].name)
+    old_unit_endpoint = get_unit_endpoint(ops_test, unit_name=refresh_order[-1].name)
     cut_network_from_unit_with_ip_change(ip_renewal_hostname)
 
-    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    # make sure the unit is not reachable from the controller
+    controller_hostname = await get_controller_hostname(ops_test)
+    assert not is_unit_reachable(controller_hostname, ip_renewal_hostname)
+    logger.info(f"{refresh_order[-1].name} is not reachable via network.")
+
+    # as the stopped member is unresponsive, only query the endpoints still available
+    remaining_endpoints = get_remaining_endpoints(endpoints, old_unit_endpoint)
+    assert_continuous_writes_increasing(
+        endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
+    )
 
     # reconnect the network for the disconnected unit
     restore_network_for_unit_with_ip_change(ip_renewal_hostname)
     logger.info(f"Network has been restored for {refresh_order[-1].name}")
 
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME],
+        apps_statuses=["blocked"],
+        units_statuses=["active"],
+        wait_for_exact_units=NUM_UNITS,
+    )
+
     # ensure the unit is up again
     new_unit_ip = await ip_address_from_unit(ops_test, unit_name=refresh_order[-1].name)
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=refresh_order[-1].name)
-    assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{refresh_order[-1].name} is available again with new ip {new_unit_ip}")
 
     logger.info("Continue refresh with `resume-refresh` action")
