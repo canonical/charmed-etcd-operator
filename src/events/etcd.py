@@ -315,7 +315,8 @@ class EtcdEvents(Object):
                     event.defer()
                     return
 
-            # reflect membership updates in the cluster state, e.g. ip change or tls switchover
+            # reflect membership updates in the cluster state and config file in case of restarts
+            # e.g. ip change or tls switchover
             self.charm.cluster_manager.update_cluster_member_state()
 
             self._update_client_relations()
@@ -626,6 +627,8 @@ class EtcdEvents(Object):
             ):
                 logger.info("All units started again - cluster rebuild completed.")
                 self.charm.state.cluster.update({"rebuild_cluster": ""})
+                # overwrite the `force-new-cluster` config after cluster has been rebuilt
+                self.charm.config_manager.set_config_properties()
 
             if self.charm.state.cluster.learning_member:
                 self.charm.cluster_manager.promote_learning_member()

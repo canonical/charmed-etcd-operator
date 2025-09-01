@@ -1159,7 +1159,10 @@ def test_rebuild_cluster_workflow_synchronisation():
     )
     state_in = testing.State(relations={peer_relation}, leader=True)
 
-    with patch("managers.cluster.ClusterManager.is_healthy") as health_check:
+    with (
+        patch("managers.cluster.ClusterManager.is_healthy") as health_check,
+        patch("workload.EtcdWorkload.write_file"),
+    ):
         state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
 
         health_check.assert_called_once()
