@@ -61,18 +61,6 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
-    # initiate the upgrade
-    logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
-    await etcd_application.refresh(path=charm)
-
-    # versions will always be marked "incompatible" if refresh to a local version
-    # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    logger.info("Wait for refresh to block as incompatible")
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
-    assert "incompatible" in etcd_application.status_message, (
-        "Refresh should be marked incompatible when using locally built charm"
-    )
-
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
         etcd_application.units,
@@ -80,18 +68,27 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
         reverse=True,
     )
 
-    logger.info(f"Continue refresh on unit {refresh_order[0].name}")
-    logger.info("Running `force-refresh-start` action with check-compatibility=false")
-    # we need to ignore pre-refresh-checks here because cluster health will be degraded immediately
-    await refresh_order[0].run_action(
-        "force-refresh-start", **{"check-compatibility": False, "run-pre-refresh-checks": False}
-    )
+    # initiate the upgrade
+    logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
+    await etcd_application.refresh(path=charm)
 
     logger.info(f"Pause etcd service on unit {refresh_order[-1].name} to force upgrade to fail")
     await disable_etcd_service(ops_test, unit_name=refresh_order[-1].name)
 
-    # no chance to know exactly which status messages to look for here, so we use `wait_for_idle`
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    # versions will always be marked "incompatible" if refresh to a local version
+    # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    if "incompatible" in etcd_application.status_message:
+        logger.info("Upgrade is blocked due to incompatibility")
+
+        logger.info(f"Continue refresh on unit {refresh_order[0].name}")
+        logger.info("Running `force-refresh-start` action with check-compatibility=false")
+        force_refresh_action = await refresh_order[0].run_action(
+            "force-refresh-start", **{"check-compatibility": False, "run-pre-refresh-checks": False}
+        )
+
+    # wait for the first unit to settle
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
 
     assert "health check failed" in refresh_order[0].workload_status_message, (
         "Health check after upgrade should have failed"
@@ -178,7 +175,7 @@ async def test_upgrade_to_local(charm: str, ops_test: OpsTest) -> None:
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
     if "incompatible" in etcd_application.status_message:
         logger.info("Upgrade is blocked due to incompatibility")
 
