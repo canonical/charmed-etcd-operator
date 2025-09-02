@@ -370,9 +370,7 @@ async def test_tls_cert_rotation_during_upgrade(charm: str, ops_test: OpsTest) -
         logger.info("Upgrade is blocked due to incompatibility")
 
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        await etcd_application.units[0].run_action(
-            "force-refresh-start", **{"check-compatibility": False}
-        )
+        await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
 
     await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
 
@@ -415,3 +413,85 @@ async def test_tls_cert_rotation_during_upgrade(charm: str, ops_test: OpsTest) -
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
     await ops_test.model.remove_application(TLS_NAME, block_until_done=True)
+
+
+@pytest.mark.abort_on_fail
+async def test_scale_up_during_upgrade(charm: str, ops_test: OpsTest) -> None:
+    """Add a unit to an etcd cluster during an upgrade."""
+    await ops_test.model.deploy(
+        APP_NAME,
+        num_units=NUM_UNITS,
+        channel=CHARM_CHANNEL,
+        revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
+    )
+
+    await wait_until(ops_test, apps=[APP_NAME])
+
+    etcd_application = ops_test.model.applications[APP_NAME]
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+    # initiate the upgrade
+    logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
+    await etcd_application.refresh(path=charm)
+
+    # Refresh always happens from highest to lowest unit number
+    refresh_order = sorted(
+        etcd_application.units,
+        key=lambda unit: int(unit.name.split("/")[1]),
+        reverse=True,
+    )
+
+    # versions will always be marked "incompatible" if refresh to a local version
+    # this will not be the case when the PR is released
+    # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
+    if "incompatible" in etcd_application.status_message:
+        logger.info("Upgrade is blocked due to incompatibility")
+
+        logger.info("Running `force-refresh-start` action with check-compatibility=false")
+        await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
+
+    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
+
+    logger.info("Scale up")
+    await ops_test.model.applications[APP_NAME].add_unit()
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME],
+        apps_statuses=["blocked"],
+        wait_for_exact_units=NUM_UNITS + 1,
+        idle_period=60,
+    )
+
+    logger.info("Scaling up will continue the refresh on the newly added unit")
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS + 1)
+
+    updated_endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    assert_continuous_writes_increasing(
+        endpoints=updated_endpoints, user=INTERNAL_USER, password=password
+    )
+
+    logger.info("Check etcd versions and cluster membership")
+    cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
+    for unit in etcd_application.units:
+        unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
+        assert (
+            get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
+            == WORKLOAD_VERSION["target"]
+        ), f"unit {unit.name} was not upgraded"
+
+        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
+            f"{unit.name} is not in {cluster_members}"
+        )
+
+    # clean up and remove the application to allow for further upgrade tests
+    stop_continuous_writes()
+    assert_continuous_writes_consistent(
+        endpoints=updated_endpoints, user=INTERNAL_USER, password=password
+    )
+    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
