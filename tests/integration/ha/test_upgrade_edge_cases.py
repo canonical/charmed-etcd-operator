@@ -291,7 +291,7 @@ async def test_ip_address_change_during_upgrade(charm: str, ops_test: OpsTest) -
     for unit in etcd_application.units:
         unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
         # workaround in case ip address was not updated in `unit.public_address`
-        unit_endpoint.replace(old_unit_ip, new_unit_ip)
+        unit_endpoint = unit_endpoint.replace(old_unit_ip, new_unit_ip)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]
