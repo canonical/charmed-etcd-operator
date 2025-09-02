@@ -4,14 +4,18 @@
 
 import logging
 from platform import machine
+from time import sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION
+from literals import INTERNAL_USER, PEER_RELATION, TLSType
+from statuses import CharmStatuses, TLSStatuses
 
 from ..helpers import (
     APP_NAME,
+    TLS_NAME,
+    get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
     get_etcd_version,
@@ -41,6 +45,7 @@ NUM_UNITS = 3
 CHARM_CHANNEL = "3.6/edge"
 CHARM_REVISIONS_TO_DEPLOY = {"x86_64": 89, "aarch64": 88}
 WORKLOAD_VERSION = {"previous": "3.6.1", "target": "3.6.2"}
+CERTIFICATE_EXPIRY_TIME = 250
 
 
 @pytest.mark.abort_on_fail
@@ -285,6 +290,8 @@ async def test_ip_address_change_during_upgrade(charm: str, ops_test: OpsTest) -
     cluster_members = get_cluster_members(endpoints_updated, user=INTERNAL_USER, password=password)
     for unit in etcd_application.units:
         unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
+        # workaround in case ip address was not updated in `unit.public_address`
+        unit_endpoint.replace(old_unit_ip, new_unit_ip)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]
@@ -300,3 +307,111 @@ async def test_ip_address_change_during_upgrade(charm: str, ops_test: OpsTest) -
         endpoints=endpoints_updated, user=INTERNAL_USER, password=password
     )
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
+
+
+@pytest.mark.abort_on_fail
+async def test_tls_cert_rotation_during_upgrade(charm: str, ops_test: OpsTest) -> None:
+    """Process new TLS certificates during an upgrade."""
+    await ops_test.model.deploy(
+        APP_NAME,
+        num_units=NUM_UNITS,
+        channel=CHARM_CHANNEL,
+        revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
+    )
+
+    # Deploy the TLS charm
+    tls_config = {"ca-common-name": "etcd", "certificate-validity": "3m"}
+    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
+
+    await wait_until(ops_test, apps=[APP_NAME, TLS_NAME])
+
+    etcd_application = ops_test.model.applications[APP_NAME]
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # start writing data to the cluster
+    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+    logger.info("Integrating peer-certificates relation")
+    await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
+
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME, TLS_NAME],
+        units_full_statuses={
+            APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
+            TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
+        },
+    )
+
+    # initiate the upgrade
+    logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
+    await etcd_application.refresh(path=charm)
+
+    # Refresh always happens from highest to lowest unit number
+    refresh_order = sorted(
+        etcd_application.units,
+        key=lambda unit: int(unit.name.split("/")[1]),
+        reverse=True,
+    )
+
+    logger.info("Getting current certificate from leader unit")
+    current_peer_certificate = get_certificate_from_unit(
+        ops_test.model_full_name, refresh_order[-1], cert_type=TLSType.PEER
+    )
+    assert current_peer_certificate, "Failed to get current peer certificate"
+
+    # versions will always be marked "incompatible" if refresh to a local version
+    # this will not be the case when the PR is released
+    # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
+    if "incompatible" in etcd_application.status_message:
+        logger.info("Upgrade is blocked due to incompatibility")
+
+        logger.info("Running `force-refresh-start` action with check-compatibility=false")
+        await etcd_application.units[0].run_action(
+            "force-refresh-start", **{"check-compatibility": False}
+        )
+
+    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
+
+    # wait for certificate to expire
+    logger.info("Waiting for certificate to expire")
+    sleep(CERTIFICATE_EXPIRY_TIME)
+
+    new_peer_certificate = get_certificate_from_unit(
+        ops_test.model_full_name, refresh_order[-1], cert_type=TLSType.PEER
+    )
+    assert new_peer_certificate, "Failed to get new peer certificate"
+    assert new_peer_certificate != current_peer_certificate, (
+        "Certificates are the same after rotation"
+    )
+
+    logger.info("Continue refresh with `resume-refresh` action")
+    resume_refresh_action = await refresh_order[1].run_action("resume-refresh")
+    resume_refresh_response = await resume_refresh_action.wait()
+    assert resume_refresh_response.results.get("return-code") == 0, "action failed"
+
+    # wait for upgrade to complete
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+
+    logger.info("Check etcd versions and cluster membership")
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
+    for unit in etcd_application.units:
+        unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
+        assert (
+            get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
+            == WORKLOAD_VERSION["target"]
+        ), f"unit {unit.name} was not upgraded"
+
+        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
+            f"{unit.name} is not in {cluster_members}"
+        )
+
+    # clean up and remove the application to allow for further upgrade tests
+    stop_continuous_writes()
+    assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
+    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
+    await ops_test.model.remove_application(TLS_NAME, block_until_done=True)
