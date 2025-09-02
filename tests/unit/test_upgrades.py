@@ -194,7 +194,7 @@ def test_statuses() -> None:
     ctx = testing.Context(EtcdOperatorCharm)
     peer_relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
 
-    state_in = testing.State(relations={peer_relation})
+    state_in = testing.State(relations={peer_relation}, leader=True)
 
     # higher app status
     refresh_mock = MagicMock()
@@ -204,7 +204,8 @@ def test_statuses() -> None:
     with patch("charm_refresh.Machines", MagicMock(return_value=refresh_mock)):
         state_out = ctx.run(ctx.on.update_status(), state_in)
 
-        assert state_out.unit_status == BlockedStatus("123")
+        assert state_out.app_status == BlockedStatus("123")
+        assert state_out.unit_status != BlockedStatus("123")
 
     # higher unit status
     refresh_mock = MagicMock()

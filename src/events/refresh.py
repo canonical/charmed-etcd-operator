@@ -12,7 +12,6 @@ import charm_refresh
 
 from common.exceptions import EtcdUpgradeError
 from literals import TLSCARotationState, TLSState
-from statuses import ClusterStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -88,13 +87,6 @@ class MachinesEtcdRefresh(charm_refresh.CharmSpecificMachines):
         self.charm.workload.start()
         if self.charm.cluster_manager.is_healthy():
             refresh.next_unit_allowed_to_refresh = True
-        else:
-            self.charm.status.set_running_status(
-                ClusterStatuses.HEALTH_CHECK_FAILED.value,
-                scope="unit",
-                component_name="upgrades",
-                statuses_state=self.charm.state.statuses,
-            )
 
     def run_pre_refresh_checks_after_1_unit_refreshed(self) -> None:
         """Implement pre-refresh checks."""

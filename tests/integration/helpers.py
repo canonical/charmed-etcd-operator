@@ -467,3 +467,29 @@ def get_role(
         ]
     except json.JSONDecodeError:
         return None
+
+
+def get_etcd_version(
+    endpoint: str,
+    user: str | None = None,
+    password: str | None = None,
+    tls_enabled: bool = False,
+) -> str:
+    """Check workload version of etcd endpoint."""
+    etcd_command = f"etcdctl endpoint status --endpoints={endpoint} -w=json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
+    if tls_enabled:
+        etcd_command = f"{etcd_command} \
+            --cacert client_ca.pem \
+            --cert client.pem \
+            --key client.key"
+
+    try:
+        result = subprocess.getoutput(etcd_command).split("\n")[0]
+        status = json.loads(result)[0]
+        return status["Status"]["version"]
+    except KeyError:
+        raise

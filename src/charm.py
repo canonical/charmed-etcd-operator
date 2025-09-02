@@ -35,7 +35,6 @@ from managers.config import ConfigManager
 from managers.external_clients import ExternalClientsManager
 from managers.tls import TLSManager
 from managers.upgrades import UpgradesManager
-from statuses import ClusterStatuses
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
@@ -81,19 +80,15 @@ class EtcdOperatorCharm(ops.CharmBase):
         )
 
         # --- STATUS HANDLER ---
-        # `higher_priority` statuses from refresh must be of higher priority than any other status
-        # `lower_priority` statuses should only be set it if there is no other status at all.
-        # We achieve this by having `upgrades_manager` last in the component priority order,
-        # but setting the field `approved_critical_component` for `higher priority` statuses.
-        # This approach needs to be changed if any other critical status is added.
+        # statuses from charm-refresh must be of higher priority than any other status
         self.status = StatusHandler(  # priority order
             self,
+            self.upgrades_manager,
             self.cluster_manager,
             self.config_manager,
             self.tls_manager,
             self.external_clients_manager,
             self.backup_manager,
-            self.upgrades_manager,
         )
 
         # --- EVENT HANDLERS ---
@@ -137,11 +132,6 @@ class EtcdOperatorCharm(ops.CharmBase):
         """Handle post-snap refresh health checks and set next_unit_allowed_to_refresh."""
         if not self.refresh.in_progress:
             self.refresh.next_unit_allowed_to_refresh = True
-            self.state.statuses.delete(
-                ClusterStatuses.HEALTH_CHECK_FAILED.value,
-                scope="unit",
-                component=self.cluster_manager.name,
-            )
             return
 
         logger.info("Restarting workload after snap refresh")
@@ -150,11 +140,6 @@ class EtcdOperatorCharm(ops.CharmBase):
             return
 
         self.refresh.next_unit_allowed_to_refresh = True
-        self.state.statuses.delete(
-            ClusterStatuses.HEALTH_CHECK_FAILED.value,
-            scope="unit",
-            component=self.cluster_manager.name,
-        )
 
     def _restart(self, _) -> None:
         """Restart callback for the rolling ips lib."""
