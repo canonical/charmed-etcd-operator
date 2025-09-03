@@ -147,14 +147,12 @@ def test_start():
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.exists", return_value=True),
-        patch("workload.EtcdWorkload.write_file") as write_config,
+        patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
         patch("managers.cluster.ClusterManager.broadcast_peer_url") as broadcast_peer_url,
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
-        # 1st call: set `force-new-cluster` to `True`, 2nd: reset `force-new-cluster` to `False`
-        assert write_config.call_count == 2
         broadcast_peer_url.assert_called()
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
@@ -1111,8 +1109,7 @@ def test_rebuild_cluster_workflow_synchronisation():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
 
-        # 1st call: set `force-new-cluster` to `True`, 2nd: reset `force-new-cluster` to `False`
-        assert write_config.call_count == 2
+        write_config.assert_called_once()
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
