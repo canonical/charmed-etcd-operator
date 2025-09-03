@@ -115,7 +115,7 @@ jobs:
           pattern: ${{ inputs.artifact-prefix }}-*
           merge-multiple: true
       - name: Run spread job
-        timeout-minutes: 75
+        timeout-minutes: 60
         id: spread
         # TODO: replace with `charmcraft test` when
         # https://github.com/canonical/charmcraft/issues/2105 and
