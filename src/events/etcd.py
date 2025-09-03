@@ -143,6 +143,8 @@ class EtcdEvents(Object):
                 statuses_state=self.charm.state.statuses,
             )
             self.charm.cluster_manager.start_member()
+            # overwrite the `force-new-cluster` config after cluster has been initialized
+            self.charm.config_manager.set_config_properties()
 
             if storage_reuse:
                 # this is a new application but storage is reused
@@ -152,8 +154,6 @@ class EtcdEvents(Object):
                         self.charm.state.unit_server.peer_url
                     )
                     self.charm.state.cluster.update({"authentication": "enabled"})
-                    # overwrite the `force-new-cluster` config after cluster has been initialized
-                    self.charm.config_manager.set_config_properties()
                 except ValueError:
                     logger.error("Failed to update member configuration")
                     event.defer()
@@ -621,6 +621,8 @@ class EtcdEvents(Object):
                 logger.info("Enabling and starting etcd again.")
                 self.charm.workload.enable_service()
                 self.charm.cluster_manager.start_member()
+                # overwrite the `force-new-cluster` config after cluster has been rebuilt
+                self.charm.config_manager.set_config_properties()
                 self.charm.state.unit_server.update({"rebuild_completed": "True"})
             elif (
                 all(unit.rebuild_completed for unit in self.charm.state.servers)
@@ -629,8 +631,6 @@ class EtcdEvents(Object):
             ):
                 logger.info("All units started again - cluster rebuild completed.")
                 self.charm.state.cluster.update({"rebuild_cluster": ""})
-                # overwrite the `force-new-cluster` config after cluster has been rebuilt
-                self.charm.config_manager.set_config_properties()
 
             if self.charm.state.cluster.learning_member:
                 self.charm.cluster_manager.promote_learning_member()
