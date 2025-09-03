@@ -323,7 +323,7 @@ class TLSManager(ManagerStatusProtocol):
                 if not self._is_ip_address(san)
             }
 
-        sans_dns.add(self.state.unit_server.unit_name)
+        sans_dns.add(self.state.unit_server.unit_name.replace("/", ""))
         sans_dns.add(self.workload.get_host_mapping()["hostname"])
         return frozenset(sans_dns)
 

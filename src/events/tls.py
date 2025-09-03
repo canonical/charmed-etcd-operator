@@ -72,7 +72,7 @@ class TLSEvents(Object):
     def __init__(self, charm: "EtcdOperatorCharm"):
         super().__init__(charm, "tls")
         self.charm: "EtcdOperatorCharm" = charm
-        common_name = f"{self.charm.unit.name}-{self.charm.model.uuid}"
+        common_name = f"{self.charm.unit.name.replace('/', '')}-{self.charm.model.uuid}"
         peer_private_key = None
         client_private_key = None
 
