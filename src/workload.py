@@ -10,6 +10,7 @@ from os.path import exists
 from pathlib import Path
 from platform import machine
 from shutil import copyfile, rmtree
+from socket import socket
 from typing import Any, Dict, List
 
 import tomllib
@@ -81,6 +82,20 @@ class EtcdWorkload(WorkloadBase):
             return bool(self.etcd.services[SNAP_SERVICE]["active"])
         except KeyError:
             return False
+
+    @override
+    def is_reachable(self, host: str, port: int) -> bool:
+        s = socket()
+        s.settimeout(5)
+
+        try:
+            s.connect((host, port))
+            return True
+        except Exception as e:
+            logger.debug(f"Connection to {host}:{port} fails with: {e}")
+            return False
+        finally:
+            s.close()
 
     @override
     def write_file(self, content: str, file: str) -> None:

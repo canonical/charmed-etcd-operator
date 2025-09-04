@@ -19,13 +19,14 @@ from common.client import EtcdClient
 from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
+    EtcdServiceError,
     EtcdUserManagementError,
     RaftLeaderNotFoundError,
 )
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, TLSState
+from literals import CLIENT_PORT, INTERNAL_USER, METRICS_PORT, EtcdClusterState, TLSState
 from statuses import CharmStatuses, ClusterStatuses, EtcdServiceStatuses
 
 logger = logging.getLogger(__name__)
@@ -232,6 +233,8 @@ class ClusterManager(ManagerStatusProtocol):
     def start_member(self) -> None:
         """Start a cluster member and update its status."""
         self.workload.start()
+        if not self.workload.is_reachable(self.state.unit_server.ip, CLIENT_PORT):
+            raise EtcdServiceError("Etcd service failed to start")
         # this triggers a relation_changed event which the leader will use to promote
         # a learner-member to fully-voting member
         self.state.unit_server.update({"state": "started"})

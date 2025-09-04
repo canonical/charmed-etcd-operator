@@ -181,6 +181,7 @@ def test_enable_tls_on_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.start"),
         patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable"),
         patch(
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates"
         ),
