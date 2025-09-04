@@ -89,7 +89,9 @@ class EtcdWorkload(WorkloadBase):
         s.settimeout(5)
 
         try:
-            s.connect((host, port))
+            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3), reraise=True):
+                with attempt:
+                    s.connect((host, port))
             return True
         except Exception as e:
             logger.debug(f"Connection to {host}:{port} fails with: {e}")
