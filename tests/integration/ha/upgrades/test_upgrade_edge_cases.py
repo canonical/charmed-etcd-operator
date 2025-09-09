@@ -195,7 +195,9 @@ async def test_ip_address_change_during_upgrade(charm: str, ops_test: OpsTest) -
 
     # make sure the unit is not reachable from the controller
     controller_hostname = await get_controller_hostname(ops_test)
-    assert not is_unit_reachable(controller_hostname, ip_renewal_hostname)
+    assert not is_unit_reachable(controller_hostname, ip_renewal_hostname), (
+        f"unit {refresh_order[-1].name} is still reachable from controller"
+    )
     logger.info(f"{refresh_order[-1].name} is not reachable via network.")
 
     # as the stopped member is unresponsive, only query the endpoints still available
