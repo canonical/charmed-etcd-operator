@@ -88,6 +88,14 @@ class WorkloadBase(ABC):
         pass
 
     @abstractmethod
+    def is_reachable(self, host: str, port: int) -> bool:
+        """Check if the workload has started and is listening on the client port.
+
+        Returns:
+            bool: True if the workload is up, False otherwise.
+        """
+
+    @abstractmethod
     def write_file(self, content: str, file: str) -> None:
         """Write content to a file.
 

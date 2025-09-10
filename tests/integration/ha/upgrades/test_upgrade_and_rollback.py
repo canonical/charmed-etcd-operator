@@ -9,17 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION
-
-from ..helpers import (
-    APP_NAME,
-    get_cluster_endpoints,
-    get_cluster_members,
-    get_etcd_version,
-    get_secret_by_label,
-    get_unit_endpoint,
-)
-from ..helpers_deployment import wait_until
-from .helpers import (
+from tests.integration.ha.helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
     disable_etcd_service,
@@ -27,6 +17,15 @@ from .helpers import (
     start_continuous_writes,
     stop_continuous_writes,
 )
+from tests.integration.helpers import (
+    APP_NAME,
+    get_cluster_endpoints,
+    get_cluster_members,
+    get_etcd_version,
+    get_secret_by_label,
+    get_unit_endpoint,
+)
+from tests.integration.helpers_deployment import wait_until
 
 logger = logging.getLogger(__name__)
 
