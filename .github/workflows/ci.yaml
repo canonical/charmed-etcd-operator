@@ -119,7 +119,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: (GitHub hosted) Free up disk space
-        timeout-minutes: 1
+        timeout-minutes: 10
         run: |
           printf '\nDisk usage before cleanup\n'
           df --human-readable
