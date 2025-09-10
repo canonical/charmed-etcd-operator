@@ -17,6 +17,12 @@ from tests.integration.ha.helpers import (
     start_continuous_writes,
     stop_continuous_writes,
 )
+from tests.integration.ha.upgrades.literals import (
+    CHARM_CHANNEL,
+    CHARM_REVISIONS_TO_DEPLOY,
+    NUM_UNITS,
+    WORKLOAD_VERSION,
+)
 from tests.integration.helpers import (
     APP_NAME,
     get_cluster_endpoints,
@@ -28,11 +34,6 @@ from tests.integration.helpers import (
 from tests.integration.helpers_deployment import wait_until
 
 logger = logging.getLogger(__name__)
-
-NUM_UNITS = 3
-CHARM_CHANNEL = "3.6/edge"
-CHARM_REVISIONS_TO_DEPLOY = {"x86_64": 89, "aarch64": 88}
-WORKLOAD_VERSION = {"previous": "3.6.1", "target": "3.6.2"}
 
 
 @pytest.mark.abort_on_fail
