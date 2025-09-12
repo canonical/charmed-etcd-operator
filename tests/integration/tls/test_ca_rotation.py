@@ -229,6 +229,31 @@ async def test_ca_rotation_by_config_change(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
+async def test_prepare_units_for_ca_expiration_test(ops_test: OpsTest) -> None:
+    """Prepare the units for the CA expiration test."""
+    # add debug log to self signed certificates app
+    ssc_unit = ops_test.model.applications[TLS_NAME].units[0]
+    logger.info("Adding debug log to self-signed-certificates charm")
+    action = await ssc_unit.run(
+        'sudo sed -i \'/^            self._dump_provider_certificates(relation=relation, certificates=provider_certificates)/a\\            logger.debug("Revoked all certificates in relation %s", relation.id)\\n            logger.debug("Relation data %s", relation.data[self.charm.app])\' /var/lib/juju/agents/unit-self-signed-certificates-0/charm/lib/charms/tls_certificates_interface/v4/tls_certificates.py',
+        block=True,
+    )
+    assert action.status == "completed", f"Failed to add debug log: {action}"
+
+    etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
+    for unit in etcd_app.units:
+        logger.info("Updating renewal relative time to 0.6 for unit %s", unit.name)
+        await unit.run(
+            f"sudo sed -i 's|\\(refresh_events=\\[self.refresh_tls_certificates_event\\],\\)|\\1renewal_relative_time=0.6,|' /var/lib/juju/agents/unit-{unit.name.replace('/', '-')}/charm/src/events/tls.py",
+            block=True,
+        )
+        await unit.run(
+            f"sudo sed -i '/provider_relation_data = _ProviderApplicationData.load(relation.data\\[relation.app\\])/a\\            logger.debug(\"Remote relation data bag: %s\", relation.data[relation.app])' /var/lib/juju/agents/unit-{unit.name.replace('/', '-')}/charm/lib/charms/tls_certificates_interface/v4/tls_certificates.py",
+            block=True,
+        )
+
+
+@pytest.mark.abort_on_fail
 async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     """Test the CA rotation.
 
@@ -240,10 +265,20 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     # cert validity should be enough time for the rotation to happen
     # even with health checks failing because of invalid certs
     # CA validity must be 2x cert validity to be considered valid
-    logger.info("Adjusting validity of the CA to 40 min and certificates to 20 min")
-    tls_config = {"root-ca-validity": "40m", "certificate-validity": "20m"}
+    ca_root_validity = 20  # in minutes
+    certificate_validity = 10  # in minutes
+    logger.info(
+        "Adjusting validity of the CA to %s min and certificates to %s min",
+        ca_root_validity,
+        certificate_validity,
+    )
+    tls_config = {
+        "root-ca-validity": f"{ca_root_validity}m",
+        "certificate-validity": f"{certificate_validity}m",
+    }
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
+    time_after_config_set = time.time()
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
@@ -279,13 +314,20 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     )
     assert current_client_certificate, "Failed to get the current client certificate"
 
-    # CA certificate will be renewed at ca validity - certificate validity = 40-20 = 20 minutes
-    # the juju secret expires at 90% of the certificate validity; 20 * 0.9 = 18 minutes
-    # The first certificate after CA renewal will be coming in 36m (18m after CA renewal)
-    logger.info(
-        "Waiting 36m for expiration of CA certificates and getting new certificates - renewed certs will have a new CA"
-    )
-    time.sleep(2160)
+    # CA certificate will be renewed at ca validity - certificate validity = 10 minutes
+    # Certificates will be renewed at certificate validity * 0.6 = 6 minutes
+    # we need to wait for the first certificate renewal after the CA renewal
+    # We need to wait certificate_validity * 0.6 * 2 + some buffer time starting from the config change
+    logger.info("Waiting for the certificates to expire after CA renewal")
+    while (
+        remaining_time := (time_after_config_set + (certificate_validity * 60 * 0.6 * 2) + 30)
+        - time.time()
+    ) > 0:
+        logger.info(
+            "Waiting %.0f seconds for the certificates to expire after CA renewal",
+            remaining_time,
+        )
+        time.sleep(10)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
