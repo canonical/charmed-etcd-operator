@@ -99,7 +99,9 @@ class EtcdEvents(Object):
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
-        if not self.charm.workload.install():
+        try:
+            self.charm.workload.install()
+        except EtcdServiceError:
             self.charm.status.set_running_status(
                 EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
                 scope="unit",
@@ -142,6 +144,8 @@ class EtcdEvents(Object):
                 statuses_state=self.charm.state.statuses,
             )
             self.charm.cluster_manager.start_member()
+            # overwrite the `force-new-cluster` config after cluster has been initialized
+            self.charm.config_manager.set_config_properties()
 
             if storage_reuse:
                 # this is a new application but storage is reused
@@ -197,13 +201,14 @@ class EtcdEvents(Object):
                         # if removing fails, we cannot start the workload or the member would crash
                         raise
 
-                self.charm.status.set_running_status(
-                    EtcdServiceStatuses.SERVICE_STARTING.value,
-                    scope="unit",
-                    component_name=self.charm.cluster_manager.name,
-                    statuses_state=self.charm.state.statuses,
-                )
-                self.charm.cluster_manager.start_member()
+            # if the flag `unit_server.is_started` is missing, this was an uncontrolled reboot
+            self.charm.status.set_running_status(
+                EtcdServiceStatuses.SERVICE_STARTING.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
+            self.charm.cluster_manager.start_member()
         else:
             # this unit that has not yet been added to the cluster
             # wait for leader to process `relation_joined` event and add the member to the cluster
@@ -234,7 +239,7 @@ class EtcdEvents(Object):
             or self.charm.state.cluster.rebuild_cluster_in_progress
         ):
             logger.warning(
-                "Cannot update config while a restore or cluster-rebuild operation is in progress."
+                "Cannot update config while cluster is in vulnerable state because of restore or cluster-rebuild"
             )
             event.defer()
             return
@@ -243,7 +248,7 @@ class EtcdEvents(Object):
         ip_address = self.charm.workload.get_host_mapping().get("private_ip")
         if ip_address and ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
-            self.charm.state.unit_server.update({"private_ip": ip_address})
+            self.charm.state.unit_server.update(self.charm.workload.get_host_mapping())
 
             # we need to update the client-urls by restarting etcd
             self.charm.config_manager.set_config_properties()
@@ -262,6 +267,14 @@ class EtcdEvents(Object):
                 TLSState.TLS,
             ) or self.charm.state.unit_server.tls_peer_state in (TLSState.TO_TLS, TLSState.TLS):
                 self.charm.tls_events.refresh_tls_certificates_event.emit()
+
+        # we can only handle this now as we must update ip addresses during long-running upgrades
+        if self.charm.refresh_in_progress:
+            logger.warning(
+                "Cannot update config while cluster is in vulnerable state because of refresh"
+            )
+            event.defer()
+            return
 
         if (
             self.charm.config_manager.are_tuning_parameters_valid()
@@ -305,7 +318,8 @@ class EtcdEvents(Object):
                     event.defer()
                     return
 
-            # reflect membership updates in the cluster state, e.g. ip change or tls switchover
+            # reflect membership updates in the cluster state and config file in case of restarts
+            # e.g. ip change or tls switchover
             self.charm.cluster_manager.update_cluster_member_state()
 
             self._update_client_relations()
@@ -398,7 +412,7 @@ class EtcdEvents(Object):
         ):
             return
 
-        if not self.charm.workload.alive():
+        if not self.charm.workload.alive() and not self.charm.refresh_in_progress:
             if not self.charm.cluster_manager.restart_member():
                 self.charm.status.set_running_status(
                     EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
@@ -415,7 +429,7 @@ class EtcdEvents(Object):
             # if anything fails with the metrics request, we don't want to panic
             pass
 
-        if self.charm.unit.is_leader():
+        if self.charm.unit.is_leader() and not self.charm.refresh_in_progress:
             try:
                 self.charm.cluster_manager.clean_users()
                 self.charm.cluster_manager.remove_inconsistent_members_if_required()
@@ -458,9 +472,10 @@ class EtcdEvents(Object):
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh_in_progress
         ):
             logger.warning(
-                "Cannot update credentials while a restore or cluster-rebuild operation is in progress."
+                "Cannot update credentials while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
             )
             event.defer()
             return
@@ -611,6 +626,8 @@ class EtcdEvents(Object):
                 logger.info("Enabling and starting etcd again.")
                 self.charm.workload.enable_service()
                 self.charm.cluster_manager.start_member()
+                # overwrite the `force-new-cluster` config after cluster has been rebuilt
+                self.charm.config_manager.set_config_properties()
                 self.charm.state.unit_server.update({"rebuild_completed": "True"})
             elif (
                 all(unit.rebuild_completed for unit in self.charm.state.servers)

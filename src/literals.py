@@ -5,13 +5,12 @@
 """Collection of global literals for the etcd charm."""
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from ops.model import StatusBase
 
 SNAP_NAME = "charmed-etcd"
-SNAP_REVISIONS = {"x86_64": 13, "aarch64": 16}
 SNAP_SERVICE = "etcd"
 SNAP_DATA_PATH = "/var/snap/charmed-etcd/common/var/lib/etcd"
 SNAP_LOG_PATH = "/var/snap/charmed-etcd/common/var/log/etcd"
@@ -24,6 +23,7 @@ TLS_ROOT_DIR = "/var/snap/charmed-etcd/current/tls"
 DATABASE_DIR = "/var/snap/charmed-etcd/common/var/lib/etcd/member"
 BACKUP_FILE_NAME = "/var/snap/charmed-etcd/common/archive/charmed-etcd_snapshot.db"
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+VERSIONS_FILE = "refresh_versions.toml"
 
 DATA_STORAGE = "data"
 PEER_RELATION = "etcd-peers"
@@ -60,7 +60,7 @@ class StatusLevel:
     log_level: DebugLevel
 
 
-class EtcdClusterState(Enum):
+class EtcdClusterState(StrEnum):
     """Enum for Cluster state in etcd."""
 
     EXISTING = "existing"
@@ -68,7 +68,7 @@ class EtcdClusterState(Enum):
 
 
 # enum for TLS state
-class TLSState(Enum):
+class TLSState(StrEnum):
     """Enum for TLS state."""
 
     NO_TLS = "no-tls"
@@ -77,14 +77,14 @@ class TLSState(Enum):
     TO_NO_TLS = "to-no-tls"
 
 
-class TLSType(Enum):
+class TLSType(StrEnum):
     """TLS types."""
 
     PEER = "peer"
     CLIENT = "client"
 
 
-class TLSCARotationState(Enum):
+class TLSCARotationState(StrEnum):
     """TLS CA Rotation state."""
 
     NO_ROTATION = "no-rotation"
@@ -94,7 +94,7 @@ class TLSCARotationState(Enum):
 
 
 # enum for Backup state
-class RestoreStep(Enum):
+class RestoreStep(StrEnum):
     """Backup / Restore workflow step representation."""
 
     NOT_STARTED = ""
@@ -106,7 +106,7 @@ class RestoreStep(Enum):
     COMPLETED = "completed"
 
 
-class TuningOptions(Enum):
+class TuningOptions(StrEnum):
     """Configuration options for tuning etcd performance."""
 
     ELECTION_TIMEOUT_CONFIG = "election-timeout"

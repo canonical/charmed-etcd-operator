@@ -52,11 +52,11 @@ MEMBER_LIST_DICT = {
 }
 
 
-def test_install_failure_blocked_status():
+def test_install_failure():
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State()
 
-    with patch("workload.EtcdWorkload.install", return_value=False):
+    with patch("workload.EtcdWorkload.install", side_effect=EtcdServiceError()):
         with raises(testing.errors.UncaughtCharmError) as e:
             ctx.run(ctx.on.install(), state_in)
         assert isinstance(e.value.__cause__, EtcdServiceError)
@@ -83,10 +83,24 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.start"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
+
+    # raise if starting the service fails
+    with (
+        patch("workload.EtcdWorkload.alive", return_value=True),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.start"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=False),
+        patch("subprocess.run"),
+    ):
+        with raises(testing.errors.UncaughtCharmError) as e:
+            ctx.run(ctx.on.start(), state_in)
+
+        assert isinstance(e.value.__cause__, EtcdServiceError)
 
     # non-leader units should not start directly
     relation = testing.PeerRelation(
@@ -101,6 +115,7 @@ def test_start():
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("workload.EtcdWorkload.start") as start,
         patch("subprocess.run"),
     ):
@@ -117,6 +132,7 @@ def test_start():
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
     ):
@@ -133,6 +149,7 @@ def test_start():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.exists", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
     ):
@@ -147,12 +164,15 @@ def test_start():
     with (
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("workload.EtcdWorkload.exists", return_value=True),
-        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.write_file") as write_config,
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="OK")),
         patch("managers.cluster.ClusterManager.broadcast_peer_url") as broadcast_peer_url,
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
+        # 1st call: set `force-new-cluster` to `True`, 2nd: reset `force-new-cluster` to `False`
+        assert write_config.call_count == 2
         broadcast_peer_url.assert_called()
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
@@ -163,7 +183,10 @@ def test_start():
         id=1, endpoint=PEER_RELATION, local_app_data={"cluster_state": "existing"}
     )
     state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
-    with patch("workload.EtcdWorkload.write_file"):
+    with (
+        patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
+    ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status != ops.ActiveStatus()
         assert state_out.get_relation(1).local_unit_data.get("state") != "started"
@@ -174,6 +197,7 @@ def test_start():
     with (
         patch("workload.EtcdWorkload.alive", return_value=False),
         patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("workload.EtcdWorkload.start"),
         patch("subprocess.run"),
     ):
@@ -195,6 +219,7 @@ def test_start():
     with (
         patch("workload.EtcdWorkload.start") as start,
         patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
@@ -216,6 +241,7 @@ def test_start():
     with (
         patch("workload.EtcdWorkload.start") as start,
         patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="test")),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
@@ -237,13 +263,14 @@ def test_start():
     with (
         patch("workload.EtcdWorkload.start") as start,
         patch("workload.EtcdWorkload.write_file"),
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("subprocess.run"),
         patch("workload.EtcdWorkload.alive", return_value=True),
     ):
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
-        start.assert_not_called()
+        start.assert_called_once()
 
     # non leader must not start if auth not enabled
     relation = testing.PeerRelation(
@@ -488,7 +515,7 @@ def test_cluster_majority_failure():
             "cluster_state": "existing",
             "cluster_members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"private_ip": "ip0"},
+        local_unit_data={"private_ip": "ip0", "state": "started"},
     )
     status_peer_relation = testing.PeerRelation(
         id=2,
@@ -1104,12 +1131,14 @@ def test_rebuild_cluster_workflow_synchronisation():
 
     with (
         patch("workload.EtcdWorkload.write_file") as write_config,
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("workload.EtcdWorkload.start") as start_etcd,
         patch("workload.EtcdWorkload.enable_service") as enable_etcd,
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
 
-        write_config.assert_called_once()
+        # 1st call: set `force-new-cluster` to `True`, 2nd: reset `force-new-cluster` to `False`
+        assert write_config.call_count == 2
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
@@ -1130,6 +1159,7 @@ def test_rebuild_cluster_workflow_synchronisation():
 
     with (
         patch("workload.EtcdWorkload.write_file") as write_config,
+        patch("workload.EtcdWorkload.is_reachable", return_value=True),
         patch("workload.EtcdWorkload.start") as start_etcd,
         patch("workload.EtcdWorkload.enable_service") as enable_etcd,
     ):

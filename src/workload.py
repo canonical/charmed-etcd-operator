@@ -5,23 +5,28 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
-import platform
 import subprocess
 from os.path import exists
 from pathlib import Path
+from platform import machine
 from shutil import copyfile, rmtree
+from socket import socket
 from typing import Any, Dict, List
 
+import tomllib
 import yaml
 from charms.operator_libs_linux.v1.systemd import service_disable, service_enable
 from charms.operator_libs_linux.v2 import snap
-from tenacity import Retrying, retry, stop_after_attempt, wait_fixed
+from tenacity import Retrying, retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
+from common.exceptions import EtcdServiceError
 from core.workload import WorkloadBase
-from literals import SNAP_NAME, SNAP_REVISIONS, SNAP_SERVICE
+from literals import SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
 
 logger = logging.getLogger(__name__)
+
+WORKING_DIR = Path(__file__).absolute().parent
 
 
 class EtcdWorkload(WorkloadBase):
@@ -39,21 +44,36 @@ class EtcdWorkload(WorkloadBase):
         except snap.SnapError as e:
             logger.exception(str(e))
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True)
-    def install(self) -> bool:
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_fixed(5),
+        reraise=True,
+        retry=retry_if_exception_type(EtcdServiceError),
+    )
+    def install(self, revision: str | None = None, retry_and_raise: bool = True) -> bool:
         """Install the etcd snap from the snap store.
 
+        Args:
+            revision (str | None): the snap revision to install. Will be loaded from the
+                `refresh_versions.toml` file if None.
+            retry_and_raise (bool): whether to retry in case of errors. Will raise if the error
+                persists.
+
         Returns:
-            True if successfully installed, False if any error occurs.
+            True if successfully installed, False if errors occur and `retry_and_raise` is False.
         """
+        if not revision:
+            versions = self.load_toml_file(f"{WORKING_DIR}/../{VERSIONS_FILE}")
+            revision = versions["snap"]["revisions"][machine()]
+
         try:
-            self.etcd.ensure(
-                snap.SnapState.Present, revision=str(SNAP_REVISIONS[platform.machine()])
-            )
+            self.etcd.ensure(snap.SnapState.Present, revision=revision)
             self.etcd.hold()
             return True
         except snap.SnapError as e:
             logger.error(str(e))
+            if retry_and_raise:
+                raise EtcdServiceError(e)
             return False
 
     @override
@@ -62,6 +82,22 @@ class EtcdWorkload(WorkloadBase):
             return bool(self.etcd.services[SNAP_SERVICE]["active"])
         except KeyError:
             return False
+
+    @override
+    def is_reachable(self, host: str, port: int) -> bool:
+        s = socket()
+        s.settimeout(5)
+
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3), reraise=True):
+                with attempt:
+                    s.connect((host, port))
+            return True
+        except Exception as e:
+            logger.debug(f"Connection to {host}:{port} fails with: {e}")
+            return False
+        finally:
+            s.close()
 
     @override
     def write_file(self, content: str, file: str) -> None:
@@ -76,6 +112,14 @@ class EtcdWorkload(WorkloadBase):
 
         with open(file, "r") as f:
             return yaml.safe_load(f)
+
+    @override
+    def load_toml_file(self, file: str) -> Dict[str, Any]:
+        if not exists(file):
+            return {}
+
+        with open(file, "rb") as f:
+            return tomllib.load(f)
 
     @override
     def stop(self) -> None:
@@ -143,3 +187,7 @@ class EtcdWorkload(WorkloadBase):
     def enable_database(self) -> None:
         self.enable_service()
         self.start()
+
+    def snap_revision(self) -> str:
+        """Get the snap revision that is currently installed."""
+        return self.etcd.revision

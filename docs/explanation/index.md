@@ -8,7 +8,7 @@ Security-related topics:
 
 * [Security hardening guide](security_index)
   * [Cryptography](cryptography_page)
-
+* [Advanced Statuses](advanced-statuses)
 
 ```{toctree}
 :titlesonly:
@@ -16,4 +16,5 @@ Security-related topics:
 :hidden:
 
 Security <security/index>
+Advanced Statuses <advanced-statuses>
 ```

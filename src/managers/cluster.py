@@ -19,13 +19,14 @@ from common.client import EtcdClient
 from common.exceptions import (
     EtcdAuthNotEnabledError,
     EtcdClusterManagementError,
+    EtcdServiceError,
     EtcdUserManagementError,
     RaftLeaderNotFoundError,
 )
 from core.cluster import ClusterState
 from core.models import Member
 from core.workload import WorkloadBase
-from literals import INTERNAL_USER, METRICS_PORT, EtcdClusterState, TLSState
+from literals import CLIENT_PORT, INTERNAL_USER, METRICS_PORT, EtcdClusterState, TLSState
 from statuses import CharmStatuses, ClusterStatuses, EtcdServiceStatuses
 
 logger = logging.getLogger(__name__)
@@ -232,6 +233,8 @@ class ClusterManager(ManagerStatusProtocol):
     def start_member(self) -> None:
         """Start a cluster member and update its status."""
         self.workload.start()
+        if not self.workload.is_reachable(self.state.unit_server.ip, CLIENT_PORT):
+            raise EtcdServiceError("Etcd service failed to start")
         # this triggers a relation_changed event which the leader will use to promote
         # a learner-member to fully-voting member
         self.state.unit_server.update({"state": "started"})
@@ -373,6 +376,10 @@ class ClusterManager(ManagerStatusProtocol):
         ):
             return [EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value]
 
+        if not self.state.peer_relation:
+            status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
+            return status_list
+
         if self.state.unit_server.is_started:
             if (
                 self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value
@@ -384,32 +391,26 @@ class ClusterManager(ManagerStatusProtocol):
             if not self.state.cluster.auth_enabled:
                 status_list.append(ClusterStatuses.AUTHENTICATION_NOT_ENABLED.value)
 
-        if not self.state.peer_relation:
-            status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
-        else:
-            if not self.state.cluster.cluster_state:
-                status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
-
-            if self.state.unit_server.member_endpoint not in self.state.cluster.cluster_members:
-                status_list.append(ClusterStatuses.CLUSTER_NOT_JOINED.value)
-
-            if self.state.cluster.rebuild_cluster_in_progress:
-                status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
-
-            if self.state.cluster.learning_member and self.state.unit_server.is_juju_leader:
-                status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
-
             try:
                 if self.is_cluster_failed:
                     status_list.append(ClusterStatuses.CLUSTER_FAILED.value)
-                else:
-                    self.state.statuses.delete(
-                        ClusterStatuses.CLUSTER_FAILED.value,
-                        scope=scope,
-                        component=self.name,
-                    )
             except RequestException as e:
-                logger.error(f"Could not determine if cluster failed: {e}")
+                logger.warning(f"Could not determine if cluster failed: {e}")
+
+        if not self.state.cluster.cluster_state:
+            status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
+
+        if self.state.unit_server.member_endpoint not in self.state.cluster.cluster_members:
+            if self.state.unit_server.tls_peer_state in [TLSState.TO_TLS, TLSState.TO_NO_TLS]:
+                status_list.append(ClusterStatuses.CLUSTER_MEMBER_RECONFIGURATION.value)
+            else:
+                status_list.append(ClusterStatuses.CLUSTER_NOT_JOINED.value)
+
+        if self.state.cluster.rebuild_cluster_in_progress:
+            status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
+
+        if self.state.cluster.learning_member and self.state.unit_server.is_juju_leader:
+            status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
 

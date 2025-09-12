@@ -88,6 +88,14 @@ class WorkloadBase(ABC):
         pass
 
     @abstractmethod
+    def is_reachable(self, host: str, port: int) -> bool:
+        """Check if the workload has started and is listening on the client port.
+
+        Returns:
+            bool: True if the workload is up, False otherwise.
+        """
+
+    @abstractmethod
     def write_file(self, content: str, file: str) -> None:
         """Write content to a file.
 
@@ -106,6 +114,18 @@ class WorkloadBase(ABC):
 
         Returns:
             The content of a YAML file as a dict.
+        """
+        pass
+
+    @abstractmethod
+    def load_toml_file(self, file: str) -> Dict[str, Any]:
+        """Read toml content from a file.
+
+        Args:
+            file (str): Path to the file.
+
+        Returns:
+            The content of a TOML file as a dict.
         """
         pass
 
