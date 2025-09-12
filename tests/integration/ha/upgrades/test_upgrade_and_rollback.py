@@ -104,14 +104,23 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
     # we can only roll back to the latest released revision from a local charm
     refresh_cmd = f"refresh {APP_NAME} --model={ops_test.model.info.name} --switch {APP_NAME} --channel {CHARM_CHANNEL}"
     return_code, _, std_err = await ops_test.juju(*refresh_cmd.split())
+    assert return_code == 0, f"rollback failed: {std_err}"
 
-    # will be marked "incompatible" if rollback is not to the same revision as initially deployed
     await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
     if "incompatible" in etcd_application.status_message:
+        # will be marked "incompatible" if rollback is not to the same revision as initially deployed
         logger.info("Rollback is blocked due to incompatibility")
 
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
         await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
+    elif "Refreshing" in etcd_application.status_message:
+        # rolling back from local to published is only possible to the latest revision
+        # if this is not run in a PR, the local built version is the same as the latest published
+        # to roll back to the initially deployed version, we need to issue another rollback command
+        logger.info("Rolling back to previous revision")
+        refresh_cmd = f"refresh {APP_NAME} --model={ops_test.model.info.name} --revision {CHARM_REVISIONS_TO_DEPLOY[machine()]}"
+        return_code, _, std_err = await ops_test.juju(*refresh_cmd.split())
+        assert return_code == 0, f"rollback failed: {std_err}"
 
     # wait for rollback to complete
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
