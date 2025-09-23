@@ -210,15 +210,6 @@ async def test_ca_rotation_by_config_change(ops_test: OpsTest) -> None:
 
 async def _prepare_units_for_ca_expiration_test(ops_test: OpsTest) -> None:
     """Prepare the units for the CA expiration test."""
-    # add debug log to self signed certificates app
-    ssc_unit = ops_test.model.applications[TLS_NAME].units[0]
-    logger.info("Adding debug log to self-signed-certificates charm")
-    action = await ssc_unit.run(
-        'sudo sed -i \'/^            self._dump_provider_certificates(relation=relation, certificates=provider_certificates)/a\\            logger.debug("Revoked all certificates in relation %s", relation.id)\\n            logger.debug("Relation data %s", relation.data[self.charm.app])\' /var/lib/juju/agents/unit-self-signed-certificates-0/charm/lib/charms/tls_certificates_interface/v4/tls_certificates.py',
-        block=True,
-    )
-    assert action.status == "completed", f"Failed to add debug log: {action}"
-
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
     for unit in etcd_app.units:
         logger.info("Updating renewal relative time to 0.6 for unit %s", unit.name)
@@ -259,7 +250,6 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     }
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
-    time_after_config_set = time.time()
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
@@ -300,15 +290,9 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     # we need to wait for the first certificate renewal after the CA renewal
     # We need to wait certificate_validity * 0.6 * 2 + some buffer time starting from the config change
     logger.info("Waiting for the certificates to expire after CA renewal")
-    while (
-        remaining_time := (time_after_config_set + (certificate_validity * 60 * 0.6 * 2) + 30)
-        - time.time()
-    ) > 0:
-        logger.info(
-            "Waiting %.0f seconds for the certificates to expire after CA renewal",
-            remaining_time,
-        )
-        time.sleep(10)
+    waiting_time = (certificate_validity * 60 * 0.6 * 2) + 30
+    logger.info(f"Certificates will expire in {waiting_time} seconds")
+    time.sleep(waiting_time)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
