@@ -5,7 +5,6 @@ import logging
 import time
 
 import pytest
-from data_platform_helpers.advanced_statuses import StatusObjectDict
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
@@ -32,25 +31,6 @@ NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 90
-
-
-async def get_app_status_detail(
-    ops_test: OpsTest, app_name: str
-) -> tuple[StatusObjectDict, StatusObjectDict]:
-    """Get the status detail of the application."""
-    for unit in ops_test.model.applications[app_name].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
-            break
-    else:
-        raise ValueError(f"No leader unit found for {app_name}")
-
-    status_detail = await leader_unit.run_action("status-detail")
-    response = await status_detail.wait()
-    json_output = response.results.get("json-output", {})
-    app_statuses = StatusObjectDict.model_validate_json(json_output["app"])
-    unit_statuses = StatusObjectDict.model_validate_json(json_output["unit"])
-    return app_statuses, unit_statuses
 
 
 @pytest.mark.abort_on_fail
@@ -228,8 +208,7 @@ async def test_ca_rotation_by_config_change(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.abort_on_fail
-async def test_prepare_units_for_ca_expiration_test(ops_test: OpsTest) -> None:
+async def _prepare_units_for_ca_expiration_test(ops_test: OpsTest) -> None:
     """Prepare the units for the CA expiration test."""
     # add debug log to self signed certificates app
     ssc_unit = ops_test.model.applications[TLS_NAME].units[0]
@@ -261,6 +240,8 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     The rotation is triggered by expiring certificates.
     """
     model = ops_test.model_full_name
+
+    await _prepare_units_for_ca_expiration_test(ops_test)
 
     # cert validity should be enough time for the rotation to happen
     # even with health checks failing because of invalid certs
