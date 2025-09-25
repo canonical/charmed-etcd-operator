@@ -213,12 +213,11 @@ async def _prepare_units_for_ca_expiration_test(ops_test: OpsTest) -> None:
     etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
     for unit in etcd_app.units:
         logger.info("Updating renewal relative time to 0.6 for unit %s", unit.name)
+        search_expression = "\\(refresh_events=\\[self.refresh_tls_certificates_event\\],\\)"
+        replace_expression = "\\1renewal_relative_time=0.6,"
+        file = f"/var/lib/juju/agents/unit-{unit.name.replace('/', '-')}/charm/src/events/tls.py"
         await unit.run(
-            f"sudo sed -i 's|\\(refresh_events=\\[self.refresh_tls_certificates_event\\],\\)|\\1renewal_relative_time=0.6,|' /var/lib/juju/agents/unit-{unit.name.replace('/', '-')}/charm/src/events/tls.py",
-            block=True,
-        )
-        await unit.run(
-            f"sudo sed -i '/provider_relation_data = _ProviderApplicationData.load(relation.data\\[relation.app\\])/a\\            logger.debug(\"Remote relation data bag: %s\", relation.data[relation.app])' /var/lib/juju/agents/unit-{unit.name.replace('/', '-')}/charm/lib/charms/tls_certificates_interface/v4/tls_certificates.py",
+            f"sudo sed -i 's|{search_expression}|{replace_expression}|' {file}",
             block=True,
         )
 
