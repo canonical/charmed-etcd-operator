@@ -124,16 +124,18 @@ prepare: |
   snap refresh --hold
   chown -R root:root "$SPREAD_PATH"
   cd "$SPREAD_PATH"
-  GOBIN=$SPREAD_PATH/bin/ go install github.com/canonical/concierge@latest
+  snap install --classic concierge
 
   # Install charmcraft & pipx (on lxd-vm backend)
-  $SPREAD_PATH/bin/concierge prepare --trace
+  concierge prepare --trace
+  /snap/bin/juju bootstrap localhost concierge-lxd --verbose --model-default 'logging-config=<root>=INFO; unit=DEBUG' --agent-version: 3.6.9
+  /snap/bin/juju add-model -c concierge-lxd testing
 
   pipx install tox poetry
 prepare-each: |
   cd "$SPREAD_PATH"
   # `concierge prepare` needs to be run for each spread job in case Juju version changed
-  $SPREAD_PATH/bin/concierge prepare --trace
+  concierge prepare --trace
 
   # Unable to set constraint on all models because of Juju bug:
   # https://bugs.launchpad.net/juju/+bug/2065050
