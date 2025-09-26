@@ -124,16 +124,16 @@ prepare: |
   snap refresh --hold
   chown -R root:root "$SPREAD_PATH"
   cd "$SPREAD_PATH"
-  go install github.com/canonical/concierge@latest
+  GOBIN=$SPREAD_PATH/bin/ go install github.com/canonical/concierge@latest
 
   # Install charmcraft & pipx (on lxd-vm backend)
-  $GOROOT/bin/concierge prepare --trace
+  $SPREAD_PATH/bin/concierge prepare --trace
 
   pipx install tox poetry
 prepare-each: |
   cd "$SPREAD_PATH"
   # `concierge prepare` needs to be run for each spread job in case Juju version changed
-  $GOROOT/bin/concierge prepare --trace
+  $SPREAD_PATH/bin/concierge prepare --trace
 
   # Unable to set constraint on all models because of Juju bug:
   # https://bugs.launchpad.net/juju/+bug/2065050
