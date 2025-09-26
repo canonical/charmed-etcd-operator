@@ -5,7 +5,6 @@ import logging
 import time
 
 import pytest
-from data_platform_helpers.advanced_statuses import StatusObjectDict
 from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
@@ -32,25 +31,6 @@ NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 90
-
-
-async def get_app_status_detail(
-    ops_test: OpsTest, app_name: str
-) -> tuple[StatusObjectDict, StatusObjectDict]:
-    """Get the status detail of the application."""
-    for unit in ops_test.model.applications[app_name].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
-            break
-    else:
-        raise ValueError(f"No leader unit found for {app_name}")
-
-    status_detail = await leader_unit.run_action("status-detail")
-    response = await status_detail.wait()
-    json_output = response.results.get("json-output", {})
-    app_statuses = StatusObjectDict.model_validate_json(json_output["app"])
-    unit_statuses = StatusObjectDict.model_validate_json(json_output["unit"])
-    return app_statuses, unit_statuses
 
 
 @pytest.mark.abort_on_fail
@@ -228,6 +208,20 @@ async def test_ca_rotation_by_config_change(ops_test: OpsTest) -> None:
     ), "Failed to read new key"
 
 
+async def _prepare_units_for_ca_expiration_test(ops_test: OpsTest) -> None:
+    """Prepare the units for the CA expiration test."""
+    etcd_app: Application = ops_test.model.applications[APP_NAME]  # type: ignore
+    for unit in etcd_app.units:
+        logger.info("Updating renewal relative time to 0.6 for unit %s", unit.name)
+        search_expression = "\\(refresh_events=\\[self.refresh_tls_certificates_event\\],\\)"
+        replace_expression = "\\1renewal_relative_time=0.6,"
+        file = f"/var/lib/juju/agents/unit-{unit.name.replace('/', '-')}/charm/src/events/tls.py"
+        await unit.run(
+            f"sudo sed -i 's|{search_expression}|{replace_expression}|' {file}",
+            block=True,
+        )
+
+
 @pytest.mark.abort_on_fail
 async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     """Test the CA rotation.
@@ -237,17 +231,28 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     """
     model = ops_test.model_full_name
 
+    await _prepare_units_for_ca_expiration_test(ops_test)
+
     # cert validity should be enough time for the rotation to happen
     # even with health checks failing because of invalid certs
     # CA validity must be 2x cert validity to be considered valid
-    logger.info("Adjusting validity of the CA to 12 min and certificates to 6 min")
-    tls_config = {"root-ca-validity": "12m", "certificate-validity": "6m"}
+    ca_root_validity = 20  # in minutes
+    certificate_validity = 10  # in minutes
+    logger.info(
+        "Adjusting validity of the CA to %s min and certificates to %s min",
+        ca_root_validity,
+        certificate_validity,
+    )
+    tls_config = {
+        "root-ca-validity": f"{ca_root_validity}m",
+        "certificate-validity": f"{certificate_validity}m",
+    }
     tls_app: Application = ops_test.model.applications[TLS_NAME]  # type: ignore
     await tls_app.set_config(tls_config)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        apps_full_statuses={
+        units_full_statuses={
             APP_NAME: [
                 TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
             ],
@@ -279,15 +284,18 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     )
     assert current_client_certificate, "Failed to get the current client certificate"
 
-    logger.info(
-        "Waiting ~10.8m for expiration of CA certificates - renewed certs will have a new CA"
-    )
-    # the juju secret expires at 90% of the certificate validity; 720s * 0.9 = 648s
-    time.sleep(660)
+    # CA certificate will be renewed at ca validity - certificate validity = 10 minutes
+    # Certificates will be renewed at certificate validity * 0.6 = 6 minutes
+    # we need to wait for the first certificate renewal after the CA renewal
+    # We need to wait certificate_validity * 0.6 * 2 + some buffer time starting from the config change
+    logger.info("Waiting for the certificates to expire after CA renewal")
+    waiting_time = (certificate_validity * 60 * 0.6 * 2) + 30
+    logger.info(f"Certificates will expire in {waiting_time} seconds")
+    time.sleep(waiting_time)
     await wait_until(
         ops_test,
         apps=[APP_NAME, TLS_NAME],
-        apps_full_statuses={
+        units_full_statuses={
             APP_NAME: [
                 TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
             ],
