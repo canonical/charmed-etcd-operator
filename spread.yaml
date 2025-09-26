@@ -124,7 +124,7 @@ prepare: |
   snap refresh --hold
   chown -R root:root "$SPREAD_PATH"
   cd "$SPREAD_PATH"
-  snap install --classic concierge
+  go install github.com/canonical/concierge@latest
 
   # Install charmcraft & pipx (on lxd-vm backend)
   concierge prepare --trace
