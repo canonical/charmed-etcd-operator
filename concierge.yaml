@@ -1,7 +1,7 @@
 juju:
   model-defaults:
     logging-config: <root>=INFO; unit=DEBUG
-    agent-version: 3.6.9
+  agent-version: 3.6.9
 providers:
   lxd:
     enable: true
