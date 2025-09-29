@@ -71,7 +71,7 @@ Check the restored data by ensuring that:
 
 ## Read the rollback instructions
 
-In the event that something goes wrong (e.g. the refresh fails, the new version of etcd is not performant enough, 
+In the event that something goes wrong (e.g. the refresh fails, the new version of etcd has any issues, 
 a database client is incompatible with the new version), you may want to quickly roll back.
 
 Prepare for this possibility by reading through the entire refresh documentation — with special attention to the 

@@ -3,6 +3,7 @@ backend
 backends
 Charmcraft
 cjk
+config
 cryptographically
 CSR
 etcd
@@ -33,6 +34,7 @@ Pygments
 QEMU
 Rockcraft
 rst
+tbd
 tex
 texlive
 th
