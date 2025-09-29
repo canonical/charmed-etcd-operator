@@ -117,9 +117,11 @@ class TLSEvents(Object):
             PEER_TLS_RELATION_NAME,
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name=common_name,
+                    common_name=self.charm.tls_manager.build_common_name(
+                        common_name, TLSType.PEER
+                    ),
                     sans_ip=self.charm.tls_manager.build_sans_ip(TLSType.PEER),
-                    sans_dns=self.charm.tls_manager.build_sans_dns(),
+                    sans_dns=self.charm.tls_manager.build_sans_dns(TLSType.PEER),
                 ),
             ],
             private_key=peer_private_key,
@@ -130,9 +132,11 @@ class TLSEvents(Object):
             CLIENT_TLS_RELATION_NAME,
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name=common_name,
+                    common_name=self.charm.tls_manager.build_common_name(
+                        common_name, TLSType.CLIENT
+                    ),
                     sans_ip=self.charm.tls_manager.build_sans_ip(TLSType.CLIENT),
-                    sans_dns=self.charm.tls_manager.build_sans_dns(),
+                    sans_dns=self.charm.tls_manager.build_sans_dns(TLSType.CLIENT),
                 ),
             ],
             private_key=client_private_key,
@@ -367,7 +371,7 @@ class TLSEvents(Object):
                 or self.charm.state.unit_server.tls_peer_state == TLSState.TLS
                 and self.charm.tls_manager.certificate_sans_require_update(TLSType.PEER)
             ):
-                logger.debug("Config change for certificate-extra-sans, refresh TLS certificates")
+                logger.debug("Config change for certificate options, refresh TLS certificates")
                 self.refresh_tls_certificates_event.emit()
 
     def _on_secret_changed(self, event: SecretChangedEvent) -> None:
