@@ -548,4 +548,10 @@ class TLSManager(ManagerStatusProtocol):
         if not self.extra_sans_config_is_valid():
             status_list.append(TLSStatuses.SANS_CONFIG_INVALID.value)
 
+        if not self.certificate_domain_config_is_valid(TLSType.CLIENT):
+            status_list.append(TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value)
+
+        if not self.certificate_domain_config_is_valid(TLSType.PEER):
+            status_list.append(TLSStatuses.PEER_DOMAIN_CONFIG_INVALID.value)
+
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]

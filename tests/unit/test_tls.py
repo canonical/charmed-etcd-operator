@@ -1657,7 +1657,7 @@ def test_set_extra_sans_config_option():
         assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
 
 
-def test_disable_ip_sans_config_option():
+def test_disable_ip_sans():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
@@ -1689,3 +1689,95 @@ def test_disable_ip_sans_config_option():
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
         assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
+
+
+def test_set_domain_config_option():
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_app_data={
+            "authentication": "enabled",
+            "cluster_state": "existing",
+            "cluster_members": "charmed-etcd0=https://my_ip:2380",
+        },
+        local_unit_data={
+            "private_ip": "my_ip",
+            "tls_peer_state": TLSState.TLS.value,
+            "tls_client_state": TLSState.TLS.value,
+        },
+    )
+    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+
+    # happy path
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "client-certificate-domain": "mydomain.com",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
+
+    # invalid client domain name
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "client-certificate-domain": ".domain",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert status_is(state_out, TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value)
+
+    # invalid peer domain name
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "peer-certificate-domain": "mydomain.com, anotherdomain.com",
+        },
+        relations={relation},
+    )
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        assert status_is(state_out, TLSStatuses.PEER_DOMAIN_CONFIG_INVALID.value)
+
+    # both are invalid
+    ctx = testing.Context(EtcdOperatorCharm)
+    state_in = testing.State(
+        config={
+            "peer-certificate-domain": "10.1.1.0",
+            "client-certificate-domain": "-",
+        },
+        relations={relation},
+    )
+
+    current_sans_value = "X509v3 Subject Alternative Name: \n    DNS:myhostname, DNS:charmed-etcd0, IP Address:127.0.1.1"
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("workload.EtcdWorkload.exec", return_value=current_sans_value),
+        patch("workload.EtcdWorkload.get_host_mapping", return_value={"hostname": "myhostname"}),
+        patch("workload.EtcdWorkload.get_private_ip", return_value="127.0.1.1"),
+        patch("subprocess.run"),
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        # client config status is set before peer config status
+        assert status_is(state_out, TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value)
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
