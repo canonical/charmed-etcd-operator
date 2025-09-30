@@ -288,12 +288,6 @@ class TLSManager(ManagerStatusProtocol):
         """
         sans_ip = set()
 
-        if tls_type == TLSType.CLIENT and not self.state.config.get(
-            "client-certificate-include-ip-sans"
-        ):
-            # return early without any IP's because IP SANs are disabled
-            return frozenset(sans_ip)
-
         if self.extra_sans_config_is_valid() and (
             extra_sans_config := self.state.config.get("certificate-extra-sans")
         ):

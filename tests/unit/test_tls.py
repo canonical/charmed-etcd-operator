@@ -1657,40 +1657,6 @@ def test_set_extra_sans_config_option():
         assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
 
 
-def test_disable_ip_sans():
-    relation = testing.PeerRelation(
-        id=1,
-        endpoint=PEER_RELATION,
-        local_app_data={
-            "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=https://my_ip:2380",
-        },
-        local_unit_data={
-            "private_ip": "my_ip",
-            "tls_peer_state": TLSState.TLS.value,
-            "tls_client_state": TLSState.TLS.value,
-        },
-    )
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
-
-    ctx = testing.Context(EtcdOperatorCharm)
-    state_in = testing.State(
-        config={
-            "client-certificate-include-ip-sans": False,
-        },
-        relations={relation},
-    )
-
-    with (
-        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("subprocess.run"),
-    ):
-        state_out = ctx.run(ctx.on.config_changed(), state_in)
-        assert isinstance(ctx.emitted_events[1], RefreshTLSCertificatesEvent)
-        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
-
-
 def test_set_domain_config_option():
     relation = testing.PeerRelation(
         id=1,

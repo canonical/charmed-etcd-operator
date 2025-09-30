@@ -48,14 +48,6 @@ options:
       for client certificates. Example: "mydomain.com". This must match the allowed domains from the TLS provider.
       In the case of Vault, this should be set to one of the domains configured in "pki_allowed_domains". 
 
-  client-certificate-include-ip-sans:
-    type: boolean
-    default: true
-    description: |
-      Config option to enable or disable IP addresses in the subject alternative names (SAN) used for 
-      certificate signing requests for client certificates. This should be set to false if the related 
-      TLS provider does not support IP addresses in certificates.
-
   peer-certificate-domain:
     type: string
     description: |
