@@ -364,15 +364,22 @@ class TLSEvents(Object):
         if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             self.update_private_key(tls_client_private_key_id)
 
-        if self.charm.tls_manager.extra_sans_config_is_valid():
-            if (
-                self.charm.state.unit_server.tls_client_state == TLSState.TLS
-                and self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT)
-                or self.charm.state.unit_server.tls_peer_state == TLSState.TLS
-                and self.charm.tls_manager.certificate_sans_require_update(TLSType.PEER)
-            ):
-                logger.debug("Config change for certificate options, refresh TLS certificates")
-                self.refresh_tls_certificates_event.emit()
+        if not (
+            self.charm.tls_manager.extra_sans_config_is_valid()
+            and self.charm.tls_manager.certificate_domain_config_is_valid(TLSType.CLIENT)
+            and self.charm.tls_manager.certificate_domain_config_is_valid(TLSType.PEER)
+        ):
+            logger.warning("TLS certificates not updated because of invalid configuration")
+            return
+
+        if (
+            self.charm.state.unit_server.tls_client_state == TLSState.TLS
+            and self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT)
+            or self.charm.state.unit_server.tls_peer_state == TLSState.TLS
+            and self.charm.tls_manager.certificate_sans_require_update(TLSType.PEER)
+        ):
+            logger.debug("Config change for certificate options, refresh TLS certificates")
+            self.refresh_tls_certificates_event.emit()
 
     def _on_secret_changed(self, event: SecretChangedEvent) -> None:
         """Handle TLS related secret changes."""

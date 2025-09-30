@@ -294,6 +294,7 @@ class TLSManager(ManagerStatusProtocol):
             or tls_type == TLSType.PEER
             and not self.state.config.get("peer-certificate-include-ip-sans")
         ):
+            # return early without any IP's because IP SANs are disabled
             return frozenset(sans_ip)
 
         if self.extra_sans_config_is_valid() and (
@@ -335,6 +336,7 @@ class TLSManager(ManagerStatusProtocol):
         sans_dns.add(self.state.unit_server.unit_name.replace("/", ""))
         sans_dns.add(self.workload.get_host_mapping()["hostname"])
 
+        # add desired domain to every DNS name if configured
         if self.certificate_domain_config_is_valid(tls_type) and (
             certificate_domain_config := self.state.config.get(f"{tls_type}-certificate-domain")
         ):

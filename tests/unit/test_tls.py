@@ -1740,6 +1740,8 @@ def test_set_domain_config_option():
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert status_is(state_out, TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value)
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
 
     # invalid peer domain name
     ctx = testing.Context(EtcdOperatorCharm)
@@ -1756,8 +1758,10 @@ def test_set_domain_config_option():
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         assert status_is(state_out, TLSStatuses.PEER_DOMAIN_CONFIG_INVALID.value)
+        # no RefreshTLSCertificatesEvent must be emitted
+        assert len(ctx.emitted_events) == 1
 
-    # both are invalid
+    # both client and peer domain names are invalid
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
         config={
