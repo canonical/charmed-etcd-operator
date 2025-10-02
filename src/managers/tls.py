@@ -340,12 +340,9 @@ class TLSManager(ManagerStatusProtocol):
 
     def build_common_name(self, common_name: str, tls_type: TLSType) -> str:
         """Build the Common Name for the TLS certificate."""
-        if not (
+        if self.certificate_domain_config_is_valid(tls_type) and (
             certificate_domain_config := self.state.config.get(f"{tls_type}-certificate-domain")
         ):
-            return common_name
-
-        if self.certificate_domain_config_is_valid(tls_type):
             return common_name + "." + certificate_domain_config
 
         return common_name
@@ -373,12 +370,9 @@ class TLSManager(ManagerStatusProtocol):
 
     def certificate_domain_config_is_valid(self, tls_type: TLSType) -> bool:
         """Validate configuration value for {peer|client}-certificate-domain option."""
-        if not (
+        if (
             certificate_domain_config := self.state.config.get(f"{tls_type}-certificate-domain")
-        ):
-            return True
-
-        if not self._is_hostname(certificate_domain_config):
+        ) and not self._is_hostname(certificate_domain_config):
             logger.error(f"{tls_type}-certificate-domain configuration is invalid")
             return False
 

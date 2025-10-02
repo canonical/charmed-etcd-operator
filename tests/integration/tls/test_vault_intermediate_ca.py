@@ -251,6 +251,10 @@ async def test_restrict_certificate_domain(ops_test: OpsTest) -> None:
     )
     logger.info("Certificates in etcd updated with new domain")
 
+
+@pytest.mark.abort_on_fail
+async def test_invalid_certificate_domain(ops_test: OpsTest) -> None:
+    """Ensure no new certificates are requested if invalid domain is configured."""
     logger.info("Set config in etcd to invalid value")
     etcd_invalid_domain_config_value = "192.168.2.200"
 

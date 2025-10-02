@@ -30,6 +30,8 @@ This guide will use the [Self-signed Certificates](https://charmhub.io/self-sign
 Check [this guide](https://charmhub.io/topics/security-with-x-509-certificates) for an overview of all the TLS certificates charms available. 
 
 If [Vault](https://charmhub.io/vault-k8s?channel=1.18/edge) is used as TLS provider, it is required in version 1.18 at least. 
+See [](../tune-settings.md/#certificate-sans-configuration) for information on how to configure the certificate domain 
+in accordance to Vault's configuration.
 ```
 
 Deploy the `self-signed-certificates` charm. etcd uses `v4` of the [{spellexception}`tls-certificates` library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates), which is currently only supported in the `edge` channel.
