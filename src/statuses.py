@@ -17,6 +17,11 @@ class CharmStatuses(Enum):
     ACTIVE_IDLE = StatusObject(status="active", message="")
     NO_PEER_RELATION = StatusObject(status="maintenance", message="no peer relation available")
     PEER_URL_NOT_SET = StatusObject(status="maintenance", message="peer-url not set")
+    SECRET_ACCESS_ERROR = StatusObject(
+        status="blocked",
+        message="Cannot access configured secret, check permissions",
+        running="async",
+    )
 
 
 class BackupStatuses(Enum):
