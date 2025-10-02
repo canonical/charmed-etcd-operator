@@ -8,6 +8,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, INTERNAL_USER_PASSWORD_CONFIG, PEER_RELATION
+from statuses import CharmStatuses
 
 from .helpers import (
     APP_NAME,
@@ -92,3 +93,35 @@ async def test_update_admin_password(ops_test: OpsTest) -> None:
     assert (
         get_key(endpoints, user=INTERNAL_USER, password=new_password, key=TEST_KEY) == TEST_VALUE
     )
+
+
+@pytest.mark.abort_on_fail
+async def test_user_secret_permissions(ops_test: OpsTest) -> None:
+    """If a user secret is not granted, ensure we can process updated permissions."""
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    # by default, this is the secret name used
+    secret_name = "system_users_secret"
+    new_password = "even-newer-password"
+
+    logger.info("Revoke permissions to access user secret")
+    await ops_test.model.revoke_secret(secret_name=secret_name, application=APP_NAME)
+
+    logger.info("Now update the configured secret - status should be blocked")
+    await ops_test.model.update_secret(
+        name=secret_name, data_args=[f"{INTERNAL_USER}={new_password}"], new_name=secret_name
+    )
+
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME],
+        apps_full_statuses={APP_NAME: [CharmStatuses.SECRET_ACCESS_ERROR.value]},
+    )
+
+    logger.info("Secret access will be granted now - wait for updated password")
+    await ops_test.model.grant_secret(secret_name=secret_name, application=APP_NAME)
+    await wait_until(ops_test, apps=[APP_NAME])
+
+    # perform read operation with the updated password
+    assert (
+        get_key(endpoints, user=INTERNAL_USER, password=new_password, key=TEST_KEY) == TEST_VALUE
+    ), "password update failed"
