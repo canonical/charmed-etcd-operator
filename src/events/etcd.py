@@ -30,11 +30,13 @@ from common.exceptions import (
     RaftLeaderNotFoundError,
 )
 from literals import (
+    ARCHIVE_STORAGE,
     CLIENT_PORT,
     DATA_STORAGE,
     DATABASE_DIR,
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
+    LOG_STORAGE,
     PEER_RELATION,
     SNAP_ARCHIVE_PATH,
     SNAP_DATA_PATH,
@@ -87,15 +89,25 @@ class EtcdEvents(Object):
             self.charm.on[DATA_STORAGE].storage_attached, self._on_storage_attached
         )
         self.framework.observe(
+            self.charm.on[ARCHIVE_STORAGE].storage_attached, self._on_storage_attached
+        )
+        self.framework.observe(
+            self.charm.on[LOG_STORAGE].storage_attached, self._on_storage_attached
+        )
+        self.framework.observe(
             self.charm.on.rebuild_cluster_action, self._on_rebuild_cluster_action
         )
 
     def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
         """Handle storage attachment."""
-        # fix the permissions of the data dir if re-attaching existing storage
         for path in [SNAP_DATA_PATH, SNAP_LOG_PATH, SNAP_ARCHIVE_PATH]:
-            self.charm.workload.exec(["chmod", "-R", "750", path])
-            self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", path])
+            try:
+                # fix the permissions of the directory if re-attaching existing storage
+                self.charm.workload.exec(["chmod", "-R", "750", path])
+                self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", path])
+            except CalledProcessError:
+                # gracefully continue if the path is not there yet
+                logger.warning("Could not adjust directory permissions")
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""

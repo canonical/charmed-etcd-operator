@@ -25,7 +25,9 @@ BACKUP_FILE_NAME = "/var/snap/charmed-etcd/common/archive/charmed-etcd_snapshot.
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 VERSIONS_FILE = "refresh_versions.toml"
 
+ARCHIVE_STORAGE = "archive"
 DATA_STORAGE = "data"
+LOG_STORAGE = "logs"
 PEER_RELATION = "etcd-peers"
 STATUS_PEERS_RELATION = "status-peers"
 RESTART_RELATION = "restart"
