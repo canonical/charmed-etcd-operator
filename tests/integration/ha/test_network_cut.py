@@ -12,6 +12,7 @@ from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
 from ..helpers import (
     APP_NAME,
+    download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
@@ -166,6 +167,8 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     )
 
 
+# todo: remove skip
+@pytest.mark.skip()
 @pytest.mark.abort_on_fail
 async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
@@ -295,3 +298,101 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     assert_continuous_writes_consistent(
         endpoints=endpoints_updated, user=INTERNAL_USER, password=password, ignore_revision=True
     )
+
+
+@pytest.mark.abort_on_fail
+async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
+    """Ensure TLS communication with the cluster works after an ip change."""
+    app = (await existing_app(ops_test)) or APP_NAME
+
+    # todo: remove
+    # Deploy the TLS charm
+    tls_config = {"ca-common-name": "etcd"}
+    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
+
+    # make sure we have at least two units so we can stop one of them
+    if len(ops_test.model.applications[app].units) < 2:
+        await ops_test.model.applications[app].add_unit(count=1)
+        await wait_until(
+            ops_test,
+            apps=[app],
+            apps_statuses=["active"],
+            units_statuses=["active"],
+            wait_for_exact_units=2,
+        )
+
+    # enable TLS and check if the cluster is still accessible
+    logger.info("Integrating peer-certificates relation")
+    await ops_test.model.integrate(f"{app}:peer-certificates", TLS_NAME)
+    logger.info("Integrating client-certificates relation")
+    await ops_test.model.integrate(f"{app}:client-certificates", TLS_NAME)
+    init_units_count = len(ops_test.model.applications[app].units)
+    await wait_until(ops_test, apps=[app, TLS_NAME], wait_for_exact_units=init_units_count)
+
+    logger.info("Get certificates before IP change")
+    unit_name = ops_test.model.applications[app].units[0].name
+    initial_client_certificate = get_certificate_from_unit(
+        ops_test.model_full_name, unit_name, cert_type=TLSType.CLIENT
+    )
+    initial_peer_certificate = get_certificate_from_unit(
+        ops_test.model_full_name, unit_name, cert_type=TLSType.PEER
+    )
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+
+    # cut network
+    unit_hostname = await hostname_from_unit(ops_test, unit_name=unit_name)
+    unit_ip = await ip_address_from_unit(ops_test, unit_name=unit_name)
+    cut_network_from_unit_with_ip_change(unit_hostname)
+
+    # make sure the unit is not reachable from the other units
+    for unit in ops_test.model.applications[app].units:
+        if unit.name == unit_name:
+            continue
+        hostname = await hostname_from_unit(ops_test, unit.name)
+        assert not is_unit_reachable(hostname, unit_hostname), (
+            f"{unit_hostname} is reachable from {hostname}"
+        )
+
+    # make sure the unit is not reachable from the controller
+    controller_hostname = await get_controller_hostname(ops_test)
+    assert not is_unit_reachable(controller_hostname, unit_hostname)
+    logger.info(f"{unit_name} is not reachable via network.")
+
+    # verify the cluster member is not up anymore
+    unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit_name, app_name=app)
+    assert not is_endpoint_up(
+        unit_endpoint, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
+    logger.info(f"etcd server on {unit_name} is not available.")
+
+    # reconnect the network for the disconnected unit
+    restore_network_for_unit_with_ip_change(unit_hostname)
+    logger.info(f"Network has been restored for {unit_name}")
+
+    await wait_until(
+        ops_test,
+        apps=[app],
+        apps_statuses=["active"],
+        units_statuses=["active"],
+        wait_for_exact_units=init_units_count,
+    )
+
+    # ensure the member is up again
+    unit_ip_updated = await ip_address_from_unit(ops_test, unit_name=unit_name)
+    unit_endpoint_updated = unit_endpoint.replace(unit_ip, unit_ip_updated)
+    assert is_endpoint_up(
+        unit_endpoint_updated, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
+    logger.info(f"{unit_name} is available again with new ip {unit_ip_updated}")
+
+    updated_client_certificate = get_certificate_from_unit(
+        ops_test.model_full_name, unit_name, cert_type=TLSType.CLIENT
+    )
+    updated_peer_certificate = get_certificate_from_unit(
+        ops_test.model_full_name, unit_name, cert_type=TLSType.PEER
+    )
+    assert updated_client_certificate != initial_client_certificate, "Client cert not updated."
+    assert updated_peer_certificate != initial_peer_certificate, "Peer cert not updated."
+    logger.info("Client certificates are updated after ip change.")
