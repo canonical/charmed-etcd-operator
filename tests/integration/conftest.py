@@ -4,14 +4,21 @@ from platform import machine
 
 import pytest
 
+platforms = {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+}
+
+
+@pytest.fixture(scope="package")
+def arch() -> str:
+    """Fixture to provide the platform architecture for testing."""
+    return platforms.get(machine(), "amd64")
+
 
 @pytest.fixture
 def platform() -> str:
     """Fixture to provide the platform architecture for testing."""
-    platforms = {
-        "x86_64": "amd64",
-        "aarch64": "arm64",
-    }
     return platforms.get(machine(), "amd64")
 
 
