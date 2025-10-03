@@ -244,7 +244,7 @@ class EtcdEvents(Object):
                 statuses_state=self.charm.state.statuses,
             )
 
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:  # noqa: C901
         """Handle config_changed event."""
         if (
             self.charm.state.cluster.is_restore_in_progress
@@ -260,6 +260,15 @@ class EtcdEvents(Object):
         ip_address = self.charm.workload.get_host_mapping().get("private_ip")
         if ip_address and ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
+            # before we do any cluster operation, we must update client certificates
+            # otherwise the certificate will be invalid and the cluster operation will fail
+            if self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT):
+                logger.info("Updating TLS certificates because of new IP address")
+                self.charm.tls_events.refresh_tls_certificates_event.emit()
+                event.defer()
+                return
+
+            # after TLS certificates are renewed, we come back here and update the unit state
             self.charm.state.unit_server.update(self.charm.workload.get_host_mapping())
 
             # we need to update the client-urls by restarting etcd

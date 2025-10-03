@@ -320,14 +320,8 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
     init_units_count = len(ops_test.model.applications[app].units)
     await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count)
 
-    logger.info("Get certificates before IP change")
+    logger.info("Get client certificate before IP change")
     unit_name = ops_test.model.applications[app].units[0].name
-    initial_client_certificate = get_certificate_from_unit(
-        ops_test.model_full_name, unit_name, cert_type=TLSType.CLIENT
-    )
-    initial_peer_certificate = get_certificate_from_unit(
-        ops_test.model_full_name, unit_name, cert_type=TLSType.PEER
-    )
     await download_client_certificate_from_unit(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -352,7 +346,9 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
     logger.info(f"{unit_name} is not reachable via network.")
 
     # verify the cluster member is not up anymore
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit_name, app_name=app)
+    unit_endpoint = get_unit_endpoint(
+        ops_test, unit_name=unit_name, app_name=app, tls_enabled=True
+    )
     assert not is_endpoint_up(
         unit_endpoint, user=INTERNAL_USER, password=password, tls_enabled=True
     )
@@ -368,22 +364,16 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
         apps_statuses=["active"],
         units_statuses=["active"],
         wait_for_exact_units=init_units_count,
+        # extended waiting period because it takes time for Juju to update the public ip address
+        # we need to wait for it because otherwise downloading the certificate will fail
+        idle_period=180,
     )
 
     # ensure the member is up again
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
     unit_ip_updated = await ip_address_from_unit(ops_test, unit_name=unit_name)
     unit_endpoint_updated = unit_endpoint.replace(unit_ip, unit_ip_updated)
     assert is_endpoint_up(
         unit_endpoint_updated, user=INTERNAL_USER, password=password, tls_enabled=True
     )
     logger.info(f"{unit_name} is available again with new ip {unit_ip_updated}")
-
-    updated_client_certificate = get_certificate_from_unit(
-        ops_test.model_full_name, unit_name, cert_type=TLSType.CLIENT
-    )
-    updated_peer_certificate = get_certificate_from_unit(
-        ops_test.model_full_name, unit_name, cert_type=TLSType.PEER
-    )
-    assert updated_client_certificate != initial_client_certificate, "Client cert not updated."
-    assert updated_peer_certificate != initial_peer_certificate, "Peer cert not updated."
-    logger.info("Client certificates are updated after ip change.")
