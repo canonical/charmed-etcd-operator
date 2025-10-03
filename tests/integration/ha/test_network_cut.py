@@ -314,9 +314,7 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
             wait_for_exact_units=2,
         )
 
-    # enable TLS and check if the cluster is still accessible
-    logger.info("Integrating peer-certificates relation")
-    await ops_test.model.integrate(f"{app}:peer-certificates", TLS_NAME)
+    # enable client TLS before ip change
     logger.info("Integrating client-certificates relation")
     await ops_test.model.integrate(f"{app}:client-certificates", TLS_NAME)
     init_units_count = len(ops_test.model.applications[app].units)
