@@ -167,8 +167,6 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     )
 
 
-# todo: remove skip
-@pytest.mark.skip()
 @pytest.mark.abort_on_fail
 async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
@@ -305,11 +303,6 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
     """Ensure TLS communication with the cluster works after an ip change."""
     app = (await existing_app(ops_test)) or APP_NAME
 
-    # todo: remove
-    # Deploy the TLS charm
-    tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
-
     # make sure we have at least two units so we can stop one of them
     if len(ops_test.model.applications[app].units) < 2:
         await ops_test.model.applications[app].add_unit(count=1)
@@ -327,7 +320,7 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
     logger.info("Integrating client-certificates relation")
     await ops_test.model.integrate(f"{app}:client-certificates", TLS_NAME)
     init_units_count = len(ops_test.model.applications[app].units)
-    await wait_until(ops_test, apps=[app, TLS_NAME], wait_for_exact_units=init_units_count)
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count)
 
     logger.info("Get certificates before IP change")
     unit_name = ops_test.model.applications[app].units[0].name
