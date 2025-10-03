@@ -617,7 +617,6 @@ def test_config_changed():
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("subprocess.run"),
-        patch("managers.tls.TLSManager.certificate_sans_require_update", return_value=False),
         patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
         patch("common.client.EtcdClient.broadcast_peer_url"),
         patch("workload.EtcdWorkload.write_file"),

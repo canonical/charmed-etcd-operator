@@ -262,7 +262,10 @@ class EtcdEvents(Object):
             logger.info(f"New ip address: {ip_address}")
             # before we do any cluster operation, we must update client certificates
             # otherwise the certificate will be invalid and the cluster operation will fail
-            if self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT):
+            if (
+                self.charm.state.unit_server.tls_client_state == TLSState.TLS
+                and self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT)
+            ):
                 logger.info("Updating TLS certificates because of new IP address")
                 self.charm.tls_events.refresh_tls_certificates_event.emit()
                 event.defer()
