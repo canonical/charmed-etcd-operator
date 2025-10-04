@@ -366,7 +366,7 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
         wait_for_exact_units=init_units_count,
         # extended waiting period because it takes time for Juju to update the public ip address
         # we need to wait for it because otherwise downloading the certificate will fail
-        idle_period=180,
+        idle_period=240,
     )
 
     # ensure the member is up again
