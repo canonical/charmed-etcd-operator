@@ -328,7 +328,6 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
 
     # cut network
     unit_hostname = await hostname_from_unit(ops_test, unit_name=unit_name)
-    unit_ip = await ip_address_from_unit(ops_test, unit_name=unit_name)
     cut_network_from_unit_with_ip_change(unit_hostname)
 
     # make sure the unit is not reachable from the other units
