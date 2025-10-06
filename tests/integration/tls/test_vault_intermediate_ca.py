@@ -13,6 +13,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION
+from statuses import TLSStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -220,3 +221,59 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         )
         == TEST_VALUE
     ), "Failed to read key"
+
+
+@pytest.mark.abort_on_fail
+async def test_restrict_certificate_domain(ops_test: OpsTest) -> None:
+    """Restrict the allowed domains and request new certificates."""
+    logger.info("Restrict allowed certificate domains in Vault")
+    vault_domain_config_value = "domain1, domain2, domain3"
+    await ops_test.model.applications[VAULT_NAME].set_config(
+        {"pki_allowed_domains": vault_domain_config_value}
+    )
+    await wait_until(ops_test, apps=[VAULT_NAME])
+
+    logger.info("Configure certificate domain in etcd")
+    etcd_domain_config_value = "domain3"
+    await ops_test.model.applications[APP_NAME].set_config(
+        {
+            "client-certificate-domain": etcd_domain_config_value,
+            "peer-certificate-domain": etcd_domain_config_value,
+        }
+    )
+
+    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    client_cert_subject = subprocess.getoutput("openssl x509 -noout -subject -in client.pem ")
+    assert etcd_domain_config_value in client_cert_subject, (
+        f"expected domain name {etcd_domain_config_value} not found in certificate subject {client_cert_subject}"
+    )
+    logger.info("Certificates in etcd updated with new domain")
+
+
+@pytest.mark.abort_on_fail
+async def test_invalid_certificate_domain(ops_test: OpsTest) -> None:
+    """Ensure no new certificates are requested if invalid domain is configured."""
+    logger.info("Set config in etcd to invalid value")
+    etcd_invalid_domain_config_value = "192.168.2.200"
+
+    await ops_test.model.applications[APP_NAME].set_config(
+        {"client-certificate-domain": etcd_invalid_domain_config_value}
+    )
+
+    await wait_until(
+        ops_test,
+        apps=[APP_NAME],
+        apps_full_statuses={
+            APP_NAME: [TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value],
+        },
+        wait_for_exact_units=NUM_UNITS,
+    )
+
+    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    client_cert_subject = subprocess.getoutput("openssl x509 -noout -subject -in client.pem ")
+    assert etcd_invalid_domain_config_value not in client_cert_subject, (
+        f"domain name {etcd_invalid_domain_config_value} found in certificate subject {client_cert_subject}"
+    )
+    logger.info("Certificates not updated after configuring invalid domain name")

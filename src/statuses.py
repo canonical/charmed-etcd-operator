@@ -120,8 +120,16 @@ class TLSStatuses(Enum):
     )
     SANS_CONFIG_INVALID = StatusObject(
         status="blocked",
-        message="Invalid value set for the config options 'certificate-extra-sans'",
+        message="Invalid value for config option 'certificate-extra-sans'",
         short_message="Invalid value `certificate-extra-sans`",
+    )
+    CLIENT_DOMAIN_CONFIG_INVALID = StatusObject(
+        status="blocked",
+        message="Invalid value for config option 'client-certificate-domain'",
+    )
+    PEER_DOMAIN_CONFIG_INVALID = StatusObject(
+        status="blocked",
+        message="Invalid value for config option 'peer-certificate-domain'",
     )
 
 

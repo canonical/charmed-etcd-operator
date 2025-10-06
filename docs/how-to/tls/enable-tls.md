@@ -14,6 +14,10 @@ etcd also supports mutual TLS authentication, which provides an additional layer
 
 ## Deploy a TLS provider
 
+```{attention}
+Etcd's communication is strictly IP-based, both for peer-to-peer as well as client-to-server communication. Make sure to choose a TLS provider that supports IP SANs.
+```
+
 Charmed etcd provides the option of using different CA certificates for client-server and peer-to-peer communication. This allows you to have different levels of trust for the two types of communication. You can also use the same CA certificate for both types of communication.
 
 You can enable peer-to-peer encryption alone, client-to-server encryption alone, or both at the same time.
@@ -25,8 +29,9 @@ This guide will use the [Self-signed Certificates](https://charmhub.io/self-sign
 
 Check [this guide](https://charmhub.io/topics/security-with-x-509-certificates) for an overview of all the TLS certificates charms available. 
 
-If [Vault](https://charmhub.io/vault-k8s?channel=1.18/edge) is used as TLS provider, it is required in version 1.18 at least. Currently Vault 
-is only supported with the configuration option `pki_allow_any_name=true`, allowing for any domain name in requested certificates. 
+If [Vault](https://charmhub.io/vault-k8s?channel=1.18/edge) is used as TLS provider, it is required in version 1.18 at least. 
+See [](../tune-settings.md/#certificate-sans-configuration) for information on how to configure the certificate domain 
+in accordance to Vault's configuration.
 ```
 
 Deploy the `self-signed-certificates` charm. etcd uses `v4` of the [{spellexception}`tls-certificates` library](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates), which is currently only supported in the `edge` channel.

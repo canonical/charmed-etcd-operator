@@ -81,12 +81,19 @@ to decide the correct adjustments to the parameters for your specific requiremen
 
 ## Certificate SANs configuration
 
+```{attention}
+Etcd's communication is strictly IP-based, both for peer-to-peer as well as client-to-server communication. 
+Make sure to choose a TLS provider that supports IP SANs.
+```
+
 In X.509 TLS certificates, a `Subject Alternative Name` (SAN) allows a certificate subject to be associated with the 
 service name and domain name components of a DNS record. If charmed etcd is deployed in an environment where the DNS 
 resolution on the client side does not correspond to the DNS resolution on the server side, it might be required to add 
 custom SANs to the TLS certificates used for client- and/or peer-communication.
 
 See more about TLS in charmed etcd: [TLS encryption](tls/index.md)
+
+### Add extra-sans
 
 To add different IP addresses or hostnames to the SANs of charmed etcd's TLS certificates, configure the `certificate-extra-sans`
 option. It is possible to add a comma-separated list of multiple values, as long as each of them is a valid IP address 
@@ -106,3 +113,18 @@ Wildcards (`*`) are not allowed as part of the `certificate-extra-sans` configur
 If it is required to include the unit number of each unit, this can be done by using the `{unit}` placeholder. For example,
 a configuration of `certificate-extra-sans="etcd{unit}.my-external-domain.com"` would result in `etcd0.my-external-domain.com`
 as an additional SAN in the TLS certificates for unit `charmed-etcd/0`.
+
+### Add a domain
+
+If a specific domain name is required for the TLS certificates used in etcd, configure the `client-certificate-domain`
+and/or `peer-certificate-domain` option. The configuration value should match the allowed value from the TLS provider.
+
+For example, if you want to expose your charmed etcd cluster externally and want to use client certificates for the 
+domain `mycompany.com`, configure it like this:
+
+```text
+juju config charmed-etcd client-certificate-domain="mycompany.com"
+```
+
+This option can be configured for client and peer certificates separately. If the configured domain name is valid 
+and not yet included in charmed etcd's certificates, it will automatically refresh those.

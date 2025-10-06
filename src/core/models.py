@@ -107,12 +107,16 @@ class EtcdServer(RelationState):
     def peer_url(self) -> str:
         """The peer connection endpoint for the etcd server."""
         scheme = "https" if self.tls_peer_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+        # `peer_url` MUST be IP address, etcd does not support using DNS names for the listeners
+        # see https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.2.md#breaking-changes
         return f"{scheme}://{self.ip}:{PEER_PORT}"
 
     @property
     def client_url(self) -> str:
         """The client connection endpoint for the etcd server."""
         scheme = "https" if self.tls_client_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
+        # `client_url` MUST be IP address, etcd does not support using DNS names for the listeners
+        # see https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.2.md#breaking-changes
         return f"{scheme}://{self.ip}:{CLIENT_PORT}"
 
     @property

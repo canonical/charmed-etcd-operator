@@ -41,6 +41,20 @@ options:
       Use "{unit}" as a placeholder to be filled with the unit number, e.g. "worker-{unit}" will be translated as 
       "worker-0" for unit 0 and "worker-1" for unit 1 when requesting the certificate.
 
+  client-certificate-domain:
+    type: string
+    description: |
+      Config option to specify a domain to be added to the common names in certificate signing requests
+      for client certificates. Example: "mydomain.com". This must match the allowed domains from the TLS provider.
+      In the case of Vault, this should be set to one of the domains configured in "pki_allowed_domains". 
+
+  peer-certificate-domain:
+    type: string
+    description: |
+      Config option to specify a domain to be added to the common names in certificate signing requests 
+      for peer server certificates. Example: "mydomain.com". This must match the allowed domains from the TLS 
+      provider. In the case of Vault, this should be set to one of the domains configured in "pki_allowed_domains". 
+
   pause-after-unit-refresh:
     type: string
     default: first

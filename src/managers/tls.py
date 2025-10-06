@@ -287,6 +287,7 @@ class TLSManager(ManagerStatusProtocol):
             frozenset[str]: The SANs IP.
         """
         sans_ip = set()
+
         if self.extra_sans_config_is_valid() and (
             extra_sans_config := self.state.config.get("certificate-extra-sans")
         ):
@@ -306,7 +307,7 @@ class TLSManager(ManagerStatusProtocol):
 
         return frozenset(sans_ip)
 
-    def build_sans_dns(self) -> frozenset[str]:
+    def build_sans_dns(self, tls_type: TLSType) -> frozenset[str]:
         """Build the SANs DNS for the TLS certificate.
 
         Returns:
@@ -325,7 +326,26 @@ class TLSManager(ManagerStatusProtocol):
 
         sans_dns.add(self.state.unit_server.unit_name.replace("/", ""))
         sans_dns.add(self.workload.get_host_mapping()["hostname"])
+
+        # add desired domain to every DNS name if configured
+        if self.certificate_domain_config_is_valid(tls_type) and (
+            certificate_domain_config := self.state.config.get(f"{tls_type}-certificate-domain")
+        ):
+            updated_sans_dns = set()
+            for san in sans_dns:
+                updated_sans_dns.add(san + "." + certificate_domain_config)
+            return frozenset(updated_sans_dns)
+
         return frozenset(sans_dns)
+
+    def build_common_name(self, common_name: str, tls_type: TLSType) -> str:
+        """Build the Common Name for the TLS certificate."""
+        if self.certificate_domain_config_is_valid(tls_type) and (
+            certificate_domain_config := self.state.config.get(f"{tls_type}-certificate-domain")
+        ):
+            return f"{common_name}.{certificate_domain_config}"
+
+        return common_name
 
     def extra_sans_config_is_valid(self) -> bool:
         """Validate configuration value for certificate-extra-sans option.
@@ -345,6 +365,16 @@ class TLSManager(ManagerStatusProtocol):
                 ):
                     logger.error(f"certificate-extra-sans configuration is invalid for {san}")
                     return False
+
+        return True
+
+    def certificate_domain_config_is_valid(self, tls_type: TLSType) -> bool:
+        """Validate configuration value for {peer|client}-certificate-domain option."""
+        if (
+            certificate_domain_config := self.state.config.get(f"{tls_type}-certificate-domain")
+        ) and not self._is_hostname(certificate_domain_config):
+            logger.error(f"{tls_type}-certificate-domain configuration is invalid")
+            return False
 
         return True
 
@@ -391,7 +421,7 @@ class TLSManager(ManagerStatusProtocol):
         """
         current_sans = self.get_current_sans(tls_type)
         new_sans_ip = self.build_sans_ip(tls_type)
-        new_sans_dns = self.build_sans_dns()
+        new_sans_dns = self.build_sans_dns(tls_type)
 
         if new_sans_ip ^ current_sans["sans_ip"] or new_sans_dns ^ current_sans["sans_dns"]:
             return True
@@ -504,5 +534,11 @@ class TLSManager(ManagerStatusProtocol):
 
         if not self.extra_sans_config_is_valid():
             status_list.append(TLSStatuses.SANS_CONFIG_INVALID.value)
+
+        if not self.certificate_domain_config_is_valid(TLSType.CLIENT):
+            status_list.append(TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value)
+
+        if not self.certificate_domain_config_is_valid(TLSType.PEER):
+            status_list.append(TLSStatuses.PEER_DOMAIN_CONFIG_INVALID.value)
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
