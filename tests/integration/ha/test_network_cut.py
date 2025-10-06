@@ -12,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
 from ..helpers import (
     APP_NAME,
-    download_client_certificate_from_unit,
     get_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
