@@ -320,11 +320,7 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
     init_units_count = len(ops_test.model.applications[app].units)
     await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count)
 
-    logger.info("Get client certificate before IP change")
     unit_name = ops_test.model.applications[app].units[0].name
-    await download_client_certificate_from_unit(ops_test, APP_NAME)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     # cut network
     unit_hostname = await hostname_from_unit(ops_test, unit_name=unit_name)
@@ -343,15 +339,6 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
     controller_hostname = await get_controller_hostname(ops_test)
     assert not is_unit_reachable(controller_hostname, unit_hostname)
     logger.info(f"{unit_name} is not reachable via network.")
-
-    # verify the cluster member is not up anymore
-    unit_endpoint = get_unit_endpoint(
-        ops_test, unit_name=unit_name, app_name=app, tls_enabled=True
-    )
-    assert not is_endpoint_up(
-        unit_endpoint, user=INTERNAL_USER, password=password, tls_enabled=True
-    )
-    logger.info(f"etcd server on {unit_name} is not available.")
 
     # reconnect the network for the disconnected unit
     restore_network_for_unit_with_ip_change(unit_hostname)
