@@ -102,11 +102,9 @@ def juju_k8s(arch: str, k8s_cloud: str, k8s_controller: str):
 
 @pytest.mark.abort_on_fail
 def test_build_and_deploy(charm: str, juju_lxd: Juju) -> None:
-    """Build the charm-under-test and deploy it with three units.
+    """Build the charm-under-test and deploy it with three units.  
 
-    The initial cluster should be formed and accessible.
-    """
-    # Deploy the charm and wait for active/idle status
+    The initial cluster should be formed and accessible.    """  # Deploy the charm and wait for active/idle status
     juju_lxd.deploy(charm, num_units=NUM_UNITS)
     juju_lxd.wait(lambda status: jubilant.all_active(status, APP_NAME))
 
@@ -120,14 +118,14 @@ def test_build_and_deploy(charm: str, juju_lxd: Juju) -> None:
 
     # make sure data can be written to the cluster
     assert (
-        put_key(
-            endpoints,
-            user=INTERNAL_USER,
-            password=password,
-            key=TEST_KEY,
-            value=TEST_VALUE,
-        )
-        == "OK"
+            put_key(
+                endpoints,
+                user=INTERNAL_USER,
+                password=password,
+                key=TEST_KEY,
+                value=TEST_VALUE,
+            )
+            == "OK"
     )
     assert get_key(endpoints, user=INTERNAL_USER, password=password, key=TEST_KEY) == TEST_VALUE
 
@@ -156,7 +154,7 @@ def test_update_admin_password(juju_lxd: Juju) -> None:
 
     # perform read operation with the updated password
     assert (
-        get_key(endpoints, user=INTERNAL_USER, password=new_password, key=TEST_KEY) == TEST_VALUE
+            get_key(endpoints, user=INTERNAL_USER, password=new_password, key=TEST_KEY) == TEST_VALUE
     )
 
     # update the config again and remove the option `admin-password`
@@ -167,7 +165,7 @@ def test_update_admin_password(juju_lxd: Juju) -> None:
 
     # make sure we can still read data with the previously set password
     assert (
-        get_key(endpoints, user=INTERNAL_USER, password=new_password, key=TEST_KEY) == TEST_VALUE
+            get_key(endpoints, user=INTERNAL_USER, password=new_password, key=TEST_KEY) == TEST_VALUE
     )
 
 
@@ -198,11 +196,7 @@ async def test_user_secret_permissions(juju_lxd: jubilant.Juju) -> None:
         timeout=1200,
     )
     # await wait_until(
-    #     ops_test,
-    #     apps=[APP_NAME],
-    #     apps_full_statuses={APP_NAME: [CharmStatuses.SECRET_ACCESS_ERROR.value]},
-    # )
-
+    #     ops_test,    #     apps=[APP_NAME],    #     apps_full_statuses={APP_NAME: [CharmStatuses.SECRET_ACCESS_ERROR.value]},    # )
     logger.info("Secret access will be granted now - wait for updated password")
     # deferred `config_changed` event will be retried before `update_status`
     with fast_forward(juju_lxd):
@@ -296,7 +290,7 @@ def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controlle
     if not isinstance(relation_data, dict):
         relation_data = json.loads(relation_data)
 
-    # assert that right targets are set in grafana-agent
+        # assert that right targets are set in grafana-agent
     scrape_job = relation_data["metrics_scrape_jobs"][0]
     assert scrape_job["static_configs"][0]["targets"][0].endswith(f":{METRICS_PORT}")
 
@@ -312,6 +306,6 @@ def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controlle
     etcd_metrics = [m for m in all_metrics if "etcd" in m]
     assert etcd_metrics, "No etcd-related metrics found in Prometheus"
     assert (
-        "etcd_server_has_leader" in etcd_metrics
-        or "etcd_server_leader_changes_seen_total" in etcd_metrics
+            "etcd_server_has_leader" in etcd_metrics
+            or "etcd_server_leader_changes_seen_total" in etcd_metrics
     )
