@@ -343,7 +343,7 @@ class TLSManager(ManagerStatusProtocol):
         if self.certificate_domain_config_is_valid(tls_type) and (
             certificate_domain_config := self.state.config.get(f"{tls_type}-certificate-domain")
         ):
-            return common_name + "." + certificate_domain_config
+            return f"{common_name}.{certificate_domain_config}"
 
         return common_name
 
