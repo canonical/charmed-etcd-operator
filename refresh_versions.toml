@@ -1,13 +1,13 @@
 # https://canonical-charm-refresh.readthedocs-hosted.com/latest/refresh-versions-toml/
 
 charm_major = 1
-workload = "3.6.4"
+workload = "3.6.5"
 
 [snap]
 name = "charmed-etcd"
 
 [snap.revisions]
 # amd64
-x86_64 = "21"
+x86_64 = "23"
 # arm64
-aarch64 = "22"
+aarch64 = "24"
