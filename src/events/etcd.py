@@ -85,15 +85,10 @@ class EtcdEvents(Object):
         self.framework.observe(
             self.charm.on[DATA_STORAGE].storage_detaching, self._on_storage_detaching
         )
-        self.framework.observe(
-            self.charm.on[DATA_STORAGE].storage_attached, self._on_storage_attached
-        )
-        self.framework.observe(
-            self.charm.on[ARCHIVE_STORAGE].storage_attached, self._on_storage_attached
-        )
-        self.framework.observe(
-            self.charm.on[LOG_STORAGE].storage_attached, self._on_storage_attached
-        )
+        for storage in [ARCHIVE_STORAGE, DATA_STORAGE, LOG_STORAGE]:
+            self.framework.observe(
+                self.charm.on[storage].storage_attached, self._on_storage_attached
+            )
         self.framework.observe(
             self.charm.on.rebuild_cluster_action, self._on_rebuild_cluster_action
         )
