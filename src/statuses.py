@@ -120,6 +120,11 @@ class TLSStatuses(Enum):
         message="TLS peer certificates expiring soon. Please ensure new certificates are provided",
         short_message="TLS peer certificates expiring soon",
     )
+    CERT_REFRESH_IP_CHANGE = StatusObject(
+        status="maintenance",
+        message="Refreshing TLS certificates because of updated IP address",
+        running="async",
+    )
     SANS_CONFIG_INVALID = StatusObject(
         status="blocked",
         message="Invalid value set for the config options 'certificate-extra-sans'",

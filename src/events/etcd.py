@@ -47,7 +47,7 @@ from literals import (
     TLSState,
     TLSType,
 )
-from statuses import CharmStatuses, ClusterStatuses, EtcdServiceStatuses
+from statuses import CharmStatuses, ClusterStatuses, EtcdServiceStatuses, TLSStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -262,12 +262,23 @@ class EtcdEvents(Object):
                 and self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT)
             ):
                 logger.info("Updating TLS certificates because of new IP address")
+                self.charm.status.set_running_status(
+                    TLSStatuses.CERT_REFRESH_IP_CHANGE.value,
+                    scope="unit",
+                    component_name=self.charm.tls_manager.name,
+                    statuses_state=self.charm.state.statuses,
+                )
                 self.charm.tls_events.refresh_tls_certificates_event.emit()
                 event.defer()
                 return
 
             # after TLS certificates are renewed, we come back here and update the unit state
             self.charm.state.unit_server.update(self.charm.workload.get_host_mapping())
+            self.charm.state.statuses.delete(
+                TLSStatuses.CERT_REFRESH_IP_CHANGE.value,
+                scope="unit",
+                component=self.charm.tls_manager.name,
+            )
 
             # we need to update the client-urls by restarting etcd
             self.charm.config_manager.set_config_properties()
