@@ -295,3 +295,63 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     assert_continuous_writes_consistent(
         endpoints=endpoints_updated, user=INTERNAL_USER, password=password, ignore_revision=True
     )
+
+
+@pytest.mark.abort_on_fail
+async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
+    """Ensure TLS communication with the cluster works after an ip change."""
+    app = (await existing_app(ops_test)) or APP_NAME
+
+    # make sure we have at least two units so we can stop one of them
+    if len(ops_test.model.applications[app].units) < 2:
+        await ops_test.model.applications[app].add_unit(count=1)
+        await wait_until(
+            ops_test,
+            apps=[app],
+            apps_statuses=["active"],
+            units_statuses=["active"],
+            wait_for_exact_units=2,
+        )
+
+    # enable client TLS before ip change
+    logger.info("Integrating client-certificates relation")
+    await ops_test.model.integrate(f"{app}:client-certificates", TLS_NAME)
+    init_units_count = len(ops_test.model.applications[app].units)
+    await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count)
+
+    unit_name = ops_test.model.applications[app].units[0].name
+
+    # cut network
+    unit_hostname = await hostname_from_unit(ops_test, unit_name=unit_name)
+    cut_network_from_unit_with_ip_change(unit_hostname)
+
+    # make sure the unit is not reachable from the other units
+    for unit in ops_test.model.applications[app].units:
+        if unit.name == unit_name:
+            continue
+        hostname = await hostname_from_unit(ops_test, unit.name)
+        assert not is_unit_reachable(hostname, unit_hostname), (
+            f"{unit_hostname} is reachable from {hostname}"
+        )
+
+    # make sure the unit is not reachable from the controller
+    controller_hostname = await get_controller_hostname(ops_test)
+    assert not is_unit_reachable(controller_hostname, unit_hostname)
+    logger.info(f"{unit_name} is not reachable via network.")
+
+    # reconnect the network for the disconnected unit
+    restore_network_for_unit_with_ip_change(unit_hostname)
+    logger.info(f"Network has been restored for {unit_name}")
+
+    await wait_until(
+        ops_test,
+        apps=[app],
+        apps_statuses=["active"],
+        units_statuses=["active"],
+        wait_for_exact_units=init_units_count,
+        # extended waiting period because it takes time for Juju to update the public ip address
+        idle_period=120,
+    )
+
+    # if all cluster operations where successful, test can be considered passed
+    logger.info(f"{unit_name} is available again")

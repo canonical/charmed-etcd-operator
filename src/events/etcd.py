@@ -30,11 +30,13 @@ from common.exceptions import (
     RaftLeaderNotFoundError,
 )
 from literals import (
+    ARCHIVE_STORAGE,
     CLIENT_PORT,
     DATA_STORAGE,
     DATABASE_DIR,
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
+    LOG_STORAGE,
     PEER_RELATION,
     SNAP_ARCHIVE_PATH,
     SNAP_DATA_PATH,
@@ -45,7 +47,7 @@ from literals import (
     TLSState,
     TLSType,
 )
-from statuses import ClusterStatuses, EtcdServiceStatuses
+from statuses import CharmStatuses, ClusterStatuses, EtcdServiceStatuses, TLSStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -83,19 +85,24 @@ class EtcdEvents(Object):
         self.framework.observe(
             self.charm.on[DATA_STORAGE].storage_detaching, self._on_storage_detaching
         )
-        self.framework.observe(
-            self.charm.on[DATA_STORAGE].storage_attached, self._on_storage_attached
-        )
+        for storage in [ARCHIVE_STORAGE, DATA_STORAGE, LOG_STORAGE]:
+            self.framework.observe(
+                self.charm.on[storage].storage_attached, self._on_storage_attached
+            )
         self.framework.observe(
             self.charm.on.rebuild_cluster_action, self._on_rebuild_cluster_action
         )
 
     def _on_storage_attached(self, event: ops.StorageAttachedEvent) -> None:
         """Handle storage attachment."""
-        # fix the permissions of the data dir if re-attaching existing storage
         for path in [SNAP_DATA_PATH, SNAP_LOG_PATH, SNAP_ARCHIVE_PATH]:
-            self.charm.workload.exec(["chmod", "-R", "750", path])
-            self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", path])
+            try:
+                # fix the permissions of the directory if re-attaching existing storage
+                self.charm.workload.exec(["chmod", "-R", "750", path])
+                self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", path])
+            except CalledProcessError:
+                # gracefully continue if the path is not there yet
+                logger.warning("Could not adjust directory permissions")
 
     def _on_install(self, event: ops.InstallEvent) -> None:
         """Handle install event."""
@@ -232,7 +239,7 @@ class EtcdEvents(Object):
                 statuses_state=self.charm.state.statuses,
             )
 
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:  # noqa: C901
         """Handle config_changed event."""
         if (
             self.charm.state.cluster.is_restore_in_progress
@@ -248,7 +255,30 @@ class EtcdEvents(Object):
         ip_address = self.charm.workload.get_host_mapping().get("private_ip")
         if ip_address and ip_address != self.charm.state.unit_server.ip:
             logger.info(f"New ip address: {ip_address}")
+            # before we do any cluster operation, we must update client certificates
+            # otherwise the certificate will be invalid and the cluster operation will fail
+            if (
+                self.charm.state.unit_server.tls_client_state == TLSState.TLS
+                and self.charm.tls_manager.certificate_sans_require_update(TLSType.CLIENT)
+            ):
+                logger.info("Updating TLS certificates because of new IP address")
+                self.charm.status.set_running_status(
+                    TLSStatuses.CERT_REFRESH_IP_CHANGE.value,
+                    scope="unit",
+                    component_name=self.charm.tls_manager.name,
+                    statuses_state=self.charm.state.statuses,
+                )
+                self.charm.tls_events.refresh_tls_certificates_event.emit()
+                event.defer()
+                return
+
+            # after TLS certificates are renewed, we come back here and update the unit state
             self.charm.state.unit_server.update(self.charm.workload.get_host_mapping())
+            self.charm.state.statuses.delete(
+                TLSStatuses.CERT_REFRESH_IP_CHANGE.value,
+                scope="unit",
+                component=self.charm.tls_manager.name,
+            )
 
             # we need to update the client-urls by restarting etcd
             self.charm.config_manager.set_config_properties()
@@ -260,13 +290,6 @@ class EtcdEvents(Object):
             self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
             if self.charm.unit.is_leader():
                 self.charm.cluster_manager.update_cluster_member_state()
-
-            # update tls certificates with new ip address
-            if self.charm.state.unit_server.tls_client_state in (
-                TLSState.TO_TLS,
-                TLSState.TLS,
-            ) or self.charm.state.unit_server.tls_peer_state in (TLSState.TO_TLS, TLSState.TLS):
-                self.charm.tls_events.refresh_tls_certificates_event.emit()
 
         # we can only handle this now as we must update ip addresses during long-running upgrades
         if self.charm.refresh_in_progress:
@@ -287,7 +310,11 @@ class EtcdEvents(Object):
             return
 
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
-            self.update_admin_password(admin_secret_id)
+            try:
+                self.update_admin_password(admin_secret_id)
+            except (ModelError, SecretNotFoundError):
+                event.defer()
+                return
 
     def _on_peer_relation_created(self, event: RelationCreatedEvent) -> None:
         """Handle event received by a new unit when joining the cluster relation."""
@@ -482,7 +509,11 @@ class EtcdEvents(Object):
 
         if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
             if admin_secret_id == event.secret.id:
-                self.update_admin_password(admin_secret_id)
+                try:
+                    self.update_admin_password(admin_secret_id)
+                except (ModelError, SecretNotFoundError):
+                    event.defer()
+                    return
 
     def _on_rebuild_cluster_action(self, event: ActionEvent) -> None:
         """Recover from majority failure by rebuilding the cluster membership configuration."""
@@ -547,7 +578,6 @@ class EtcdEvents(Object):
 
     def update_admin_password(self, admin_secret_id: str) -> None:
         """Compare current admin password and update in etcd if required."""
-        errored = False
         try:
             if new_password := self.charm.state.get_secret_from_id(admin_secret_id).get(
                 INTERNAL_USER
@@ -572,7 +602,7 @@ class EtcdEvents(Object):
                             component_name=self.charm.cluster_manager.name,
                             statuses_state=self.charm.state.statuses,
                         )
-                        errored = True
+                        return
             else:
                 logger.error(f"Invalid username in secret {admin_secret_id}.")
                 self.charm.status.set_running_status(
@@ -581,23 +611,27 @@ class EtcdEvents(Object):
                     component_name=self.charm.cluster_manager.name,
                     statuses_state=self.charm.state.statuses,
                 )
-                errored = True
+                return
         except (ModelError, SecretNotFoundError) as e:
             logger.error(e)
             self.charm.status.set_running_status(
-                ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+                CharmStatuses.SECRET_ACCESS_ERROR.value,
                 scope="app",
                 component_name=self.charm.cluster_manager.name,
                 statuses_state=self.charm.state.statuses,
             )
-            errored = True
+            raise
 
-        if not errored:
-            self.charm.state.statuses.delete(
-                ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
-                scope="app",
-                component=self.charm.cluster_manager.name,
-            )
+        self.charm.state.statuses.delete(
+            ClusterStatuses.PASSWORD_UPDATE_FAILED.value,
+            scope="app",
+            component=self.charm.cluster_manager.name,
+        )
+        self.charm.state.statuses.delete(
+            CharmStatuses.SECRET_ACCESS_ERROR.value,
+            scope="app",
+            component=self.charm.cluster_manager.name,
+        )
 
     def _rebuild_cluster(self) -> None:  # noqa: C901
         """Rebuild cluster with new membership configuration, to recover from majority failure.

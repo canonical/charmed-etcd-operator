@@ -47,6 +47,7 @@ async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     storage = {
         "data": {"pool": "etcd-pool", "size": 2048},
         "archive": {"pool": "etcd-pool", "size": 2048},
+        "logs": {"pool": "etcd-pool", "size": 2048},
     }
 
     # Deploy the charm and wait for active/idle status
@@ -65,6 +66,7 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     unit = ops_test.model.applications[app].units[-1]
     data_storage_id = get_storage_id(ops_test, unit.name, "data")
     archive_storage_id = get_storage_id(ops_test, unit.name, "archive")
+    log_storage_id = get_storage_id(ops_test, unit.name, "log")
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -79,10 +81,15 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     )
 
     # add unit with previous storage attached
-    add_unit_cmd = f"add-unit {app} --model={ops_test.model.info.name} --attach-storage={data_storage_id} --attach-storage={archive_storage_id}"
+    add_unit_cmd = f"""add-unit {app} \
+                    --model={ops_test.model.info.name} \
+                    --attach-storage={data_storage_id} \
+                    --attach-storage={archive_storage_id} \
+                    --attach-storage={log_storage_id}
+                    """
     return_code, _, std_err = await ops_test.juju(*add_unit_cmd.split())
     assert return_code == 0, (
-        f"Failed to add unit with storages {data_storage_id} and {archive_storage_id}: {std_err}"
+        f"Failed to add unit with storages {data_storage_id}, {archive_storage_id}, {log_storage_id}: {std_err}"
     )
 
     new_unit = ops_test.model.applications[app].units[-1]
