@@ -12,11 +12,14 @@ from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificatesRemovedEvent,
     CertificateTransferRequires,
 )
-from charms.data_platform_libs.v0.data_interfaces import (
-    EtcdProvides,
-    MTLSCertUpdatedEvent,
+from charms.data_platform_libs.v1.data_interfaces import (
+    MtlsCertUpdatedEvent,
+    RequirerCommonModel,
+    ResourceProviderEventHandler,
+    ResourceProviderModel,
 )
 from ops import Object, RelationBrokenEvent
+from pydantic import SecretStr
 
 from common.certificates import is_leaf_certificate_valid
 from common.exceptions import EtcdUserManagementError
@@ -41,7 +44,9 @@ class ExternalClientsEvents(Object):
         super().__init__(charm, key="etcd_events")
         self.charm = charm
 
-        self.etcd_provides = EtcdProvides(self.charm, EXTERNAL_CLIENTS_RELATION)
+        self.etcd_provides = ResourceProviderEventHandler(
+            self.charm, EXTERNAL_CLIENTS_RELATION, RequirerCommonModel, mtls_enabled=True
+        )
 
         self.certificate_transfer = CertificateTransferRequires(
             self.charm, CERTIFICATE_TRANSFER_RELATION
@@ -58,7 +63,7 @@ class ExternalClientsEvents(Object):
             self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_broken, self._on_relation_broken
         )
 
-    def _on_mtls_cert_updated(self, event: MTLSCertUpdatedEvent) -> None:  # noqa: C901
+    def _on_mtls_cert_updated(self, event: MtlsCertUpdatedEvent[RequirerCommonModel]) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
         if (
             self.charm.state.cluster.is_restore_in_progress
@@ -70,8 +75,11 @@ class ExternalClientsEvents(Object):
             )
             event.defer()
             return
+        request = event.request
+        import pdb
 
-        if not event.mtls_cert or not event.prefix:
+        pdb.set_trace()
+        if not request.mtls_cert or not request.resource:
             logger.error("CA chain, keys prefix, or common name not provided")
             return
 
@@ -107,11 +115,11 @@ class ExternalClientsEvents(Object):
                 else None
             )
         common_name = self.charm.external_clients_manager.get_common_name_from_chain(
-            event.mtls_cert
+            request.mtls_cert.get_secret_value()
         )
 
         # validate leaf certificate
-        if not is_leaf_certificate_valid(event.mtls_cert):
+        if not is_leaf_certificate_valid(request.mtls_cert.get_secret_value()):
             logger.error("Invalid end-entity certificate")
             # clean the old user if exists
             if old_common_name:
@@ -147,11 +155,19 @@ class ExternalClientsEvents(Object):
 
                 if relation_managed_user is None:
                     logger.info(f"Creating new user: {common_name}")
-                    self.charm.cluster_manager.add_managed_user(common_name, event.prefix)
+                    self.charm.cluster_manager.add_managed_user(common_name, request.resource)
                     self.charm.external_clients_manager.add_managed_user(
                         event.relation.id, common_name
                     )
-                    self.etcd_provides.set_credentials(event.relation.id, common_name, "")
+                    self.etcd_provides.set_response(
+                        event.relation.id,
+                        ResourceProviderModel(
+                            username=SecretStr(common_name),
+                            request_id=request.request_id,
+                            resource=request.resource,
+                            salt=request.salt,
+                        ),
+                    )
                     self.charm.external_clients_manager.update_client_relations_data(
                         etcd_version=self.charm.cluster_manager.get_version()
                     )

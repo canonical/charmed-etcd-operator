@@ -10,10 +10,15 @@ import subprocess
 from pathlib import Path
 
 import ops
-from charms.data_platform_libs.v0.data_interfaces import (
-    DatabaseEndpointsChangedEvent,
-    EtcdReadyEvent,
-    EtcdRequires,
+from charms.data_platform_libs.v1.data_interfaces import (
+    DataContractV1,
+    RequirerCommonModel,
+    RequirerDataContractV1,
+    ResourceCreatedEvent,
+    ResourceEndpointsChangedEvent,
+    ResourceProviderModel,
+    ResourceRequirerEventHandler,
+    build_model,
 )
 from charms.operator_libs_linux.v2 import snap
 from charms.tls_certificates_interface.v4.tls_certificates import (
@@ -22,6 +27,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
 )
+from pydantic import SecretStr
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
@@ -55,16 +61,20 @@ class RequirerCharmCharm(ops.CharmBase):
             refresh_events=[self.refresh_tls_certificates_event],
         )
 
-        self.etcd_requires = EtcdRequires(
+        self.etcd_requires = ResourceRequirerEventHandler(
             self,
             relation_name="etcd-client",
-            prefix="/test/",
-            mtls_cert=self.raw_certificate,
+            requests=[
+                RequirerCommonModel(
+                    resource="/test/", mtls_cert=SecretStr(self.raw_certificate or "")
+                )
+            ],
+            response_model=ResourceProviderModel,
         )
 
         # EtcdRequires events
         framework.observe(self.etcd_requires.on.endpoints_changed, self._on_endpoints_changed)
-        framework.observe(self.etcd_requires.on.etcd_ready, self._on_etcd_ready)
+        framework.observe(self.etcd_requires.on.resource_created, self._on_resource_created)
 
         # TLSCertificatesRequiresV4 events
         framework.observe(
@@ -86,11 +96,11 @@ class RequirerCharmCharm(ops.CharmBase):
         """Return the common name for the certificate."""
         if not self.etcd_relation:
             return "requirer-charm"
-        mtls_cert = self.etcd_requires.fetch_my_relation_field(self.etcd_relation.id, "mtls-cert")
-        if not mtls_cert:
+        request = self.etcd_relation_local_model.requests[0]
+        if not request.mtls_cert or request.mtls_cert.get_secret_value() == "":
             return "requirer-charm"
 
-        return _get_common_name_from_chain(mtls_cert)
+        return _get_common_name_from_chain(request.mtls_cert.get_secret_value())
 
     @property
     def server_ca_chain(self) -> str | None:
@@ -131,9 +141,38 @@ class RequirerCharmCharm(ops.CharmBase):
         return self.etcd_requires.relations[0] if len(self.etcd_requires.relations) else None
 
     @property
+    def etcd_relation_local_model(self) -> RequirerDataContractV1[RequirerCommonModel]:
+        """Return the etcd relation local model."""
+        if not self.etcd_relation:
+            raise RuntimeError("etcd relation not found")
+        return build_model(
+            self.etcd_requires.interface.repository(self.etcd_relation.id),
+            RequirerDataContractV1[RequirerCommonModel],
+        )
+
+    @property
     def send_ca_option(self) -> bool:
         """Return True if the CA chain is available."""
         return bool(self.config.get("send-ca-cert", False))
+
+    @property
+    def remote_response(self) -> ResourceProviderModel | None:
+        """Return the remote response model."""
+        if not self.etcd_relation:
+            return None
+        remote_model = build_model(
+            self.etcd_requires.interface.repository(self.etcd_relation.id, self.etcd_relation.app),
+            DataContractV1[ResourceProviderModel],
+        )
+        return remote_model.requests[0]
+
+    @property
+    def etcd_uris(self) -> str | None:
+        """Return the etcd uris."""
+        remote_response = self.remote_response
+        if not remote_response or not remote_response.uris:
+            return None
+        return remote_response.uris.get_secret_value()
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
@@ -149,13 +188,13 @@ class RequirerCharmCharm(ops.CharmBase):
     def _on_update_action(self, event: ops.ActionEvent) -> None:
         """Handle update common name action."""
         # client relation
-        if not (relation := self.model.get_relation("etcd-client")):
+        if not self.etcd_relation:
             event.fail("etcd-client relation not found")
             return
 
         if event.params.get("chain"):
             ca = event.params["chain"].replace("\\n", "\n")
-            self.etcd_requires.set_mtls_cert(relation.id, ca)
+            self._set_mtls_cert(ca)
 
         event.set_results({"message": "chain updated on data bag"})
 
@@ -172,28 +211,31 @@ class RequirerCharmCharm(ops.CharmBase):
         Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
         Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
 
-        if relation := self.model.get_relation("etcd-client"):
+        if self.etcd_relation:
             raw_cert = self.raw_certificate or cert.certificate.raw
-            self.etcd_requires.set_mtls_cert(relation.id, raw_cert)
+            self._set_mtls_cert(raw_cert)
 
-    def _on_etcd_ready(self, event: EtcdReadyEvent) -> None:
-        """Handle etcd ready event."""
-        logger.info("etcd ready")
-        if not event.tls_ca:
+    def _on_resource_created(self, event: ResourceCreatedEvent[ResourceProviderModel]) -> None:
+        """Handle resource created event."""
+        logger.info("Resource created")
+        response = event.response
+        if not response.tls_ca:
             logger.error("No server CA chain available")
             return
-        if not event.username:
+        if not response.username:
             logger.error("No username available")
             return
         Path(SNAP_DIR).mkdir(exist_ok=True)
-        Path(f"{SNAP_DIR}/ca.pem").write_text(event.tls_ca)
+        Path(f"{SNAP_DIR}/ca.pem").write_text(response.tls_ca.get_secret_value())
 
-    def _on_endpoints_changed(self, event: DatabaseEndpointsChangedEvent) -> None:
+    def _on_endpoints_changed(
+        self, event: ResourceEndpointsChangedEvent[ResourceProviderModel]
+    ) -> None:
         """Handle etcd client relation data changed event."""
-        logger.info("Endpoints changed: %s", event.endpoints)
-        if not event.endpoints:
+        response = event.response
+        logger.info("Endpoints changed: %s", response.endpoints)
+        if not response.endpoints:
             logger.error("No endpoints available")
-            return
 
     def _on_put_action(self, event: ops.ActionEvent) -> None:
         """Handle put action."""
@@ -203,7 +245,7 @@ class RequirerCharmCharm(ops.CharmBase):
             return
         key = event.params["key"]
         value = event.params["value"]
-        uris = self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "uris")
+        uris = self.etcd_uris
         if not uris:
             event.fail("No uris available")
             event.set_results({"ok": False})
@@ -223,7 +265,7 @@ class RequirerCharmCharm(ops.CharmBase):
             event.fail("The action can be run only after relation is created.")
             event.set_results({"ok": False})
             return
-        uris = self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "uris")
+        uris = self.etcd_uris
         if not uris:
             event.fail("No uris available")
             event.set_results({"ok": False})
@@ -252,19 +294,21 @@ class RequirerCharmCharm(ops.CharmBase):
 
         result: dict = {"ok": True}
 
+        remote_response = self.remote_response
+        if not remote_response:
+            event.fail("No remote response available")
+            event.set_results({"ok": False})
+            return
+
         result.update(
             {
-                "username": self.etcd_requires.fetch_relation_field(
-                    self.etcd_relation.id, "username"
-                ),
-                "uris": self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "uris"),
-                "endpoints": self.etcd_requires.fetch_relation_field(
-                    self.etcd_relation.id, "endpoints"
-                ),
-                "version": self.etcd_requires.fetch_relation_field(
-                    self.etcd_relation.id, "version"
-                ),
-                "tls-ca": self.etcd_requires.fetch_relation_field(self.etcd_relation.id, "tls-ca"),
+                "username": remote_response.username,
+                "uris": remote_response.uris.get_secret_value() if remote_response.uris else None,
+                "endpoints": remote_response.endpoints,
+                "version": remote_response.version,
+                "tls-ca": remote_response.tls_ca.get_secret_value()
+                if remote_response.tls_ca
+                else None,
             }
         )
 
@@ -291,6 +335,14 @@ class RequirerCharmCharm(ops.CharmBase):
         except snap.SnapError as e:
             logger.error(str(e))
             return False
+
+    def _set_mtls_cert(self, cert: str) -> None:
+        """Set the mtls cert in the relation data bag."""
+        if not self.etcd_relation:
+            return
+        local_model = self.etcd_relation_local_model
+        local_model.requests[0].mtls_cert = SecretStr(cert)
+        self.etcd_requires.interface.write_model(self.etcd_relation.id, local_model)
 
 
 def _put(endpoints: str, key: str, value: str) -> str | None:

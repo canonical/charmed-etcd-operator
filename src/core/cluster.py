@@ -11,7 +11,10 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DataPeerData,
     DataPeerOtherUnitData,
     DataPeerUnitData,
-    EtcdProviderData,
+)
+from charms.data_platform_libs.v1.data_interfaces import (
+    OpsRelationRepositoryInterface,
+    RequirerCommonModel,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
     ProviderCertificate,
@@ -126,9 +129,11 @@ class ClusterState(Object, StatusesStateProtocol):
         return self.model.get_relation(CLIENT_TLS_RELATION_NAME)
 
     @property
-    def etcd_provides(self) -> EtcdProviderData:
+    def etcd_provides(self) -> OpsRelationRepositoryInterface:
         """Get the etcd provides interface."""
-        return EtcdProviderData(self.model, relation_name=EXTERNAL_CLIENTS_RELATION)
+        return OpsRelationRepositoryInterface(
+            self.charm, EXTERNAL_CLIENTS_RELATION, RequirerCommonModel
+        )
 
     @property
     def tls_client_certificate(self) -> ProviderCertificate:

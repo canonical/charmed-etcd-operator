@@ -11,6 +11,11 @@ from ipaddress import ip_address
 from pathlib import Path
 from typing import Dict, Iterable
 
+from charms.data_platform_libs.v1.data_interfaces import (
+    RequirerCommonModel,
+    RequirerDataContractV1,
+    build_model,
+)
 from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
     ProviderCertificate,
@@ -442,12 +447,19 @@ class TLSManager(ManagerStatusProtocol):
 
         # managed users cas
         for relation in self.state.etcd_provides.relations:
-            mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
-            logger.debug(
-                f"Collecting CA from relation {relation.id}, chain exists: {bool(mtls_cert)}"
+            request_model = build_model(
+                self.state.etcd_provides.repository(relation.id, relation.app),
+                RequirerDataContractV1[RequirerCommonModel],
             )
-            if mtls_cert and is_leaf_certificate_valid(mtls_cert):
-                cas.add(leaf_certificate(mtls_cert))
+            for request in request_model.requests:
+                mtls_cert = request.mtls_cert
+                logger.debug(
+                    "Collecting CA from relation %s, chain exists: %s",
+                    relation.id,
+                    bool(mtls_cert),
+                )
+                if mtls_cert and is_leaf_certificate_valid(mtls_cert.get_secret_value()):
+                    cas.add(leaf_certificate(mtls_cert.get_secret_value()))
 
         # certificate transfer cas
         cas.update(self.state.tls_certificate_transfer_certificates)

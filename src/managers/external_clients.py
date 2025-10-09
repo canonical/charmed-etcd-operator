@@ -8,10 +8,18 @@ import json
 import logging
 from pathlib import Path
 
+from charms.data_platform_libs.v1.data_interfaces import (
+    DataContractV1,
+    RequirerCommonModel,
+    RequirerDataContractV1,
+    ResourceProviderModel,
+    build_model,
+)
 from charms.tls_certificates_interface.v4.tls_certificates import Certificate
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
+from pydantic import SecretStr
 
 from common.certificates import is_leaf_certificate_valid
 from core.cluster import ClusterState
@@ -121,47 +129,59 @@ class ExternalClientsManager(ManagerStatusProtocol):
         server_ca = self.state.tls_client_certificate.ca.raw
 
         for relation in self.state.etcd_provides.relations:
-            if not self.state.etcd_provides.fetch_relation_field(
-                relation.id, "prefix"
-            ) or not self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert"):
-                # Skip relations with invalid payloads
-                logger.warning(f"Skipping relation {relation.id} with invalid payloads.")
-                continue
+            response_model = self.state.etcd_provides.build_model(
+                relation.id, DataContractV1[ResourceProviderModel]
+            )
+            request_model = build_model(
+                self.state.etcd_provides.repository(relation.id, relation.app),
+                RequirerDataContractV1[RequirerCommonModel],
+            )
+            for request in request_model.requests:
+                if not request.resource or not request.mtls_cert:
+                    logger.warning("Skipping relation %s with invalid payloads.", relation.id)
+                    continue
+                current_response = next(
+                    (
+                        res
+                        for res in response_model.requests
+                        if res.request_id == request.request_id
+                    ),
+                    None,
+                )
+                if not current_response:
+                    logger.warning(
+                        "Skipping relation %s did not find a matching response.", relation.id
+                    )
+                    continue
 
-            relation_data = self.state.etcd_provides.fetch_my_relation_data(
-                [relation.id], ["uris", "endpoints", "tls-ca", "version"]
-            )[relation.id]
-
-            if set(relation_data.get("uris", "").split(",")) != uris:
-                self.state.etcd_provides.set_uris(relation.id, ",".join(uris))
-
-            if set(relation_data.get("endpoints", "").split(",")) != endpoints:
-                self.state.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
-
-            if relation_data.get("tls-ca") != server_ca:
-                self.state.etcd_provides.set_tls_ca(relation.id, server_ca)
-
-            if relation_data.get("version") != etcd_version:
-                self.state.etcd_provides.set_version(relation.id, etcd_version)
+                current_response.endpoints = ",".join(endpoints)
+                current_response.uris = SecretStr(",".join(uris))
+                current_response.tls_ca = SecretStr(server_ca)
+                current_response.version = etcd_version
+            self.state.etcd_provides.write_model(relation.id, response_model)
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the component status."""
         status_list: list[StatusObject] = []
-
         for relation in self.state.etcd_provides.relations:
-            mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
-            prefix = self.state.etcd_provides.fetch_relation_field(relation.id, "prefix")
-            # for client relation created hook
-            if not mtls_cert or not prefix:
-                status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
-                continue
-            if not is_leaf_certificate_valid(mtls_cert):
-                status_list.append(ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value)
+            request_model = build_model(
+                self.state.etcd_provides.repository(relation.id, relation.app),
+                RequirerDataContractV1[RequirerCommonModel],
+            )
+            for request in request_model.requests:
+                mtls_cert = request.mtls_cert
+                prefix = request.resource
+                # for client relation created hook
+                if not mtls_cert or not prefix:
+                    status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
+                    continue
+                if not is_leaf_certificate_valid(mtls_cert.get_secret_value()):
+                    status_list.append(ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value)
 
-            common_name = self.get_common_name_from_chain(mtls_cert)
-            relation_managed_user = self.get_relation_managed_user(relation.id)
-            if relation_managed_user and relation_managed_user != common_name:
-                status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
+                common_name = self.get_common_name_from_chain(mtls_cert.get_secret_value())
+                relation_managed_user = self.get_relation_managed_user(relation.id)
+                if relation_managed_user and relation_managed_user != common_name:
+                    status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
 
         if self.state.etcd_provides.relations:
             if self.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
