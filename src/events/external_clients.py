@@ -75,11 +75,8 @@ class ExternalClientsEvents(Object):
             )
             event.defer()
             return
-        request = event.request
-        import pdb
 
-        pdb.set_trace()
-        if not request.mtls_cert or not request.resource:
+        if not event.request.mtls_cert or not event.request.resource:
             logger.error("CA chain, keys prefix, or common name not provided")
             return
 
@@ -115,11 +112,11 @@ class ExternalClientsEvents(Object):
                 else None
             )
         common_name = self.charm.external_clients_manager.get_common_name_from_chain(
-            request.mtls_cert.get_secret_value()
+            event.request.mtls_cert.get_secret_value()
         )
 
         # validate leaf certificate
-        if not is_leaf_certificate_valid(request.mtls_cert.get_secret_value()):
+        if not is_leaf_certificate_valid(event.request.mtls_cert.get_secret_value()):
             logger.error("Invalid end-entity certificate")
             # clean the old user if exists
             if old_common_name:
@@ -155,7 +152,9 @@ class ExternalClientsEvents(Object):
 
                 if relation_managed_user is None:
                     logger.info(f"Creating new user: {common_name}")
-                    self.charm.cluster_manager.add_managed_user(common_name, request.resource)
+                    self.charm.cluster_manager.add_managed_user(
+                        common_name, event.request.resource
+                    )
                     self.charm.external_clients_manager.add_managed_user(
                         event.relation.id, common_name
                     )
@@ -163,9 +162,9 @@ class ExternalClientsEvents(Object):
                         event.relation.id,
                         ResourceProviderModel(
                             username=SecretStr(common_name),
-                            request_id=request.request_id,
-                            resource=request.resource,
-                            salt=request.salt,
+                            request_id=event.request.request_id,
+                            resource=event.request.resource,
+                            salt=event.request.salt,
                         ),
                     )
                     self.charm.external_clients_manager.update_client_relations_data(

@@ -8,13 +8,6 @@ import json
 import logging
 from pathlib import Path
 
-from charms.data_platform_libs.v1.data_interfaces import (
-    DataContractV1,
-    RequirerCommonModel,
-    RequirerDataContractV1,
-    ResourceProviderModel,
-    build_model,
-)
 from charms.tls_certificates_interface.v4.tls_certificates import Certificate
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
@@ -106,7 +99,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
 
     def update_client_relations_data(self, etcd_version: str) -> None:
         """Update the ECR data."""
-        if not self.state.etcd_provides.relations:
+        if not self.state.etcd_provides_interface.relations:
             return
 
         if not self.state.cluster.cluster_state:
@@ -128,14 +121,9 @@ class ExternalClientsManager(ManagerStatusProtocol):
 
         server_ca = self.state.tls_client_certificate.ca.raw
 
-        for relation in self.state.etcd_provides.relations:
-            response_model = self.state.etcd_provides.build_model(
-                relation.id, DataContractV1[ResourceProviderModel]
-            )
-            request_model = build_model(
-                self.state.etcd_provides.repository(relation.id, relation.app),
-                RequirerDataContractV1[RequirerCommonModel],
-            )
+        for relation in self.state.etcd_provides_interface.relations:
+            response_model = self.state.get_etcd_provider_request_model(relation)
+            request_model = self.state.get_etcd_requirer_request_model(relation)
             for request in request_model.requests:
                 if not request.resource or not request.mtls_cert:
                     logger.warning("Skipping relation %s with invalid payloads.", relation.id)
@@ -158,16 +146,13 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 current_response.uris = SecretStr(",".join(uris))
                 current_response.tls_ca = SecretStr(server_ca)
                 current_response.version = etcd_version
-            self.state.etcd_provides.write_model(relation.id, response_model)
+            self.state.etcd_provides_interface.write_model(relation.id, response_model)
 
-    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:  # noqa: C901
         """Compute the component status."""
         status_list: list[StatusObject] = []
-        for relation in self.state.etcd_provides.relations:
-            request_model = build_model(
-                self.state.etcd_provides.repository(relation.id, relation.app),
-                RequirerDataContractV1[RequirerCommonModel],
-            )
+        for relation in self.state.etcd_provides_interface.relations:
+            request_model = self.state.get_etcd_requirer_request_model(relation)
             for request in request_model.requests:
                 mtls_cert = request.mtls_cert
                 prefix = request.resource
@@ -183,7 +168,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 if relation_managed_user and relation_managed_user != common_name:
                     status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
 
-        if self.state.etcd_provides.relations:
+        if self.state.etcd_provides_interface.relations:
             if self.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
                 status_list.append(ExternalClientsStatuses.EC_TLS_IS_DISABLED.value)
 

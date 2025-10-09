@@ -13,8 +13,12 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DataPeerUnitData,
 )
 from charms.data_platform_libs.v1.data_interfaces import (
+    DataContractV1,
     OpsRelationRepositoryInterface,
     RequirerCommonModel,
+    RequirerDataContractV1,
+    ResourceProviderModel,
+    build_model,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
     ProviderCertificate,
@@ -129,7 +133,7 @@ class ClusterState(Object, StatusesStateProtocol):
         return self.model.get_relation(CLIENT_TLS_RELATION_NAME)
 
     @property
-    def etcd_provides(self) -> OpsRelationRepositoryInterface:
+    def etcd_provides_interface(self) -> OpsRelationRepositoryInterface:
         """Get the etcd provides interface."""
         return OpsRelationRepositoryInterface(
             self.charm, EXTERNAL_CLIENTS_RELATION, RequirerCommonModel
@@ -192,3 +196,20 @@ class ClusterState(Object, StatusesStateProtocol):
             raise
 
         return secret_content
+
+    def get_etcd_provider_request_model(
+        self, relation: Relation
+    ) -> DataContractV1[ResourceProviderModel]:
+        """Get the etcd provides interface."""
+        return self.etcd_provides_interface.build_model(
+            relation.id, DataContractV1[ResourceProviderModel]
+        )
+
+    def get_etcd_requirer_request_model(
+        self, relation: Relation
+    ) -> RequirerDataContractV1[RequirerCommonModel]:
+        """Get the etcd requirer interface."""
+        return build_model(
+            self.etcd_provides_interface.repository(relation.id, relation.app),
+            RequirerDataContractV1[RequirerCommonModel],
+        )

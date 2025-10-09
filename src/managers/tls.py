@@ -11,11 +11,6 @@ from ipaddress import ip_address
 from pathlib import Path
 from typing import Dict, Iterable
 
-from charms.data_platform_libs.v1.data_interfaces import (
-    RequirerCommonModel,
-    RequirerDataContractV1,
-    build_model,
-)
 from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
     ProviderCertificate,
@@ -446,11 +441,8 @@ class TLSManager(ManagerStatusProtocol):
             logger.warning("No client CA found in the TLS client certificate.")
 
         # managed users cas
-        for relation in self.state.etcd_provides.relations:
-            request_model = build_model(
-                self.state.etcd_provides.repository(relation.id, relation.app),
-                RequirerDataContractV1[RequirerCommonModel],
-            )
+        for relation in self.state.etcd_provides_interface.relations:
+            request_model = self.state.get_etcd_requirer_request_model(relation)
             for request in request_model.requests:
                 mtls_cert = request.mtls_cert
                 logger.debug(
