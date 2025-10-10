@@ -8,6 +8,9 @@ providers:
   microk8s:
     enable: true
     bootstrap: true
+    addons:
+      - hostpath-storage
+      - dns
 host:
   snaps:
     jhack:
