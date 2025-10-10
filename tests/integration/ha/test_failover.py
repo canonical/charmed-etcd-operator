@@ -583,6 +583,9 @@ async def test_reboot_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
         endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
     )
 
+    # give some time for the reboot to complete
+    time.sleep(30)
+
     # ensure the stopped unit was restarted
     assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is available again.")
