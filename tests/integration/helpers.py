@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict
 
-#TODO jubilant: remove juju, pytest-operator, and pytest-asyncio when all tests migrated
+# TODO jubilant: remove juju, pytest-operator, and pytest-asyncio when all tests migrated
 import jubilant
 import yaml
 from pytest_operator.plugin import OpsTest
@@ -630,9 +630,9 @@ def get_leader_unit_ip(juju: jubilant.Juju, app: str = APP_NAME) -> str:
 @contextlib.contextmanager
 def fast_forward(juju: jubilant.Juju):
     """Context manager that temporarily speeds up update-status hooks to fire every 10s."""
-    old = juju.model_config()['update-status-hook-interval']
-    juju.model_config({'update-status-hook-interval': '10s'})
+    old = juju.model_config()["update-status-hook-interval"]
+    juju.model_config({"update-status-hook-interval": "10s"})
     try:
         yield
     finally:
-        juju.model_config({'update-status-hook-interval': old})
+        juju.model_config({"update-status-hook-interval": old})
