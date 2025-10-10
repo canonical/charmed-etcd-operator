@@ -13,6 +13,9 @@ providers:
       - dns
       - metallb:10.64.140.43-10.64.140.49
 host:
+  packages:
+    - python3-pip
+    - python3-venv
   snaps:
     jhack:
       channel: latest/edge
