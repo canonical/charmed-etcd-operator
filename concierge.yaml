@@ -5,6 +5,9 @@ providers:
   lxd:
     enable: true
     bootstrap: false
+  microk8s:
+    enable: true
+    bootstrap: true
 host:
   snaps:
     jhack:
