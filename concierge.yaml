@@ -11,6 +11,7 @@ providers:
     addons:
       - hostpath-storage
       - dns
+      - rbac
       - metallb:10.64.140.43-10.64.140.49
 host:
   packages:
