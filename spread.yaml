@@ -119,10 +119,10 @@ path: /root/spread_project
 kill-timeout: 3h
 environment:
   PATH: $PATH:$(pipx environment --value PIPX_BIN_DIR)
-  CONCIERGE_JUJU_CHANNEL/juju36_lxd: 3.6/stable
-  CONCIERGE_JUJU_CHANNEL/juju36_microk8s: 3.6/stable
-  CONTROLLER_NAME/juju36_lxd: concierge-lxd
-  CONTROLLER_NAME/juju36_microk8s: concierge-microk8s
+  CONCIERGE_JUJU_CHANNEL/lxd: 3.6/stable
+  CONCIERGE_JUJU_CHANNEL/microk8s: 3.6/stable
+  CONTROLLER_NAME/lxd: concierge-lxd
+  CONTROLLER_NAME/microk8s: concierge-microk8s
 prepare: |
   snap refresh --hold
   chown -R root:root "$SPREAD_PATH"
