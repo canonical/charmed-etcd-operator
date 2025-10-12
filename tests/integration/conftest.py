@@ -101,7 +101,12 @@ async def k8s_cloud(juju: Juju):
     yield None
 
     juju.cli(
-        "remove-cloud", "--client", "--controller", MICROK8S_CONTROLLER_NAME, MICROK8S_CLOUD_NAME, include_model=False
+        "remove-cloud",
+        "--client",
+        "--controller",
+        MICROK8S_CONTROLLER_NAME,
+        MICROK8S_CLOUD_NAME,
+        include_model=False,
     )
     subprocess.run(["sudo", "snap", "remove", "--purge", "microk8s"], check=True)
     subprocess.run(["sudo", "snap", "remove", "--purge", "kubectl"], check=True)
