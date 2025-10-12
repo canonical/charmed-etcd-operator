@@ -91,12 +91,12 @@ async def k8s_cloud(juju: Juju):
                 ):  # We got sth different from "No resources found." in stderr
                     raise Exception()
 
-        juju.bootstrap(MICROK8S_CLOUD_NAME, MICROK8S_CONTROLLER_NAME)
-
         # Add microk8s to the kubeconfig
         juju.cli(
-            "add-k8s", MICROK8S_CLOUD_NAME, "--client", "--controller", MICROK8S_CONTROLLER_NAME
+            "add-k8s", MICROK8S_CLOUD_NAME
         )
+        juju.bootstrap(MICROK8S_CLOUD_NAME, MICROK8S_CONTROLLER_NAME)
+
     except subprocess.CalledProcessError as e:
         pytest.exit(str(e))
 
