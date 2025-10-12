@@ -5,18 +5,7 @@ providers:
   lxd:
     enable: true
     bootstrap: false
-  microk8s:
-    enable: true
-    bootstrap: true
-    addons:
-      - hostpath-storage
-      - dns
-      - rbac
-      - metallb:10.64.140.43-10.64.140.49
 host:
-  packages:
-    - python3-pip
-    - python3-venv
   snaps:
     jhack:
       channel: latest/edge

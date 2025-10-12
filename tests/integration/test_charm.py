@@ -40,67 +40,6 @@ TEST_VALUE = "42"
 ADMIN = "admin"
 
 
-# TODO jubilant: move common fixtures to conftest.py when all modules migrated
-@pytest.fixture(scope="module")
-def juju(arch: str):
-    with jubilant.temp_model() as juju:
-        juju.wait_timeout = 1000
-        juju.cli("set-model-constraints", f"arch={arch}")
-        yield juju
-
-
-@pytest.fixture(scope="module")
-def k8s_cloud(juju: Juju):
-    clouds = json.loads(juju.cli("clouds", "--format", "json", include_model=False))
-    for cloud, details in clouds.items():
-        if "k8s" == details.get("type"):
-            logger.info(f"Identified K8s cloud: {cloud}")
-            yield cloud
-
-
-@pytest.fixture(scope="module")
-def k8s_controller(k8s_cloud: str, juju: Juju):
-    controllers = json.loads(juju.cli("controllers", "--format", "json", include_model=False))
-    for controller, details in controllers.get("controllers").items():
-        if k8s_cloud == details.get("cloud"):
-            logger.info(f"Identified K8s controller: {controller}")
-            yield controller
-
-
-@pytest.fixture(scope="module")
-def lxd_cloud(juju: Juju):
-    clouds = json.loads(juju.cli("clouds", "--format", "json", include_model=False))
-    for cloud, details in clouds.items():
-        if "lxd" == details.get("type"):
-            logger.info(f"Identified LXD cloud: {cloud}")
-            yield cloud
-
-
-@pytest.fixture(scope="module")
-def lxd_controller(lxd_cloud: str, juju: Juju):
-    controllers = json.loads(juju.cli("controllers", "--format", "json", include_model=False))
-    for controller, details in controllers.get("controllers").items():
-        if lxd_cloud == details.get("cloud"):
-            logger.info(f"Identified LXD controller: {controller}")
-            yield controller
-
-
-@pytest.fixture(scope="module")
-def juju_lxd(arch: str, lxd_cloud: str, lxd_controller):
-    with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
-        juju_lxd.wait_timeout = 1000
-        juju_lxd.cli("set-model-constraints", f"arch={arch}")
-        yield juju_lxd
-
-
-@pytest.fixture(scope="module")
-def juju_k8s(arch: str, k8s_cloud: str, k8s_controller: str):
-    with jubilant.temp_model(cloud=k8s_cloud, controller=k8s_controller) as juju_k8s:
-        juju_k8s.wait_timeout = 1000
-        juju_k8s.cli("set-model-constraints", f"arch={arch}")
-        yield juju_k8s
-
-
 @pytest.mark.abort_on_fail
 def test_build_and_deploy(charm: str, juju_lxd: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
