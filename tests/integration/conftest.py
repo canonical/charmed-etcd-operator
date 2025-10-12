@@ -92,9 +92,7 @@ async def k8s_cloud(juju: Juju):
                     raise Exception()
 
         # Add microk8s to the kubeconfig
-        juju.cli(
-            "add-k8s", MICROK8S_CLOUD_NAME
-        )
+        juju.cli("add-k8s", MICROK8S_CLOUD_NAME)
         juju.bootstrap(MICROK8S_CLOUD_NAME, MICROK8S_CONTROLLER_NAME)
 
     except subprocess.CalledProcessError as e:
