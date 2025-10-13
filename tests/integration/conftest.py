@@ -108,7 +108,7 @@ async def k8s_cloud(juju: Juju):
         "--no-prompt",
         "--force",
         MICROK8S_CONTROLLER_NAME,
-        include_model=False
+        include_model=False,
     )
     juju.cli(
         "remove-cloud",

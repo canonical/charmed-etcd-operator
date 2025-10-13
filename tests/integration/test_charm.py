@@ -233,7 +233,7 @@ def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controlle
     # assert that etcd metrics show up in prometheus
     juju_k8s.wait(jubilant.all_agents_idle)
     result = juju_k8s.run(action="show-proxied-endpoints", unit="traefik/0")
-    logger.info(f"Proxied endpoints from traefik: {result.results["proxied-endpoints"]}")
+    logger.info(f"Proxied endpoints from traefik: {result.results['proxied-endpoints']}")
     proxied_endpoints = json.loads(result.results["proxied-endpoints"])
     prometheus_url = proxied_endpoints["prometheus/0"]["url"]
     prometheus_endpoint = f"{prometheus_url}/api/v1/label/__name__/values"
