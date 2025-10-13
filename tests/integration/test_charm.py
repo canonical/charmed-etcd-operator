@@ -218,7 +218,9 @@ def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controlle
             owner=ADMIN,
         )
         juju_lxd.consume(
-            model_and_app=f"{juju_k8s_model}.{LOKI_APP_NAME}", controller=k8s_controller, owner=ADMIN
+            model_and_app=f"{juju_k8s_model}.{LOKI_APP_NAME}",
+            controller=k8s_controller,
+            owner=ADMIN,
         )
         juju_lxd.consume(
             model_and_app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
