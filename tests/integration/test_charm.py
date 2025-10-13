@@ -163,55 +163,10 @@ async def test_etcd_metrics_endpoint(juju_lxd: Juju):
 
 
 @pytest.mark.abort_on_fail
-def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controller: str):
-    # deploy COS essentials for grafana-agent
-    juju_k8s.deploy("cos-lite", trust=True)
-    juju_k8s.wait(jubilant.all_active)
-    juju_k8s.wait(jubilant.all_agents_idle)
-
-    juju_k8s_model = juju_k8s.model.split(":")[1]
-
-    # offer COS interfaces to be cross-model related with the machine model
-    juju_k8s.offer(
-        app=f"{juju_k8s_model}.{LOKI_APP_NAME}", endpoint="logging", controller=k8s_controller
-    )
-    juju_k8s.offer(
-        app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
-        endpoint="receive-remote-write",
-        controller=k8s_controller,
-    )
-    juju_k8s.offer(
-        app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
-        endpoint="grafana-dashboard",
-        controller=k8s_controller,
-    )
-    juju_k8s.wait(jubilant.all_agents_idle)
-
-    # consume the offers on the machine model
-    juju_lxd.consume(
-        model_and_app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
-        controller=k8s_controller,
-        owner=ADMIN,
-    )
-    juju_lxd.consume(
-        model_and_app=f"{juju_k8s_model}.{LOKI_APP_NAME}", controller=k8s_controller, owner=ADMIN
-    )
-    juju_lxd.consume(
-        model_and_app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
-        controller=k8s_controller,
-        owner=ADMIN,
-    )
-
+def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controller: str, arch: str):
     # deploy grafana-agent and integrate
     juju_lxd.deploy(GRAFANA_AGENT_APP_NAME, channel=COS_CHANNEL)
     juju_lxd.integrate(APP_NAME, GRAFANA_AGENT_APP_NAME)
-    juju_lxd.wait(
-        lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
-        timeout=1200,
-    )
-    juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, GRAFANA_APP_NAME)
-    juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, LOKI_APP_NAME)
-    juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, PROMETHEUS_APP_NAME)
     juju_lxd.wait(
         lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
         timeout=1200,
@@ -230,20 +185,70 @@ def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controlle
     scrape_job = relation_data["metrics_scrape_jobs"][0]
     assert scrape_job["static_configs"][0]["targets"][0].endswith(f":{METRICS_PORT}")
 
-    # assert that etcd metrics show up in prometheus
-    juju_k8s.wait(jubilant.all_agents_idle)
-    result = juju_k8s.run(action="show-proxied-endpoints", unit="traefik/0")
-    logger.info(f"Proxied endpoints from traefik: {result.results['proxied-endpoints']}")
-    proxied_endpoints = json.loads(result.results["proxied-endpoints"])
-    prometheus_url = proxied_endpoints["prometheus/0"]["url"]
-    prometheus_endpoint = f"{prometheus_url}/api/v1/label/__name__/values"
+    # further, verify integration with cos-lite bundle.
+    # Some charms in this bundle are only supported by amd64
+    if "amd64" == arch:
+        # deploy COS essentials for grafana-agent
+        juju_k8s.deploy("cos-lite", trust=True)
+        juju_k8s.wait(jubilant.all_active)
+        juju_k8s.wait(jubilant.all_agents_idle)
 
-    prometheus_metrics_raw = requests.get(prometheus_endpoint)
-    prometheus_metrics_raw.raise_for_status()
-    all_metrics = prometheus_metrics_raw.json()["data"]
-    etcd_metrics = [m for m in all_metrics if "etcd" in m]
-    assert etcd_metrics, "No etcd-related metrics found in Prometheus"
-    assert (
-        "etcd_server_has_leader" in etcd_metrics
-        or "etcd_server_leader_changes_seen_total" in etcd_metrics
-    )
+        juju_k8s_model = juju_k8s.model.split(":")[1]
+
+        # offer COS interfaces to be cross-model related with the machine model
+        juju_k8s.offer(
+            app=f"{juju_k8s_model}.{LOKI_APP_NAME}", endpoint="logging", controller=k8s_controller
+        )
+        juju_k8s.offer(
+            app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
+            endpoint="receive-remote-write",
+            controller=k8s_controller,
+        )
+        juju_k8s.offer(
+            app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
+            endpoint="grafana-dashboard",
+            controller=k8s_controller,
+        )
+        juju_k8s.wait(jubilant.all_agents_idle)
+
+        # consume the offers on the machine model
+        juju_lxd.consume(
+            model_and_app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
+            controller=k8s_controller,
+            owner=ADMIN,
+        )
+        juju_lxd.consume(
+            model_and_app=f"{juju_k8s_model}.{LOKI_APP_NAME}", controller=k8s_controller, owner=ADMIN
+        )
+        juju_lxd.consume(
+            model_and_app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
+            controller=k8s_controller,
+            owner=ADMIN,
+        )
+
+        # integrate the COS charms with grafana-agent on the machine
+        juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, GRAFANA_APP_NAME)
+        juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, LOKI_APP_NAME)
+        juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, PROMETHEUS_APP_NAME)
+        juju_lxd.wait(
+            lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
+            timeout=1200,
+        )
+        juju_k8s.wait(jubilant.all_agents_idle)
+
+        # assert that etcd metrics show up in prometheus
+        result = juju_k8s.run(action="show-proxied-endpoints", unit="traefik/0")
+        logger.info(f"Proxied endpoints from traefik: {result.results['proxied-endpoints']}")
+        proxied_endpoints = json.loads(result.results["proxied-endpoints"])
+        prometheus_url = proxied_endpoints["prometheus/0"]["url"]
+        prometheus_endpoint = f"{prometheus_url}/api/v1/label/__name__/values"
+
+        prometheus_metrics_raw = requests.get(prometheus_endpoint)
+        prometheus_metrics_raw.raise_for_status()
+        all_metrics = prometheus_metrics_raw.json()["data"]
+        etcd_metrics = [m for m in all_metrics if "etcd" in m]
+        assert etcd_metrics, "No etcd-related metrics found in Prometheus"
+        assert (
+            "etcd_server_has_leader" in etcd_metrics
+            or "etcd_server_leader_changes_seen_total" in etcd_metrics
+        )
