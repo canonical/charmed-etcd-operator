@@ -102,10 +102,17 @@ async def k8s_cloud(juju: Juju):
     yield MICROK8S_CLOUD_NAME
 
     juju.cli(
+        "destroy-controller",
+        "--destroy-all-models",
+        "--destroy-storage",
+        "--no-prompt",
+        "--force",
+        MICROK8S_CONTROLLER_NAME,
+        include_model=False
+    )
+    juju.cli(
         "remove-cloud",
         "--client",
-        "--controller",
-        MICROK8S_CONTROLLER_NAME,
         MICROK8S_CLOUD_NAME,
         include_model=False,
     )
