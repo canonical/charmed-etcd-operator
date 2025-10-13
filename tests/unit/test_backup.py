@@ -166,7 +166,7 @@ def test_create_backup_action_s3():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started"},
-        local_app_data={"backup_id": "xyz"},
+        local_app_data={"backup-id": "xyz"},
     )
     secret_content = {"s3-credentials": json.dumps(s3_credentials)}
     secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -242,7 +242,7 @@ def test_create_backup_action_azure():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started"},
-        local_app_data={"backup_id": "xyz"},
+        local_app_data={"backup-id": "xyz"},
     )
     secret_content = {"azure-credentials": json.dumps(azure_credentials)}
     secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -521,7 +521,7 @@ def test_restore_action_s3():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={"state": "started"},
-        local_app_data={"restore_id": "XYZ"},
+        local_app_data={"restore-id": "XYZ"},
     )
     secret_content = {"s3-credentials": json.dumps(s3_credentials)}
     secret = Secret(secret_content, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -634,9 +634,9 @@ def test_restore_action_s3():
         state_out = ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
 
         assert ctx.action_results == {"success": f"restore initiated for {backup_id}"}
-    assert state_out.get_relation(1).local_app_data.get("restore_id") == backup_id
+    assert state_out.get_relation(1).local_app_data.get("restore-id") == backup_id
     assert (
-        state_out.get_relation(1).local_app_data.get("restore_instruction")
+        state_out.get_relation(1).local_app_data.get("restore-instruction")
         == RestoreStep.DOWNLOAD.value
     )
 
@@ -691,9 +691,9 @@ def test_restore_action_azure():
         state_out = ctx.run(ctx.on.action("restore", params={"backup-id": backup_id}), state_in)
 
         assert ctx.action_results == {"success": f"restore initiated for {backup_id}"}
-    assert state_out.get_relation(1).local_app_data.get("restore_id") == backup_id
+    assert state_out.get_relation(1).local_app_data.get("restore-id") == backup_id
     assert (
-        state_out.get_relation(1).local_app_data.get("restore_instruction")
+        state_out.get_relation(1).local_app_data.get("restore-instruction")
         == RestoreStep.DOWNLOAD.value
     )
 
@@ -740,13 +740,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.DOWNLOAD.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.DOWNLOAD.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.STOP.value,
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.STOP.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     status_relation = testing.PeerRelation(
@@ -762,20 +766,24 @@ def test_restore_workflow_synchronization():
 
         assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
+            state_out.get_relation(1).local_unit_data.get("restore-step") == RestoreStep.STOP.value
         )
 
     # restore step: stop (leader)
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.DOWNLOAD.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.DOWNLOAD.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.STOP.value,
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.STOP.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -787,10 +795,10 @@ def test_restore_workflow_synchronization():
 
         assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.STOP.value
+            state_out.get_relation(1).local_unit_data.get("restore-step") == RestoreStep.STOP.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            state_out.get_relation(1).local_app_data.get("restore-instruction")
             == RestoreStep.VERIFY.value
         )
 
@@ -798,13 +806,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.STOP.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.VERIFY.value,
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.VERIFY.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -812,20 +824,24 @@ def test_restore_workflow_synchronization():
 
     assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
     assert (
-        state_out.get_relation(1).local_unit_data.get("restore_step") == RestoreStep.VERIFY.value
+        state_out.get_relation(1).local_unit_data.get("restore-step") == RestoreStep.VERIFY.value
     )
 
     # restore step: verify (leader)
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.STOP.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.VERIFY.value,
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.VERIFY.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -843,11 +859,11 @@ def test_restore_workflow_synchronization():
 
         assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step")
+            state_out.get_relation(1).local_unit_data.get("restore-step")
             == RestoreStep.VERIFY.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            state_out.get_relation(1).local_app_data.get("restore-instruction")
             == RestoreStep.RESTORE.value
         )
 
@@ -855,18 +871,22 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.STOP.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.STOP.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.VERIFY.value,
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.VERIFY.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
         peers_data={
             1: {
                 "state": "started",
-                "restore_step": RestoreStep.VERIFY.value,
+                "restore-step": RestoreStep.VERIFY.value,
             }
         },
     )
@@ -885,28 +905,32 @@ def test_restore_workflow_synchronization():
 
         assert status_is(state_out, BackupStatuses.RESTORE_VERIFICATION_FAILED.value)
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step")
+            state_out.get_relation(1).local_unit_data.get("restore-step")
             == RestoreStep.VERIFY.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            state_out.get_relation(1).local_app_data.get("restore-instruction")
             == RestoreStep.RESTORE.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("restore_verification_failed") == "True"
+            state_out.get_relation(1).local_app_data.get("restore-verification-failed") == "True"
         )
 
     # restore step: restore (non-leader)
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.VERIFY.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.RESTORE.value,
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.RESTORE.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -917,7 +941,7 @@ def test_restore_workflow_synchronization():
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step")
+            state_out.get_relation(1).local_unit_data.get("restore-step")
             == RestoreStep.RESTORE.value
         )
 
@@ -925,13 +949,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.VERIFY.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.RESTORE.value,
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.RESTORE.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -942,15 +970,15 @@ def test_restore_workflow_synchronization():
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
 
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step")
+            state_out.get_relation(1).local_unit_data.get("restore-step")
             == RestoreStep.RESTORE.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            state_out.get_relation(1).local_app_data.get("restore-instruction")
             == RestoreStep.START.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("cluster_state")
+            state_out.get_relation(1).local_app_data.get("cluster-state")
             == EtcdClusterState.NEW.value
         )
 
@@ -958,14 +986,18 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.VERIFY.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.RESTORE.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.RESTORE.value,
             "restore_verification_failed": "True",
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -976,7 +1008,7 @@ def test_restore_workflow_synchronization():
 
         restore_backup.assert_not_called()
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step")
+            state_out.get_relation(1).local_unit_data.get("restore-step")
             == RestoreStep.RESTORE.value
         )
         assert status_is(state_out, BackupStatuses.RESTORE_VERIFICATION_FAILED.value)
@@ -985,14 +1017,18 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.VERIFY.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.RESTORE.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.RESTORE.value,
             "restore_verification_failed": "True",
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -1003,15 +1039,15 @@ def test_restore_workflow_synchronization():
 
         restore_backup.assert_not_called()
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step")
+            state_out.get_relation(1).local_unit_data.get("restore-step")
             == RestoreStep.RESTORE.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            state_out.get_relation(1).local_app_data.get("restore-instruction")
             == RestoreStep.START.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("cluster_state")
+            state_out.get_relation(1).local_app_data.get("cluster-state")
             == EtcdClusterState.EXISTING.value
         )
         assert status_is(state_out, BackupStatuses.RESTORE_VERIFICATION_FAILED.value)
@@ -1020,13 +1056,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.VERIFY.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.VERIFY.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.RESTORE.value,
-            "cluster_state": EtcdClusterState.EXISTING.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.RESTORE.value,
+            "cluster-state": EtcdClusterState.EXISTING.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation})
@@ -1038,7 +1078,7 @@ def test_restore_workflow_synchronization():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
         assert not (
-            state_out.get_relation(1).local_app_data.get("cluster_state")
+            state_out.get_relation(1).local_app_data.get("cluster-state")
             == EtcdClusterState.NEW.value
         )
         assert status_is(state_out, BackupStatuses.RESTORE_FAILED.value)
@@ -1047,13 +1087,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTORE.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.RESTORE.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.START.value,
-            "cluster_state": EtcdClusterState.NEW.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.START.value,
+            "cluster-state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -1066,7 +1110,7 @@ def test_restore_workflow_synchronization():
 
         write_config.assert_called_once()
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step")
+            state_out.get_relation(1).local_unit_data.get("restore-step")
             == RestoreStep.START.value
         )
 
@@ -1074,13 +1118,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.RESTORE.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.RESTORE.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.START.value,
-            "cluster_state": EtcdClusterState.NEW.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.START.value,
+            "cluster-state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -1094,11 +1142,11 @@ def test_restore_workflow_synchronization():
 
         write_config.assert_called_once()
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step")
+            state_out.get_relation(1).local_unit_data.get("restore-step")
             == RestoreStep.START.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("restore_instruction")
+            state_out.get_relation(1).local_app_data.get("restore-instruction")
             == RestoreStep.COMPLETED.value
         )
 
@@ -1106,13 +1154,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.START.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.START.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.COMPLETED.value,
-            "cluster_state": EtcdClusterState.NEW.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.COMPLETED.value,
+            "cluster-state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -1124,7 +1176,7 @@ def test_restore_workflow_synchronization():
 
         remove_backup.assert_called_once()
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step", "")
+            state_out.get_relation(1).local_unit_data.get("restore-step", "")
             == RestoreStep.NOT_STARTED.value
         )
 
@@ -1132,13 +1184,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.START.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.START.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.COMPLETED.value,
-            "cluster_state": EtcdClusterState.NEW.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.COMPLETED.value,
+            "cluster-state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
@@ -1154,13 +1210,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.START.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.START.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.COMPLETED.value,
-            "cluster_state": EtcdClusterState.NEW.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.COMPLETED.value,
+            "cluster-state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)
@@ -1172,16 +1232,16 @@ def test_restore_workflow_synchronization():
 
         remove_backup.assert_called_once()
         assert (
-            state_out.get_relation(1).local_unit_data.get("restore_step", "")
+            state_out.get_relation(1).local_unit_data.get("restore-step", "")
             == RestoreStep.NOT_STARTED.value
         )
         assert (
-            state_out.get_relation(1).local_app_data.get("restore_instruction", "")
+            state_out.get_relation(1).local_app_data.get("restore-instruction", "")
             == RestoreStep.NOT_STARTED.value
         )
-        assert state_out.get_relation(1).local_app_data.get("restore_id", "") == ""
+        assert state_out.get_relation(1).local_app_data.get("restore-id", "") == ""
         assert (
-            state_out.get_relation(1).local_app_data.get("cluster_state")
+            state_out.get_relation(1).local_app_data.get("cluster-state")
             == EtcdClusterState.EXISTING.value
         )
 
@@ -1189,13 +1249,17 @@ def test_restore_workflow_synchronization():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"state": "started", "restore_step": RestoreStep.START.value},
+        local_unit_data={
+            "private-ip": "ip0",
+            "state": "started",
+            "restore-step": RestoreStep.START.value,
+        },
         local_app_data={
-            "restore_id": "xyz",
-            "restore_instruction": RestoreStep.COMPLETED.value,
-            "cluster_state": EtcdClusterState.NEW.value,
+            "restore-id": "xyz",
+            "restore-instruction": RestoreStep.COMPLETED.value,
+            "cluster-state": EtcdClusterState.NEW.value,
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=True)

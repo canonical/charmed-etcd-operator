@@ -85,22 +85,22 @@ def certificate_available_context():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"cluster_state": "existing"},
-        local_unit_data={"private_ip": "localhost"},
+        local_app_data={"cluster-state": "existing"},
+        local_unit_data={"private-ip": "localhost"},
         peers_data={
             1: {
-                "private_ip": "localhost",
-                "client_cert_ready": "True",
-                "peer_cert_ready": "True",
-                "tls_client_state": "tls",
-                "tls_peer_state": "tls",
+                "private-ip": "localhost",
+                "client-cert-ready": "True",
+                "peer-cert-ready": "True",
+                "tls-client-state": "tls",
+                "tls-peer-state": "tls",
             },
             2: {
-                "private_ip": "localhost",
-                "client_cert_ready": "True",
-                "peer_cert_ready": "True",
-                "tls_client_state": "tls",
-                "tls_peer_state": "tls",
+                "private-ip": "localhost",
+                "client-cert-ready": "True",
+                "peer-cert-ready": "True",
+                "tls-client-state": "tls",
+                "tls-peer-state": "tls",
             },
         },
     )
@@ -192,10 +192,10 @@ def test_enable_tls_on_start():
             id=1,
             endpoint=PEER_RELATION,
             local_unit_data={
-                "private_ip": "localhost",
+                "private-ip": "localhost",
             },
             local_app_data={
-                "cluster_members": "charmed-etcd0=http://localhost:2380",
+                "cluster-members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -209,20 +209,20 @@ def test_enable_tls_on_start():
         peer_relation = state_out.get_relation(peer_relation.id)
         assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
         assert peer_relation.local_unit_data["state"] == "started"
-        assert peer_relation.local_app_data["cluster_state"] == "existing"
+        assert peer_relation.local_app_data["cluster-state"] == "existing"
 
         # tls not ready
         peer_relation = testing.PeerRelation(
             id=1,
             endpoint=PEER_RELATION,
             local_unit_data={
-                "private_ip": "localhost",
-                "tls_peer_state": TLSState.TO_TLS.value,
+                "private-ip": "localhost",
+                "tls-peer-state": TLSState.TO_TLS.value,
             },
             local_app_data={
                 "authentication": "enabled",
-                "cluster_state": "existing",
-                "cluster_members": "charmed-etcd0=http://localhost:2380",
+                "cluster-state": "existing",
+                "cluster-members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -239,13 +239,13 @@ def test_enable_tls_on_start():
             id=1,
             endpoint=PEER_RELATION,
             local_unit_data={
-                "private_ip": "localhost",
-                "tls_client_state": TLSState.TO_TLS.value,
+                "private-ip": "localhost",
+                "tls-client-state": TLSState.TO_TLS.value,
             },
             local_app_data={
                 "authentication": "enabled",
-                "cluster_state": "existing",
-                "cluster_members": "charmed-etcd0=http://localhost:2380",
+                "cluster-state": "existing",
+                "cluster-members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -262,12 +262,12 @@ def test_enable_tls_on_start():
             id=1,
             endpoint=PEER_RELATION,
             local_unit_data={
-                "private_ip": "localhost",
-                "tls_peer_state": TLSState.TLS.value,
-                "tls_client_state": TLSState.TLS.value,
+                "private-ip": "localhost",
+                "tls-peer-state": TLSState.TLS.value,
+                "tls-client-state": TLSState.TLS.value,
             },
             local_app_data={
-                "cluster_members": "charmed-etcd0=http://localhost:2380",
+                "cluster-members": "charmed-etcd0=http://localhost:2380",
             },
         )
         peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -280,7 +280,7 @@ def test_enable_tls_on_start():
         peer_relation = state_out.get_relation(peer_relation.id)
         assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value)
         assert peer_relation.local_unit_data["state"] == "started"
-        assert peer_relation.local_app_data["cluster_state"] == "existing"
+        assert peer_relation.local_app_data["cluster-state"] == "existing"
         assert state_out.app_status == as_status(CharmStatuses.ACTIVE_IDLE.value)
 
 
@@ -291,10 +291,10 @@ def test_certificates_broken():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={
-            "client_cert_ready": "True",
-            "peer_cert_ready": "True",
-            "tls_client_state": "tls",
-            "tls_peer_state": "tls",
+            "client-cert-ready": "True",
+            "peer-cert-ready": "True",
+            "tls-client-state": "tls",
+            "tls-peer-state": "tls",
             "state": "started",
         },
     )
@@ -336,10 +336,10 @@ def test_certificates_broken():
                 state_out = manager.run()
                 peer_relation = state_out.get_relation(peer_relation.id)
                 assert charm.state.unit_server.tls_client_state == TLSState.NO_TLS
-                assert peer_relation.local_unit_data["tls_client_state"] == TLSState.NO_TLS.value
-                assert peer_relation.local_unit_data["client_cert_ready"] == "False"
-                assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.TLS.value
-                assert peer_relation.local_unit_data["peer_cert_ready"] == "True"
+                assert peer_relation.local_unit_data["tls-client-state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["client-cert-ready"] == "False"
+                assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.TLS.value
+                assert peer_relation.local_unit_data["peer-cert-ready"] == "True"
 
             event.relation.name = PEER_TLS_RELATION_NAME
             with (
@@ -353,10 +353,10 @@ def test_certificates_broken():
             ):
                 charm.tls_events._on_certificates_broken(event)
                 assert charm.state.unit_server.tls_peer_state == TLSState.NO_TLS
-                assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.NO_TLS.value
-                assert peer_relation.local_unit_data["peer_cert_ready"] == "False"
-                assert peer_relation.local_unit_data["tls_client_state"] == TLSState.NO_TLS.value
-                assert peer_relation.local_unit_data["client_cert_ready"] == "False"
+                assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["peer-cert-ready"] == "False"
+                assert peer_relation.local_unit_data["tls-client-state"] == TLSState.NO_TLS.value
+                assert peer_relation.local_unit_data["client-cert-ready"] == "False"
 
 
 def test_certificate_available_new_cluster(certificate_available_context):
@@ -392,7 +392,7 @@ def test_certificate_available_new_cluster(certificate_available_context):
                 peer_relation = state_out.get_relation(peer_relation.id)
                 event.certificate = client_certificate
                 charm.tls_events._on_certificate_available(event)
-                assert peer_relation.local_unit_data["tls_client_state"] == TLSState.TLS.value
+                assert peer_relation.local_unit_data["tls-client-state"] == TLSState.TLS.value
                 assert charm.state.client_tls_relation, "Client relation not set"
 
             with patch(
@@ -404,7 +404,7 @@ def test_certificate_available_new_cluster(certificate_available_context):
             ):
                 event.certificate = peer_certificate
                 charm.tls_events._on_certificate_available(event)
-                assert peer_relation.local_unit_data["tls_peer_state"] == TLSState.TLS.value
+                assert peer_relation.local_unit_data["tls-peer-state"] == TLSState.TLS.value
                 assert charm.state.peer_tls_relation, "Peer relation not set"
 
 
@@ -423,13 +423,13 @@ def test_certificate_available_enabling_tls(certificate_available_context):
     peer_relation.local_unit_data.update(
         {
             "hostname": "localhost",
-            "private_ip": "localhost",
+            "private-ip": "localhost",
             "state": "started",
         }
     )
     peer_relation.local_app_data.update(
         {
-            "cluster_state": "existing",
+            "cluster-state": "existing",
             "authenticating": "enabled",
         }
     )
@@ -516,13 +516,13 @@ def test_enabling_tls_one_restart(certificate_available_context):
     peer_relation.local_unit_data.update(
         {
             "hostname": "localhost",
-            "private_ip": "localhost",
+            "private-ip": "localhost",
             "state": "started",
         }
     )
     peer_relation.local_app_data.update(
         {
-            "cluster_state": "existing",
+            "cluster-state": "existing",
             "authenticating": "enabled",
         }
     )
@@ -613,10 +613,10 @@ def test_enabling_tls_one_restart(certificate_available_context):
         peer_relation = dataclasses.replace(
             peer_relation,
             local_app_data={
-                "cluster_state": "existing",
+                "cluster-state": "existing",
             },
             local_unit_data={
-                "private_ip": "localhost",
+                "private-ip": "localhost",
                 "state": "started",
             },
         )
@@ -673,8 +673,11 @@ def test_certificates_relation_created():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://my-ip:2380",
+        },
+        local_unit_data={
+            "private-ip": "my-ip",
         },
     )
     peer_tls_relation = testing.Relation(id=2, endpoint=PEER_TLS_RELATION_NAME)
@@ -687,7 +690,7 @@ def test_certificates_relation_created():
         state_out = ctx.run(ctx.on.relation_created(relation=peer_tls_relation), state_in)
         assert status_is(state_out, TLSStatuses.TLS_ENABLING_PEER_TLS.value)
         assert (
-            state_out.get_relation(peer_relation.id).local_unit_data["tls_peer_state"]
+            state_out.get_relation(peer_relation.id).local_unit_data["tls-peer-state"]
             == TLSState.TO_TLS.value
         )
 
@@ -696,8 +699,11 @@ def test_certificates_relation_created():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://my-ip:2380",
+        },
+        local_unit_data={
+            "private-ip": "my-ip",
         },
     )
     client_tls_relation = testing.Relation(id=2, endpoint=CLIENT_TLS_RELATION_NAME)
@@ -710,7 +716,7 @@ def test_certificates_relation_created():
         state_out = ctx.run(ctx.on.relation_created(relation=client_tls_relation), state_in)
         assert status_is(state_out, TLSStatuses.TLS_ENABLING_CLIENT_TLS.value)
         assert (
-            state_out.get_relation(peer_relation.id).local_unit_data["tls_client_state"]
+            state_out.get_relation(peer_relation.id).local_unit_data["tls-client-state"]
             == TLSState.TO_TLS.value
         )
 
@@ -783,15 +789,15 @@ def test_set_tls_private_key():
         id=1,
         endpoint=PEER_RELATION,
         local_unit_data={
-            "client_cert_ready": "True",
+            "client-cert-ready": "True",
             "peer_cert_ready": "True",
             "tls_client_state": "tls",
             "tls_peer_state": "tls",
             "state": "started",
-            "private_ip": "my_ip",
+            "private-ip": "my_ip",
         },
         local_app_data={
-            "cluster_state": "existing",
+            "cluster-state": "existing",
             "authentication": "enabled",
         },
     )
@@ -1094,16 +1100,16 @@ def test_ca_peer_rotation(certificate_available_context):
     peer_relation = dataclasses.replace(
         peer_relation,
         local_app_data={
-            "cluster_state": "existing",
+            "cluster-state": "existing",
             "authenticating": "enabled",
         },
         local_unit_data={
-            "client_cert_ready": "True",
-            "peer_cert_ready": "True",
+            "client-cert-ready": "True",
+            "peer-cert-ready": "True",
             "hostname": "localhost",
-            "private_ip": "localhost",
-            "tls_client_state": "tls",
-            "tls_peer_state": "tls",
+            "private-ip": "localhost",
+            "tls-client-state": "tls",
+            "tls-peer-state": "tls",
             "state": "started",
         },
     )
@@ -1177,11 +1183,11 @@ def test_ca_peer_rotation(certificate_available_context):
             peers_data={
                 1: {
                     **peer_relation.peers_data[1],
-                    "tls_peer_ca_rotation": TLSCARotationState.NEW_CA_ADDED.value,
+                    "tls-peer-ca-rotation": TLSCARotationState.NEW_CA_ADDED.value,
                 },
                 2: {
                     **peer_relation.peers_data[2],
-                    "tls_peer_ca_rotation": TLSCARotationState.NEW_CA_ADDED.value,
+                    "tls-peer-ca-rotation": TLSCARotationState.NEW_CA_ADDED.value,
                 },
             },
         )
@@ -1220,7 +1226,7 @@ def test_ca_peer_rotation(certificate_available_context):
             peers_data={
                 1: {
                     **peer_relation.peers_data[1],
-                    "tls_peer_ca_rotation": TLSCARotationState.NEW_CA_ADDED.value,
+                    "tls-peer-ca-rotation": TLSCARotationState.NEW_CA_ADDED.value,
                 },
                 2: {
                     **peer_relation.peers_data[2],
@@ -1256,11 +1262,11 @@ def test_ca_peer_rotation(certificate_available_context):
             peers_data={
                 1: {
                     **peer_relation.peers_data[1],
-                    "tls_peer_ca_rotation": TLSCARotationState.CERT_UPDATED.value,
+                    "tls-peer-ca-rotation": TLSCARotationState.CERT_UPDATED.value,
                 },
                 2: {
                     **peer_relation.peers_data[2],
-                    "tls_peer_ca_rotation": TLSCARotationState.CERT_UPDATED.value,
+                    "tls-peer-ca-rotation": TLSCARotationState.CERT_UPDATED.value,
                 },
             },
         )
@@ -1294,7 +1300,7 @@ def test_ca_peer_rotation(certificate_available_context):
             charm.tls_events._on_clean_ca(event)
             peer_relation = state_out.get_relation(peer_relation.id)
             assert (
-                peer_relation.local_unit_data["tls_peer_ca_rotation"]
+                peer_relation.local_unit_data["tls-peer-ca-rotation"]
                 == TLSCARotationState.NO_ROTATION.value
             )
             event.defer.assert_not_called()
@@ -1312,16 +1318,16 @@ def test_ca_client_rotation(certificate_available_context):
     peer_relation = dataclasses.replace(
         peer_relation,
         local_app_data={
-            "cluster_state": "existing",
+            "cluster-state": "existing",
             "authenticating": "enabled",
         },
         local_unit_data={
-            "client_cert_ready": "True",
-            "peer_cert_ready": "True",
+            "client-cert-ready": "True",
+            "peer-cert-ready": "True",
             "hostname": "localhost",
-            "private_ip": "localhost",
-            "tls_client_state": "tls",
-            "tls_peer_state": "tls",
+            "private-ip": "localhost",
+            "tls-client-state": "tls",
+            "tls-peer-state": "tls",
             "state": "started",
         },
     )
@@ -1360,6 +1366,7 @@ def test_ca_client_rotation(certificate_available_context):
                 lambda _, callback: charm._restart_ca_rotation(event),
             ):
                 charm.tls_events._on_certificate_available(event)
+                assert charm.state.unit_server.model is not None, "peer relation not set"
                 assert charm.state.unit_server.client_cert_ready
                 assert charm.state.unit_server.tls_client_state == TLSState.TLS
                 assert (
@@ -1383,11 +1390,11 @@ def test_ca_client_rotation(certificate_available_context):
             peers_data={
                 1: {
                     **peer_relation.peers_data[1],
-                    "tls_client_ca_rotation": TLSCARotationState.NEW_CA_ADDED.value,
+                    "tls-client-ca-rotation": TLSCARotationState.NEW_CA_ADDED.value,
                 },
                 2: {
                     **peer_relation.peers_data[2],
-                    "tls_client_ca_rotation": TLSCARotationState.NEW_CA_ADDED.value,
+                    "tls-client-ca-rotation": TLSCARotationState.NEW_CA_ADDED.value,
                 },
             },
         )
@@ -1419,7 +1426,7 @@ def test_ca_client_rotation(certificate_available_context):
             peers_data={
                 1: {
                     **peer_relation.peers_data[1],
-                    "tls_client_ca_rotation": TLSCARotationState.NEW_CA_ADDED.value,
+                    "tls-client-ca-rotation": TLSCARotationState.NEW_CA_ADDED.value,
                 },
                 2: {
                     **peer_relation.peers_data[2],
@@ -1455,11 +1462,11 @@ def test_ca_client_rotation(certificate_available_context):
             peers_data={
                 1: {
                     **peer_relation.peers_data[1],
-                    "tls_client_ca_rotation": TLSCARotationState.CERT_UPDATED.value,
+                    "tls-client-ca-rotation": TLSCARotationState.CERT_UPDATED.value,
                 },
                 2: {
                     **peer_relation.peers_data[2],
-                    "tls_client_ca_rotation": TLSCARotationState.CERT_UPDATED.value,
+                    "tls-client-ca-rotation": TLSCARotationState.CERT_UPDATED.value,
                 },
             },
         )
@@ -1487,7 +1494,7 @@ def test_ca_client_rotation(certificate_available_context):
             charm.tls_events._on_clean_ca(event)
             peer_relation = state_out.get_relation(peer_relation.id)
             assert (
-                peer_relation.local_unit_data["tls_client_ca_rotation"]
+                peer_relation.local_unit_data["tls-client-ca-rotation"]
                 == TLSCARotationState.NO_ROTATION.value
             )
             event.defer.assert_not_called()
@@ -1499,11 +1506,11 @@ def test_set_extra_sans_config_option():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=https://my_ip:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=https://my_ip:2380",
         },
         local_unit_data={
-            "private_ip": "my_ip",
+            "private-ip": "my_ip",
             "tls_peer_state": TLSState.TLS.value,
             "tls_client_state": TLSState.TLS.value,
         },
@@ -1663,13 +1670,13 @@ def test_set_domain_config_option():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=https://my_ip:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=https://my_ip:2380",
         },
         local_unit_data={
-            "private_ip": "my_ip",
-            "tls_peer_state": TLSState.TLS.value,
-            "tls_client_state": TLSState.TLS.value,
+            "private-ip": "my_ip",
+            "tls-peer-state": TLSState.TLS.value,
+            "tls-client-state": TLSState.TLS.value,
         },
     )
     current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
