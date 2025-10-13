@@ -11,7 +11,7 @@ import pytest
 from jubilant import Juju
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-MICROK8S_CLOUD_NAME = "microk8s"
+MICROK8S_CLOUD_NAME = "mk8s"
 MICROK8S_CONTROLLER_NAME = "mk8s-controller"
 
 
@@ -92,7 +92,8 @@ async def k8s_cloud(juju: Juju):
                     raise Exception()
 
         # Add microk8s to the kubeconfig
-        # juju.cli("add-k8s", MICROK8S_CLOUD_NAME, include_model=False)
+        config = kubeconfig.decode()
+        juju.cli("add-k8s", MICROK8S_CLOUD_NAME, "--client", stdin=config, include_model=False)
         juju.bootstrap(MICROK8S_CLOUD_NAME, MICROK8S_CONTROLLER_NAME)
 
     except subprocess.CalledProcessError as e:
