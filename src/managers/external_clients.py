@@ -102,12 +102,12 @@ class ExternalClientsManager(ManagerStatusProtocol):
         if not self.state.etcd_provides_interface.relations:
             return
 
-        if not self.state.cluster.cluster_state:
+        if not self.state.cluster.model.cluster_state:
             logger.debug("Cluster not yet initialized, cannot update client relation data.")
             return
 
         cluster_server_names = {
-            uri.split("=")[0] for uri in self.state.cluster.cluster_members.split(",")
+            uri.split("=")[0] for uri in self.state.cluster.model.cluster_members.split(",")
         }
         cluster_servers = {
             server
@@ -117,7 +117,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
         }
 
         uris = {server.client_url for server in cluster_servers}
-        endpoints = {f"{server.ip}:{CLIENT_PORT}" for server in cluster_servers}
+        endpoints = {f"{server.model.private_ip}:{CLIENT_PORT}" for server in cluster_servers}
 
         server_ca = self.state.tls_client_certificate.ca.raw
 

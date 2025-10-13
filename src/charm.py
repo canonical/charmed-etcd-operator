@@ -109,7 +109,11 @@ class EtcdOperatorCharm(ops.CharmBase):
                 {
                     "job_name": "etcd",
                     "static_configs": [
-                        {"targets": [f"{self.state.unit_server.ip}:{METRICS_PORT}"]}
+                        {
+                            "targets": [
+                                f"{self.state.unit_server.model.private_ip if self.state.unit_server.model else ''}:{METRICS_PORT}"
+                            ]
+                        }
                     ],
                 }
             ],

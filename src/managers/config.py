@@ -66,12 +66,12 @@ class ConfigManager(ManagerStatusProtocol):
             and self.state.cluster.restore_instruction == RestoreStep.VERIFY
         ):
             # when verifying a backup restore, cluster configuration is only the local unit
-            config_properties["initial-cluster-state"] = self.state.cluster.cluster_state
+            config_properties["initial-cluster-state"] = self.state.cluster.model.cluster_state
             config_properties["initial-cluster"] = self.state.unit_server.member_endpoint
-        elif self.state.cluster.cluster_state:
+        elif self.state.cluster.model.cluster_state:
             # regular situation: cluster is initialized and cluster configuration should be applied
-            config_properties["initial-cluster-state"] = self.state.cluster.cluster_state
-            config_properties["initial-cluster"] = self.state.cluster.cluster_members
+            config_properties["initial-cluster-state"] = self.state.cluster.model.cluster_state
+            config_properties["initial-cluster"] = self.state.cluster.model.cluster_members
         elif self.workload.exists(DATABASE_DIR):
             # if no cluster state is available, but we find a database file
             # we force a new one-cluster-member with existing data
@@ -87,7 +87,7 @@ class ConfigManager(ManagerStatusProtocol):
         config_properties["listen-client-urls"] = self.state.unit_server.client_url
         config_properties["advertise-client-urls"] = self.state.unit_server.client_url
         config_properties["listen-metrics-urls"] = (
-            f"http://{self.state.unit_server.ip}:{METRICS_PORT}"
+            f"http://{self.state.unit_server.model.private_ip}:{METRICS_PORT}"
         )
 
         if self.are_tuning_parameters_valid():
