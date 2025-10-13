@@ -99,7 +99,7 @@ async def k8s_cloud(juju: Juju):
     except subprocess.CalledProcessError as e:
         pytest.exit(str(e))
 
-    yield None
+    yield MICROK8S_CLOUD_NAME
 
     juju.cli(
         "remove-cloud",
