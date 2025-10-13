@@ -36,7 +36,6 @@ COS_CHANNEL = "1/stable"
 LOKI_APP_NAME = "loki"
 PROMETHEUS_APP_NAME = "prometheus"
 GRAFANA_APP_NAME = "grafana"
-K8S_SUFFIX = "-k8s"
 COS_RELATION_NAME = "cos-agent"
 
 
@@ -301,7 +300,7 @@ def get_unit_relation_data(
     relation_name: str,
     key: str,
 ) -> str | None:
-    """Get relation data for an application.
+    """Get relation data for a unit.
 
     Args:
         juju: An instance of Jubilant's Juju class on which to run Juju commands
