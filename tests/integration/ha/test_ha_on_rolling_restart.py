@@ -45,11 +45,6 @@ async def test_deploy_with_peer_tls(charm: str, ops_test: OpsTest) -> None:
     logger.info("Deploying the charm")
     await ops_test.model.deploy(charm, num_units=NUM_UNITS)
 
-    # enable TLS and check if the cluster is still accessible
-    logger.info("Integrating peer-certificates relations")
-    await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
-
 
 @pytest.mark.abort_on_fail
 async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
@@ -59,6 +54,11 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     This will cause transfer of Raft leadership, and we want to make sure the cluster is available
     for writing data all the time.
     """
+    # enable TLS and check if the cluster is still accessible
+    logger.info("Integrating peer-certificates relations")
+    await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
+    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+
     app_name = (await existing_app(ops_test)) or APP_NAME
     etcd_app: Application = ops_test.model.applications[app_name]
 
