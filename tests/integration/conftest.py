@@ -15,34 +15,26 @@ MICROK8S_CLOUD_NAME = "mk8s"
 MICROK8S_CONTROLLER_NAME = "mk8s-controller"
 
 
-platforms = {
-    "x86_64": "amd64",
-    "aarch64": "arm64",
-}
-
-
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="package")
 def arch() -> str:
     """Fixture to provide the platform architecture for testing."""
+    platforms = {
+        "x86_64": "amd64",
+        "aarch64": "arm64",
+    }
     return platforms.get(machine(), "amd64")
 
 
 @pytest.fixture
-def platform() -> str:
-    """Fixture to provide the platform architecture for testing."""
-    return platforms.get(machine(), "amd64")
-
-
-@pytest.fixture
-def charm(platform: str) -> str:
+def charm(arch: str) -> str:
     """Path to the charm file to use for testing."""
     # Return str instead of pathlib.Path since python-libjuju's model.deploy(), juju deploy, and
     # juju bundle files expect local charms to begin with `./` or `/` to distinguish them from
     # Charmhub charms.
-    return f"./charmed-etcd_ubuntu@24.04-{platform}.charm"
+    return f"./charmed-etcd_ubuntu@24.04-{arch}.charm"
 
 
 @pytest.fixture(scope="module")
@@ -54,7 +46,14 @@ def juju(arch: str):
 
 
 @pytest.fixture(scope="module")
-async def k8s_cloud(juju: Juju):
+async def k8s_cloud(juju: Juju, arch: str):
+    """Provision a microk8s cloud (if not already present) and return the name, only if running on amd64.
+
+    This is because arm64 isn't supported by cos-lite charms for which we are provisioning k8s cloud.
+    """
+    if arch != "amd64":
+        pytest.skip("k8s_cloud provisioning is only supported on amd64")
+
     clouds = json.loads(juju.cli("clouds", "--format", "json", include_model=False))
     for cloud, details in clouds.items():
         if "k8s" == details.get("type"):
@@ -91,7 +90,8 @@ async def k8s_cloud(juju: Juju):
                 ):  # We got sth different from "No resources found." in stderr
                     raise Exception()
 
-        # Add microk8s to the kubeconfig
+        # add this microk8s as a juju k8s cloud, by explicitly providing its config
+        # this is done to bypass the issue with juju 3.9 necessitating strictly confined microk8s
         config = kubeconfig.decode()
         juju.cli("add-k8s", MICROK8S_CLOUD_NAME, "--client", stdin=config, include_model=False)
         juju.bootstrap(MICROK8S_CLOUD_NAME, MICROK8S_CONTROLLER_NAME)
@@ -148,7 +148,7 @@ def lxd_controller(lxd_cloud: str, juju: Juju):
 
 
 @pytest.fixture(scope="module")
-def juju_lxd(arch: str, lxd_cloud: str, lxd_controller):
+def juju_lxd_model(arch: str, lxd_cloud: str, lxd_controller):
     with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
         juju_lxd.wait_timeout = 1000
         juju_lxd.cli("set-model-constraints", f"arch={arch}")
@@ -156,7 +156,7 @@ def juju_lxd(arch: str, lxd_cloud: str, lxd_controller):
 
 
 @pytest.fixture(scope="module")
-def juju_k8s(arch: str, k8s_cloud: str, k8s_controller: str):
+def juju_k8s_model(arch: str, k8s_cloud: str, k8s_controller: str):
     with jubilant.temp_model(cloud=k8s_cloud, controller=k8s_controller) as juju_k8s:
         juju_k8s.wait_timeout = 1000
         juju_k8s.cli("set-model-constraints", f"arch={arch}")

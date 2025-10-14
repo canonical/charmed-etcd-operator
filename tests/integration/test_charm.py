@@ -41,17 +41,17 @@ ADMIN = "admin"
 
 
 @pytest.mark.abort_on_fail
-def test_build_and_deploy(charm: str, juju_lxd: Juju) -> None:
+def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
     """  # Deploy the charm and wait for active/idle status
-    juju_lxd.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd.wait(lambda status: jubilant.all_active(status, APP_NAME))
+    juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
+    juju_lxd_model.wait(lambda status: jubilant.all_active(status, APP_NAME))
 
     # check if all units have been added to the cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
@@ -72,9 +72,9 @@ def test_build_and_deploy(charm: str, juju_lxd: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-def test_authentication(juju_lxd: Juju) -> None:
+def test_authentication(juju_lxd_model: Juju) -> None:
     """Assert authentication is enabled by default."""
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd, APP_NAME)
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
 
     # check that reading/writing data without credentials fails
     assert get_key(endpoints, key=TEST_KEY) != TEST_VALUE
@@ -82,16 +82,16 @@ def test_authentication(juju_lxd: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-def test_update_admin_password(juju_lxd: Juju) -> None:
+def test_update_admin_password(juju_lxd_model: Juju) -> None:
     """Assert the admin password is updated when adding a user secret to the config."""
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd, APP_NAME)
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
 
     # create a user secret and grant it to the application
     new_password = "some-password"
-    set_password_jubilant(juju_lxd, new_password)
+    set_password_jubilant(juju_lxd_model, new_password)
 
     # wait for config-changed hook to finish executing
-    juju_lxd.wait(lambda status: jubilant.all_agents_idle(status, APP_NAME), timeout=1200)
+    juju_lxd_model.wait(lambda status: jubilant.all_agents_idle(status, APP_NAME), timeout=1200)
 
     # perform read operation with the updated password
     assert (
@@ -99,10 +99,10 @@ def test_update_admin_password(juju_lxd: Juju) -> None:
     )
 
     # update the config again and remove the option `admin-password`
-    juju_lxd.config(app=APP_NAME, reset=[INTERNAL_USER_PASSWORD_CONFIG])
+    juju_lxd_model.config(app=APP_NAME, reset=[INTERNAL_USER_PASSWORD_CONFIG])
 
     # wait for config-changed hook to finish executing
-    juju_lxd.wait(lambda status: jubilant.all_agents_idle(status, APP_NAME), timeout=1200)
+    juju_lxd_model.wait(lambda status: jubilant.all_agents_idle(status, APP_NAME), timeout=1200)
 
     # make sure we can still read data with the previously set password
     assert (
@@ -111,34 +111,30 @@ def test_update_admin_password(juju_lxd: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_user_secret_permissions(juju_lxd: jubilant.Juju) -> None:
+async def test_user_secret_permissions(juju_lxd_model: Juju) -> None:
     """If a user secret is not granted, ensure we can process updated permissions."""
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd, APP_NAME)
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
 
     logger.info("Creating new user secret")
     secret_name = "my_secret"
     new_password = "even-newer-password"
-    secret_id = juju_lxd.add_secret(name=secret_name, content={INTERNAL_USER: new_password})
+    secret_id = juju_lxd_model.add_secret(name=secret_name, content={INTERNAL_USER: new_password})
 
     logger.info("Updating configuration with the new secret - but without access")
-    juju_lxd.config(app=APP_NAME, values={INTERNAL_USER_PASSWORD_CONFIG: secret_id})
+    juju_lxd_model.config(app=APP_NAME, values={INTERNAL_USER_PASSWORD_CONFIG: secret_id})
 
-    def secret_access_error(status: jubilant.Status, app: str) -> bool:
-        return (
-            CharmStatuses.SECRET_ACCESS_ERROR.value.message == status.apps[app].app_status.message
-        )
-
-    juju_lxd.wait(
-        lambda status: secret_access_error(status, APP_NAME),
+    juju_lxd_model.wait(
+        lambda status: CharmStatuses.SECRET_ACCESS_ERROR.value.message
+        == status.apps[APP_NAME].app_status.message,
         timeout=1200,
     )
 
     logger.info("Secret access will be granted now - wait for updated password")
     # deferred `config_changed` event will be retried before `update_status`
-    with fast_forward(juju_lxd):
-        juju_lxd.grant_secret(identifier=secret_name, app=APP_NAME)
+    with fast_forward(juju_lxd_model):
+        juju_lxd_model.grant_secret(identifier=secret_name, app=APP_NAME)
 
-    juju_lxd.wait(
+    juju_lxd_model.wait(
         lambda status: jubilant.all_active(status, APP_NAME),
         timeout=1200,
     )
@@ -152,9 +148,9 @@ async def test_user_secret_permissions(juju_lxd: jubilant.Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_etcd_metrics_endpoint(juju_lxd: Juju):
+async def test_etcd_metrics_endpoint(juju_lxd_model: Juju):
     # direct metrics scrape
-    leader_unit_ip = get_leader_unit_ip(juju_lxd, app=APP_NAME)
+    leader_unit_ip = get_leader_unit_ip(juju_lxd_model, app=APP_NAME)
     endpoint = f"http://{leader_unit_ip}:{METRICS_PORT}/metrics"
     resp = requests.get(endpoint)
     text = resp.content.decode("utf-8")
@@ -163,20 +159,20 @@ async def test_etcd_metrics_endpoint(juju_lxd: Juju):
 
 
 @pytest.mark.abort_on_fail
-def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controller: str, arch: str):
+def test_etcd_integration_with_grafana_agent(juju_lxd_model: Juju):
     # deploy grafana-agent and integrate
-    juju_lxd.deploy(GRAFANA_AGENT_APP_NAME, channel=COS_CHANNEL)
-    juju_lxd.integrate(APP_NAME, GRAFANA_AGENT_APP_NAME)
-    juju_lxd.wait(
+    juju_lxd_model.deploy(GRAFANA_AGENT_APP_NAME, channel=COS_CHANNEL)
+    juju_lxd_model.integrate(APP_NAME, GRAFANA_AGENT_APP_NAME)
+    juju_lxd_model.wait(
         lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
         timeout=1200,
     )
 
     # get relation data sent to grafana-agent
-    cos_leader_name = get_leader_unit_name_jubilant(juju_lxd, GRAFANA_AGENT_APP_NAME)
-    leader_name = get_leader_unit_name_jubilant(juju_lxd, APP_NAME)
+    cos_leader_name = get_leader_unit_name_jubilant(juju_lxd_model, GRAFANA_AGENT_APP_NAME)
+    leader_name = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
     relation_data = get_unit_relation_data(
-        juju_lxd, cos_leader_name, leader_name, COS_RELATION_NAME, "config"
+        juju_lxd_model, cos_leader_name, leader_name, COS_RELATION_NAME, "config"
     )
     if not isinstance(relation_data, dict):
         relation_data = json.loads(relation_data)
@@ -185,72 +181,75 @@ def test_etcd_metrics_cos_relation(juju_lxd: Juju, juju_k8s: Juju, k8s_controlle
     scrape_job = relation_data["metrics_scrape_jobs"][0]
     assert scrape_job["static_configs"][0]["targets"][0].endswith(f":{METRICS_PORT}")
 
+
+@pytest.mark.abort_on_fail
+def test_etcd_metrics_on_cos(juju_lxd_model: Juju, juju_k8s_model: Juju, k8s_controller: str):
     # further, verify integration with cos-lite bundle.
     # Some charms in this bundle are only supported by amd64
-    if "amd64" == arch:
-        # deploy COS essentials for grafana-agent
-        juju_k8s.deploy("cos-lite", trust=True)
-        juju_k8s.wait(jubilant.all_active)
-        juju_k8s.wait(jubilant.all_agents_idle)
 
-        juju_k8s_model = juju_k8s.model.split(":")[1]
+    # deploy COS essentials for grafana-agent
+    juju_k8s_model.deploy("cos-lite", trust=True)
+    juju_k8s_model.wait(jubilant.all_active)
+    juju_k8s_model.wait(jubilant.all_agents_idle)
 
-        # offer COS interfaces to be cross-model related with the machine model
-        juju_k8s.offer(
-            app=f"{juju_k8s_model}.{LOKI_APP_NAME}", endpoint="logging", controller=k8s_controller
-        )
-        juju_k8s.offer(
-            app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
-            endpoint="receive-remote-write",
-            controller=k8s_controller,
-        )
-        juju_k8s.offer(
-            app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
-            endpoint="grafana-dashboard",
-            controller=k8s_controller,
-        )
-        juju_k8s.wait(jubilant.all_agents_idle)
+    juju_k8s_model = juju_k8s_model.model.split(":")[1]
 
-        # consume the offers on the machine model
-        juju_lxd.consume(
-            model_and_app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
-            controller=k8s_controller,
-            owner=ADMIN,
-        )
-        juju_lxd.consume(
-            model_and_app=f"{juju_k8s_model}.{LOKI_APP_NAME}",
-            controller=k8s_controller,
-            owner=ADMIN,
-        )
-        juju_lxd.consume(
-            model_and_app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
-            controller=k8s_controller,
-            owner=ADMIN,
-        )
+    # offer COS interfaces to be cross-model related with the machine model
+    juju_k8s_model.offer(
+        app=f"{juju_k8s_model}.{LOKI_APP_NAME}", endpoint="logging", controller=k8s_controller
+    )
+    juju_k8s_model.offer(
+        app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
+        endpoint="receive-remote-write",
+        controller=k8s_controller,
+    )
+    juju_k8s_model.offer(
+        app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
+        endpoint="grafana-dashboard",
+        controller=k8s_controller,
+    )
+    juju_k8s_model.wait(jubilant.all_agents_idle)
 
-        # integrate the COS charms with grafana-agent on the machine
-        juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, GRAFANA_APP_NAME)
-        juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, LOKI_APP_NAME)
-        juju_lxd.integrate(GRAFANA_AGENT_APP_NAME, PROMETHEUS_APP_NAME)
-        juju_lxd.wait(
-            lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
-            timeout=1200,
-        )
-        juju_k8s.wait(jubilant.all_agents_idle)
+    # consume the offers on the machine model
+    juju_lxd_model.consume(
+        model_and_app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
+        controller=k8s_controller,
+        owner=ADMIN,
+    )
+    juju_lxd_model.consume(
+        model_and_app=f"{juju_k8s_model}.{LOKI_APP_NAME}",
+        controller=k8s_controller,
+        owner=ADMIN,
+    )
+    juju_lxd_model.consume(
+        model_and_app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
+        controller=k8s_controller,
+        owner=ADMIN,
+    )
 
-        # assert that etcd metrics show up in prometheus
-        result = juju_k8s.run(action="show-proxied-endpoints", unit="traefik/0")
-        logger.info(f"Proxied endpoints from traefik: {result.results['proxied-endpoints']}")
-        proxied_endpoints = json.loads(result.results["proxied-endpoints"])
-        prometheus_url = proxied_endpoints["prometheus/0"]["url"]
-        prometheus_endpoint = f"{prometheus_url}/api/v1/label/__name__/values"
+    # integrate the COS charms with grafana-agent on the machine
+    juju_lxd_model.integrate(GRAFANA_AGENT_APP_NAME, GRAFANA_APP_NAME)
+    juju_lxd_model.integrate(GRAFANA_AGENT_APP_NAME, LOKI_APP_NAME)
+    juju_lxd_model.integrate(GRAFANA_AGENT_APP_NAME, PROMETHEUS_APP_NAME)
+    juju_lxd_model.wait(
+        lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
+        timeout=1200,
+    )
+    juju_k8s_model.wait(jubilant.all_agents_idle)
 
-        prometheus_metrics_raw = requests.get(prometheus_endpoint)
-        prometheus_metrics_raw.raise_for_status()
-        all_metrics = prometheus_metrics_raw.json()["data"]
-        etcd_metrics = [m for m in all_metrics if "etcd" in m]
-        assert etcd_metrics, "No etcd-related metrics found in Prometheus"
-        assert (
-            "etcd_server_has_leader" in etcd_metrics
-            or "etcd_server_leader_changes_seen_total" in etcd_metrics
-        )
+    # assert that etcd metrics show up in prometheus
+    result = juju_k8s_model.run(action="show-proxied-endpoints", unit="traefik/0")
+    logger.info(f"Proxied endpoints from traefik: {result.results['proxied-endpoints']}")
+    proxied_endpoints = json.loads(result.results["proxied-endpoints"])
+    prometheus_url = proxied_endpoints["prometheus/0"]["url"]
+    prometheus_endpoint = f"{prometheus_url}/api/v1/label/__name__/values"
+
+    prometheus_metrics_raw = requests.get(prometheus_endpoint)
+    prometheus_metrics_raw.raise_for_status()
+    all_metrics = prometheus_metrics_raw.json()["data"]
+    etcd_metrics = [m for m in all_metrics if "etcd" in m]
+    assert etcd_metrics, "No etcd-related metrics found in Prometheus"
+    assert (
+        "etcd_server_has_leader" in etcd_metrics
+        or "etcd_server_leader_changes_seen_total" in etcd_metrics
+    )
