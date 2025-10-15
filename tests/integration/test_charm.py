@@ -192,19 +192,19 @@ def test_etcd_metrics_on_cos(juju_lxd_model: Juju, juju_k8s_model: Juju, k8s_con
     juju_k8s_model.wait(jubilant.all_active)
     juju_k8s_model.wait(jubilant.all_agents_idle)
 
-    juju_k8s_model = juju_k8s_model.model.split(":")[1]
+    juju_k8s_model_name = juju_k8s_model.model.split(":")[1]
 
     # offer COS interfaces to be cross-model related with the machine model
     juju_k8s_model.offer(
-        app=f"{juju_k8s_model}.{LOKI_APP_NAME}", endpoint="logging", controller=k8s_controller
+        app=f"{juju_k8s_model_name}.{LOKI_APP_NAME}", endpoint="logging", controller=k8s_controller
     )
     juju_k8s_model.offer(
-        app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
+        app=f"{juju_k8s_model_name}.{PROMETHEUS_APP_NAME}",
         endpoint="receive-remote-write",
         controller=k8s_controller,
     )
     juju_k8s_model.offer(
-        app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
+        app=f"{juju_k8s_model_name}.{GRAFANA_APP_NAME}",
         endpoint="grafana-dashboard",
         controller=k8s_controller,
     )
@@ -212,17 +212,17 @@ def test_etcd_metrics_on_cos(juju_lxd_model: Juju, juju_k8s_model: Juju, k8s_con
 
     # consume the offers on the machine model
     juju_lxd_model.consume(
-        model_and_app=f"{juju_k8s_model}.{GRAFANA_APP_NAME}",
+        model_and_app=f"{juju_k8s_model_name}.{GRAFANA_APP_NAME}",
         controller=k8s_controller,
         owner=ADMIN,
     )
     juju_lxd_model.consume(
-        model_and_app=f"{juju_k8s_model}.{LOKI_APP_NAME}",
+        model_and_app=f"{juju_k8s_model_name}.{LOKI_APP_NAME}",
         controller=k8s_controller,
         owner=ADMIN,
     )
     juju_lxd_model.consume(
-        model_and_app=f"{juju_k8s_model}.{PROMETHEUS_APP_NAME}",
+        model_and_app=f"{juju_k8s_model_name}.{PROMETHEUS_APP_NAME}",
         controller=k8s_controller,
         owner=ADMIN,
     )
