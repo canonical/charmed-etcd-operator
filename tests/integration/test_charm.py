@@ -183,9 +183,9 @@ def test_etcd_integration_with_grafana_agent(juju_lxd_model: Juju):
 
 
 @pytest.mark.abort_on_fail
-def test_etcd_metrics_on_cos(juju_lxd_model: Juju, juju_k8s_model: Juju, k8s_controller: str):
+def test_etcd_metrics_on_cos(juju_lxd_model: Juju, juju_k8s_model: Juju, lxd_controller: str):
     # further, verify integration with cos-lite bundle.
-    # Some charms in this bundle are only supported by amd64
+    # Some charms in this bundle are only supported by amd64, so this test will be run only on this arch
 
     # deploy COS essentials for grafana-agent
     juju_k8s_model.deploy("cos-lite", trust=True)
@@ -196,34 +196,34 @@ def test_etcd_metrics_on_cos(juju_lxd_model: Juju, juju_k8s_model: Juju, k8s_con
 
     # offer COS interfaces to be cross-model related with the machine model
     juju_k8s_model.offer(
-        app=f"{juju_k8s_model_name}.{LOKI_APP_NAME}", endpoint="logging", controller=k8s_controller
+        app=f"{juju_k8s_model_name}.{LOKI_APP_NAME}", endpoint="logging", controller=lxd_controller
     )
     juju_k8s_model.offer(
         app=f"{juju_k8s_model_name}.{PROMETHEUS_APP_NAME}",
         endpoint="receive-remote-write",
-        controller=k8s_controller,
+        controller=lxd_controller,
     )
     juju_k8s_model.offer(
         app=f"{juju_k8s_model_name}.{GRAFANA_APP_NAME}",
         endpoint="grafana-dashboard",
-        controller=k8s_controller,
+        controller=lxd_controller,
     )
     juju_k8s_model.wait(jubilant.all_agents_idle)
 
     # consume the offers on the machine model
     juju_lxd_model.consume(
         model_and_app=f"{juju_k8s_model_name}.{GRAFANA_APP_NAME}",
-        controller=k8s_controller,
+        controller=lxd_controller,
         owner=ADMIN,
     )
     juju_lxd_model.consume(
         model_and_app=f"{juju_k8s_model_name}.{LOKI_APP_NAME}",
-        controller=k8s_controller,
+        controller=lxd_controller,
         owner=ADMIN,
     )
     juju_lxd_model.consume(
         model_and_app=f"{juju_k8s_model_name}.{PROMETHEUS_APP_NAME}",
-        controller=k8s_controller,
+        controller=lxd_controller,
         owner=ADMIN,
     )
 

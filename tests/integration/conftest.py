@@ -12,7 +12,6 @@ from jubilant import Juju
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 MICROK8S_CLOUD_NAME = "mk8s"
-MICROK8S_CONTROLLER_NAME = "mk8s-controller"
 
 
 logger = logging.getLogger(__name__)
@@ -46,18 +45,36 @@ def juju(arch: str):
 
 
 @pytest.fixture(scope="module")
-async def k8s_cloud(juju: Juju, arch: str):
-    """Provision a microk8s cloud (if not already present) and return the name, only if running on amd64.
+def lxd_cloud(juju: Juju):
+    clouds = json.loads(juju.cli("clouds", "--format", "json", include_model=False))
+    for cloud, details in clouds.items():
+        if "lxd" == details.get("type"):
+            logger.info(f"Identified LXD cloud: {cloud}")
+            yield cloud
 
-    This is because arm64 isn't supported by cos-lite charms for which we are provisioning k8s cloud.
+
+@pytest.fixture(scope="module")
+def lxd_controller(lxd_cloud: str, juju: Juju):
+    controllers = json.loads(juju.cli("controllers", "--format", "json", include_model=False))
+    for controller, details in controllers.get("controllers").items():
+        if lxd_cloud == details.get("cloud"):
+            logger.info(f"Identified LXD controller: {controller}")
+            yield controller
+
+
+@pytest.fixture(scope="module")
+async def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
+    """Provision a microk8s cloud, if a k8s cloud isn't already present, and return the name. Do so only if running on amd64.
+
+    This is because arm64 isn't supported by the cos-lite charms for which we are provisioning this k8s cloud.
     """
-    if arch != "amd64":
-        pytest.skip("k8s_cloud provisioning is only supported on amd64")
+    if "amd64" != arch:
+        pytest.skip("k8s cloud provisioning for COS-lite integration tests only done on amd64")
 
     clouds = json.loads(juju.cli("clouds", "--format", "json", include_model=False))
     for cloud, details in clouds.items():
         if "k8s" == details.get("type"):
-            logger.info(f"Identified K8s cloud: {cloud}")
+            logger.info(f"Identified existing k8s cloud: {cloud}")
             yield cloud
             return
 
@@ -93,27 +110,33 @@ async def k8s_cloud(juju: Juju, arch: str):
         # add this microk8s as a juju k8s cloud, by explicitly providing its config
         # this is done to bypass the issue with juju 3.9 necessitating strictly confined microk8s
         config = kubeconfig.decode()
-        juju.cli("add-k8s", MICROK8S_CLOUD_NAME, "--client", stdin=config, include_model=False)
-        juju.bootstrap(MICROK8S_CLOUD_NAME, MICROK8S_CONTROLLER_NAME)
+        juju.cli(
+            "add-k8s",
+            MICROK8S_CLOUD_NAME,
+            "--client",
+            "--controller",
+            lxd_controller,
+            stdin=config,
+            include_model=False,
+        )
 
     except subprocess.CalledProcessError as e:
         pytest.exit(str(e))
 
     yield MICROK8S_CLOUD_NAME
 
+    models = json.loads(juju.cli("models", "--format", "json", include_model=False))
+    for model in models["models"]:
+        if MICROK8S_CLOUD_NAME == model.get("cloud"):
+            logger.info(f"Destroying model {model.get('name')}...")
+            juju.destroy_model(model=model.get("name"), destroy_storage=True, force=True)
+
     juju.cli(
-        "destroy-controller",
-        "--destroy-all-models",
-        "--destroy-storage",
-        "--no-prompt",
-        "--force",
-        MICROK8S_CONTROLLER_NAME,
-        include_model=False,
-    )
-    juju.cli(
-        "remove-cloud",
+        "remove-k8s",
         "--client",
         MICROK8S_CLOUD_NAME,
+        "--controller",
+        lxd_controller,
         include_model=False,
     )
     subprocess.run(["sudo", "snap", "remove", "--purge", "microk8s"], check=True)
@@ -121,34 +144,7 @@ async def k8s_cloud(juju: Juju, arch: str):
 
 
 @pytest.fixture(scope="module")
-def k8s_controller(k8s_cloud: str, juju: Juju):
-    controllers = json.loads(juju.cli("controllers", "--format", "json", include_model=False))
-    for controller, details in controllers.get("controllers").items():
-        if k8s_cloud == details.get("cloud"):
-            logger.info(f"Identified K8s controller: {controller}")
-            yield controller
-
-
-@pytest.fixture(scope="module")
-def lxd_cloud(juju: Juju):
-    clouds = json.loads(juju.cli("clouds", "--format", "json", include_model=False))
-    for cloud, details in clouds.items():
-        if "lxd" == details.get("type"):
-            logger.info(f"Identified LXD cloud: {cloud}")
-            yield cloud
-
-
-@pytest.fixture(scope="module")
-def lxd_controller(lxd_cloud: str, juju: Juju):
-    controllers = json.loads(juju.cli("controllers", "--format", "json", include_model=False))
-    for controller, details in controllers.get("controllers").items():
-        if lxd_cloud == details.get("cloud"):
-            logger.info(f"Identified LXD controller: {controller}")
-            yield controller
-
-
-@pytest.fixture(scope="module")
-def juju_lxd_model(arch: str, lxd_cloud: str, lxd_controller):
+def juju_lxd_model(arch: str, lxd_cloud: str, lxd_controller: str):
     with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
         juju_lxd.wait_timeout = 1000
         juju_lxd.cli("set-model-constraints", f"arch={arch}")
@@ -156,8 +152,8 @@ def juju_lxd_model(arch: str, lxd_cloud: str, lxd_controller):
 
 
 @pytest.fixture(scope="module")
-def juju_k8s_model(arch: str, k8s_cloud: str, k8s_controller: str):
-    with jubilant.temp_model(cloud=k8s_cloud, controller=k8s_controller) as juju_k8s:
+def juju_k8s_model(arch: str, k8s_cloud: str, lxd_controller: str):
+    with jubilant.temp_model(cloud=k8s_cloud, controller=lxd_controller) as juju_k8s:
         juju_k8s.wait_timeout = 1000
         juju_k8s.cli("set-model-constraints", f"arch={arch}")
         yield juju_k8s
