@@ -59,7 +59,7 @@ async def test_build_and_deploy_with_tls(charm: str, ops_test: OpsTest) -> None:
     # make sure data can be written to the cluster
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     cluster_members = get_cluster_members(
         endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
@@ -168,7 +168,7 @@ async def test_ca_rotation_by_config_change(ops_test: OpsTest) -> None:
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
 
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     cluster_members = get_cluster_members(
         endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
@@ -347,7 +347,7 @@ async def test_ca_rotation_by_expiration(ops_test: OpsTest) -> None:
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
 
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     logger.info("Reading and writing keys with HTTP peerURLs and HTTPS clientURLs")
     assert (

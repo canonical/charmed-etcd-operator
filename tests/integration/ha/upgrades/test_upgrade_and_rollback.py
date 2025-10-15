@@ -56,7 +56,7 @@ async def test_fail_upgrade_and_rollback(charm: str, ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -156,7 +156,7 @@ async def test_upgrade_to_local(charm: str, ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)

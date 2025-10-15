@@ -64,7 +64,7 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, app_name)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app_name}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -95,7 +95,7 @@ async def test_tuning_config_options(ops_test: OpsTest) -> None:
     # start writing data to the cluster
     endpoints = get_cluster_endpoints(ops_test, app_name)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app_name}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # set tuning parameters to reasonable values in high-latency environments
@@ -123,7 +123,7 @@ async def test_invalid_tuning_config_options(ops_test: OpsTest) -> None:
     # start writing data to the cluster
     endpoints = get_cluster_endpoints(ops_test, app_name)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app_name}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # set tuning parameters to invalid values (election timeout must be >= 10x heartbeat interval)

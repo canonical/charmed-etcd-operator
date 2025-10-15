@@ -63,7 +63,7 @@ async def test_disaster_recovery_during_upgrade(charm: str, ops_test: OpsTest) -
     etcd_application = ops_test.model.applications[APP_NAME]
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -149,7 +149,7 @@ async def test_ip_address_change_during_upgrade(charm: str, ops_test: OpsTest) -
     etcd_application = ops_test.model.applications[APP_NAME]
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -276,7 +276,7 @@ async def test_tls_cert_rotation_during_upgrade(charm: str, ops_test: OpsTest) -
     etcd_application = ops_test.model.applications[APP_NAME]
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
+    password = secret.get("internal-user-credentials")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
