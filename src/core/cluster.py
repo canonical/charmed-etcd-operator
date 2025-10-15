@@ -136,7 +136,7 @@ class ClusterState(Object, StatusesStateProtocol):
         return self.model.get_relation(CLIENT_TLS_RELATION_NAME)
 
     @property
-    def etcd_provides_interface(self) -> OpsRelationRepositoryInterface:
+    def etcd_provides_interface(self) -> OpsRelationRepositoryInterface[RequirerCommonModel]:
         """Get the etcd provides interface."""
         return OpsRelationRepositoryInterface(
             self.charm, EXTERNAL_CLIENTS_RELATION, RequirerCommonModel

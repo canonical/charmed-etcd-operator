@@ -7,6 +7,7 @@
 import json
 import logging
 from dataclasses import dataclass
+from typing import Any, final
 
 from charms.data_platform_libs.v1.data_interfaces import (
     ExtraSecretStr,
@@ -49,7 +50,7 @@ class PeerAppModel(PeerModel):
     # put the unit's `member_id` here. After promoting to full voting member, the juju leader
     # will unset the `member_id` here.
     learning_member: str = Field(default="")
-    managed_users: str = Field(default="")
+    managed_users: dict[int, str] = Field(default_factory=dict)
     s3_credentials: ExtraSecretStr = Field(default=None)
     azure_credentials: ExtraSecretStr = Field(default=None)
     backup_id: str | None = Field(default=None)
@@ -84,9 +85,9 @@ class RelationState:
     def __init__(
         self,
         relation: Relation | None,
-        data_interface: OpsPeerRepositoryInterface
-        | OpsPeerUnitRepositoryInterface
-        | OpsOtherPeerUnitRepositoryInterface,
+        data_interface: OpsPeerRepositoryInterface[PeerAppModel]
+        | OpsPeerUnitRepositoryInterface[PeerUnitModel]
+        | OpsOtherPeerUnitRepositoryInterface[PeerUnitModel],
         component: Unit | Application | None,
         substrate: SUBSTRATES,
     ):
@@ -95,7 +96,7 @@ class RelationState:
         self.component = component
         self.substrate = substrate
 
-    def update(self, items: dict[str, str]) -> None:
+    def update(self, items: dict[str, Any]) -> None:
         """Write to relation data."""
         if not self.relation:
             logger.warning(
@@ -116,6 +117,7 @@ class RelationState:
         self.data_interface.write_model(self.relation.id, model)
 
 
+@final
 class EtcdServer(RelationState):
     """State/Relation data collection for a unit."""
 
@@ -262,6 +264,7 @@ class EtcdServer(RelationState):
         return self.unit.is_leader()
 
 
+@final
 class EtcdCluster(RelationState):
     """State/Relation data collection for the etcd application."""
 
@@ -274,6 +277,7 @@ class EtcdCluster(RelationState):
     ):
         super().__init__(relation, data_interface, component, substrate)
         self.app = component
+        self.data_interface = data_interface
 
     @property
     def model(self) -> PeerAppModel | None:
@@ -292,15 +296,6 @@ class EtcdCluster(RelationState):
     def auth_enabled(self) -> bool:
         """Flag to check if authentication is already enabled in the Cluster."""
         return self.model.authentication == "enabled" if self.model else False
-
-    @property
-    def managed_users(self) -> dict[int, str]:
-        """Get the list of managed users."""
-        if not self.model:
-            return {}
-        return {
-            int(key): value for key, value in json.loads(self.model.managed_users or "{}").items()
-        }
 
     @property
     def s3_credentials(self) -> dict[str, str]:

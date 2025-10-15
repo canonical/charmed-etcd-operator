@@ -65,6 +65,11 @@ class ExternalClientsEvents(Object):
 
     def _on_mtls_cert_updated(self, event: MtlsCertUpdatedEvent[RequirerCommonModel]) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
+        if not self.charm.state.cluster.model or not self.charm.state.unit_server.model:
+            logger.error("peer data not available")
+            event.defer()
+            return
+
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
@@ -76,7 +81,11 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
 
-        if not event.request.mtls_cert or not event.request.resource:
+        if (
+            not event.request.mtls_cert
+            or not event.request.resource
+            or not event.request.request_id
+        ):
             logger.error("CA chain, keys prefix, or common name not provided")
             return
 
@@ -105,7 +114,7 @@ class ExternalClientsEvents(Object):
 
         # Get common name from mtls_cert
         old_common_name = None
-        if self.charm.state.cluster.managed_users.get(event.relation.id):
+        if self.charm.state.cluster.model.managed_users.get(event.relation.id):
             old_common_name = (
                 self.charm.external_clients_manager.get_common_name_from_chain(event.old_mtls_cert)
                 if event.old_mtls_cert
@@ -158,17 +167,22 @@ class ExternalClientsEvents(Object):
                     self.charm.external_clients_manager.add_managed_user(
                         event.relation.id, common_name
                     )
+                    response = self.charm.external_clients_manager.get_reponse_of(
+                        event.relation, request_id=event.request.request_id
+                    ) or ResourceProviderModel(
+                        username=SecretStr(common_name),
+                        request_id=event.request.request_id,
+                        resource=event.request.resource,
+                        salt=event.request.salt,
+                    )
+                    response.username = SecretStr(common_name)
+                    response.endpoints = self.charm.external_clients_manager.get_endpoints()
+                    response.uris = SecretStr(self.charm.external_clients_manager.get_uris())
+                    response.tls_ca = SecretStr(self.charm.state.tls_client_certificate.ca.raw)
+                    response.version = self.charm.cluster_manager.get_version()
                     self.etcd_provides.set_response(
                         event.relation.id,
-                        ResourceProviderModel(
-                            username=SecretStr(common_name),
-                            request_id=event.request.request_id,
-                            resource=event.request.resource,
-                            salt=event.request.salt,
-                        ),
-                    )
-                    self.charm.external_clients_manager.update_client_relations_data(
-                        etcd_version=self.charm.cluster_manager.get_version()
+                        response,
                     )
 
         relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(

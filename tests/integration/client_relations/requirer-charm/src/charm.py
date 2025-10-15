@@ -302,7 +302,9 @@ class RequirerCharmCharm(ops.CharmBase):
 
         result.update(
             {
-                "username": remote_response.username,
+                "username": remote_response.username.get_secret_value()
+                if remote_response.username
+                else None,
                 "uris": remote_response.uris.get_secret_value() if remote_response.uris else None,
                 "endpoints": remote_response.endpoints,
                 "version": remote_response.version,

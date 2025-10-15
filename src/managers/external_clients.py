@@ -4,10 +4,12 @@
 
 """Manager for handling external clients."""
 
-import json
 import logging
 from pathlib import Path
 
+from ops import Relation
+
+from charms.data_platform_libs.v1.data_interfaces import ResourceProviderModel
 from charms.tls_certificates_interface.v4.tls_certificates import Certificate
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
@@ -47,11 +49,11 @@ class ExternalClientsManager(ManagerStatusProtocol):
         Args:
             relation_id (int): The relation id.
         """
-        managed_users = self.state.cluster.managed_users
+        managed_users = self.state.cluster.model.managed_users
         del managed_users[relation_id]
         self.state.cluster.update(
             {
-                "managed_users": json.dumps(managed_users),
+                "managed_users": managed_users,
             }
         )
 
@@ -62,12 +64,12 @@ class ExternalClientsManager(ManagerStatusProtocol):
             relation_id (int): The relation id.
             common_name (str): The common name.
         """
-        managed_users = self.state.cluster.managed_users
+        managed_users = self.state.cluster.model.managed_users
         managed_users[relation_id] = common_name
 
         self.state.cluster.update(
             {
-                "managed_users": json.dumps(managed_users),
+                "managed_users": managed_users,
             }
         )
 
@@ -80,7 +82,11 @@ class ExternalClientsManager(ManagerStatusProtocol):
         Returns:
             (str): The managed user.
         """
-        return self.state.cluster.managed_users.get(relation_id)
+        return (
+            self.state.cluster.model.managed_users.get(relation_id)
+            if self.state.cluster.model
+            else None
+        )
 
     def get_common_name_from_chain(self, mtls_cert: str) -> str:
         """Get the common name from the mtls chain.
@@ -185,3 +191,61 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 status_list.append(ClusterStatuses.CLUSTER_NOT_INITIALIZED.value)
 
         return status_list or [CharmStatuses.ACTIVE_IDLE.value]
+
+    def get_reponse_of(self, relation: Relation, request_id: str) -> ResourceProviderModel | None:
+        """Get the current response for a given request id.
+
+        Args:
+            relation (Relation): The relation.
+            request_id (str): The request id.
+
+        Returns:
+            (ResourceProviderModel | None): The current response or None if not found.
+        """
+        if not self.state.etcd_provides_interface.relations:
+            return None
+
+        response_model = self.state.get_etcd_provider_request_model(relation)
+        return next((res for res in response_model.requests if res.request_id == request_id), None)
+
+    def get_uris(self) -> str:
+        """Get the URIs of the cluster.
+
+        Returns:
+            (list[str]): The URIs of the cluster.
+        """
+        if not self.state.cluster.model or not self.state.cluster.model.cluster_state:
+            return ""
+
+        cluster_server_names = {
+            uri.split("=")[0] for uri in self.state.cluster.model.cluster_members.split(",")
+        }
+        cluster_servers = {
+            server
+            for server in self.state.servers
+            if server.member_name in cluster_server_names
+            and server.tls_client_state == TLSState.TLS
+        }
+
+        return ",".join([server.client_url for server in cluster_servers])
+
+    def get_endpoints(self) -> str:
+        """Get the endpoints of the cluster.
+
+        Returns:
+            (list[str]): The endpoints of the cluster.
+        """
+        if not self.state.cluster.model or not self.state.cluster.model.cluster_state:
+            return ""
+
+        cluster_server_names = {
+            uri.split("=")[0] for uri in self.state.cluster.model.cluster_members.split(",")
+        }
+        cluster_servers = {
+            server
+            for server in self.state.servers
+            if server.member_name in cluster_server_names
+            and server.tls_client_state == TLSState.TLS
+        }
+
+        return ",".join([f"{server.model.private_ip}:{CLIENT_PORT}" for server in cluster_servers])

@@ -148,7 +148,6 @@ class EtcdOperatorCharm(ops.CharmBase):
     def _restart(self, _) -> None:
         """Restart callback for the rolling ips lib."""
         logger.debug("executing normal rolling restart")
-        logger.debug(f"relation data for unit: {self.state.unit_server.relation_data}")
 
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member():
