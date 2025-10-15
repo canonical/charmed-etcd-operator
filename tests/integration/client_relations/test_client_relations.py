@@ -45,9 +45,9 @@ key_prefix = "/test/"
 
 
 @pytest.fixture
-def requirer_charm(platform: str) -> str:
+def requirer_charm(arch: str) -> str:
     """Path to the requirer charm file to use for testing."""
-    return f"./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-{platform}.charm"
+    return f"./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-{arch}.charm"
 
 
 def generate_mtls_chain(common_name: str) -> tuple[str, str]:
