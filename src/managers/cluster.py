@@ -404,7 +404,7 @@ class ClusterManager(ManagerStatusProtocol):
         if not self.state.cluster.model.cluster_state:
             status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
 
-        if self.state.unit_server.member_name not in self.state.cluster.cluster_members:
+        if self.state.unit_server.member_name not in self.state.cluster.model.cluster_members:
             status_list.append(ClusterStatuses.CLUSTER_NOT_JOINED.value)
 
         if self.state.cluster.rebuild_cluster_in_progress:
