@@ -78,8 +78,7 @@ jobs:
     name: Integration test charm
     needs:
       - lint
-      # TODO add unit tests back when they are fixed
-      # - unit-test
+      - unit-test
       - build
     uses: ./.github/workflows/integration_test.yaml
     with:
