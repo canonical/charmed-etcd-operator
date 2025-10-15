@@ -17,6 +17,11 @@ class CharmStatuses(Enum):
     ACTIVE_IDLE = StatusObject(status="active", message="")
     NO_PEER_RELATION = StatusObject(status="maintenance", message="no peer relation available")
     PEER_URL_NOT_SET = StatusObject(status="maintenance", message="peer-url not set")
+    SECRET_ACCESS_ERROR = StatusObject(
+        status="blocked",
+        message="Cannot access configured secret, check permissions",
+        running="async",
+    )
 
 
 class BackupStatuses(Enum):
@@ -67,9 +72,6 @@ class ClusterStatuses(Enum):
     CLUSTER_MEMBER_NOT_PROMOTED = StatusObject(
         status="maintenance", message="Waiting to promote learning member"
     )
-    CLUSTER_MEMBER_RECONFIGURATION = StatusObject(
-        status="maintenance", message="Refreshing cluster membership information"
-    )
     CLUSTER_REBUILD_IN_PROGRESS = StatusObject(
         status="blocked", message="Rebuilding with new cluster configuration..."
     )
@@ -117,6 +119,11 @@ class TLSStatuses(Enum):
         status="maintenance",
         message="TLS peer certificates expiring soon. Please ensure new certificates are provided",
         short_message="TLS peer certificates expiring soon",
+    )
+    CERT_REFRESH_IP_CHANGE = StatusObject(
+        status="maintenance",
+        message="Refreshing TLS certificates because of updated IP address",
+        running="async",
     )
     SANS_CONFIG_INVALID = StatusObject(
         status="blocked",
