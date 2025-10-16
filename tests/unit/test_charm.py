@@ -22,6 +22,7 @@ from common.exceptions import (
 from core.models import Member
 from literals import (
     CLIENT_PORT,
+    INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     PEER_RELATION,
     STATUS_PEERS_RELATION,
@@ -69,7 +70,7 @@ def test_internal_user_creation():
     state_in = testing.State(relations={relation, restart_relation}, leader=True)
     state_out = ctx.run(ctx.on.leader_elected(), state_in)
     secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
-    assert secret_out.latest_content.get("internal-user-credentials")
+    assert secret_out.latest_content.get(f"{INTERNAL_USER}-password")
 
 
 def test_start():
@@ -630,7 +631,7 @@ def test_config_changed():
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
-        assert secret_out.latest_content.get("internal-user-credentials") == secret_value
+        assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
 
 
 def test_set_config_options():
@@ -775,7 +776,7 @@ def test_secret_changed():
     with patch("subprocess.run"):
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
         secret_out = state_out.get_secret(label=f"{PEER_RELATION}.{APP_NAME}.app")
-        assert secret_out.latest_content.get("internal-user-credentials") == secret_value
+        assert secret_out.latest_content.get(f"{INTERNAL_USER}-password") == secret_value
 
     # unhappy path: if the password update fails in etcd, charm status has to be blocked
     with patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="failed")):

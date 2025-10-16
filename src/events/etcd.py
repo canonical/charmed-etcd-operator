@@ -611,7 +611,7 @@ class EtcdEvents(Object):
                             username=INTERNAL_USER, password=new_password
                         )
                         self.charm.state.cluster.update(
-                            {"internal_user_credentials": new_password}
+                            {f"{INTERNAL_USER}-password": new_password}
                         )
                     except EtcdUserManagementError as e:
                         logger.error(e)
