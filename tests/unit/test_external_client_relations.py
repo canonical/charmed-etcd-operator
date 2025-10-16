@@ -853,7 +853,7 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
         response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
         assert ecr_relation.id in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
-        assert response.tls_ca.get_secret_value() == "test_ca_server"
+        assert response.tls_ca and response.tls_ca.get_secret_value() == "test_ca_server"
 
         new_server_cert = MagicMock()
         new_server_cert.ca.raw = "new_test_ca_server"
@@ -884,7 +884,7 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
             )
             charm.tls_events._on_certificate_available(event)
             response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
-            assert response.tls_ca.get_secret_value() == "new_test_ca_server"
+            assert response.tls_ca and response.tls_ca.get_secret_value() == "new_test_ca_server"
             manager.run()
 
 

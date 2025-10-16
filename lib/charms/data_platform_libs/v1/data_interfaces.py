@@ -890,7 +890,7 @@ class CommonModel(BaseModel):
                         setattr(self, secret_field, secret.meta.id)
                     continue
 
-                if secret and secret.meta:
+                if secret and secret.meta and secret.meta.id:
                     # In case we lost the secret uri in the structure, let's add it back.
                     setattr(self, secret_field, secret.meta.id)
 
