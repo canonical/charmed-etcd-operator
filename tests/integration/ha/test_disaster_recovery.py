@@ -38,7 +38,7 @@ async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -58,7 +58,7 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # wait for the next `update_status` for the cluster membership to be updated
     async with ops_test.fast_forward("5s"):

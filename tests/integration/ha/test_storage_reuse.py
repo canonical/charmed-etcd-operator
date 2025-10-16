@@ -69,7 +69,7 @@ async def test_attach_storage_after_scale_down(ops_test: OpsTest) -> None:
     log_storage_id = get_storage_id(ops_test, unit.name, "log")
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
@@ -127,7 +127,7 @@ async def test_attach_storage_after_scale_to_zero(ops_test: OpsTest) -> None:
     # this test should only be executed with the app we deployed
     app = APP_NAME
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
     initial_endpoints = get_cluster_endpoints(ops_test, app)
     initial_cluster_id = get_cluster_id(initial_endpoints, user=INTERNAL_USER, password=password)
     initial_writes_value = count_writes(initial_endpoints, INTERNAL_USER, password)
@@ -195,7 +195,7 @@ async def test_attach_storage_after_removing_application(charm: str, ops_test: O
     # this test should only be executed with the app we deployed
     app = APP_NAME
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
     initial_endpoints = get_cluster_endpoints(ops_test, app)
     initial_cluster_id = get_cluster_id(initial_endpoints, user=INTERNAL_USER, password=password)
     initial_writes_value = count_writes(initial_endpoints, INTERNAL_USER, password)

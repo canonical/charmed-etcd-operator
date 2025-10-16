@@ -73,7 +73,7 @@ async def test_create_backup(ops_test: OpsTest) -> None:
 
     # Before creating a backup, enter some data
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    initial_password = secret.get("internal-user-credentials")
+    initial_password = secret.get(f"{INTERNAL_USER}-password")
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     assert (
         put_key(

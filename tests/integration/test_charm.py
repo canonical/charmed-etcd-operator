@@ -36,17 +36,12 @@ async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
     """
     # Deploy the charm and wait for active/idle status
     await ops_test.model.deploy(charm, num_units=NUM_UNITS)
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME],
-        units_full_statuses={APP_NAME: [CharmStatuses.ACTIVE_IDLE.value]},
-        wait_for_exact_units=NUM_UNITS,
-    )
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS

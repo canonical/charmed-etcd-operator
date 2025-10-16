@@ -73,7 +73,7 @@ async def test_kill_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTe
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -157,7 +157,7 @@ async def test_freeze_db_process_on_raft_leader(etcd_process: str, ops_test: Ops
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -247,7 +247,7 @@ async def test_restart_db_process_on_raft_leader(etcd_process: str, ops_test: Op
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -330,7 +330,7 @@ async def test_full_cluster_restart(etcd_process: str, ops_test: OpsTest) -> Non
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -396,7 +396,7 @@ async def test_full_cluster_crash(etcd_process: str, ops_test: OpsTest) -> None:
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -464,7 +464,7 @@ async def test_restart_raft_leader_after_deleting_database_file(
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -550,7 +550,7 @@ async def test_reboot_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
 
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)

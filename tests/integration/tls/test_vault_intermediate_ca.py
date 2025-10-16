@@ -185,7 +185,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     # make sure data can be written to the cluster
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     cluster_members = get_cluster_members(
         endpoints, user=INTERNAL_USER, password=password, tls_enabled=True

@@ -51,7 +51,7 @@ async def test_scale_up(ops_test: OpsTest) -> None:
     init_units_count = len(ops_test.model.applications[app].units)
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
@@ -86,7 +86,7 @@ async def test_scale_down(ops_test: OpsTest) -> None:
     init_units_count = len(ops_test.model.applications[app].units)
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
@@ -121,7 +121,7 @@ async def test_remove_raft_leader(ops_test: OpsTest) -> None:
     app = (await existing_app(ops_test)) or APP_NAME
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
@@ -180,7 +180,7 @@ async def test_remove_multiple_units(ops_test: OpsTest) -> None:
     app = (await existing_app(ops_test)) or APP_NAME
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
@@ -213,7 +213,7 @@ async def test_scale_to_zero_and_back(ops_test: OpsTest) -> None:
     """Make sure that removing all units and then adding them again works."""
     app = (await existing_app(ops_test)) or APP_NAME
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # remove all remaining units
     for unit in ops_test.model.applications[app].units:
@@ -253,7 +253,7 @@ async def test_remove_juju_leader(ops_test: OpsTest) -> None:
     init_units_count = len(ops_test.model.applications[app].units)
     init_endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)

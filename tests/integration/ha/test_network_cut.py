@@ -81,7 +81,7 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -194,7 +194,7 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     init_units_count = len(ops_test.model.applications[app].units)
     endpoints = get_cluster_endpoints(ops_test, app)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
