@@ -199,3 +199,29 @@ juju deploy charmed-etcd -n 3 --channel 3.6/edge
 juju integrate self-signed-certificates:certificates charmed-etcd:client-certificates
 juju integrate self-signed-certificates:certificates charmed-etcd:peer-certificates
 ```
+
+## Certificate expiration and rotation
+
+Charmed etcd provides full automation of certificate rotation. If a certificate expires in the next 24 hours, it will display a status:
+
+```text
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.9    unsupported  10:07:35Z
+
+App                       Version  Status       Scale  Charm                     Channel  Rev  Exposed  Message
+charmed-etcd              3.6.5    maintenance      3  charmed-etcd                         0  no       TLS peer certificates expiring soon. Run `status-detail`: 0 action required; 1 additional statuses.
+self-signed-certificates           active           1  self-signed-certificates  1/edge   396  no       
+
+Unit                         Workload     Agent  Machine  Public address  Ports     Message
+charmed-etcd/0*              maintenance  idle   1        10.37.196.85    2379/tcp  TLS peer certificates expiring soon. Run `status-detail`: 0 action required; 1 additional statuses.
+charmed-etcd/1               maintenance  idle   2        10.37.196.169   2379/tcp  TLS peer certificates expiring soon. Run `status-detail`: 0 action required; 1 additional statuses.
+charmed-etcd/2               maintenance  idle   3        10.37.196.236   2379/tcp  TLS peer certificates expiring soon. Run `status-detail`: 0 action required; 1 additional statuses.
+self-signed-certificates/0*  active       idle   0        10.37.196.76              
+```
+
+In addition, charmed etcd will write a message to the log: `TLS client/peer certificates expiring soon. Please ensure new certificates are provided`. 
+This log message can be used for [creating an alert with COS](https://charmhub.io/topics/canonical-observability-stack/how-to/add-alert-rules).
+
+As soon as new certificates are issued by the TLS provider, charmed etcd will replace the expiring certificate with the
+renewed one on each unit. In case of CA certificates, it will restart the units in rolling fashion to enable the updated 
+CA certificate while maintaining availability during the process.
