@@ -36,7 +36,7 @@ class PeerAppModel(PeerModel):
     """Model for the peer application data."""
 
     cluster_state: str | None = Field(default=None)
-    internal_user_credentials: ExtraSecretStr = Field(default=None)
+    root_password: ExtraSecretStr = Field(default=None)
     authentication: str | None = Field(default=None)
     # This string is the output of the `etcdctl member add` command issued by the juju leader
     # when a new unit joins and is added as cluster member. This string needs to be provided
@@ -287,7 +287,7 @@ class EtcdCluster(RelationState):
     @property
     def internal_user_credentials(self) -> dict[str, str]:
         """Retrieve the credentials for the internal admin user."""
-        if self.model and (password := self.model.internal_user_credentials):
+        if self.model and (password := self.model.root_password):
             return {INTERNAL_USER: password.get_secret_value()}
 
         return {}

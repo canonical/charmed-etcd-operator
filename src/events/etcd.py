@@ -432,7 +432,7 @@ class EtcdEvents(Object):
             else:
                 password = self.charm.workload.generate_password()
 
-            self.charm.state.cluster.update({"internal_user_credentials": password})
+            self.charm.state.cluster.update({f"{INTERNAL_USER}-password": password})
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
@@ -447,7 +447,8 @@ class EtcdEvents(Object):
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
         if (
-            not self.charm.state.cluster.model.cluster_state
+            not self.charm.state.cluster.model
+            or not self.charm.state.cluster.model.cluster_state
             or self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
             or self.charm.state.unit_server.tls_client_ca_rotation_state
