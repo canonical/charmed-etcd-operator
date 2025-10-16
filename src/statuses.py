@@ -80,6 +80,9 @@ class ClusterStatuses(Enum):
     )
     HEALTH_CHECK_FAILED = StatusObject(status="maintenance", message="health check failed")
     REMOVED = StatusObject(status="blocked", message="unit removed from cluster", running="async")
+    RESTART_FAILED = StatusObject(
+        status="maintenance", message="unhealthy after restarting", running="async"
+    )
     PASSWORD_UPDATE_FAILED = StatusObject(
         status="blocked", message="failed to update password", running="async"
     )

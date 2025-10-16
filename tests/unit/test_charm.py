@@ -649,6 +649,8 @@ def test_set_config_options():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
     ):
         ctx.run(ctx.on.config_changed(), state_in)
@@ -668,6 +670,8 @@ def test_set_config_options():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
     ):
         ctx.run(ctx.on.config_changed(), state_in)
@@ -687,6 +691,8 @@ def test_set_config_options():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
     ):
         ctx.run(ctx.on.config_changed(), state_in)
@@ -706,6 +712,8 @@ def test_set_config_options():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -729,6 +737,8 @@ def test_set_config_options():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)

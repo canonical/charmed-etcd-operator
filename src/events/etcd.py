@@ -26,7 +26,6 @@ from common.exceptions import (
     EtcdClusterManagementError,
     EtcdServiceError,
     EtcdUserManagementError,
-    HealthCheckFailedError,
     RaftLeaderNotFoundError,
 )
 from literals import (
@@ -283,13 +282,35 @@ class EtcdEvents(Object):
             # we need to update the client-urls by restarting etcd
             self.charm.config_manager.set_config_properties()
             # after ip change, this member is unavailable, no need to acquire restart lock
-            if not self.charm.cluster_manager.restart_member(move_leader=False):
-                raise HealthCheckFailedError("Failed to check health of the member after restart")
+            self.charm.cluster_manager.restart_member(move_leader=False)
 
-            # update cluster configuration
-            self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
-            if self.charm.unit.is_leader():
-                self.charm.cluster_manager.update_cluster_member_state()
+        try:
+            # this check will raise a `ValueError` if the member is not healthy
+            if (
+                self.charm.state.unit_server.peer_url
+                not in self.charm.cluster_manager.member.peer_urls
+            ):
+                logger.info("Cluster configuration requires update for peer url")
+                self.charm.cluster_manager.broadcast_peer_url(
+                    self.charm.state.unit_server.peer_url
+                )
+                if self.charm.unit.is_leader():
+                    self.charm.cluster_manager.update_cluster_member_state()
+
+                self.charm.state.statuses.delete(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component=self.charm.cluster_manager.name,
+                )
+        except ValueError:
+            self.charm.status.set_running_status(
+                ClusterStatuses.RESTART_FAILED.value,
+                scope="unit",
+                component_name=self.charm.cluster_manager.name,
+                statuses_state=self.charm.state.statuses,
+            )
+            event.defer()
+            return
 
         # we can only handle this now as we must update ip addresses during long-running upgrades
         if self.charm.refresh_in_progress:
@@ -398,7 +419,7 @@ class EtcdEvents(Object):
                 return
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
-        """Handle all events in the 'cluster' peer relation."""
+        """Handle Juju leadership changes in the peer relation."""
         if not self.charm.state.peer_relation:
             event.defer()
             return
@@ -448,6 +469,12 @@ class EtcdEvents(Object):
                     statuses_state=self.charm.state.statuses,
                 )
                 return
+
+            self.charm.state.statuses.delete(
+                EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                scope="unit",
+                component=self.charm.cluster_manager.name,
+            )
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:
