@@ -130,7 +130,7 @@ async def test_relate_client_charm(ops_test: OpsTest) -> None:
 
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     # check if user and role are created for the common name and that the role is assigned to the user
     common_name = await get_requirer_common_name(ops_test)
@@ -284,7 +284,7 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
 
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
-    password = secret.get("internal-user-credentials")
+    password = secret.get(f"{INTERNAL_USER}-password")
 
     user_roles = get_user(
         endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
