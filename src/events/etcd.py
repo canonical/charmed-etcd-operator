@@ -367,9 +367,15 @@ class EtcdEvents(Object):
                 )
 
         # update client CA truststore if changed
-        if self.charm.state.unit_server.tls_client_state == TLSState.TLS and (
-            all_cas := self.charm.tls_manager.collect_client_cas()
-        ) != self.charm.tls_manager.load_trusted_ca(TLSType.CLIENT):
+        if (
+            self.charm.state.unit_server.tls_client_state == TLSState.TLS
+            and self.charm.state.unit_server.tls_peer_ca_rotation_state
+            == TLSCARotationState.NO_ROTATION
+            and self.charm.state.unit_server.tls_client_ca_rotation_state
+            == TLSCARotationState.NO_ROTATION
+            and (all_cas := self.charm.tls_manager.collect_client_cas())
+            != self.charm.tls_manager.load_trusted_ca(TLSType.CLIENT)
+        ):
             logger.debug("CAs have changed, updating client truststore")
             self.charm.tls_manager.update_cas(all_cas, TLSType.CLIENT)
             self.charm.rolling_restart()
