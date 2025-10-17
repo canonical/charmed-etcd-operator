@@ -289,6 +289,12 @@ class EtcdEvents(Object):
                     component_name=self.charm.cluster_manager.name,
                     statuses_state=self.charm.state.statuses,
                 )
+            else:
+                self.charm.state.statuses.delete(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component=self.charm.cluster_manager.name,
+                )
 
             # update cluster configuration
             self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)

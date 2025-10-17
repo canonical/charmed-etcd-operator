@@ -162,7 +162,10 @@ class ClusterManager(ManagerStatusProtocol):
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
         )
-        client.broadcast_peer_url(self.member.id, peer_urls)
+        try:
+            client.broadcast_peer_url(self.member.id, peer_urls)
+        except ValueError as e:
+            logger.error(e)
 
     def is_healthy(self, cluster: bool = True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
