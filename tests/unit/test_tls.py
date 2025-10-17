@@ -807,7 +807,11 @@ def test_set_tls_private_key():
         {"private-key": private_key},
         label=TLS_PEER_PRIVATE_KEY_CONFIG,
     )
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch(
@@ -976,7 +980,11 @@ def test_set_tls_private_key():
         {"private-key": private_key},
         label=TLS_CLIENT_PRIVATE_KEY_CONFIG,
     )
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch(
@@ -1068,7 +1076,11 @@ def test_set_tls_private_key():
         config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
         secrets={secret},
     )
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch(
@@ -1508,7 +1520,11 @@ def test_set_extra_sans_config_option():
             "tls_client_state": TLSState.TLS.value,
         },
     )
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
 
     # happy path
     ctx = testing.Context(EtcdOperatorCharm)
@@ -1672,7 +1688,11 @@ def test_set_domain_config_option():
             "tls_client_state": TLSState.TLS.value,
         },
     )
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
 
     # happy path
     ctx = testing.Context(EtcdOperatorCharm)
