@@ -23,7 +23,7 @@ from typing_extensions import override
 
 from common.exceptions import EtcdServiceError
 from core.workload import WorkloadBase
-from literals import SNAP_DATA_PATH, SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
+from literals import DATABASE_DIR, SNAP_DATA_PATH, SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -220,3 +220,15 @@ class EtcdWorkload(WorkloadBase):
             float: The size of the data storage in Bytes.
         """
         return shutil.disk_usage(SNAP_DATA_PATH).total
+
+    @override
+    def get_db_file_size(self) -> int:
+        """Get the size of the etcd database file in bytes.
+
+        Returns:
+            int: Size of the etcd database file in bytes.
+        """
+        db_file_path = Path(DATABASE_DIR) / "snap" / "db"
+        if db_file_path.exists() and db_file_path.is_file():
+            return db_file_path.stat().st_size
+        return 0

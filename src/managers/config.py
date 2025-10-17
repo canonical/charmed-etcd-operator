@@ -196,6 +196,13 @@ class ConfigManager(ManagerStatusProtocol):
                 )
                 return False
 
+            if quota_backend_bytes < (db_file_size := self.workload.get_db_file_size()):
+                logger.error(
+                    f"Quota backend bytes {quota_backend_bytes} is less than current DB file size "
+                    f"{db_file_size}."
+                )
+                return False
+
         return True
 
     def requires_restart(self) -> bool:

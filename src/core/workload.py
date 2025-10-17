@@ -279,3 +279,12 @@ class WorkloadBase(ABC):
             float: The size of the data storage in Bytes.
         """
         pass
+
+    @abstractmethod
+    def get_db_file_size(self) -> float:
+        """Get the size of the etcd database file in Bytes.
+
+        Returns:
+            float: The size of the etcd database file in Bytes.
+        """
+        pass
