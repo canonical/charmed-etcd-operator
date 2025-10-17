@@ -19,6 +19,7 @@ from literals import (
     CONFIG_FILE,
     DATABASE_DIR,
     METRICS_PORT,
+    MIN_QUOTA_BACKEND_BYTES,
     RestoreStep,
     TLSState,
     TuningOptions,
@@ -93,7 +94,8 @@ class ConfigManager(ManagerStatusProtocol):
         if self.are_tuning_parameters_valid():
             for option in TuningOptions:
                 # take over the config value set by users
-                config_properties[option.value] = self.config.get(option.value)
+                value = self._get_tuning_config_value(option)
+                config_properties[option.value] = value
 
         if self.state.unit_server.tls_client_state in [TLSState.TO_TLS, TLSState.TLS]:
             # replace http with https in listen-client-urls and advertise-client-urls
@@ -168,10 +170,30 @@ class ConfigManager(ManagerStatusProtocol):
         """
         if heartbeat_interval := self.config.get(TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value):
             if heartbeat_interval < 10 or heartbeat_interval > 5000:
+                logger.error(
+                    f"Heartbeat interval {heartbeat_interval} is invalid. "
+                    "It must be between 10ms and 5000ms."
+                )
                 return False
 
         if election_timeout := self.config.get(TuningOptions.ELECTION_TIMEOUT_CONFIG.value):
             if election_timeout < heartbeat_interval * 10 or election_timeout > 50000:
+                logger.error(
+                    f"Election timeout {election_timeout} is invalid. "
+                    f"It must be at least 10x the heartbeat interval ({heartbeat_interval}) "
+                    "and no more than 50000ms."
+                )
+                return False
+
+        if quota_backend_bytes := self.config.get(TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value):
+            # if less than 100MB
+            if (
+                type(quota_backend_bytes) is not int
+                or quota_backend_bytes < MIN_QUOTA_BACKEND_BYTES
+            ):
+                logger.error(
+                    f"Quota backend bytes too low: {quota_backend_bytes}. Minimum is {MIN_QUOTA_BACKEND_BYTES}."
+                )
                 return False
 
         return True
@@ -185,7 +207,7 @@ class ConfigManager(ManagerStatusProtocol):
             return False
 
         for option in TuningOptions:
-            if self.config.get(option.value) != current_config_values[option.value]:
+            if self._get_tuning_config_value(option) != current_config_values[option.value]:
                 logger.info(f"Config change to {option.value} requires restart")
                 return True
 
@@ -212,3 +234,22 @@ class ConfigManager(ManagerStatusProtocol):
         )
 
         return cluster_endpoints
+
+    def _get_tuning_config_value(self, option: TuningOptions) -> int:
+        """Get the value of a tuning configuration option.
+
+        Args:
+            option (TuningOptions): The tuning option to get the value for.
+
+        Returns:
+            int: The value of the tuning option.
+        """
+        if option == TuningOptions.QUOTA_BACKEND_BYTES_CONFIG and (
+            value := min(
+                self.config.get(option.value),
+                int(self.workload.memory_size() * 0.9),
+            )
+        ) != self.config.get(option.value):
+            logger.warning(f"Quota backend bytes reduced to {value} to fit available memory.")
+            return value
+        return self.config.get(option.value)

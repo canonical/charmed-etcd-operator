@@ -261,3 +261,12 @@ class WorkloadBase(ABC):
             raise ValueError("Could not get private IP address of the unit.")
 
         return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
+
+    @abstractmethod
+    def memory_size(self) -> float:
+        """Get the total memory size of the system in Bytes.
+
+        Returns:
+            float: The total memory size in Bytes.
+        """
+        pass

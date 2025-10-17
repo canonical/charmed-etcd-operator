@@ -90,7 +90,7 @@ class ConfigStatuses(Enum):
 
     TUNING_CONFIG_INVALID = StatusObject(
         status="blocked",
-        message="Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'",
+        message="Invalid values set for the config options: 'election-timeout', 'heartbeat-interval', or 'quota-backend-bytes'",
     )
 
 

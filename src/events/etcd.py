@@ -302,6 +302,7 @@ class EtcdEvents(Object):
         if (
             self.charm.config_manager.are_tuning_parameters_valid()
             and self.charm.config_manager.requires_restart()
+            and self.charm.state.unit_server.is_started
         ):
             # apply config and initiate restart
             self.charm.rolling_restart()

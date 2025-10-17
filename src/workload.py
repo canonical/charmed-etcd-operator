@@ -191,3 +191,22 @@ class EtcdWorkload(WorkloadBase):
     def snap_revision(self) -> str:
         """Get the snap revision that is currently installed."""
         return self.etcd.revision
+
+    @override
+    def memory_size(self) -> int:
+        """Get the total memory size of the system in Bytes.
+
+        Read the /proc/meminfo file and return the values.
+        According to the kernel source code, the values are always in kB:
+            https://github.com/torvalds/linux/blob/
+                2a130b7e1fcdd83633c4aa70998c314d7c38b476/fs/proc/meminfo.c#L31
+
+        Returns:
+            float: The total memory size in Bytes.
+        """
+        with open("/proc/meminfo") as f:
+            meminfo = f.read().split("\n")
+            meminfo = [line.split() for line in meminfo if line.strip()]
+
+        memory_sizes = {line[0][:-1]: float(line[1]) for line in meminfo}
+        return int(memory_sizes["MemTotal"] * 1024)  # convert from kB to Bytes
