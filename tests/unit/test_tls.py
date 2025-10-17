@@ -989,8 +989,6 @@ def test_set_tls_private_key():
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         # Configure client private key
@@ -1077,8 +1075,6 @@ def test_set_tls_private_key():
             "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
         ) as cleanup,
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         # Configure peer private key configured
@@ -1525,8 +1521,6 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1544,8 +1538,6 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1563,8 +1555,6 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1583,8 +1573,6 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1603,8 +1591,6 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1623,8 +1609,6 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1643,8 +1627,6 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1665,8 +1647,6 @@ def test_set_extra_sans_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("workload.EtcdWorkload.exec", return_value=current_sans_value),
         patch("workload.EtcdWorkload.get_host_mapping", return_value={"hostname": "myhostname"}),
         patch("workload.EtcdWorkload.get_private_ip", return_value="127.0.1.1"),
