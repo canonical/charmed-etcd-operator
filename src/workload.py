@@ -5,6 +5,7 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
+import shutil
 import subprocess
 from os.path import exists
 from pathlib import Path
@@ -22,7 +23,7 @@ from typing_extensions import override
 
 from common.exceptions import EtcdServiceError
 from core.workload import WorkloadBase
-from literals import SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
+from literals import SNAP_DATA_PATH, SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -210,3 +211,12 @@ class EtcdWorkload(WorkloadBase):
 
         memory_sizes = {line[0][:-1]: float(line[1]) for line in meminfo}
         return int(memory_sizes["MemTotal"] * 1024)  # convert from kB to Bytes
+
+    @override
+    def data_storage_size(self) -> float:
+        """Get the size of the data storage in Bytes.
+
+        Returns:
+            float: The size of the data storage in Bytes.
+        """
+        return shutil.disk_usage(SNAP_DATA_PATH).total

@@ -270,3 +270,12 @@ class WorkloadBase(ABC):
             float: The total memory size in Bytes.
         """
         pass
+
+    @abstractmethod
+    def data_storage_size(self) -> float:
+        """Get the size of the data storage in Bytes.
+
+        Returns:
+            float: The size of the data storage in Bytes.
+        """
+        pass

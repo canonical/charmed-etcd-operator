@@ -244,12 +244,17 @@ class ConfigManager(ManagerStatusProtocol):
         Returns:
             int: The value of the tuning option.
         """
-        if option == TuningOptions.QUOTA_BACKEND_BYTES_CONFIG and (
-            value := min(
+        if option == TuningOptions.QUOTA_BACKEND_BYTES_CONFIG:
+            memory_max = int(self.workload.memory_size() * 0.9)
+            storage_max = int(self.workload.data_storage_size() * 0.9)
+            value = min(
                 self.config.get(option.value),
-                int(self.workload.memory_size() * 0.9),
+                memory_max,
+                storage_max,
             )
-        ) != self.config.get(option.value):
-            logger.warning(f"Quota backend bytes reduced to {value} to fit available memory.")
+            if value == memory_max:
+                logger.warning(f"Quota backend bytes reduced to {value} to fit available memory.")
+            if value == storage_max:
+                logger.warning(f"Quota backend bytes reduced to {value} to fit available storage.")
             return value
         return self.config.get(option.value)
