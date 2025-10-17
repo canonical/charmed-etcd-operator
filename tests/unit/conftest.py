@@ -125,6 +125,14 @@ def mock_get_host_mapping(mocker):
 
 
 @pytest.fixture(autouse=True)  # autouse=True makes this fixture run for all tests in the module
+def mock_data_storage_size(mocker):
+    mocker.patch(
+        "workload.EtcdWorkload.data_storage_size",
+        return_value=10 * 1024**3,  # 10 GB in Bytes
+    )
+
+
+@pytest.fixture(autouse=True)
 def mock_is_cluster_failed(mocker):
     mocker.patch(
         "managers.cluster.EtcdClient.get_metric",
