@@ -146,7 +146,9 @@ class ExternalClientsManager(ManagerStatusProtocol):
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the component status."""
-        status_list: list[StatusObject] = []
+        status_list: list[StatusObject] = self.state.statuses.get(
+            scope=scope, component=self.name, running_status_only=True, running_status_type="async"
+        ).root
 
         for relation in self.state.etcd_provides.relations:
             mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")

@@ -27,6 +27,7 @@ from literals import (
     TLSState,
     TLSType,
 )
+from statuses import ExternalClientsStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -111,12 +112,16 @@ class ExternalClientsEvents(Object):
         )
 
         # validate leaf certificate
-        if not is_leaf_certificate_valid(event.mtls_cert):
-            logger.error("Invalid end-entity certificate")
-            # clean the old user if exists
-            if old_common_name:
-                self._on_relation_broken(event)  # type: ignore
+        try:
+            if not is_leaf_certificate_valid(event.mtls_cert):
+                logger.error("Invalid end-entity certificate")
+                # clean the old user if exists
+                if old_common_name:
+                    self._on_relation_broken(event)  # type: ignore
+                    return
                 return
+        except ValueError as e:
+            logger.error(e)
             return
 
         # if leader then create/update user
@@ -147,7 +152,18 @@ class ExternalClientsEvents(Object):
 
                 if relation_managed_user is None:
                     logger.info(f"Creating new user: {common_name}")
-                    self.charm.cluster_manager.add_managed_user(common_name, event.prefix)
+                    try:
+                        self.charm.cluster_manager.add_managed_user(common_name, event.prefix)
+                    except EtcdUserManagementError as e:
+                        self.charm.status.set_running_status(
+                            ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value,
+                            scope="app",
+                            component_name=self.charm.external_clients_manager.name,
+                            statuses_state=self.charm.state.statuses,
+                        )
+                        logger.error(e)
+                        return
+
                     self.charm.external_clients_manager.add_managed_user(
                         event.relation.id, common_name
                     )
@@ -165,6 +181,11 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
         self._update_client_truststore()
+        self.charm.state.statuses.delete(
+            ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value,
+            scope="app",
+            component=self.charm.external_clients_manager.name,
+        )
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle the relation broken event."""

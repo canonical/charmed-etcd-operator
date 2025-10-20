@@ -11,7 +11,6 @@ from typing import List
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
-from ops import BlockedStatus
 from requests import RequestException
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed, wait_random_exponential
 

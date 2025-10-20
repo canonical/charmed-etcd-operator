@@ -160,6 +160,11 @@ class ExternalClientsStatuses(Enum):
     EC_TLS_IS_DISABLED = StatusObject(
         status="blocked", message="Client relation: TLS is disabled. Please enable TLS"
     )
+    EC_USER_MANAGEMENT_ERROR = StatusObject(
+        status="blocked",
+        message="Client relation: User management error. Please check logs",
+        running="async",
+    )
 
 
 class EtcdServiceStatuses(Enum):
