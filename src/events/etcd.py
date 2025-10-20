@@ -5,7 +5,7 @@
 """Etcd related and core event handlers."""
 
 import logging
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, TimeoutExpired
 from typing import TYPE_CHECKING
 
 import ops
@@ -99,7 +99,7 @@ class EtcdEvents(Object):
                 # fix the permissions of the directory if re-attaching existing storage
                 self.charm.workload.exec(["chmod", "-R", "750", path])
                 self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", path])
-            except CalledProcessError:
+            except (CalledProcessError, TimeoutExpired):
                 # gracefully continue if the path is not there yet
                 logger.warning("Could not adjust directory permissions")
 
@@ -108,15 +108,7 @@ class EtcdEvents(Object):
         try:
             self.charm.workload.install()
         except EtcdServiceError:
-            self.charm.status.set_running_status(
-                EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
-                scope="unit",
-                component_name=self.charm.cluster_manager.name,
-                statuses_state=self.charm.state.statuses,
-            )
-            raise EtcdServiceError(
-                "Failed to install the etcd snap. Check the logs for more details."
-            )
+            raise EtcdServiceError("Failed to install the etcd snap")
 
     def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
