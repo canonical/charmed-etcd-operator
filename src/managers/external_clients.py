@@ -168,10 +168,12 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 if not is_leaf_certificate_valid(mtls_cert.get_secret_value()):
                     status_list.append(ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value)
 
-                common_name = self.get_common_name_from_chain(mtls_cert.get_secret_value())
-                relation_managed_user = self.get_relation_managed_user(relation.id)
-                if relation_managed_user and relation_managed_user != common_name:
-                    status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
+                # Only the leader manages the usernames
+                if self.state.charm.unit.is_leader():
+                    common_name = self.get_common_name_from_chain(mtls_cert.get_secret_value())
+                    relation_managed_user = self.get_relation_managed_user(relation.id)
+                    if relation_managed_user and relation_managed_user != common_name:
+                        status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
 
         if self.state.etcd_provides_interface.relations:
             if self.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
