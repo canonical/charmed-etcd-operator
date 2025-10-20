@@ -51,7 +51,7 @@ class ConfigManager(ManagerStatusProtocol):
         self.config_file = workload.paths.config_file
 
     @property
-    def config_properties(self) -> str:
+    def config_properties(self) -> str:  # noqa: C901
         """Assemble the config properties.
 
         Returns:

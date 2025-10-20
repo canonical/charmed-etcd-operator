@@ -612,7 +612,11 @@ def test_config_changed():
         leader=True,
     )
 
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
@@ -631,7 +635,8 @@ def test_set_config_options():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"private_ip": "my_ip"},
+        local_unit_data={"private_ip": "my_ip", "state": "started"},
+        local_app_data={"cluster_state": "existing", "authentication": "enabled"},
     )
     ctx = testing.Context(EtcdOperatorCharm)
 
@@ -645,7 +650,11 @@ def test_set_config_options():
         leader=True,
     )
 
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
@@ -664,7 +673,11 @@ def test_set_config_options():
         leader=True,
     )
 
-    current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
@@ -683,7 +696,11 @@ def test_set_config_options():
         leader=True,
     )
 
-    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+    current_config_file = {
+        "election-timeout": 5000,
+        "heartbeat-interval": 500,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
@@ -702,7 +719,11 @@ def test_set_config_options():
         leader=True,
     )
 
-    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+    current_config_file = {
+        "election-timeout": 5000,
+        "heartbeat-interval": 500,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
@@ -725,7 +746,11 @@ def test_set_config_options():
         leader=True,
     )
 
-    current_config_file = {"election-timeout": 5000, "heartbeat-interval": 500}
+    current_config_file = {
+        "election-timeout": 5000,
+        "heartbeat-interval": 500,
+        "quota-backend-bytes": 8589934592,
+    }
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
@@ -736,6 +761,87 @@ def test_set_config_options():
         assert status_is(
             state_out,
             ConfigStatuses.TUNING_CONFIG_INVALID.value,
+        )
+
+
+def test_update_profile():
+    relation = testing.PeerRelation(
+        id=1,
+        endpoint=PEER_RELATION,
+        local_unit_data={"private_ip": "my_ip", "state": "started"},
+        local_app_data={"cluster_state": "existing", "authentication": "enabled"},
+    )
+    ctx = testing.Context(EtcdOperatorCharm)
+
+    # testing to production
+    state_in = testing.State(
+        config={
+            TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
+            TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+            "profile": "production",
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+    }
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_called_once()
+
+    # production to testing
+    state_in = testing.State(
+        config={
+            "profile": "testing",
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_called_once()
+
+    # invalid profile
+    state_in = testing.State(
+        config={
+            "profile": "invalid-profile",
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    current_config_file = {
+        "election-timeout": 1000,
+        "heartbeat-interval": 100,
+        "quota-backend-bytes": 8589934592,
+    }
+
+    with (
+        patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+        patch("charm.EtcdOperatorCharm.rolling_restart") as rolling_restart,
+    ):
+        state_out = ctx.run(ctx.on.config_changed(), state_in)
+        rolling_restart.assert_not_called()
+        assert status_is(
+            state_out,
+            ConfigStatuses.PROFILE_INVALID.value,
         )
 
 
