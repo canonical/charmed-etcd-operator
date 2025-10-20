@@ -404,6 +404,7 @@ class EtcdEvents(Object):
         if not self.charm.state.peer_relation:
             event.defer()
             return
+
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
                 try:
