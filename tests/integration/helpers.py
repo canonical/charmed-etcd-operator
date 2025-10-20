@@ -14,6 +14,7 @@ from typing import Any, Dict
 # TODO jubilant: remove juju, pytest-operator, and pytest-asyncio when all tests migrated
 import jubilant
 import yaml
+from jubilant import Juju
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
 
@@ -294,7 +295,7 @@ async def get_application_relation_data(
 
 
 def get_unit_relation_data(
-    juju: jubilant.Juju,
+    juju: Juju,
     unit_name: str,
     target_unit_name: str,
     relation_name: str,
@@ -365,7 +366,7 @@ async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME)
     raise Exception("No leader unit found")
 
 
-def get_leader_unit_name_jubilant(juju: jubilant.Juju, app_name: str = APP_NAME) -> str:
+def get_leader_unit_name_jubilant(juju: Juju, app_name: str = APP_NAME) -> str:
     """Retrieve the leader unit name."""
     for unit_name, unit_status in juju.status().get_units(app_name).items():
         if unit_status.leader:
@@ -392,7 +393,7 @@ async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str]:
     raise SecretNotFoundError(f"Secret with label {label} not found")
 
 
-def get_secret_by_label_jubilant(juju: jubilant.Juju, label: str) -> Dict[str, str]:
+def get_secret_by_label_jubilant(juju: Juju, label: str) -> Dict[str, str]:
     for secret in juju.secrets():
         if label == secret.label:
             revealed_secret = juju.show_secret(secret.uri, reveal=True)
@@ -407,6 +408,20 @@ def get_certificate_from_unit(
     """Retrieve a certificate from a unit."""
     command = f'juju ssh --model={model} {unit} "cat {TLS_ROOT_DIR}/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
     output = subprocess.getoutput(command)
+    if output.startswith("-----BEGIN CERTIFICATE-----"):
+        return output
+
+    return None
+
+
+def get_certificate_from_unit_jubilant(
+    juju: jubilant.Juju, unit: str, cert_type: TLSType, is_ca: bool = False
+) -> str | None:
+    """Retrieve a certificate from a unit."""
+    command = f"cat {TLS_ROOT_DIR}/{cert_type.value}{'_ca' if is_ca else ''}.pem"
+    output = juju.ssh(target=unit, command=command)
+    # command = f'juju ssh --model={model} {unit} "cat {TLS_ROOT_DIR}/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
+    # output = subprocess.getoutput(command)
     if output.startswith("-----BEGIN CERTIFICATE-----"):
         return output
 
@@ -472,7 +487,7 @@ async def set_password(
 
 
 def set_password_jubilant(
-    juju: jubilant.Juju,
+    juju: Juju,
     password: str,
     username: str = INTERNAL_USER,
     application: str = APP_NAME,
@@ -511,6 +526,18 @@ async def download_client_certificate_from_unit(
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
         await unit.scp_from(f"{tls_path}/{file}", file)
+
+
+def download_client_certificate_from_unit_jubilant(
+    juju: jubilant.Juju, app_name: str = APP_NAME
+) -> None:
+    """Copy the client certificate files from a unit to the host's filesystem."""
+    unit = next(iter(juju.status().get_units(app_name).keys()))
+
+    tls_path = TLS_ROOT_DIR
+
+    for file in ["client.pem", "client.key", "client_ca.pem"]:
+        juju.scp(f"{unit}:{tls_path}/{file}", file)
 
 
 def get_storage_id(ops_test: OpsTest, unit_name: str, storage_name: str) -> str:
@@ -613,7 +640,7 @@ def get_etcd_version(
         raise
 
 
-def get_leader_unit_ip(juju: jubilant.Juju, app: str = APP_NAME) -> str:
+def get_leader_unit_ip(juju: Juju, app: str = APP_NAME) -> str:
     """Retrieve the leader unit's public address.
 
     Raises:
@@ -627,7 +654,7 @@ def get_leader_unit_ip(juju: jubilant.Juju, app: str = APP_NAME) -> str:
 
 
 @contextlib.contextmanager
-def fast_forward(juju: jubilant.Juju):
+def fast_forward(juju: Juju):
     """Context manager that temporarily speeds up update-status hooks to fire every 10s."""
     old = juju.model_config()["update-status-hook-interval"]
     juju.model_config({"update-status-hook-interval": "10s"})
