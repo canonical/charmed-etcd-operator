@@ -1685,8 +1685,6 @@ def test_set_domain_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1704,8 +1702,6 @@ def test_set_domain_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1724,8 +1720,6 @@ def test_set_domain_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1747,8 +1741,6 @@ def test_set_domain_config_option():
 
     with (
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
-        patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
-        patch("managers.cluster.ClusterManager.broadcast_peer_url"),
         patch("workload.EtcdWorkload.exec", return_value=current_sans_value),
         patch("workload.EtcdWorkload.get_host_mapping", return_value={"hostname": "myhostname"}),
         patch("workload.EtcdWorkload.get_private_ip", return_value="127.0.1.1"),
