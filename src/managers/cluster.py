@@ -374,11 +374,6 @@ class ClusterManager(ManagerStatusProtocol):
             scope=scope, component=self.name, running_status_only=True, running_status_type="async"
         ).root
 
-        if self.state.unit_server.unit.status == BlockedStatus(
-            EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value.message
-        ):
-            return [EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value]
-
         if not self.state.peer_relation:
             status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
             return status_list
