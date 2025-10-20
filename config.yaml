@@ -62,3 +62,10 @@ options:
       Wait for manual confirmation to resume refresh after these units refresh
 
       Allowed values: "all", "first", "none"
+  
+  profile:
+    type: string
+    default: production
+    description: |
+      Profile representing the scope of deployment, and used to tune etcd's configuration options. 
+      Allowed values are: "production" or "testing".

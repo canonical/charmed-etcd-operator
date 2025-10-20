@@ -139,6 +139,11 @@ class EtcdEvents(Object):
             event.defer()
             return
 
+        if not self.charm.config_manager.are_tuning_parameters_valid():
+            logger.error("Deferring start because of invalid tuning parameters.")
+            event.defer()
+            return
+
         self.charm.config_manager.set_config_properties()
 
         if not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
@@ -302,6 +307,7 @@ class EtcdEvents(Object):
         if (
             self.charm.config_manager.are_tuning_parameters_valid()
             and self.charm.config_manager.requires_restart()
+            and self.charm.state.unit_server.is_started
         ):
             # apply config and initiate restart
             self.charm.rolling_restart()

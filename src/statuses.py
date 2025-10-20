@@ -92,6 +92,10 @@ class ConfigStatuses(Enum):
         status="blocked",
         message="Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'",
     )
+    PROFILE_INVALID = StatusObject(
+        status="blocked",
+        message="Invalid profile configuration option. Only “production” and “testing” values are allowed",
+    )
 
 
 class TLSStatuses(Enum):

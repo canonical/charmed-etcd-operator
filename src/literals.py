@@ -52,6 +52,8 @@ TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 
 S3_RELATION_NAME = "s3-credentials"
 AZURE_RELATION_NAME = "azure-credentials"
+QUOTA_BACKEND_BYTES = "quota-backend-bytes"
+PRODUCTION_QUOTA_BACKEND_BYTES = 8589934592  # 8GiB
 
 
 @dataclass
@@ -113,3 +115,10 @@ class TuningOptions(StrEnum):
 
     ELECTION_TIMEOUT_CONFIG = "election-timeout"
     HEARTBEAT_INTERVAL_CONFIG = "heartbeat-interval"
+
+
+class Profile(StrEnum):
+    """Profiles for deployment scope."""
+
+    PRODUCTION = "production"
+    TESTING = "testing"

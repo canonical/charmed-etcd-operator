@@ -19,6 +19,9 @@ from literals import (
     CONFIG_FILE,
     DATABASE_DIR,
     METRICS_PORT,
+    PRODUCTION_QUOTA_BACKEND_BYTES,
+    QUOTA_BACKEND_BYTES,
+    Profile,
     RestoreStep,
     TLSState,
     TuningOptions,
@@ -95,6 +98,14 @@ class ConfigManager(ManagerStatusProtocol):
                 # take over the config value set by users
                 config_properties[option.value] = self.config.get(option.value)
 
+            config_profile = Profile(self.config.get("profile"))
+            if config_profile == Profile.PRODUCTION:
+                config_properties[QUOTA_BACKEND_BYTES] = PRODUCTION_QUOTA_BACKEND_BYTES
+            else:
+                # remove quota-backend-bytes from config for testing profile
+                if QUOTA_BACKEND_BYTES in config_properties:
+                    del config_properties[QUOTA_BACKEND_BYTES]
+
         if self.state.unit_server.tls_client_state in [TLSState.TO_TLS, TLSState.TLS]:
             # replace http with https in listen-client-urls and advertise-client-urls
             config_properties["listen-client-urls"] = self.state.unit_server.client_url.replace(
@@ -161,17 +172,24 @@ class ConfigManager(ManagerStatusProtocol):
         )
 
     def are_tuning_parameters_valid(self) -> bool:
-        """Validate configuration values for tuning parameters.
+        """Validate configuration values for tuning parameters and profile.
 
         Returns:
             bool: True if tuning config values are valid, False if invalid.
         """
         if heartbeat_interval := self.config.get(TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value):
             if heartbeat_interval < 10 or heartbeat_interval > 5000:
+                logger.error(f"Invalid heartbeat_interval value: {heartbeat_interval}")
                 return False
 
         if election_timeout := self.config.get(TuningOptions.ELECTION_TIMEOUT_CONFIG.value):
             if election_timeout < heartbeat_interval * 10 or election_timeout > 50000:
+                logger.error(f"Invalid election_timeout value: {election_timeout}")
+                return False
+
+        if profile := self.config.get("profile"):
+            if profile not in [option.value for option in Profile]:
+                logger.error(f"Invalid profile value: {profile}")
                 return False
 
         return True
@@ -189,11 +207,22 @@ class ConfigManager(ManagerStatusProtocol):
                 logger.info(f"Config change to {option.value} requires restart")
                 return True
 
+        config_profile = Profile(self.config.get("profile"))
+        if (
+            config_profile == Profile.PRODUCTION
+            and current_config_values.get(QUOTA_BACKEND_BYTES) != PRODUCTION_QUOTA_BACKEND_BYTES
+        ) or (config_profile == Profile.TESTING and QUOTA_BACKEND_BYTES in current_config_values):
+            logger.info("Config change to profile requires restart")
+            return True
+
         return False
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Compute the Cluster manager's statuses."""
         status_list: list[StatusObject] = []
+
+        if self.config.get("profile") not in [option.value for option in Profile]:
+            status_list.append(ConfigStatuses.PROFILE_INVALID.value)
 
         if not self.are_tuning_parameters_valid():
             status_list.append(ConfigStatuses.TUNING_CONFIG_INVALID.value)
