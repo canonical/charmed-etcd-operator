@@ -119,8 +119,6 @@ jobs:
         run: |
           sudo lxc image copy ubuntu:568f69ff1166 local:
           sudo lxc image alias create "juju/ubuntu@22.04/amd64" 568f69ff1166
-          sudo lxc image copy ubuntu:60d56aa663ed local:
-          sudo lxc image alias create "juju/ubuntu@22.04/arm64" 60d56aa663ed
       - name: Run spread job
         timeout-minutes: 60
         id: spread
