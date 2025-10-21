@@ -148,7 +148,7 @@ class ExternalClientsStatuses(Enum):
 
     EC_INVALID_CERTIFICATE = StatusObject(
         status="blocked",
-        message="Client relation: The certificate provided is a CA certificate. Please provide an end-entity certificate",
+        message="Client relation: The provided certificate is invalid. Please provide a valid certificate",
     )
     EC_MISSING_CREDENTIALS = StatusObject(
         status="blocked", message="Client relation: Missing certificate or prefix"

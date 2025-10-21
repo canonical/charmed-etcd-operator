@@ -112,16 +112,12 @@ class ExternalClientsEvents(Object):
         )
 
         # validate leaf certificate
-        try:
-            if not is_leaf_certificate_valid(event.mtls_cert):
-                logger.error("Invalid end-entity certificate")
-                # clean the old user if exists
-                if old_common_name:
-                    self._on_relation_broken(event)  # type: ignore
-                    return
+        if not is_leaf_certificate_valid(event.mtls_cert):
+            logger.error("Invalid end-entity certificate")
+            # clean the old user if exists
+            if old_common_name:
+                self._on_relation_broken(event)  # type: ignore
                 return
-        except ValueError as e:
-            logger.error(e)
             return
 
         # if leader then create/update user
