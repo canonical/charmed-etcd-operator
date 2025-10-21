@@ -50,10 +50,10 @@ class ClusterState(Object, StatusesStateProtocol):
         self.charm = charm
         self.substrate: SUBSTRATES = substrate
         self.peer_app_interface = OpsPeerRepositoryInterface(
-            charm, relation_name=PEER_RELATION, model=PeerAppModel
+            model=charm.model, relation_name=PEER_RELATION, data_model=PeerAppModel
         )
         self.peer_unit_interface = OpsPeerUnitRepositoryInterface(
-            charm, relation_name=PEER_RELATION, model=PeerUnitModel
+            model=charm.model, relation_name=PEER_RELATION, data_model=PeerUnitModel
         )
         self.statuses_relation_name = STATUS_PEERS_RELATION
         self.statuses = StatusesState(self, self.statuses_relation_name)
@@ -84,7 +84,10 @@ class ClusterState(Object, StatusesStateProtocol):
 
         return {
             unit: OpsOtherPeerUnitRepositoryInterface(
-                charm=self.charm, relation_name=PEER_RELATION, unit=unit, model=PeerUnitModel
+                model=self.charm.model,
+                relation_name=PEER_RELATION,
+                unit=unit,
+                data_model=PeerUnitModel,
             )
             for unit in self.peer_relation.units
         }
@@ -139,7 +142,9 @@ class ClusterState(Object, StatusesStateProtocol):
     def etcd_provides_interface(self) -> OpsRelationRepositoryInterface[RequirerCommonModel]:
         """Get the etcd provides interface."""
         return OpsRelationRepositoryInterface(
-            self.charm, EXTERNAL_CLIENTS_RELATION, RequirerCommonModel
+            model=self.charm.model,
+            relation_name=EXTERNAL_CLIENTS_RELATION,
+            data_model=RequirerCommonModel,
         )
 
     @property
