@@ -376,11 +376,7 @@ class ClusterManager(ManagerStatusProtocol):
         ):
             return [EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value]
 
-        if (
-            not self.state.peer_relation
-            or not self.state.cluster.model
-            or not self.state.unit_server.model
-        ):
+        if not self.state.cluster.model or not self.state.unit_server.model:
             status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
             return status_list
 
