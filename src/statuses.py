@@ -94,7 +94,7 @@ class ConfigStatuses(Enum):
     )
     PROFILE_INVALID = StatusObject(
         status="blocked",
-        message="Invalid profile configuration option. Only “production” and “testing” values are allowed",
+        message="Invalid profile configuration option. Only 'production' and 'testing' values are allowed",
     )
 
 

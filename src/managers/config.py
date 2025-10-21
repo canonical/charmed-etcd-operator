@@ -102,9 +102,7 @@ class ConfigManager(ManagerStatusProtocol):
             if config_profile == Profile.PRODUCTION:
                 config_properties[QUOTA_BACKEND_BYTES] = PRODUCTION_QUOTA_BACKEND_BYTES
             else:
-                # remove quota-backend-bytes from config for testing profile
-                if QUOTA_BACKEND_BYTES in config_properties:
-                    del config_properties[QUOTA_BACKEND_BYTES]
+                config_properties.pop(QUOTA_BACKEND_BYTES, None)
 
         if self.state.unit_server.tls_client_state in [TLSState.TO_TLS, TLSState.TLS]:
             # replace http with https in listen-client-urls and advertise-client-urls
