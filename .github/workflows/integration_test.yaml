@@ -117,8 +117,10 @@ jobs:
       # TODO Remove pinned image when problem is resolved on jammy
       - name: Pin lxc image for jammy
         run: |
-          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- lxc image copy ubuntu:82b997ec581b local: --alias 'juju/ubuntu@22.04/amd64'
-          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- lxc image copy ubuntu:60d56aa663ed local: --alias 'juju/ubuntu@22.04/arm64'
+          sudo lxc image copy ubuntu:568f69ff1166 local:
+          sudo lxc image alias create "juju/ubuntu@22.04/amd64" 568f69ff1166
+          sudo lxc image copy ubuntu:60d56aa663ed local:
+          sudo lxc image alias create "juju/ubuntu@22.04/arm64" 60d56aa663ed
       - name: Run spread job
         timeout-minutes: 60
         id: spread
