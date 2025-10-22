@@ -209,10 +209,8 @@ def test_add_ecr_user_creation_failed(cluster_tls_context, mtls_cert):
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
-            "secret-mtls": secret.id,
-            "prefix": "/test/keys",
-            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "read-only-uris", "entity-name", "entity-password"]',
-            "provided-secrets": '["mtls-cert"]',
+            "version": "v1",
+            "requests": f'[{{"resource": "/test/keys", "request-id": "0cbbc9781f189ea5", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
         },
     )
     status_peer_relation = testing.PeerRelation(
@@ -242,7 +240,7 @@ def test_add_ecr_user_creation_failed(cluster_tls_context, mtls_cert):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
-        assert ecr_relation.id not in charm.state.cluster.managed_users
+        assert ecr_relation.id not in charm.state.cluster.model.managed_users
         assert state_out.app_status == as_status(
             ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value
         )
