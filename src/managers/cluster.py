@@ -11,7 +11,6 @@ from typing import List
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
-from ops import BlockedStatus
 from requests import RequestException
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
@@ -162,7 +161,10 @@ class ClusterManager(ManagerStatusProtocol):
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
         )
-        client.broadcast_peer_url(self.member.id, peer_urls)
+        try:
+            client.broadcast_peer_url(self.member.id, peer_urls)
+        except ValueError as e:
+            logger.error(e)
 
     def is_healthy(self, cluster: bool = True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
@@ -370,11 +372,6 @@ class ClusterManager(ManagerStatusProtocol):
         status_list: list[StatusObject] = self.state.statuses.get(
             scope=scope, component=self.name, running_status_only=True, running_status_type="async"
         ).root
-
-        if self.state.unit_server.unit.status == BlockedStatus(
-            EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value.message
-        ):
-            return [EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value]
 
         if not self.state.cluster.model or not self.state.unit_server.model:
             status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)

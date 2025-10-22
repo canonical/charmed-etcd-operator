@@ -34,8 +34,13 @@ def is_leaf_certificate_valid(mtls_cert: str) -> bool:
     Returns:
         (bool): True if the certificate is not a CA.
     """
-    leaf_cert = leaf_certificate(mtls_cert)
-    certificate = x509.load_pem_x509_certificate(data=leaf_cert.encode())
+    try:
+        leaf_cert = leaf_certificate(mtls_cert)
+        certificate = x509.load_pem_x509_certificate(data=leaf_cert.encode())
+    except ValueError as e:
+        logger.error(e)
+        return False
+
     # check if the certificate is a CA
     try:
         basic_constraints = certificate.extensions.get_extension_for_class(
@@ -43,6 +48,7 @@ def is_leaf_certificate_valid(mtls_cert: str) -> bool:
         ).value
     except x509.ExtensionNotFound:
         return False
+
     # check if the certificate can sign other certificates
     try:
         key_usage = certificate.extensions.get_extension_for_class(x509.KeyUsage).value

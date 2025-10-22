@@ -5,6 +5,7 @@
 """Manager for handling TLS related events."""
 
 import base64
+import binascii
 import logging
 import re
 from ipaddress import ip_address
@@ -487,11 +488,16 @@ class TLSManager(ManagerStatusProtocol):
             logger.error(f"Secret {private_key_secret_id} does not contain a private key.")
             return None
 
-        private_key = (
-            secret_content
-            if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
-            else base64.b64decode(secret_content).decode("utf-8").strip()
-        )
+        try:
+            private_key = (
+                secret_content
+                if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
+                else base64.b64decode(secret_content).decode("utf-8").strip()
+            )
+        except (UnicodeDecodeError, binascii.Error) as e:
+            logger.error(e)
+            return None
+
         private_key = PrivateKey(raw=private_key)
         if not private_key.is_valid():
             logger.error("Invalid private key format.")

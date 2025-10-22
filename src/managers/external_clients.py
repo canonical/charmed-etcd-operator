@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 
 from charms.data_platform_libs.v1.data_interfaces import ResourceProviderModel
-from charms.tls_certificates_interface.v4.tls_certificates import Certificate
+from charms.tls_certificates_interface.v4.tls_certificates import Certificate, TLSCertificatesError
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
@@ -99,7 +99,11 @@ class ExternalClientsManager(ManagerStatusProtocol):
         raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
         # add the marker back to the certificate
         cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
-        return Certificate.from_string(cert).common_name
+        try:
+            return Certificate.from_string(cert).common_name
+        except TLSCertificatesError as e:
+            logger.error(e)
+            return ""
 
     def update_client_relations_data(self, etcd_version: str) -> None:
         """Update the ECR data."""
@@ -154,7 +158,10 @@ class ExternalClientsManager(ManagerStatusProtocol):
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:  # noqa: C901
         """Compute the component status."""
-        status_list: list[StatusObject] = []
+        status_list: list[StatusObject] = self.state.statuses.get(
+            scope=scope, component=self.name, running_status_only=True, running_status_type="async"
+        ).root
+
         for relation in self.state.etcd_provides_interface.relations:
             request_model = self.state.get_etcd_requirer_request_model(relation)
             for request in request_model.requests:

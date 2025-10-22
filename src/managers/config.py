@@ -48,7 +48,7 @@ class ConfigManager(ManagerStatusProtocol):
         self.config_file = workload.paths.config_file
 
     @property
-    def config_properties(self) -> str:
+    def config_properties(self) -> str:  # noqa: C901
         """Assemble the config properties.
 
         Returns:
@@ -115,10 +115,14 @@ class ConfigManager(ManagerStatusProtocol):
             config_properties["listen-peer-urls"] = self.state.unit_server.peer_url.replace(
                 "http://", "https://"
             )
-            config_properties["initial-cluster"] = config_properties["initial-cluster"].replace(
-                self.state.unit_server.peer_url,
-                self.state.unit_server.peer_url.replace("http://", "https://"),
-            )
+            # in the `rebuild_cluster` workflow `initial-cluster` is not set
+            if config_properties.get("initial-cluster"):
+                config_properties["initial-cluster"] = config_properties[
+                    "initial-cluster"
+                ].replace(
+                    self.state.unit_server.peer_url,
+                    self.state.unit_server.peer_url.replace("http://", "https://"),
+                )
             config_properties["initial-advertise-peer-urls"] = config_properties[
                 "initial-advertise-peer-urls"
             ].replace("http://", "https://")
@@ -143,9 +147,11 @@ class ConfigManager(ManagerStatusProtocol):
             config_properties["listen-peer-urls"] = self.state.unit_server.peer_url.replace(
                 "https://", "http://"
             )
-            config_properties["initial-cluster"] = config_properties["initial-cluster"].replace(
-                "https://", "http://"
-            )
+            # in the `rebuild_cluster` workflow `initial-cluster` is not set
+            if config_properties.get("initial-cluster"):
+                config_properties["initial-cluster"] = config_properties[
+                    "initial-cluster"
+                ].replace("https://", "http://")
             config_properties["initial-advertise-peer-urls"] = config_properties[
                 "initial-advertise-peer-urls"
             ].replace("https://", "http://")

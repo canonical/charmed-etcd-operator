@@ -26,6 +26,7 @@ from common.exceptions import EtcdUserManagementError
 from literals import (
     CERTIFICATE_TRANSFER_RELATION,
     EXTERNAL_CLIENTS_RELATION,
+    STATUS_PEERS_RELATION,
     TLSCARotationState,
     TLSType,
 )
@@ -198,6 +199,53 @@ def test_add_ecr_new_user_leader(cluster_tls_context, mtls_cert):
             == CLIENT_COMMON_NAME
         )
         restart_member.assert_called_once()
+
+
+def test_add_ecr_user_creation_failed(cluster_tls_context, mtls_cert):
+    """Test adding an external client relation to the charm."""
+    ctx, relations = cluster_tls_context
+    secret = Secret({"mtls-cert": mtls_cert}, owner="app")
+    ecr_relation = testing.Relation(
+        id=5,
+        endpoint=EXTERNAL_CLIENTS_RELATION,
+        remote_app_data={
+            "secret-mtls": secret.id,
+            "prefix": "/test/keys",
+            "requested-secrets": '["username", "password", "tls", "tls-ca", "uris", "read-only-uris", "entity-name", "entity-password"]',
+            "provided-secrets": '["mtls-cert"]',
+        },
+    )
+    status_peer_relation = testing.PeerRelation(
+        id=6,
+        endpoint=STATUS_PEERS_RELATION,
+    )
+
+    state_in = testing.State(
+        relations=relations + [ecr_relation, status_peer_relation],
+        leader=True,
+        secrets=[secret],
+    )
+
+    with (
+        ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
+        patch("common.client.EtcdClient.get_user", return_value=None),
+        patch(
+            "common.client.EtcdClient.add_user",
+            side_effect=EtcdUserManagementError("failed to add managed user"),
+        ),
+        patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
+        patch(
+            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+            return_value=([server_cert], MagicMock()),
+        ),
+    ):
+        charm: EtcdOperatorCharm = manager.charm
+        state_out = manager.run()
+        ecr_relation = state_out.get_relation(ecr_relation.id)
+        assert ecr_relation.id not in charm.state.cluster.managed_users
+        assert state_out.app_status == as_status(
+            ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value
+        )
 
 
 def test_add_ecr_new_user_not_leader(cluster_tls_context, mtls_cert):
