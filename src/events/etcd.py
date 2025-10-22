@@ -5,7 +5,7 @@
 """Etcd related and core event handlers."""
 
 import logging
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, TimeoutExpired
 from typing import TYPE_CHECKING
 
 import ops
@@ -26,7 +26,6 @@ from common.exceptions import (
     EtcdClusterManagementError,
     EtcdServiceError,
     EtcdUserManagementError,
-    HealthCheckFailedError,
     RaftLeaderNotFoundError,
 )
 from literals import (
@@ -100,7 +99,7 @@ class EtcdEvents(Object):
                 # fix the permissions of the directory if re-attaching existing storage
                 self.charm.workload.exec(["chmod", "-R", "750", path])
                 self.charm.workload.exec(["chown", "-R", f"{SNAP_USER}:{SNAP_GROUP}", path])
-            except CalledProcessError:
+            except (CalledProcessError, TimeoutExpired):
                 # gracefully continue if the path is not there yet
                 logger.warning("Could not adjust directory permissions")
 
@@ -109,15 +108,7 @@ class EtcdEvents(Object):
         try:
             self.charm.workload.install()
         except EtcdServiceError:
-            self.charm.status.set_running_status(
-                EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value,
-                scope="unit",
-                component_name=self.charm.cluster_manager.name,
-                statuses_state=self.charm.state.statuses,
-            )
-            raise EtcdServiceError(
-                "Failed to install the etcd snap. Check the logs for more details."
-            )
+            raise EtcdServiceError("Failed to install the etcd snap")
 
     def _on_start(self, event: ops.StartEvent) -> None:  # noqa: C901
         """Handle start event."""
@@ -284,7 +275,18 @@ class EtcdEvents(Object):
             self.charm.config_manager.set_config_properties()
             # after ip change, this member is unavailable, no need to acquire restart lock
             if not self.charm.cluster_manager.restart_member(move_leader=False):
-                raise HealthCheckFailedError("Failed to check health of the member after restart")
+                self.charm.status.set_running_status(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component_name=self.charm.cluster_manager.name,
+                    statuses_state=self.charm.state.statuses,
+                )
+            else:
+                self.charm.state.statuses.delete(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component=self.charm.cluster_manager.name,
+                )
 
             # update cluster configuration
             self.charm.cluster_manager.broadcast_peer_url(self.charm.state.unit_server.peer_url)
@@ -398,10 +400,11 @@ class EtcdEvents(Object):
                 return
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
-        """Handle all events in the 'cluster' peer relation."""
+        """Handle Juju leadership changes in the peer relation."""
         if not self.charm.state.peer_relation:
             event.defer()
             return
+
         if self.charm.unit.is_leader() and not self.charm.state.cluster.internal_user_credentials:
             if admin_secret_id := self.charm.config.get(INTERNAL_USER_PASSWORD_CONFIG):
                 try:
@@ -442,12 +445,18 @@ class EtcdEvents(Object):
         if not self.charm.workload.alive() and not self.charm.refresh_in_progress:
             if not self.charm.cluster_manager.restart_member():
                 self.charm.status.set_running_status(
-                    EtcdServiceStatuses.SERVICE_NOT_RUNNING.value,
+                    ClusterStatuses.RESTART_FAILED.value,
                     scope="unit",
                     component_name=self.charm.cluster_manager.name,
                     statuses_state=self.charm.state.statuses,
                 )
                 return
+
+            self.charm.state.statuses.delete(
+                ClusterStatuses.RESTART_FAILED.value,
+                scope="unit",
+                component=self.charm.cluster_manager.name,
+            )
 
         try:
             if self.charm.cluster_manager.is_cluster_failed:

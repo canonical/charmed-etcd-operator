@@ -14,7 +14,6 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from data_platform_helpers.advanced_statuses.handler import StatusHandler
 
-from common.exceptions import HealthCheckFailedError
 from core.cluster import ClusterState
 from events.backup import BackupEvents
 from events.etcd import EtcdEvents
@@ -35,6 +34,7 @@ from managers.config import ConfigManager
 from managers.external_clients import ExternalClientsManager
 from managers.tls import TLSManager
 from managers.upgrades import UpgradesManager
+from statuses import ClusterStatuses
 from workload import EtcdWorkload
 
 logger = logging.getLogger(__name__)
@@ -144,11 +144,22 @@ class EtcdOperatorCharm(ops.CharmBase):
     def _restart(self, _) -> None:
         """Restart callback for the rolling ips lib."""
         logger.debug("executing normal rolling restart")
-        logger.debug(f"relation data for unit: {self.state.unit_server.relation_data}")
 
         self.config_manager.set_config_properties()
         if not self.cluster_manager.restart_member():
-            raise HealthCheckFailedError("Failed to check health of the member after restart")
+            self.status.set_running_status(
+                ClusterStatuses.RESTART_FAILED.value,
+                scope="unit",
+                component_name=self.cluster_manager.name,
+                statuses_state=self.state.statuses,
+            )
+            return
+
+        self.state.statuses.delete(
+            ClusterStatuses.RESTART_FAILED.value,
+            scope="unit",
+            component=self.cluster_manager.name,
+        )
 
     def rolling_restart(self, callback_override: str = "_restart") -> None:
         """Initiate a rolling restart."""
@@ -179,9 +190,21 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.cluster_manager.restart_member():
             try:
                 self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
-                raise HealthCheckFailedError("Failed to check health of the member after restart")
+                self.status.set_running_status(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component_name=self.cluster_manager.name,
+                    statuses_state=self.state.statuses,
+                )
+                return
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
+
+        self.state.statuses.delete(
+            ClusterStatuses.RESTART_FAILED.value,
+            scope="unit",
+            component=self.cluster_manager.name,
+        )
 
     def _restart_enable_peer_tls(self, _) -> None:
         """Enable peer TLS."""
@@ -208,9 +231,21 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.cluster_manager.restart_member(move_leader=False):
             try:
                 self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
-                raise HealthCheckFailedError("Failed to check health of the member after restart")
+                self.status.set_running_status(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component_name=self.cluster_manager.name,
+                    statuses_state=self.state.statuses,
+                )
+                return
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
+
+        self.state.statuses.delete(
+            ClusterStatuses.RESTART_FAILED.value,
+            scope="unit",
+            component=self.cluster_manager.name,
+        )
 
     def _restart_disable_client_tls(self, _) -> None:
         """Disable client TLS."""
@@ -237,9 +272,21 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.cluster_manager.restart_member(move_leader=False):
             try:
                 self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
-                raise HealthCheckFailedError("Failed to check health of the member after restart")
+                self.status.set_running_status(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component_name=self.cluster_manager.name,
+                    statuses_state=self.state.statuses,
+                )
+                return
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
+
+        self.state.statuses.delete(
+            ClusterStatuses.RESTART_FAILED.value,
+            scope="unit",
+            component=self.cluster_manager.name,
+        )
 
     def _restart_disable_peer_tls(self, _) -> None:
         """Disable peer TLS."""
@@ -270,9 +317,21 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.cluster_manager.restart_member(move_leader=False):
             try:
                 self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
-                raise HealthCheckFailedError("Failed to check health of the member after restart")
+                self.status.set_running_status(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component_name=self.cluster_manager.name,
+                    statuses_state=self.state.statuses,
+                )
+                return
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
+
+        self.state.statuses.delete(
+            ClusterStatuses.RESTART_FAILED.value,
+            scope="unit",
+            component=self.cluster_manager.name,
+        )
 
     def _restart_ca_rotation(self, _) -> None:
         """Restart callback for CA rotation."""
@@ -285,9 +344,21 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.cluster_manager.restart_member():
             try:
                 self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
-                raise HealthCheckFailedError("Failed to check health of the member after restart")
+                self.status.set_running_status(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component_name=self.cluster_manager.name,
+                    statuses_state=self.state.statuses,
+                )
+                return
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
+
+        self.state.statuses.delete(
+            ClusterStatuses.RESTART_FAILED.value,
+            scope="unit",
+            component=self.cluster_manager.name,
+        )
 
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
             self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NEW_CA_ADDED)
@@ -319,9 +390,21 @@ class EtcdOperatorCharm(ops.CharmBase):
         if not self.cluster_manager.restart_member():
             try:
                 self.tls_manager.check_certificate_validity(tls_type=TLSType.CLIENT)
-                raise HealthCheckFailedError("Failed to check health of the member after restart")
+                self.status.set_running_status(
+                    ClusterStatuses.RESTART_FAILED.value,
+                    scope="unit",
+                    component_name=self.cluster_manager.name,
+                    statuses_state=self.state.statuses,
+                )
+                return
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
+
+        self.state.statuses.delete(
+            ClusterStatuses.RESTART_FAILED.value,
+            scope="unit",
+            component=self.cluster_manager.name,
+        )
 
 
 if __name__ == "__main__":  # pragma: nocover
