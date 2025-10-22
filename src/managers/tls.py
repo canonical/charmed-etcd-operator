@@ -450,8 +450,8 @@ class TLSManager(ManagerStatusProtocol):
                     relation.id,
                     bool(mtls_cert),
                 )
-                if mtls_cert and is_leaf_certificate_valid(mtls_cert.get_secret_value()):
-                    cas.add(leaf_certificate(mtls_cert.get_secret_value()))
+                if mtls_cert and is_leaf_certificate_valid(mtls_cert):
+                    cas.add(leaf_certificate(mtls_cert))
 
         # certificate transfer cas
         cas.update(self.state.tls_certificate_transfer_certificates)

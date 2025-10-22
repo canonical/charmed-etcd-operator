@@ -19,7 +19,6 @@ from charms.data_platform_libs.v1.data_interfaces import (
     ResourceProviderModel,
 )
 from ops import Object, RelationBrokenEvent
-from pydantic import SecretStr
 
 from common.certificates import is_leaf_certificate_valid
 from common.exceptions import EtcdUserManagementError
@@ -121,11 +120,11 @@ class ExternalClientsEvents(Object):
                 else None
             )
         common_name = self.charm.external_clients_manager.get_common_name_from_chain(
-            event.request.mtls_cert.get_secret_value()
+            event.request.mtls_cert
         )
 
         # validate leaf certificate
-        if not is_leaf_certificate_valid(event.request.mtls_cert.get_secret_value()):
+        if not is_leaf_certificate_valid(event.request.mtls_cert):
             logger.error("Invalid end-entity certificate")
             # clean the old user if exists
             if old_common_name:
@@ -170,15 +169,15 @@ class ExternalClientsEvents(Object):
                     response = self.charm.external_clients_manager.get_reponse_of(
                         event.relation, request_id=event.request.request_id
                     ) or ResourceProviderModel(
-                        username=SecretStr(common_name),
+                        username=common_name,
                         request_id=event.request.request_id,
                         resource=event.request.resource,
                         salt=event.request.salt,
                     )
-                    response.username = SecretStr(common_name)
+                    response.username = common_name
                     response.endpoints = self.charm.external_clients_manager.get_endpoints()
-                    response.uris = SecretStr(self.charm.external_clients_manager.get_uris())
-                    response.tls_ca = SecretStr(self.charm.state.tls_client_certificate.ca.raw)
+                    response.uris = self.charm.external_clients_manager.get_uris()
+                    response.tls_ca = self.charm.state.tls_client_certificate.ca.raw
                     response.version = self.charm.cluster_manager.get_version()
                     self.etcd_provides.set_response(
                         event.relation.id,

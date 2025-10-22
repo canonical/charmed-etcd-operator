@@ -13,7 +13,6 @@ from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
 from ops import Relation
-from pydantic import SecretStr
 
 from common.certificates import is_leaf_certificate_valid
 from core.cluster import ClusterState
@@ -148,8 +147,8 @@ class ExternalClientsManager(ManagerStatusProtocol):
                     continue
 
                 current_response.endpoints = ",".join(endpoints)
-                current_response.uris = SecretStr(",".join(uris))
-                current_response.tls_ca = SecretStr(server_ca)
+                current_response.uris = ",".join(uris)
+                current_response.tls_ca = server_ca
                 current_response.version = etcd_version
             self.state.etcd_provides_interface.write_model(relation.id, response_model)
 
@@ -165,12 +164,12 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 if not mtls_cert or not prefix:
                     status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
                     continue
-                if not is_leaf_certificate_valid(mtls_cert.get_secret_value()):
+                if not is_leaf_certificate_valid(mtls_cert):
                     status_list.append(ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value)
 
                 # Only the leader manages the usernames
                 if self.state.charm.unit.is_leader():
-                    common_name = self.get_common_name_from_chain(mtls_cert.get_secret_value())
+                    common_name = self.get_common_name_from_chain(mtls_cert)
                     relation_managed_user = self.get_relation_managed_user(relation.id)
                     if relation_managed_user and relation_managed_user != common_name:
                         status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)

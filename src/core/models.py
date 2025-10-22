@@ -288,7 +288,7 @@ class EtcdCluster(RelationState):
     def internal_user_credentials(self) -> dict[str, str]:
         """Retrieve the credentials for the internal admin user."""
         if self.model and (password := self.model.root_password):
-            return {INTERNAL_USER: password.get_secret_value()}
+            return {INTERNAL_USER: password}
 
         return {}
 
@@ -302,20 +302,14 @@ class EtcdCluster(RelationState):
         """Get credentials and parameters to access s3 object storage."""
         if not self.model:
             return {}
-        return json.loads(
-            self.model.s3_credentials.get_secret_value() if self.model.s3_credentials else "{}"
-        )
+        return json.loads(self.model.s3_credentials if self.model.s3_credentials else "{}")
 
     @property
     def azure_credentials(self) -> dict[str, str]:
         """Get credentials and parameters to access azure object storage."""
         if not self.model:
             return {}
-        return json.loads(
-            self.model.azure_credentials.get_secret_value()
-            if self.model.azure_credentials
-            else "{}"
-        )
+        return json.loads(self.model.azure_credentials if self.model.azure_credentials else "{}")
 
     @property
     def is_backup_in_progress(self) -> bool:

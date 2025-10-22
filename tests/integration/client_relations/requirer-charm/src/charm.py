@@ -27,7 +27,6 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
 )
-from pydantic import SecretStr
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
@@ -65,9 +64,7 @@ class RequirerCharmCharm(ops.CharmBase):
             self,
             relation_name="etcd-client",
             requests=[
-                RequirerCommonModel(
-                    resource="/test/", mtls_cert=SecretStr(self.raw_certificate or "")
-                )
+                RequirerCommonModel(resource="/test/", mtls_cert=self.raw_certificate or "")
             ],
             response_model=ResourceProviderModel,
         )
@@ -97,10 +94,10 @@ class RequirerCharmCharm(ops.CharmBase):
         if not self.etcd_relation:
             return "requirer-charm"
         request = self.etcd_relation_local_model.requests[0]
-        if not request.mtls_cert or request.mtls_cert.get_secret_value() == "":
+        if not request.mtls_cert or request.mtls_cert == "":
             return "requirer-charm"
 
-        return _get_common_name_from_chain(request.mtls_cert.get_secret_value())
+        return _get_common_name_from_chain(request.mtls_cert)
 
     @property
     def server_ca_chain(self) -> str | None:
@@ -172,7 +169,7 @@ class RequirerCharmCharm(ops.CharmBase):
         remote_response = self.remote_response
         if not remote_response or not remote_response.uris:
             return None
-        return remote_response.uris.get_secret_value()
+        return remote_response.uris
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
@@ -226,7 +223,7 @@ class RequirerCharmCharm(ops.CharmBase):
             logger.error("No username available")
             return
         Path(SNAP_DIR).mkdir(exist_ok=True)
-        Path(f"{SNAP_DIR}/ca.pem").write_text(response.tls_ca.get_secret_value())
+        Path(f"{SNAP_DIR}/ca.pem").write_text(response.tls_ca)
 
     def _on_endpoints_changed(
         self, event: ResourceEndpointsChangedEvent[ResourceProviderModel]
@@ -302,15 +299,11 @@ class RequirerCharmCharm(ops.CharmBase):
 
         result.update(
             {
-                "username": remote_response.username.get_secret_value()
-                if remote_response.username
-                else None,
-                "uris": remote_response.uris.get_secret_value() if remote_response.uris else None,
+                "username": remote_response.username if remote_response.username else None,
+                "uris": remote_response.uris if remote_response.uris else None,
                 "endpoints": remote_response.endpoints,
                 "version": remote_response.version,
-                "tls-ca": remote_response.tls_ca.get_secret_value()
-                if remote_response.tls_ca
-                else None,
+                "tls-ca": remote_response.tls_ca if remote_response.tls_ca else None,
             }
         )
 
@@ -343,7 +336,7 @@ class RequirerCharmCharm(ops.CharmBase):
         if not self.etcd_relation:
             return
         local_model = self.etcd_relation_local_model
-        local_model.requests[0].mtls_cert = SecretStr(cert)
+        local_model.requests[0].mtls_cert = cert
         self.etcd_requires.interface.write_model(self.etcd_relation.id, local_model)
 
 

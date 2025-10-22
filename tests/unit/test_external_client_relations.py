@@ -853,7 +853,7 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
         response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
         assert ecr_relation.id in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
-        assert response.tls_ca and response.tls_ca.get_secret_value() == "test_ca_server"
+        assert response.tls_ca and response.tls_ca == "test_ca_server"
 
         new_server_cert = MagicMock()
         new_server_cert.ca.raw = "new_test_ca_server"
@@ -884,7 +884,7 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
             )
             charm.tls_events._on_certificate_available(event)
             response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
-            assert response.tls_ca and response.tls_ca.get_secret_value() == "new_test_ca_server"
+            assert response.tls_ca and response.tls_ca == "new_test_ca_server"
             manager.run()
 
 
@@ -927,7 +927,7 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
         response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
         assert ecr_relation.id in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
-        assert response.uris and set(response.uris.get_secret_value().split(",")) == set(
+        assert response.uris and set(response.uris.split(",")) == set(
             "https://ip1:2379,https://ip2:2379,https://ip0:2379".split(",")
         )
         assert response.endpoints and set(response.endpoints.split(",")) == set(
@@ -959,7 +959,7 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
         response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
-        assert response.uris and set(response.uris.get_secret_value().split(",")) == set(
+        assert response.uris and set(response.uris.split(",")) == set(
             "https://ip10:2379,https://ip2:2379,https://ip1:2379".split(",")
         )
         assert response.endpoints and set(response.endpoints.split(",")) == set(
