@@ -39,7 +39,13 @@ METRICS_PORT = 9100
 
 INTERNAL_USER = "root"
 INTERNAL_USER_PASSWORD_CONFIG = "system-users"
-SECRETS_APP = ["root-password", "s3-credentials", "azure-credentials"]
+SECRETS_APP = [
+    "root-password",
+    "s3-credentials",
+    "azure-credentials",
+    "tls-client-private-key",
+    "tls-peer-private-key",
+]
 
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 SUBSTRATES = Literal["vm", "k8s"]
