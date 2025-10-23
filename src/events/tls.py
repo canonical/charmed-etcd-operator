@@ -82,17 +82,7 @@ class TLSEvents(Object):
                     peer_private_key_id
                 )
             ) is None:
-                self.charm.state.statuses.add(
-                    TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
-                    scope="unit",
-                    component=self.charm.tls_manager.name,
-                )
-            else:
-                self.charm.state.statuses.delete(
-                    TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
-                    scope="unit",
-                    component=self.charm.tls_manager.name,
-                )
+                peer_private_key = self.charm.state.cluster.tls_peer_private_key.get("key", None)
 
         if client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if (
@@ -100,16 +90,8 @@ class TLSEvents(Object):
                     client_private_key_id
                 )
             ) is None:
-                self.charm.state.statuses.add(
-                    TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
-                    scope="unit",
-                    component=self.charm.tls_manager.name,
-                )
-            else:
-                self.charm.state.statuses.delete(
-                    TLSStatuses.TLS_INVALID_PRIVATE_KEY.value,
-                    scope="unit",
-                    component=self.charm.tls_manager.name,
+                client_private_key = self.charm.state.cluster.tls_client_private_key.get(
+                    "key", None
                 )
 
         self.peer_certificate = TLSCertificatesRequiresV4(
@@ -359,10 +341,10 @@ class TLSEvents(Object):
     def _on_config_changed(self, event: ConfigChangedEvent) -> None:
         """Handle TLS related config changes."""
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
-            self.update_private_key(tls_peer_private_key_id)
+            self.update_private_key(tls_peer_private_key_id, tls_type=TLSType.PEER)
 
         if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
-            self.update_private_key(tls_client_private_key_id)
+            self.update_private_key(tls_client_private_key_id, tls_type=TLSType.CLIENT)
 
         if not (
             self.charm.tls_manager.extra_sans_config_is_valid()
@@ -385,18 +367,22 @@ class TLSEvents(Object):
         """Handle TLS related secret changes."""
         if tls_peer_private_key_id := self.charm.config.get(TLS_PEER_PRIVATE_KEY_CONFIG):
             if tls_peer_private_key_id == event.secret.id:
-                self.update_private_key(tls_peer_private_key_id)
+                self.update_private_key(tls_peer_private_key_id, tls_type=TLSType.PEER)
 
         if tls_client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if tls_client_private_key_id == event.secret.id:
-                self.update_private_key(tls_client_private_key_id)
+                self.update_private_key(tls_client_private_key_id, tls_type=TLSType.CLIENT)
 
-    def update_private_key(self, private_key_id: str) -> None:
+    def update_private_key(self, private_key_id: str, tls_type: TLSType) -> None:
         """Update the private key in etcd."""
-        logger.debug("Updating TLS private key.")
+        logger.debug(f"Updating {tls_type.value} TLS private key.")
 
-        if self.charm.tls_manager.read_and_validate_private_key(private_key_id) is None:
+        if not (
+            private_key := self.charm.tls_manager.read_and_validate_private_key(private_key_id)
+        ):
             logger.error("Invalid private key provided, cannot update TLS certificates.")
             return
 
+        if self.charm.unit.is_leader:
+            self.charm.state.cluster.update({f"tls-{tls_type.value}-private-key": private_key.raw})
         self.refresh_tls_certificates_event.emit()
