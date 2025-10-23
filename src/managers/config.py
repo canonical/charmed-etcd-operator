@@ -284,7 +284,10 @@ class ConfigManager(ManagerStatusProtocol):
         config_value = self.config.get(TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value)
         if config_value == "auto":
             memory_max = int(self.workload.memory_size() * 0.9)
-            storage_max = int(self.workload.data_storage_size() * 0.9)
+            if self.workload.data_storage_attached():
+                storage_max = int(self.workload.data_storage_size() * 0.9)
+            else:
+                storage_max = MAX_QUOTA_BACKEND_BYTES
             value = min(
                 MAX_QUOTA_BACKEND_BYTES,
                 memory_max,

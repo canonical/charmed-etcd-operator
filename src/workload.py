@@ -241,4 +241,14 @@ class EtcdWorkload(WorkloadBase):
             bool: True if running in LXD cloud, False otherwise.
         """
         # LXD sets up a Unix socket at /dev/lxd/sock inside the container
+        # https://documentation.ubuntu.com/lxd/latest/dev-lxd/#implementation-details
         return Path("/dev/lxd/sock").exists()
+
+    @override
+    def data_storage_attached(self) -> bool:
+        """Check if the data storage is attached.
+
+        Returns:
+            bool: True if data storage is attached, False otherwise.
+        """
+        return Path(SNAP_DATA_PATH).exists()

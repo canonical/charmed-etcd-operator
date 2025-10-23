@@ -297,3 +297,12 @@ class WorkloadBase(ABC):
             bool: True if running in LXD cloud, False otherwise.
         """
         pass
+
+    @abstractmethod
+    def data_storage_attached(self) -> bool:
+        """Check if the data storage is attached.
+
+        Returns:
+            bool: True if data storage is attached, False otherwise.
+        """
+        pass
