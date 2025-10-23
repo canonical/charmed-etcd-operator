@@ -222,22 +222,22 @@ class EtcdCluster(RelationState):
         return {}
 
     @property
-    def tls_client_private_key(self) -> dict[str, PrivateKey]:
+    def tls_client_private_key(self) -> PrivateKey | None:
         """Retrieve the private key for client TLS."""
         if private_key := self.relation_data.get("tls-client-private-key"):
             private_key = PrivateKey(raw=private_key)
-            return {"key": private_key}
+            return private_key
 
-        return {}
+        return None
 
     @property
-    def tls_peer_private_key(self) -> dict[str, PrivateKey]:
+    def tls_peer_private_key(self) -> PrivateKey | None:
         """Retrieve the private key for peer TLS."""
         if private_key := self.relation_data.get("tls-peer-private-key"):
             private_key = PrivateKey(raw=private_key)
-            return {"key": private_key}
+            return private_key
 
-        return {}
+        return None
 
     @property
     def auth_enabled(self) -> bool:

@@ -82,7 +82,7 @@ class TLSEvents(Object):
                     peer_private_key_id
                 )
             ) is None:
-                peer_private_key = self.charm.state.cluster.tls_peer_private_key.get("key", None)
+                peer_private_key = self.charm.state.cluster.tls_peer_private_key
 
         if client_private_key_id := self.charm.config.get(TLS_CLIENT_PRIVATE_KEY_CONFIG):
             if (
@@ -90,9 +90,7 @@ class TLSEvents(Object):
                     client_private_key_id
                 )
             ) is None:
-                client_private_key = self.charm.state.cluster.tls_client_private_key.get(
-                    "key", None
-                )
+                client_private_key = self.charm.state.cluster.tls_client_private_key
 
         self.peer_certificate = TLSCertificatesRequiresV4(
             self.charm,
