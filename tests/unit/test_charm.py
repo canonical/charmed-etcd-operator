@@ -691,6 +691,7 @@ def test_set_config_options():
         config={
             TuningOptions.ELECTION_TIMEOUT_CONFIG.value: 5000,
             TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: 500,
+            TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value: "8589934592",
         },
         relations={relation},
         leader=True,
