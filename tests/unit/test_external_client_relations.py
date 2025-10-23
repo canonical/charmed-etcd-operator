@@ -866,12 +866,18 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
     """Test rotating the CA chain of etcd for an external client relation."""
     ctx, relations = cluster_tls_context
     secret = Secret({"mtls-cert": mtls_cert}, owner="app")
+    request_dict = {
+        "resource": "/test/keys",
+        "request-id": "0cbbc9781f189ea5",
+        "salt": "mWpK32IQW4bsu65t",
+        "secret-mtls": f"{secret.id}",
+    }
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
             "version": "v1",
-            "requests": f'[{{"resource": "/test/keys", "request-id": "0cbbc9781f189ea5", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
+            "requests": json.dumps([request_dict]),
         },
     )
 
@@ -896,10 +902,18 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
+        state_out_client_relation = next(
+            relation for relation in state_out.relations if relation.id == ecr_relation.id
+        )
+        response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
+        tls_secret = _get_secret_from_state(state_out, response_dict.get("secret-tls"))
         assert ecr_relation.id in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
-        assert response.tls_ca and response.tls_ca == "test_ca_server"
+        assert (
+            tls_secret
+            and tls_secret.latest_content
+            and tls_secret.latest_content.get("tls-ca") == "test_ca_server"
+        )
 
         new_server_cert = MagicMock()
         new_server_cert.ca.raw = "new_test_ca_server"
@@ -929,9 +943,17 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
                 TLSType.CLIENT, TLSCARotationState.NEW_CA_ADDED
             )
             charm.tls_events._on_certificate_available(event)
-            response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
-            assert response.tls_ca and response.tls_ca == "new_test_ca_server"
-            manager.run()
+            state_out = manager.run()
+            state_out_client_relation = next(
+                relation for relation in state_out.relations if relation.id == ecr_relation.id
+            )
+            response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
+            tls_secret = _get_secret_from_state(state_out, response_dict.get("secret-tls"))
+            assert (
+                tls_secret
+                and tls_secret.latest_content
+                and tls_secret.latest_content.get("tls-ca") == "new_test_ca_server"
+            )
 
 
 def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
@@ -970,15 +992,22 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
-        response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
+        state_out_client_relation = next(
+            relation for relation in state_out.relations if relation.id == ecr_relation.id
+        )
+        response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
+        user_secret = _get_secret_from_state(state_out, response_dict.get("secret-user"))
         assert ecr_relation.id in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
-        assert response.uris and set(response.uris.split(",")) == set(
-            "https://ip1:2379,https://ip2:2379,https://ip0:2379".split(",")
+        assert (
+            user_secret
+            and user_secret.latest_content
+            and set(user_secret.latest_content.get("uris", "").split(","))
+            == set("https://ip1:2379,https://ip2:2379,https://ip0:2379".split(","))
         )
-        assert response.endpoints and set(response.endpoints.split(",")) == set(
-            "ip1:2379,ip2:2379,ip0:2379".split(",")
-        )
+        assert response_dict.get("endpoints") and set(
+            response_dict.get("endpoints", "").split(",")
+        ) == set("ip1:2379,ip2:2379,ip0:2379".split(","))
 
     peer_relation = state_out.get_relation(relations[0].id)
     peer_relation = dataclasses.replace(
@@ -1004,13 +1033,22 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
-        response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
-        assert response.uris and set(response.uris.split(",")) == set(
-            "https://ip10:2379,https://ip2:2379,https://ip1:2379".split(",")
+        state_out_client_relation = next(
+            relation for relation in state_out.relations if relation.id == ecr_relation.id
         )
-        assert response.endpoints and set(response.endpoints.split(",")) == set(
-            "ip10:2379,ip2:2379,ip1:2379".split(",")
+        response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
+        user_secret = _get_secret_from_state(state_out, response_dict.get("secret-user"))
+        assert ecr_relation.id in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+        assert (
+            user_secret
+            and user_secret.latest_content
+            and set(user_secret.latest_content.get("uris", "").split(","))
+            == set("https://ip1:2379,https://ip2:2379,https://ip10:2379".split(","))
         )
+        assert response_dict.get("endpoints") and set(
+            response_dict.get("endpoints", "").split(",")
+        ) == set("ip1:2379,ip2:2379,ip10:2379".split(","))
 
 
 def test_etcd_updates_version(cluster_tls_context, mtls_cert):
@@ -1048,10 +1086,13 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
-        response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
+        state_out_client_relation = next(
+            relation for relation in state_out.relations if relation.id == ecr_relation.id
+        )
+        response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
         assert ecr_relation.id in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
-        assert response.version == "3.6"
+        assert response_dict.get("version") == "3.6"
 
     with (
         ctx(
@@ -1068,8 +1109,13 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
-        response = charm.state.get_etcd_provider_request_model(ecr_relation).requests[0]
-        assert response.version == "3.6.0"
+        state_out_client_relation = next(
+            relation for relation in state_out.relations if relation.id == ecr_relation.id
+        )
+        response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
+        assert ecr_relation.id in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+        assert response_dict.get("version") == "3.6.0"
 
 
 def test_update_client_relations_data_non_leader(cluster_tls_context):
