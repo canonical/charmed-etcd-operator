@@ -141,6 +141,8 @@ async def test_restore_backup_on_different_cluster(charm: str, ops_test: OpsTest
     """Restore a backup and check if data is recovered."""
     logger.info("Remove existing etcd cluster and deploy a new one.")
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
+    await ops_test.model.remove_secret(secret_name="system_users_secret")
+
     await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=60)
 
