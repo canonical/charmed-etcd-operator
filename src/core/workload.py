@@ -288,3 +288,12 @@ class WorkloadBase(ABC):
             float: The size of the etcd database file in Bytes.
         """
         pass
+
+    @abstractmethod
+    def is_lxd_cloud(self) -> bool:
+        """Check if the workload is running in an LXD cloud environment.
+
+        Returns:
+            bool: True if running in LXD cloud, False otherwise.
+        """
+        pass

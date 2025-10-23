@@ -232,3 +232,13 @@ class EtcdWorkload(WorkloadBase):
         if db_file_path.exists() and db_file_path.is_file():
             return db_file_path.stat().st_size
         return 0
+
+    @override
+    def is_lxd_cloud(self) -> bool:
+        """Check if the workload is running in an LXD cloud environment.
+
+        Returns:
+            bool: True if running in LXD cloud, False otherwise.
+        """
+        # LXD sets up a Unix socket at /dev/lxd/sock inside the container
+        return Path("/dev/lxd/sock").exists()

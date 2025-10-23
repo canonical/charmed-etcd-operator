@@ -178,17 +178,17 @@ class ConfigManager(ManagerStatusProtocol):
         if heartbeat_interval := self.config.get(TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value):
             if heartbeat_interval < 10 or heartbeat_interval > 5000:
                 logger.error(
-                    f"Heartbeat interval {heartbeat_interval} is invalid. "
-                    "It must be between 10ms and 5000ms."
+                    "Heartbeat interval %s is invalid. It must be between 10ms and 5000ms.",
+                    heartbeat_interval,
                 )
                 return False
 
         if election_timeout := self.config.get(TuningOptions.ELECTION_TIMEOUT_CONFIG.value):
             if election_timeout < heartbeat_interval * 10 or election_timeout > 50000:
                 logger.error(
-                    f"Election timeout {election_timeout} is invalid. "
-                    f"It must be at least 10x the heartbeat interval ({heartbeat_interval}) "
-                    "and no more than 50000ms."
+                    "Election timeout %s is invalid. It must be at least 10x the heartbeat interval (%s) and no more than 50000ms.",
+                    election_timeout,
+                    heartbeat_interval,
                 )
                 return False
 
@@ -197,16 +197,25 @@ class ConfigManager(ManagerStatusProtocol):
         ):
             if quota_backend_bytes < MIN_QUOTA_BACKEND_BYTES:
                 logger.error(
-                    f"Quota backend bytes too low: {quota_backend_bytes}. Minimum is {MIN_QUOTA_BACKEND_BYTES}."
+                    "Quota backend bytes too low: %s. Minimum is %s.",
+                    quota_backend_bytes,
+                    MIN_QUOTA_BACKEND_BYTES,
                 )
                 return False
 
             if quota_backend_bytes < (db_file_size := self.workload.get_db_file_size()):
                 logger.error(
-                    f"Quota backend bytes {quota_backend_bytes} is less than current DB file size "
-                    f"{db_file_size}."
+                    "Quota backend bytes %s is less than current DB file size %s",
+                    quota_backend_bytes,
+                    db_file_size,
                 )
                 return False
+
+            if self.workload.is_lxd_cloud():
+                logger.warning(
+                    "The deployment's quota-backend-bytes value is %s - consider applying constraints and/or setting the right lxd storage driver",
+                    quota_backend_bytes,
+                )
 
         return True
 
