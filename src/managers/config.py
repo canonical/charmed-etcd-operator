@@ -18,6 +18,7 @@ from core.workload import WorkloadBase
 from literals import (
     CONFIG_FILE,
     DATABASE_DIR,
+    MAX_QUOTA_BACKEND_BYTES,
     METRICS_PORT,
     MIN_QUOTA_BACKEND_BYTES,
     RestoreStep,
@@ -191,12 +192,10 @@ class ConfigManager(ManagerStatusProtocol):
                 )
                 return False
 
-        if quota_backend_bytes := self.config.get(TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value):
-            # if less than 100MB
-            if (
-                type(quota_backend_bytes) is not int
-                or quota_backend_bytes < MIN_QUOTA_BACKEND_BYTES
-            ):
+        if quota_backend_bytes := self._get_tuning_config_value(
+            TuningOptions.QUOTA_BACKEND_BYTES_CONFIG
+        ):
+            if quota_backend_bytes < MIN_QUOTA_BACKEND_BYTES:
                 logger.error(
                     f"Quota backend bytes too low: {quota_backend_bytes}. Minimum is {MIN_QUOTA_BACKEND_BYTES}."
                 )
@@ -257,11 +256,13 @@ class ConfigManager(ManagerStatusProtocol):
         Returns:
             int: The value of the tuning option.
         """
-        if option == TuningOptions.QUOTA_BACKEND_BYTES_CONFIG:
+        if option == TuningOptions.QUOTA_BACKEND_BYTES_CONFIG and not self.config.get(
+            TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value
+        ):
             memory_max = int(self.workload.memory_size() * 0.9)
             storage_max = int(self.workload.data_storage_size() * 0.9)
             value = min(
-                self.config.get(option.value),
+                MAX_QUOTA_BACKEND_BYTES,
                 memory_max,
                 storage_max,
             )
