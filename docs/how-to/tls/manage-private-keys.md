@@ -18,7 +18,7 @@ Now that the secret is stored, you can grant the secret to the application using
 
 ```{terminal}
 :scroll:
-:input: juju grant charmed-etcd tls-peer-private-key
+:input: juju grant-secret tls-peer-private-key charmed-etcd
 ```
 
 ## Reference the secret in the charm configuration
