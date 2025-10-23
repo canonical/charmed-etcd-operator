@@ -443,8 +443,7 @@ class TLSManager(ManagerStatusProtocol):
 
         # managed users cas
         for relation in self.state.etcd_provides_interface.relations:
-            request_model = self.state.get_etcd_requirer_request_model(relation)
-            for request in request_model.requests:
+            for request in self.state.etcd_provides_event_handler.requests(relation):
                 mtls_cert = request.mtls_cert
                 logger.debug(
                     "Collecting CA from relation %s, chain exists: %s",

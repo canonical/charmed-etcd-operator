@@ -8,15 +8,12 @@ import logging
 from typing import TYPE_CHECKING, Dict, Set
 
 from charms.data_platform_libs.v1.data_interfaces import (
-    DataContractV1,
     OpsOtherPeerUnitRepositoryInterface,
     OpsPeerRepositoryInterface,
     OpsPeerUnitRepositoryInterface,
     OpsRelationRepositoryInterface,
     RequirerCommonModel,
-    RequirerDataContractV1,
-    ResourceProviderModel,
-    build_model,
+    ResourceProviderEventHandler,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
     ProviderCertificate,
@@ -148,6 +145,11 @@ class ClusterState(Object, StatusesStateProtocol):
         )
 
     @property
+    def etcd_provides_event_handler(self) -> ResourceProviderEventHandler:
+        """Get the etcd provides event handler."""
+        return self.charm.external_clients_events.etcd_provides
+
+    @property
     def tls_client_certificate(self) -> ProviderCertificate:
         """Get the client TLS certificate."""
         return self.charm.tls_events.client_certificate.get_assigned_certificates()[0][0]
@@ -204,20 +206,3 @@ class ClusterState(Object, StatusesStateProtocol):
             raise
 
         return secret_content
-
-    def get_etcd_provider_request_model(
-        self, relation: Relation
-    ) -> DataContractV1[ResourceProviderModel]:
-        """Get the etcd provides interface."""
-        return self.etcd_provides_interface.build_model(
-            relation.id, DataContractV1[ResourceProviderModel]
-        )
-
-    def get_etcd_requirer_request_model(
-        self, relation: Relation
-    ) -> RequirerDataContractV1[RequirerCommonModel]:
-        """Get the etcd requirer interface."""
-        return build_model(
-            self.etcd_provides_interface.repository(relation.id, relation.app),
-            RequirerDataContractV1[RequirerCommonModel],
-        )

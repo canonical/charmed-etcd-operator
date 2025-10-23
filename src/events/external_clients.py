@@ -81,11 +81,7 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
 
-        if (
-            not event.request.mtls_cert
-            or not event.request.resource
-            or not event.request.request_id
-        ):
+        if not event.request.mtls_cert or not event.request.resource:
             logger.error("CA chain, keys prefix, or common name not provided")
             return
 
@@ -178,8 +174,15 @@ class ExternalClientsEvents(Object):
                     self.charm.external_clients_manager.add_managed_user(
                         event.relation.id, common_name
                     )
-                    response = self.charm.external_clients_manager.get_reponse_of(
-                        event.relation, request_id=event.request.request_id
+                    response = next(
+                        (
+                            res
+                            for res in self.etcd_provides.responses(
+                                event.relation, ResourceProviderModel
+                            )
+                            if res.request_id == event.request.request_id
+                        ),
+                        None,
                     ) or ResourceProviderModel(
                         username=common_name,
                         request_id=event.request.request_id,

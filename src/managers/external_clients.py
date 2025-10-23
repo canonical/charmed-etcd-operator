@@ -7,12 +7,13 @@
 import logging
 from pathlib import Path
 
-from charms.data_platform_libs.v1.data_interfaces import ResourceProviderModel
+from charms.data_platform_libs.v1.data_interfaces import (
+    ResourceProviderModel,
+)
 from charms.tls_certificates_interface.v4.tls_certificates import Certificate, TLSCertificatesError
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
-from ops import Relation
 
 from common.certificates import is_leaf_certificate_valid
 from core.cluster import ClusterState
@@ -130,19 +131,18 @@ class ExternalClientsManager(ManagerStatusProtocol):
         server_ca = self.state.tls_client_certificate.ca.raw
 
         for relation in self.state.etcd_provides_interface.relations:
-            response_model = self.state.get_etcd_provider_request_model(relation)
-            request_model = self.state.get_etcd_requirer_request_model(relation)
-            for request in request_model.requests:
+            responses = self.state.etcd_provides_event_handler.responses(
+                relation, ResourceProviderModel
+            )
+            if not responses:
+                logger.warning("Skipping relation %s with no responses.", relation.id)
+                continue
+            for request in self.state.etcd_provides_event_handler.requests(relation):
                 if not request.resource or not request.mtls_cert:
                     logger.warning("Skipping relation %s with invalid payloads.", relation.id)
                     continue
                 current_response = next(
-                    (
-                        res
-                        for res in response_model.requests
-                        if res.request_id == request.request_id
-                    ),
-                    None,
+                    (res for res in responses if res.request_id == request.request_id), None
                 )
                 if not current_response:
                     logger.warning(
@@ -154,7 +154,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 current_response.uris = ",".join(uris)
                 current_response.tls_ca = server_ca
                 current_response.version = etcd_version
-            self.state.etcd_provides_interface.write_model(relation.id, response_model)
+            self.state.etcd_provides_event_handler.set_responses(relation.id, responses)
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:  # noqa: C901
         """Compute the component status."""
@@ -163,8 +163,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
         ).root
 
         for relation in self.state.etcd_provides_interface.relations:
-            request_model = self.state.get_etcd_requirer_request_model(relation)
-            for request in request_model.requests:
+            for request in self.state.etcd_provides_event_handler.requests(relation):
                 mtls_cert = request.mtls_cert
                 prefix = request.resource
                 # for client relation created hook
@@ -198,22 +197,6 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 status_list.append(ClusterStatuses.CLUSTER_NOT_INITIALIZED.value)
 
         return status_list or [CharmStatuses.ACTIVE_IDLE.value]
-
-    def get_reponse_of(self, relation: Relation, request_id: str) -> ResourceProviderModel | None:
-        """Get the current response for a given request id.
-
-        Args:
-            relation (Relation): The relation.
-            request_id (str): The request id.
-
-        Returns:
-            (ResourceProviderModel | None): The current response or None if not found.
-        """
-        if not self.state.etcd_provides_interface.relations:
-            return None
-
-        response_model = self.state.get_etcd_provider_request_model(relation)
-        return next((res for res in response_model.requests if res.request_id == request_id), None)
 
     def get_uris(self) -> str:
         """Get the URIs of the cluster.
