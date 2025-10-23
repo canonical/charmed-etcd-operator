@@ -192,30 +192,35 @@ class ConfigManager(ManagerStatusProtocol):
                 )
                 return False
 
-        if quota_backend_bytes := self._get_tuning_config_value(
-            TuningOptions.QUOTA_BACKEND_BYTES_CONFIG
-        ):
-            if quota_backend_bytes < MIN_QUOTA_BACKEND_BYTES:
-                logger.error(
-                    "Quota backend bytes too low: %s. Minimum is %s.",
-                    quota_backend_bytes,
-                    MIN_QUOTA_BACKEND_BYTES,
-                )
-                return False
+        # avoid recalculating quota_backend_bytes multiple times
+        quota_backend_bytes = self.quota_backend_bytes
+        if quota_backend_bytes is None:
+            logger.error(
+                "Quota backend bytes value '%s' is invalid. It must be an integer or 'auto'.",
+                self.config.get(TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value),
+            )
+            return False
+        if quota_backend_bytes < MIN_QUOTA_BACKEND_BYTES:
+            logger.error(
+                "Quota backend bytes too low: %s. Minimum is %s.",
+                quota_backend_bytes,
+                MIN_QUOTA_BACKEND_BYTES,
+            )
+            return False
 
-            if quota_backend_bytes < (db_file_size := self.workload.get_db_file_size()):
-                logger.error(
-                    "Quota backend bytes %s is less than current DB file size %s",
-                    quota_backend_bytes,
-                    db_file_size,
-                )
-                return False
+        if quota_backend_bytes < (db_file_size := self.workload.get_db_file_size()):
+            logger.error(
+                "Quota backend bytes %s is less than current DB file size %s",
+                quota_backend_bytes,
+                db_file_size,
+            )
+            return False
 
-            if self.workload.is_lxd_cloud():
-                logger.warning(
-                    "The deployment's quota-backend-bytes value is %s - consider applying constraints and/or setting the right lxd storage driver",
-                    quota_backend_bytes,
-                )
+        if self.workload.is_lxd_cloud():
+            logger.warning(
+                "The deployment's quota-backend-bytes value is %s - consider applying constraints and/or setting the right lxd storage driver",
+                quota_backend_bytes,
+            )
 
         return True
 
@@ -265,9 +270,19 @@ class ConfigManager(ManagerStatusProtocol):
         Returns:
             int: The value of the tuning option.
         """
-        if option == TuningOptions.QUOTA_BACKEND_BYTES_CONFIG and not self.config.get(
-            TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value
-        ):
+        if option == TuningOptions.QUOTA_BACKEND_BYTES_CONFIG:
+            return self.quota_backend_bytes
+        return self.config.get(option.value)
+
+    @property
+    def quota_backend_bytes(self) -> int | None:
+        """Get the quota-backend-bytes configuration value.
+
+        Returns:
+            int: The quota-backend-bytes value.
+        """
+        config_value = self.config.get(TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value)
+        if config_value == "auto":
             memory_max = int(self.workload.memory_size() * 0.9)
             storage_max = int(self.workload.data_storage_size() * 0.9)
             value = min(
@@ -280,4 +295,8 @@ class ConfigManager(ManagerStatusProtocol):
             if value == storage_max:
                 logger.warning(f"Quota backend bytes reduced to {value} to fit available storage.")
             return value
-        return self.config.get(option.value)
+
+        try:
+            return int(str(config_value))
+        except (TypeError, ValueError):
+            return None
