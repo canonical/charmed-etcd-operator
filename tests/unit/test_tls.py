@@ -38,6 +38,7 @@ from literals import (
     TLS_PEER_PRIVATE_KEY_CONFIG,
     TLSCARotationState,
     TLSState,
+    TuningOptions,
 )
 from managers.tls import TLSType
 from statuses import CharmStatuses, TLSStatuses
@@ -790,9 +791,9 @@ def test_set_tls_private_key():
         endpoint=PEER_RELATION,
         local_unit_data={
             "client-cert-ready": "True",
-            "peer_cert_ready": "True",
-            "tls_client_state": "tls",
-            "tls_peer_state": "tls",
+            "peer-cert-ready": "True",
+            "tls-client-state": "tls",
+            "tls-peer-state": "tls",
             "state": "started",
             "private-ip": "my_ip",
         },
@@ -857,7 +858,10 @@ def test_set_tls_private_key():
                     owner="unit",
                 ),
             },
-            config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
+            config={
+                TLS_PEER_PRIVATE_KEY_CONFIG: secret.id,
+                TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value: "8589934592",
+            },
             leader=True,
         )
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -889,7 +893,10 @@ def test_set_tls_private_key():
                     owner="unit",
                 ),
             },
-            config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
+            config={
+                TLS_PEER_PRIVATE_KEY_CONFIG: secret.id,
+                TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value: "8589934592",
+            },
             leader=True,
         )
         newer_private_key = generate_private_key().raw
@@ -973,7 +980,10 @@ def test_set_tls_private_key():
                     owner="unit",
                 ),
             },
-            config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
+            config={
+                TLS_PEER_PRIVATE_KEY_CONFIG: secret.id,
+                TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value: "8589934592",
+            },
         )
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
         assert status_is(state_out, TLSStatuses.TLS_INVALID_PRIVATE_KEY.value)
@@ -1028,7 +1038,10 @@ def test_set_tls_private_key():
                     owner="unit",
                 ),
             },
-            config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
+            config={
+                TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id,
+                TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value: "8589934592",
+            },
             leader=True,
         )
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -1067,7 +1080,10 @@ def test_set_tls_private_key():
                     owner="unit",
                 ),
             },
-            config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
+            config={
+                TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id,
+                TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value: "8589934592",
+            },
             leader=True,
         )
 
@@ -1083,7 +1099,10 @@ def test_set_tls_private_key():
     )
     state_in = testing.State(
         relations=[peer_relation, restart_peer_relation],
-        config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
+        config={
+            TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id,
+            TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value: "8589934592",
+        },
         secrets={secret},
         leader=True,
     )
