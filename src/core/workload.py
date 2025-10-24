@@ -263,29 +263,29 @@ class WorkloadBase(ABC):
         return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
 
     @abstractmethod
-    def memory_size(self) -> float:
+    def memory_size(self) -> int:
         """Get the total memory size of the system in Bytes.
 
         Returns:
-            float: The total memory size in Bytes.
+            int: The total memory size in Bytes.
         """
         pass
 
     @abstractmethod
-    def data_storage_size(self) -> float:
+    def data_storage_size(self) -> int:
         """Get the size of the data storage in Bytes.
 
         Returns:
-            float: The size of the data storage in Bytes.
+            int: The size of the data storage in Bytes.
         """
         pass
 
     @abstractmethod
-    def get_db_file_size(self) -> float:
+    def get_db_file_size(self) -> int:
         """Get the size of the etcd database file in Bytes.
 
         Returns:
-            float: The size of the etcd database file in Bytes.
+            int: The size of the etcd database file in Bytes.
         """
         pass
 

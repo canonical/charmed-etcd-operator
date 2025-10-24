@@ -203,7 +203,7 @@ class EtcdWorkload(WorkloadBase):
                 2a130b7e1fcdd83633c4aa70998c314d7c38b476/fs/proc/meminfo.c#L31
 
         Returns:
-            float: The total memory size in Bytes.
+            int: The total memory size in Bytes.
         """
         with open("/proc/meminfo") as f:
             meminfo = f.read().split("\n")
@@ -213,11 +213,11 @@ class EtcdWorkload(WorkloadBase):
         return int(memory_sizes["MemTotal"] * 1024)  # convert from kB to Bytes
 
     @override
-    def data_storage_size(self) -> float:
+    def data_storage_size(self) -> int:
         """Get the size of the data storage in Bytes.
 
         Returns:
-            float: The size of the data storage in Bytes.
+            int: The size of the data storage in Bytes.
         """
         return shutil.disk_usage(SNAP_DATA_PATH).total
 
