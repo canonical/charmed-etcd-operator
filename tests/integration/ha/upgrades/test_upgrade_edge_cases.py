@@ -370,5 +370,3 @@ async def test_tls_cert_rotation_during_upgrade(charm: str, ops_test: OpsTest) -
     # clean up and remove the application to allow for further upgrade tests
     stop_continuous_writes()
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
-    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
-    await ops_test.model.remove_application(TLS_NAME, block_until_done=True)
