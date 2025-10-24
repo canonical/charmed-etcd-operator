@@ -8,6 +8,6 @@ name = "charmed-etcd"
 
 [snap.revisions]
 # amd64
-x86_64 = "23"
+x86_64 = "25"
 # arm64
-aarch64 = "24"
+aarch64 = "26"

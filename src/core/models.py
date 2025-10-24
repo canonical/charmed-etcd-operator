@@ -16,6 +16,7 @@ from charms.data_platform_libs.v1.data_interfaces import (
     OpsPeerUnitRepositoryInterface,
     PeerModel,
 )
+from charms.tls_certificates_interface.v4.tls_certificates import PrivateKey
 from ops.model import Application, Relation, Unit
 from pydantic import Field
 
@@ -58,6 +59,8 @@ class PeerAppModel(PeerModel):
     restore_instruction: str | None = Field(default=None)
     restore_verification_failed: str | None = Field(default=None)
     rebuild_cluster: str | None = Field(default=None)
+    tls_client_private_key: ExtraSecretStr = Field(default=None)
+    tls_peer_private_key: ExtraSecretStr = Field(default=None)
 
 
 class PeerUnitModel(PeerModel):
@@ -291,6 +294,24 @@ class EtcdCluster(RelationState):
             return {INTERNAL_USER: password}
 
         return {}
+
+    @property
+    def tls_client_private_key(self) -> PrivateKey | None:
+        """Retrieve the private key for client TLS."""
+        if self.model and (private_key := self.model.tls_client_private_key):
+            private_key = PrivateKey(raw=private_key)
+            return private_key
+
+        return None
+
+    @property
+    def tls_peer_private_key(self) -> PrivateKey | None:
+        """Retrieve the private key for peer TLS."""
+        if self.model and (private_key := self.model.tls_peer_private_key):
+            private_key = PrivateKey(raw=private_key)
+            return private_key
+
+        return None
 
     @property
     def auth_enabled(self) -> bool:
