@@ -18,7 +18,7 @@ from charms.data_platform_libs.v1.data_interfaces import (
     ResourceProviderEventHandler,
     ResourceProviderModel,
 )
-from ops import Object, RelationBrokenEvent
+from ops import Object, Relation, RelationBrokenEvent
 
 from common.certificates import is_leaf_certificate_valid
 from common.exceptions import EtcdUserManagementError
@@ -174,20 +174,12 @@ class ExternalClientsEvents(Object):
                     self.charm.external_clients_manager.add_managed_user(
                         event.relation.id, common_name
                     )
-                    response = next(
-                        (
-                            res
-                            for res in self.etcd_provides.responses(
-                                event.relation, ResourceProviderModel
-                            )
-                            if res.request_id == event.request.request_id
-                        ),
-                        None,
-                    ) or ResourceProviderModel(
-                        username=common_name,
-                        request_id=event.request.request_id,
-                        resource=event.request.resource,
-                        salt=event.request.salt,
+                    response = self._get_or_create_resource_response(
+                        event.relation,
+                        common_name,
+                        event.request.request_id,
+                        event.request.resource,
+                        event.request.salt,
                     )
                     response.username = common_name
                     response.endpoints = self.charm.external_clients_manager.get_endpoints()
@@ -213,6 +205,42 @@ class ExternalClientsEvents(Object):
             scope="app",
             component=self.charm.external_clients_manager.name,
         )
+
+    def _get_or_create_resource_response(
+        self,
+        relation: Relation,
+        common_name: str,
+        request_id: str | None,
+        resource: str,
+        salt: str,
+    ) -> ResourceProviderModel:
+        """Get or create the resource response for the relation.
+
+        Args:
+            relation (Relation): The relation of the event.
+            common_name (str): The common name of the user.
+            request_id (str): The request id.
+            resource (str): The resource requested.
+            salt (str): The salt used for password hashing.
+
+        Returns:
+            The ResourceProviderModel response.
+        """
+        response = next(
+            (
+                res
+                for res in self.etcd_provides.responses(relation, ResourceProviderModel)
+                if res.request_id == request_id
+            ),
+            None,
+        ) or ResourceProviderModel(
+            username=common_name,
+            request_id=request_id,
+            resource=resource,
+            salt=salt,
+        )
+
+        return response
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle the relation broken event."""

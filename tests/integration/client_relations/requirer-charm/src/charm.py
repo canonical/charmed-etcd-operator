@@ -94,7 +94,7 @@ class RequirerCharmCharm(ops.CharmBase):
         if not self.etcd_relation:
             return "requirer-charm"
         request = self.etcd_relation_local_model.requests[0]
-        if not request.mtls_cert or request.mtls_cert == "":
+        if not request.mtls_cert:
             return "requirer-charm"
 
         return _get_common_name_from_chain(request.mtls_cert)
