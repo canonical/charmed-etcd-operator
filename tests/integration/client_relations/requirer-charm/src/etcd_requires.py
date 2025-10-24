@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+# Copyright 2025 Ubuntu
+# See LICENSE file for licensing details.
+
+import logging
+from abc import abstractmethod
+from pathlib import Path
+from typing import TYPE_CHECKING, override
+
+import ops
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseEndpointsChangedEvent,
+    EtcdReadyEvent,
+)
+from charms.data_platform_libs.v0.data_interfaces import EtcdRequires as EtcdRequiresV0Base
+from charms.data_platform_libs.v1.data_interfaces import (
+    DataContractV1,
+    RequirerCommonModel,
+    RequirerDataContractV1,
+    ResourceCreatedEvent,
+    ResourceEndpointsChangedEvent,
+    ResourceProviderModel,
+    ResourceRequirerEventHandler,
+    build_model,
+)
+from constants import SNAP_DIR
+
+if TYPE_CHECKING:
+    from charm import RequirerCharm
+
+logger = logging.getLogger(__name__)
+
+
+class EtcdRequires(ops.framework.Object):
+    """Common interface for etcd requirer relation."""
+
+    def __init__(self, charm: "RequirerCharm") -> None:
+        super().__init__(charm, "requirer-etcd")
+        self.charm = charm
+
+    @abstractmethod
+    def _on_endpoints_changed(self, event) -> None:
+        """Handle endpoints changed event."""
+        pass
+
+    @abstractmethod
+    def _on_resource_created(self, event) -> None:
+        """Handle resource created event."""
+        pass
+
+    @abstractmethod
+    def set_mtls_cert(self, cert: str) -> None:
+        """Set the mtls cert in the relation data bag."""
+        pass
+
+    @property
+    @abstractmethod
+    def etcd_relation(self) -> ops.Relation | None:
+        """Return the etcd relation if present."""
+        pass
+
+    @property
+    @abstractmethod
+    def common_name(self) -> str:
+        """Return the common name for the certificate."""
+        pass
+
+    @property
+    @abstractmethod
+    def etcd_uris(self) -> str | None:
+        """Return the etcd uris."""
+        pass
+
+    @property
+    @abstractmethod
+    def credentials(self) -> dict[str, str] | None:
+        """Return the etcd credentials."""
+        pass
+
+
+class EtcdRequiresV1(EtcdRequires):
+    """EtcdRequires implementation for data interfaces version 1."""
+
+    def __init__(self, charm: "RequirerCharm") -> None:
+        super().__init__(charm=charm)
+        self.etcd_interface = ResourceRequirerEventHandler(
+            self.charm,
+            relation_name="etcd-client",
+            requests=[
+                RequirerCommonModel(resource="/test/", mtls_cert=self.charm.raw_certificate or "")
+            ],
+            response_model=ResourceProviderModel,
+        )
+
+        self.framework.observe(
+            self.etcd_interface.on.endpoints_changed, self._on_endpoints_changed
+        )
+        self.framework.observe(self.etcd_interface.on.resource_created, self._on_resource_created)
+
+    @override
+    def _on_endpoints_changed(
+        self, event: ResourceEndpointsChangedEvent[ResourceProviderModel]
+    ) -> None:
+        """Handle etcd client relation data changed event."""
+        response = event.response
+        logger.info("Endpoints changed: %s", response.endpoints)
+        if not response.endpoints:
+            logger.error("No endpoints available")
+
+    @override
+    def _on_resource_created(self, event: ResourceCreatedEvent[ResourceProviderModel]) -> None:
+        """Handle resource created event."""
+        logger.info("Resource created")
+        response = event.response
+        if not response.tls_ca:
+            logger.error("No server CA chain available")
+            return
+        if not response.username:
+            logger.error("No username available")
+            return
+        Path(SNAP_DIR).mkdir(exist_ok=True)
+        Path(f"{SNAP_DIR}/ca.pem").write_text(response.tls_ca)
+
+    @override
+    def set_mtls_cert(self, cert: str) -> None:
+        """Set the mtls cert in the relation data bag."""
+        if not self.etcd_relation:
+            return
+        local_model = self.etcd_relation_local_model
+        local_model.requests[0].mtls_cert = cert
+        self.etcd_interface.interface.write_model(self.etcd_relation.id, local_model)
+
+    @property
+    def etcd_relation(self) -> ops.Relation | None:
+        """Return the etcd relation if present."""
+        if not hasattr(self, "etcd_interface"):
+            return None
+        return self.etcd_interface.relations[0] if len(self.etcd_interface.relations) else None
+
+    @property
+    def common_name(self) -> str:
+        """Return the common name for the certificate."""
+        if not self.etcd_relation:
+            return "requirer-charm"
+
+        request = (
+            self.etcd_relation_local_model.requests[0]
+            if self.etcd_relation_local_model.requests
+            else None
+        )
+        if not request or not request.mtls_cert or request.mtls_cert == "":
+            return "requirer-charm"
+
+        return _get_common_name_from_chain(request.mtls_cert)
+
+    @property
+    def etcd_uris(self) -> str | None:
+        """Return the etcd uris."""
+        remote_response = self.remote_response
+        if not remote_response or not remote_response.uris:
+            return None
+        return remote_response.uris
+
+    @property
+    def etcd_relation_local_model(self) -> RequirerDataContractV1[RequirerCommonModel]:
+        """Return the etcd relation local model."""
+        if not self.etcd_relation:
+            raise RuntimeError("etcd relation not found")
+        return build_model(
+            self.etcd_interface.interface.repository(self.etcd_relation.id),
+            RequirerDataContractV1[RequirerCommonModel],
+        )
+
+    @property
+    def remote_response(self) -> ResourceProviderModel | None:
+        """Return the remote response model."""
+        if not self.etcd_relation:
+            return None
+        remote_model = build_model(
+            self.etcd_interface.interface.repository(
+                self.etcd_relation.id, self.etcd_relation.app
+            ),
+            DataContractV1[ResourceProviderModel],
+        )
+        return remote_model.requests[0]
+
+    @property
+    def credentials(self) -> dict[str, str | None] | None:
+        """Return the etcd credentials."""
+        remote_response = self.remote_response
+        if not remote_response:
+            return None
+
+        return {
+            "username": remote_response.username if remote_response.username else None,
+            "uris": remote_response.uris if remote_response.uris else None,
+            "endpoints": remote_response.endpoints,
+            "version": remote_response.version,
+            "tls-ca": remote_response.tls_ca if remote_response.tls_ca else None,
+        }
+
+
+class EtcdRequiresV0(EtcdRequires):
+    """EtcdRequires implementation for legacy relation interface."""
+
+    def __init__(self, charm: "RequirerCharm") -> None:
+        super().__init__(charm=charm)
+        self.etcd_interface = EtcdRequiresV0Base(
+            charm=self.charm,
+            relation_name="etcd-client",
+            prefix="/test/",
+            mtls_cert=self.charm.raw_certificate or "",
+        )
+
+        self.charm.framework.observe(
+            self.etcd_interface.on.endpoints_changed, self._on_endpoints_changed
+        )
+        self.charm.framework.observe(self.etcd_interface.on.etcd_ready, self._on_resource_created)
+
+    @override
+    def _on_endpoints_changed(self, event: DatabaseEndpointsChangedEvent) -> None:
+        """Handle etcd client relation data changed event."""
+        logger.info("Endpoints changed: %s", event.endpoints)
+        if not event.endpoints:
+            logger.error("No endpoints available")
+            return
+
+    @override
+    def _on_resource_created(self, event: EtcdReadyEvent) -> None:
+        """Handle etcd ready event."""
+        logger.info("etcd ready")
+        if not event.tls_ca:
+            logger.error("No server CA chain available")
+            return
+        if not event.username:
+            logger.error("No username available")
+            return
+        Path(SNAP_DIR).mkdir(exist_ok=True)
+        Path(f"{SNAP_DIR}/ca.pem").write_text(event.tls_ca)
+
+    @override
+    def set_mtls_cert(self, cert: str) -> None:
+        """Set the mtls cert in the relation data bag."""
+        if not self.etcd_relation:
+            return
+        self.etcd_interface.set_mtls_cert(self.etcd_relation.id, cert)
+
+    @property
+    def etcd_relation(self) -> ops.Relation | None:
+        """Return the etcd relation if present."""
+        if not hasattr(self, "etcd_interface"):
+            return None
+        return self.etcd_interface.relations[0] if len(self.etcd_interface.relations) else None
+
+    @property
+    def common_name(self) -> str:
+        """Return the common name for the certificate."""
+        if not self.etcd_relation:
+            return "requirer-charm"
+        mtls_cert = self.etcd_interface.fetch_my_relation_field(self.etcd_relation.id, "mtls-cert")
+        if not mtls_cert:
+            return "requirer-charm"
+
+        return _get_common_name_from_chain(mtls_cert)
+
+    @property
+    def etcd_uris(self) -> str | None:
+        """Return the etcd uris."""
+        if not self.etcd_relation:
+            return None
+        return self.etcd_interface.fetch_relation_field(self.etcd_relation.id, "uris")
+
+    @property
+    def credentials(self) -> dict[str, str | None] | None:
+        """Return the etcd credentials."""
+        if not self.etcd_relation:
+            return None
+
+        return {
+            "username": self.etcd_interface.fetch_relation_field(
+                self.etcd_relation.id, "username"
+            ),
+            "uris": self.etcd_interface.fetch_relation_field(self.etcd_relation.id, "uris"),
+            "endpoints": self.etcd_interface.fetch_relation_field(
+                self.etcd_relation.id, "endpoints"
+            ),
+            "version": self.etcd_interface.fetch_relation_field(self.etcd_relation.id, "version"),
+            "tls-ca": self.etcd_interface.fetch_relation_field(self.etcd_relation.id, "tls-ca"),
+        }
