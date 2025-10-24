@@ -261,3 +261,48 @@ class WorkloadBase(ABC):
             raise ValueError("Could not get private IP address of the unit.")
 
         return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
+
+    @abstractmethod
+    def memory_size(self) -> int:
+        """Get the total memory size of the system in Bytes.
+
+        Returns:
+            int: The total memory size in Bytes.
+        """
+        pass
+
+    @abstractmethod
+    def data_storage_size(self) -> int:
+        """Get the size of the data storage in Bytes.
+
+        Returns:
+            int: The size of the data storage in Bytes.
+        """
+        pass
+
+    @abstractmethod
+    def get_db_file_size(self) -> int:
+        """Get the size of the etcd database file in Bytes.
+
+        Returns:
+            int: The size of the etcd database file in Bytes.
+        """
+        pass
+
+    @abstractmethod
+    def is_lxd_cloud(self) -> bool:
+        """Check if the workload is running in an LXD cloud environment.
+
+        Returns:
+            bool: True if running in LXD cloud, False otherwise.
+        """
+        pass
+
+    @abstractmethod
+    def data_storage_attached(self) -> bool:
+        """Check if the data storage is attached.
+
+        Returns:
+            bool: True if data storage is attached, False otherwise.
+        """
+        pass

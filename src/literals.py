@@ -59,6 +59,9 @@ TLS_CLIENT_PRIVATE_KEY_CONFIG = "tls-client-private-key"
 S3_RELATION_NAME = "s3-credentials"
 AZURE_RELATION_NAME = "azure-credentials"
 
+MIN_QUOTA_BACKEND_BYTES = 100 * 1024**2  # 100MiB in bytes
+MAX_QUOTA_BACKEND_BYTES = 100 * 1024**3  # 100GiB in bytes
+
 
 @dataclass
 class StatusLevel:
@@ -119,3 +122,4 @@ class TuningOptions(StrEnum):
 
     ELECTION_TIMEOUT_CONFIG = "election-timeout"
     HEARTBEAT_INTERVAL_CONFIG = "heartbeat-interval"
+    QUOTA_BACKEND_BYTES_CONFIG = "quota-backend-bytes"
