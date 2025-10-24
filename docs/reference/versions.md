@@ -2,13 +2,26 @@
 
 Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.com/juju/3.6/reference/charm/#track): 
 
-* [Charmed etcd 3.6](https://charmhub.io/charmed-etcd?channel=3.6/beta) (channel `3.6/beta`)
+* [Charmed etcd 3.6](https://charmhub.io/charmed-etcd?channel=3.6/stable) (channel `3.6/stable`)
 
 ## etcd 3.6
 
 **Base:** Noble (Ubuntu 24.04)
 
 **Supported architectures:** `amd64` and `arm64`.
+
+### Releases
+
+```{eval-rst}
++--------------+------------+----------+
+| Charm        | etcd       | Snap     |
+| revision     | Version    | revision |
++==============+============+==========+
+| tbd. (amd64) | 3.6.5      | 25       |
++--------------+            +----------+
+| tbd. (arm64) |            | 26       |
++--------------+------------+----------+
+```            
 
 ### Supported features
 
@@ -30,16 +43,13 @@ Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.c
 * [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user-secret) for charm [internal passwords](/how-to/manage-passwords)
 * [Recovery from majority failure](/how-to/disaster-recovery)
 * [Tuning for configuration settings](/how-to/tune-settings)
+* [Minor version upgrades without downtime](/how-to/refresh)
 
 ### Requirements and compatibility
 
-* Juju v3.6.5+ 
+* Juju v3.6.11+ 
   * Older minor versions of Juju 3 may be compatible, but are not officially supported. 
 * LXD v6.4+
   * Older LXD versions may be compatible, but are not officially supported. 
 * Integration with a TLS provider charm
   * `tls-certificates` interface v4
-
-### Limitations
-
-We currently do not support upgrades without downtime. This is scheduled to be implemented for the `candidate` release.
