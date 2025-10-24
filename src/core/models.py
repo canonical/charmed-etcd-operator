@@ -59,6 +59,8 @@ class PeerAppModel(PeerModel):
     restore_instruction: str | None = Field(default=None)
     restore_verification_failed: str | None = Field(default=None)
     rebuild_cluster: str | None = Field(default=None)
+    tls_client_private_key: ExtraSecretStr = Field(default=None)
+    tls_peer_private_key: ExtraSecretStr = Field(default=None)
 
 
 class PeerUnitModel(PeerModel):
@@ -296,7 +298,7 @@ class EtcdCluster(RelationState):
     @property
     def tls_client_private_key(self) -> PrivateKey | None:
         """Retrieve the private key for client TLS."""
-        if private_key := self.relation_data.get("tls-client-private-key"):
+        if self.model and (private_key := self.model.tls_client_private_key):
             private_key = PrivateKey(raw=private_key)
             return private_key
 
@@ -305,7 +307,7 @@ class EtcdCluster(RelationState):
     @property
     def tls_peer_private_key(self) -> PrivateKey | None:
         """Retrieve the private key for peer TLS."""
-        if private_key := self.relation_data.get("tls-peer-private-key"):
+        if self.model and (private_key := self.model.tls_peer_private_key):
             private_key = PrivateKey(raw=private_key)
             return private_key
 
