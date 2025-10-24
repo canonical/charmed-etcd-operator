@@ -7,14 +7,18 @@
 import json
 import logging
 from dataclasses import dataclass
+from typing import Any, final
 
-from charms.data_platform_libs.v0.data_interfaces import (
-    Data,
-    DataPeerData,
-    DataPeerUnitData,
+from charms.data_platform_libs.v1.data_interfaces import (
+    ExtraSecretStr,
+    OpsOtherPeerUnitRepositoryInterface,
+    OpsPeerRepositoryInterface,
+    OpsPeerUnitRepositoryInterface,
+    PeerModel,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import PrivateKey
 from ops.model import Application, Relation, Unit
+from pydantic import Field
 
 from literals import (
     CLIENT_PORT,
@@ -29,13 +33,64 @@ from literals import (
 logger = logging.getLogger(__name__)
 
 
+class PeerAppModel(PeerModel):
+    """Model for the peer application data."""
+
+    cluster_state: str | None = Field(default=None)
+    root_password: ExtraSecretStr = Field(default=None)
+    authentication: str | None = Field(default=None)
+    # This string is the output of the `etcdctl member add` command issued by the juju leader
+    # when a new unit joins and is added as cluster member. This string needs to be provided
+    # as an argument `--initial-cluster` when starting the workload on the newly added unit.
+    # This data is added to the peer cluster relation app databag when the first unit initializes
+    # the cluster on startup after deployment.
+    cluster_members: str = Field(default="")
+    # New cluster members are added to the etcd cluster as so-called learning members. That means
+    # they are not participating in raft leader election because they do not yet have up-to-data
+    # data. When added as cluster members with the `add member` command, the juju leader will
+    # put the unit's `member_id` here. After promoting to full voting member, the juju leader
+    # will unset the `member_id` here.
+    learning_member: str = Field(default="")
+    managed_users: dict[int, str] = Field(default_factory=dict)
+    s3_credentials: ExtraSecretStr = Field(default=None)
+    azure_credentials: ExtraSecretStr = Field(default=None)
+    backup_id: str | None = Field(default=None)
+    restore_id: str | None = Field(default=None)
+    restore_instruction: str | None = Field(default=None)
+    restore_verification_failed: str | None = Field(default=None)
+    rebuild_cluster: str | None = Field(default=None)
+    tls_client_private_key: ExtraSecretStr = Field(default=None)
+    tls_peer_private_key: ExtraSecretStr = Field(default=None)
+
+
+class PeerUnitModel(PeerModel):
+    """Model for the peer unit data."""
+
+    hostname: str | None = Field(default=None)
+    private_ip: str | None = Field(default=None)
+    public_ip: str | None = Field(default=None)
+    tls_client_state: str | None = Field(default=None)
+    tls_peer_state: str | None = Field(default=None)
+    client_cert_ready: str | None = Field(default=None)
+    peer_cert_ready: str | None = Field(default=None)
+    tls_peer_certificates_expiring: str | None = Field(default=None)
+    tls_client_certificates_expiring: str | None = Field(default=None)
+    state: str | None = Field(default=None)
+    rebuild_completed: str | None = Field(default=None)
+    tls_peer_ca_rotation: str | None = Field(default=None)
+    tls_client_ca_rotation: str | None = Field(default=None)
+    restore_step: str | None = Field(default=None)
+
+
 class RelationState:
     """Relation state object."""
 
     def __init__(
         self,
         relation: Relation | None,
-        data_interface: Data,
+        data_interface: OpsPeerRepositoryInterface[PeerAppModel]
+        | OpsPeerUnitRepositoryInterface[PeerUnitModel]
+        | OpsOtherPeerUnitRepositoryInterface[PeerUnitModel],
         component: Unit | Application | None,
         substrate: SUBSTRATES,
     ):
@@ -43,9 +98,8 @@ class RelationState:
         self.data_interface = data_interface
         self.component = component
         self.substrate = substrate
-        self.relation_data = self.data_interface.as_dict(self.relation.id) if self.relation else {}
 
-    def update(self, items: dict[str, str]) -> None:
+    def update(self, items: dict[str, Any]) -> None:
         """Write to relation data."""
         if not self.relation:
             logger.warning(
@@ -56,27 +110,30 @@ class RelationState:
         delete_fields = [key for key in items if not items[key]]
         update_content = {k: items[k] for k in items if k not in delete_fields}
 
-        self.relation_data.update(update_content)
+        model = self.data_interface.build_model(self.relation.id)
+        for field, value in update_content.items():
+            setattr(model, field.replace("-", "_"), value)
 
         for field in delete_fields:
-            # use del instead of pop here because of error with dataplatform-libs
-            try:
-                del self.relation_data[field]
-            except KeyError:
-                pass
+            setattr(model, field.replace("-", "_"), None)
+
+        self.data_interface.write_model(self.relation.id, model)
 
 
+@final
 class EtcdServer(RelationState):
     """State/Relation data collection for a unit."""
 
     def __init__(
         self,
         relation: Relation | None,
-        data_interface: DataPeerUnitData,
+        data_interface: OpsPeerUnitRepositoryInterface[PeerUnitModel]
+        | OpsOtherPeerUnitRepositoryInterface[PeerUnitModel],
         component: Unit,
         substrate: SUBSTRATES,
     ):
         super().__init__(relation, data_interface, component, substrate)
+        self.data_interface = data_interface
         self.unit = component
 
     @property
@@ -95,14 +152,9 @@ class EtcdServer(RelationState):
         return f"{self.unit.app.name}{self.unit_id}"
 
     @property
-    def hostname(self) -> str:
-        """The hostname for the unit."""
-        return self.relation_data.get("hostname", "")
-
-    @property
-    def ip(self) -> str:
-        """The IP address for the unit."""
-        return self.relation_data.get("private_ip", "")
+    def model(self) -> PeerUnitModel | None:
+        """The peer relation model for this unit."""
+        return self.data_interface.build_model(self.relation.id) if self.relation else None
 
     @property
     def peer_url(self) -> str:
@@ -110,7 +162,7 @@ class EtcdServer(RelationState):
         scheme = "https" if self.tls_peer_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
         # `peer_url` MUST be IP address, etcd does not support using DNS names for the listeners
         # see https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.2.md#breaking-changes
-        return f"{scheme}://{self.ip}:{PEER_PORT}"
+        return f"{scheme}://{self.model.private_ip}:{PEER_PORT}" if self.model else ""
 
     @property
     def client_url(self) -> str:
@@ -118,27 +170,35 @@ class EtcdServer(RelationState):
         scheme = "https" if self.tls_client_state in [TLSState.TLS, TLSState.TO_NO_TLS] else "http"
         # `client_url` MUST be IP address, etcd does not support using DNS names for the listeners
         # see https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.2.md#breaking-changes
-        return f"{scheme}://{self.ip}:{CLIENT_PORT}"
+        return f"{scheme}://{self.model.private_ip}:{CLIENT_PORT}" if self.model else ""
 
     @property
     def tls_client_state(self) -> TLSState:
         """The current TLS state of the etcd server."""
-        return TLSState(self.relation_data.get("tls_client_state", TLSState.NO_TLS.value))
+        return (
+            TLSState(self.model.tls_client_state or TLSState.NO_TLS.value)
+            if self.model
+            else TLSState.NO_TLS
+        )
 
     @property
     def tls_peer_state(self) -> TLSState:
         """The current TLS state of the etcd server."""
-        return TLSState(self.relation_data.get("tls_peer_state", TLSState.NO_TLS.value))
+        return (
+            TLSState(self.model.tls_peer_state or TLSState.NO_TLS.value)
+            if self.model
+            else TLSState.NO_TLS
+        )
 
     @property
     def peer_cert_ready(self) -> bool:
         """Check if the peer certificate is ready."""
-        return self.relation_data.get("peer_cert_ready", "") == "True"
+        return self.model.peer_cert_ready == "True" if self.model else False
 
     @property
     def client_cert_ready(self) -> bool:
         """Check if the client certificate is ready."""
-        return self.relation_data.get("client_cert_ready", "") == "True"
+        return self.model.client_cert_ready == "True" if self.model else False
 
     @property
     def certs_ready(self) -> bool:
@@ -148,12 +208,12 @@ class EtcdServer(RelationState):
     @property
     def tls_peer_certs_expiring(self) -> bool:
         """Check if any certificate is expiring."""
-        return self.relation_data.get("tls_peer_certificates_expiring", "") == "True"
+        return self.model.tls_peer_certificates_expiring == "True" if self.model else False
 
     @property
     def tls_client_certs_expiring(self) -> bool:
         """Check if any certificate is expiring."""
-        return self.relation_data.get("tls_client_certificates_expiring", "") == "True"
+        return self.model.tls_client_certificates_expiring == "True" if self.model else False
 
     @property
     def member_endpoint(self) -> str:
@@ -163,31 +223,43 @@ class EtcdServer(RelationState):
     @property
     def is_started(self) -> bool:
         """Check if the unit has started."""
-        return self.relation_data.get("state", "") == "started"
+        return self.model.state == "started" if self.model else False
 
     @property
     def rebuild_completed(self) -> bool:
         """Check if the has been processed for cluster rebuild."""
-        return self.relation_data.get("rebuild_completed", "") == "True"
+        return self.model.rebuild_completed == "True" if self.model else False
 
     @property
     def tls_peer_ca_rotation_state(self) -> TLSCARotationState:
         """Check if the peer CA rotation is enabled."""
-        return TLSCARotationState(
-            self.relation_data.get("tls_peer_ca_rotation", TLSCARotationState.NO_ROTATION.value)
+        return (
+            TLSCARotationState(
+                self.model.tls_peer_ca_rotation or TLSCARotationState.NO_ROTATION.value
+            )
+            if self.model
+            else TLSCARotationState.NO_ROTATION
         )
 
     @property
     def tls_client_ca_rotation_state(self) -> TLSCARotationState:
         """Check if the client CA rotation is enabled."""
-        return TLSCARotationState(
-            self.relation_data.get("tls_client_ca_rotation", TLSCARotationState.NO_ROTATION.value)
+        return (
+            TLSCARotationState(
+                self.model.tls_client_ca_rotation or TLSCARotationState.NO_ROTATION.value
+            )
+            if self.model
+            else TLSCARotationState.NO_ROTATION
         )
 
     @property
     def restore_step(self) -> RestoreStep:
         """Get the current progress of the restore workflow."""
-        return RestoreStep(self.relation_data.get("restore_step", ""))
+        return (
+            RestoreStep(self.model.restore_step or RestoreStep.NOT_STARTED.value)
+            if self.model
+            else RestoreStep.NOT_STARTED
+        )
 
     @property
     def is_juju_leader(self) -> bool:
@@ -195,28 +267,30 @@ class EtcdServer(RelationState):
         return self.unit.is_leader()
 
 
+@final
 class EtcdCluster(RelationState):
     """State/Relation data collection for the etcd application."""
 
     def __init__(
         self,
         relation: Relation | None,
-        data_interface: DataPeerData,
+        data_interface: OpsPeerRepositoryInterface[PeerAppModel],
         component: Application,
         substrate: SUBSTRATES,
     ):
         super().__init__(relation, data_interface, component, substrate)
         self.app = component
+        self.data_interface = data_interface
 
     @property
-    def cluster_state(self) -> str:
-        """The cluster state ('new' or 'existing') of the etcd cluster."""
-        return self.relation_data.get("cluster_state", "")
+    def model(self) -> PeerAppModel | None:
+        """The peer relation model for this application."""
+        return self.data_interface.build_model(self.relation.id) if self.relation else None
 
     @property
     def internal_user_credentials(self) -> dict[str, str]:
         """Retrieve the credentials for the internal admin user."""
-        if password := self.relation_data.get(f"{INTERNAL_USER}-password"):
+        if self.model and (password := self.model.root_password):
             return {INTERNAL_USER: password}
 
         return {}
@@ -224,7 +298,7 @@ class EtcdCluster(RelationState):
     @property
     def tls_client_private_key(self) -> PrivateKey | None:
         """Retrieve the private key for client TLS."""
-        if private_key := self.relation_data.get("tls-client-private-key"):
+        if self.model and (private_key := self.model.tls_client_private_key):
             private_key = PrivateKey(raw=private_key)
             return private_key
 
@@ -233,7 +307,7 @@ class EtcdCluster(RelationState):
     @property
     def tls_peer_private_key(self) -> PrivateKey | None:
         """Retrieve the private key for peer TLS."""
-        if private_key := self.relation_data.get("tls-peer-private-key"):
+        if self.model and (private_key := self.model.tls_peer_private_key):
             private_key = PrivateKey(raw=private_key)
             return private_key
 
@@ -242,85 +316,48 @@ class EtcdCluster(RelationState):
     @property
     def auth_enabled(self) -> bool:
         """Flag to check if authentication is already enabled in the Cluster."""
-        return self.relation_data.get("authentication", "") == "enabled"
-
-    @property
-    def cluster_members(self) -> str:
-        """Get the list of current members added to the etcd cluster.
-
-        This string is the output of the `etcdctl member add` command issued by the juju leader
-        when a new unit joins and is added as cluster member. This string needs to be provided
-        as an argument `--initial-cluster` when starting the workload on the newly added unit.
-
-        This data is added to the peer cluster relation app databag when the first unit initializes
-        the cluster on startup after deployment.
-        """
-        return self.relation_data.get("cluster_members", "")
-
-    @property
-    def learning_member(self) -> str:
-        """Get the current learning member.
-
-        New cluster members are added to the etcd cluster as so-called learning members. That means
-        they are not participating in raft leader election because they do not yet have up-to-data
-        data. When added as cluster members with the `add member` command, the juju leader will
-        put the unit's `member_id` here. After promoting to full voting member, the juju leader
-        will unset the `member_id` here.
-        """
-        return self.relation_data.get("learning_member", "")
-
-    @property
-    def managed_users(self) -> dict[int, str]:
-        """Get the list of managed users."""
-        return {
-            int(key): value
-            for key, value in json.loads(self.relation_data.get("managed_users", "{}")).items()
-        }
+        return self.model.authentication == "enabled" if self.model else False
 
     @property
     def s3_credentials(self) -> dict[str, str]:
         """Get credentials and parameters to access s3 object storage."""
-        return json.loads(self.relation_data.get("s3-credentials", "{}"))
+        if not self.model:
+            return {}
+        return json.loads(self.model.s3_credentials if self.model.s3_credentials else "{}")
 
     @property
     def azure_credentials(self) -> dict[str, str]:
         """Get credentials and parameters to access azure object storage."""
-        return json.loads(self.relation_data.get("azure-credentials", "{}"))
-
-    @property
-    def backup_id(self) -> str:
-        """Id of the backup that is currently being created."""
-        return self.relation_data.get("backup_id", "")
+        if not self.model:
+            return {}
+        return json.loads(self.model.azure_credentials if self.model.azure_credentials else "{}")
 
     @property
     def is_backup_in_progress(self) -> bool:
         """Flag to indicate if the cluster is creating a backup."""
-        return bool(self.backup_id)
-
-    @property
-    def restore_id(self) -> str:
-        """Backup id to restore."""
-        return self.relation_data.get("restore_id", "")
+        return bool(self.model.backup_id) if self.model else False
 
     @property
     def is_restore_in_progress(self) -> bool:
         """Flag to indicate if the cluster is restoring a backup."""
-        return bool(self.restore_id)
+        return bool(self.model.restore_id) if self.model else False
 
     @property
     def restore_instruction(self) -> RestoreStep:
         """Current step of the restore workflow to be executed by the cluster members."""
-        return RestoreStep(self.relation_data.get("restore_instruction", ""))
+        if not self.model or not self.model.restore_instruction:
+            return RestoreStep.NOT_STARTED
+        return RestoreStep(self.model.restore_instruction)
 
     @property
     def restore_verification_failed(self) -> bool:
         """Flag for failed restore verification."""
-        return bool(self.relation_data.get("restore_verification_failed", ""))
+        return bool(self.model.restore_verification_failed) if self.model else False
 
     @property
     def rebuild_cluster_in_progress(self) -> bool:
         """Flag to indicate if the cluster is being rebuilt to recover from majority failure."""
-        return bool(self.relation_data.get("rebuild_cluster", ""))
+        return bool(self.model.rebuild_cluster) if self.model else False
 
 
 @dataclass

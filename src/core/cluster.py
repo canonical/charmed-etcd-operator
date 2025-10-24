@@ -7,11 +7,13 @@
 import logging
 from typing import TYPE_CHECKING, Dict, Set
 
-from charms.data_platform_libs.v0.data_interfaces import (
-    DataPeerData,
-    DataPeerOtherUnitData,
-    DataPeerUnitData,
-    EtcdProviderData,
+from charms.data_platform_libs.v1.data_interfaces import (
+    OpsOtherPeerUnitRepositoryInterface,
+    OpsPeerRepositoryInterface,
+    OpsPeerUnitRepositoryInterface,
+    OpsRelationRepositoryInterface,
+    RequirerCommonModel,
+    ResourceProviderEventHandler,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
     ProviderCertificate,
@@ -19,7 +21,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 from data_platform_helpers.advanced_statuses.protocol import StatusesState, StatusesStateProtocol
 from ops import ModelError, Object, Relation, SecretNotFoundError, Unit
 
-from core.models import EtcdCluster, EtcdServer
+from core.models import EtcdCluster, EtcdServer, PeerAppModel, PeerUnitModel
 from literals import (
     AZURE_RELATION_NAME,
     CLIENT_TLS_RELATION_NAME,
@@ -27,7 +29,6 @@ from literals import (
     PEER_RELATION,
     PEER_TLS_RELATION_NAME,
     S3_RELATION_NAME,
-    SECRETS_APP,
     STATUS_PEERS_RELATION,
     SUBSTRATES,
 )
@@ -45,10 +46,12 @@ class ClusterState(Object, StatusesStateProtocol):
         super().__init__(parent=charm, key="charm_state")
         self.charm = charm
         self.substrate: SUBSTRATES = substrate
-        self.peer_app_interface = DataPeerData(
-            self.model, relation_name=PEER_RELATION, additional_secret_fields=SECRETS_APP
+        self.peer_app_interface = OpsPeerRepositoryInterface(
+            model=charm.model, relation_name=PEER_RELATION, data_model=PeerAppModel
         )
-        self.peer_unit_interface = DataPeerUnitData(self.model, relation_name=PEER_RELATION)
+        self.peer_unit_interface = OpsPeerUnitRepositoryInterface(
+            model=charm.model, relation_name=PEER_RELATION, data_model=PeerUnitModel
+        )
         self.statuses_relation_name = STATUS_PEERS_RELATION
         self.statuses = StatusesState(self, self.statuses_relation_name)
         self.config = charm.config
@@ -69,13 +72,20 @@ class ClusterState(Object, StatusesStateProtocol):
         )
 
     @property
-    def peer_units_data_interfaces(self) -> Dict[Unit, DataPeerOtherUnitData]:
+    def peer_units_data_interfaces(
+        self,
+    ) -> Dict[Unit, OpsOtherPeerUnitRepositoryInterface[PeerUnitModel]]:
         """Get unit data interface of all peer units from the cluster peer relation."""
         if not self.peer_relation or not self.peer_relation.units:
             return {}
 
         return {
-            unit: DataPeerOtherUnitData(model=self.model, unit=unit, relation_name=PEER_RELATION)
+            unit: OpsOtherPeerUnitRepositoryInterface(
+                model=self.charm.model,
+                relation_name=PEER_RELATION,
+                unit=unit,
+                data_model=PeerUnitModel,
+            )
             for unit in self.peer_relation.units
         }
 
@@ -126,9 +136,18 @@ class ClusterState(Object, StatusesStateProtocol):
         return self.model.get_relation(CLIENT_TLS_RELATION_NAME)
 
     @property
-    def etcd_provides(self) -> EtcdProviderData:
+    def etcd_provides_interface(self) -> OpsRelationRepositoryInterface[RequirerCommonModel]:
         """Get the etcd provides interface."""
-        return EtcdProviderData(self.model, relation_name=EXTERNAL_CLIENTS_RELATION)
+        return OpsRelationRepositoryInterface(
+            model=self.charm.model,
+            relation_name=EXTERNAL_CLIENTS_RELATION,
+            data_model=RequirerCommonModel,
+        )
+
+    @property
+    def etcd_provides_event_handler(self) -> ResourceProviderEventHandler:
+        """Get the etcd provides event handler."""
+        return self.charm.external_clients_events.etcd_provides
 
     @property
     def tls_client_certificate(self) -> ProviderCertificate:

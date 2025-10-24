@@ -132,7 +132,7 @@ class EtcdEvents(Object):
 
         self.charm.config_manager.set_config_properties()
 
-        if not self.charm.state.cluster.cluster_state and self.charm.unit.is_leader():
+        if not self.charm.state.cluster.model.cluster_state and self.charm.unit.is_leader():
             # this is the very first cluster start, this unit starts without being added as member
             # all subsequent units will have to be added as member before starting the workload
             self.charm.status.set_running_status(
@@ -167,7 +167,7 @@ class EtcdEvents(Object):
                     raise
         elif (
             self.charm.state.unit_server.member_endpoint
-            in self.charm.state.cluster.cluster_members
+            in self.charm.state.cluster.model.cluster_members
         ):
             # this unit has been added to the etcd cluster
             if not self.charm.state.cluster.auth_enabled:
@@ -244,7 +244,11 @@ class EtcdEvents(Object):
 
         # refresh the host information and cluster membership in case of ip change
         ip_address = self.charm.workload.get_host_mapping().get("private_ip")
-        if ip_address and ip_address != self.charm.state.unit_server.ip:
+        if (
+            ip_address
+            and self.charm.state.unit_server.model
+            and ip_address != self.charm.state.unit_server.model.private_ip
+        ):
             logger.info(f"New ip address: {ip_address}")
             # before we do any cluster operation, we must update client certificates
             # otherwise the certificate will be invalid and the cluster operation will fail
@@ -339,7 +343,7 @@ class EtcdEvents(Object):
             return
 
         if self.charm.unit.is_leader():
-            if self.charm.state.cluster.learning_member:
+            if self.charm.state.cluster.model.learning_member:
                 try:
                     # this will promote any learner, not only the unit that updated its relation data
                     self.charm.cluster_manager.promote_learning_member()
@@ -365,6 +369,20 @@ class EtcdEvents(Object):
                     {f"tls_{tls_type.value}_certificates_expiring": "True"}
                 )
 
+        # update client CA truststore if changed
+        if (
+            self.charm.state.unit_server.tls_client_state == TLSState.TLS
+            and self.charm.state.unit_server.tls_peer_ca_rotation_state
+            == TLSCARotationState.NO_ROTATION
+            and self.charm.state.unit_server.tls_client_ca_rotation_state
+            == TLSCARotationState.NO_ROTATION
+            and (all_cas := self.charm.tls_manager.collect_client_cas())
+            != self.charm.tls_manager.load_trusted_ca(TLSType.CLIENT)
+        ):
+            logger.debug("CAs have changed, updating client truststore")
+            self.charm.tls_manager.update_cas(all_cas, TLSType.CLIENT)
+            self.charm.rolling_restart()
+
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle event received by all units when a unit leaves the cluster relation."""
         if not self.charm.unit.is_leader():
@@ -374,7 +392,7 @@ class EtcdEvents(Object):
             # this must not overwrite already cleaned up application databag
             # it should only happen if at least this unit's workload is still running
             logger.debug(f"Removing {event.unit.name} from cluster state in peer relation.")
-            cluster_members = self.charm.state.cluster.cluster_members.split(",")
+            cluster_members = self.charm.state.cluster.model.cluster_members.split(",")
             # re-assemble the string without the departing unit
             updated_cluster_members = ",".join(
                 m for m in cluster_members if event.unit.name.replace("/", "") not in m
@@ -433,7 +451,8 @@ class EtcdEvents(Object):
     def _on_update_status(self, event: ops.UpdateStatusEvent) -> None:
         """Handle update_status event."""
         if (
-            not self.charm.state.cluster.cluster_state
+            not self.charm.state.cluster.model
+            or not self.charm.state.cluster.model.cluster_state
             or self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
             or self.charm.state.unit_server.tls_client_ca_rotation_state
@@ -675,19 +694,19 @@ class EtcdEvents(Object):
                 self.charm.state.unit_server.update({"rebuild_completed": "True"})
             elif (
                 all(unit.rebuild_completed for unit in self.charm.state.servers)
-                and not self.charm.state.cluster.learning_member
+                and not self.charm.state.cluster.model.learning_member
                 and self.charm.cluster_manager.is_healthy()
             ):
                 logger.info("All units started again - cluster rebuild completed.")
                 self.charm.state.cluster.update({"rebuild_cluster": ""})
 
-            if self.charm.state.cluster.learning_member:
+            if self.charm.state.cluster.model.learning_member:
                 self.charm.cluster_manager.promote_learning_member()
 
             if self.charm.state.unit_server.rebuild_completed:
                 # after leader has started again, subsequently add all other units
                 for unit in self.charm.state.servers:
-                    if unit.member_endpoint not in self.charm.state.cluster.cluster_members:
+                    if unit.member_endpoint not in self.charm.state.cluster.model.cluster_members:
                         # we only add one learner at a time to not overload the raft leader
                         self.charm.cluster_manager.add_member(unit.unit_name)
                         break
@@ -695,7 +714,7 @@ class EtcdEvents(Object):
             return
 
         # this is the workflow for non-leader units
-        if not self.charm.state.cluster.cluster_members:
+        if not self.charm.state.cluster.model.cluster_members:
             # the action was executed on the leader, cluster member configuration was cleared
             # clean up in case a previous run failed
             self.charm.state.unit_server.update({"rebuild_completed": ""})
@@ -717,7 +736,7 @@ class EtcdEvents(Object):
 
         if (
             self.charm.state.unit_server.member_endpoint
-            in self.charm.state.cluster.cluster_members
+            in self.charm.state.cluster.model.cluster_members
             and not self.charm.state.unit_server.is_started
         ):
             # startup phase

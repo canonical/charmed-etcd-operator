@@ -442,13 +442,16 @@ class TLSManager(ManagerStatusProtocol):
             logger.warning("No client CA found in the TLS client certificate.")
 
         # managed users cas
-        for relation in self.state.etcd_provides.relations:
-            mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
-            logger.debug(
-                f"Collecting CA from relation {relation.id}, chain exists: {bool(mtls_cert)}"
-            )
-            if mtls_cert and is_leaf_certificate_valid(mtls_cert):
-                cas.add(leaf_certificate(mtls_cert))
+        for relation in self.state.etcd_provides_interface.relations:
+            for request in self.state.etcd_provides_event_handler.requests(relation):
+                mtls_cert = request.mtls_cert
+                logger.debug(
+                    "Collecting CA from relation %s, chain exists: %s",
+                    relation.id,
+                    bool(mtls_cert),
+                )
+                if mtls_cert and is_leaf_certificate_valid(mtls_cert):
+                    cas.add(leaf_certificate(mtls_cert))
 
         # certificate transfer cas
         cas.update(self.state.tls_certificate_transfer_certificates)

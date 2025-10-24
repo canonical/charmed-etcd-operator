@@ -4,6 +4,7 @@
 
 import asyncio
 import logging
+import random
 from datetime import timedelta
 
 import pytest
@@ -192,7 +193,10 @@ async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
 async def test_update_mtls_cert(ops_test: OpsTest) -> None:
     """Test updating the common name used by the requirer app."""
     # generate new mtls cert
-    mtls_cert, mtls_ca = generate_mtls_chain("new-common-name")
+    # new_common_name = "new-common-name"
+    # random common name
+    new_common_name = f"new-common-name-{random.randint(1000, 9999)}"
+    mtls_cert, mtls_ca = generate_mtls_chain(new_common_name)
     # run juju action to update the common name
     requirer_unit: Unit = ops_test.model.applications[REQUIRER_NAME].units[0]
     # we send all chain to test that etcd only stores the leaf certificate
@@ -211,7 +215,7 @@ async def test_update_mtls_cert(ops_test: OpsTest) -> None:
 
     # get common name from the requirer charm
     common_name = await get_requirer_common_name(ops_test)
-    assert common_name == "new-common-name", "common name not updated"
+    assert common_name == new_common_name, "common name not updated"
 
     old_mtls_cert = await get_requirer_mtls_certificate(ops_test)
     assert old_mtls_cert, "failed to get the old mtls cert from requirer TLS provider"

@@ -108,7 +108,7 @@ def test_start():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
+            "cluster-state": "existing",
         },
     )
     state_in = testing.State(leader=False, relations={relation, status_peer_relation})
@@ -156,7 +156,7 @@ def test_start():
         state_out = ctx.run(ctx.on.start(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
-        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "existing"
+        assert state_out.get_relation(1).local_app_data.get("cluster-state") == "existing"
 
     # if the cluster is reusing storage, the workload should start and broadcast its peer URL
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION, local_app_data={})
@@ -176,11 +176,11 @@ def test_start():
         broadcast_peer_url.assert_called()
         assert state_out.unit_status == ops.ActiveStatus()
         assert state_out.get_relation(1).local_app_data.get("authentication") == "enabled"
-        assert state_out.get_relation(1).local_app_data.get("cluster_state") == "existing"
+        assert state_out.get_relation(1).local_app_data.get("cluster-state") == "existing"
 
     # if the cluster already exists, the leader should not start but wait for being added as member
     relation = testing.PeerRelation(
-        id=1, endpoint=PEER_RELATION, local_app_data={"cluster_state": "existing"}
+        id=1, endpoint=PEER_RELATION, local_app_data={"cluster-state": "existing"}
     )
     state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
@@ -209,11 +209,11 @@ def test_start():
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
             "authentication": "enabled",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0"},
+        local_unit_data={"hostname": "charmed-etcd0", "private-ip": "ip0"},
     )
     state_in = testing.State(relations={relation, status_peer_relation})
     with (
@@ -232,10 +232,10 @@ def test_start():
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://ip0:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private-ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
@@ -254,10 +254,10 @@ def test_start():
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://ip0:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private-ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation, status_peer_relation}, leader=True)
     with (
@@ -277,10 +277,10 @@ def test_start():
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0"},
+        local_unit_data={"hostname": "charmed-etcd0", "private-ip": "ip0"},
     )
     state_in = testing.State(relations={relation, status_peer_relation})
     with (
@@ -300,9 +300,10 @@ def test_update_status():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
+        local_unit_data={"private-ip": "ip0", "state": "started"},
     )
     status_peer_relation = testing.PeerRelation(
         id=2,
@@ -337,7 +338,9 @@ def test_update_status():
         patch("workload.EtcdWorkload.alive", return_value=True),
         patch("managers.cluster.ClusterManager.clean_users"),
     ):
-        with ctx(ctx.on.update_status(), testing.State(storages=[data_storage])) as context:
+        with ctx(
+            ctx.on.update_status(), testing.State(storages=[data_storage], relations={relation})
+        ) as context:
             data = context.charm.model.storages["data"][0]
             data_loc = data.location
             data_path = data_loc / "myfile.data"
@@ -356,14 +359,16 @@ def test_update_status():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=https://:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=https://ip0:2380",
         },
         local_unit_data={
-            "tls_peer_state": TLSState.TLS.value,
-            "tls_client_state": TLSState.TLS.value,
-            "tls_client_certificates_expiring": "",
-            "tls_peer_certificates_expiring": "",
+            "private-ip": "ip0",
+            "state": "started",
+            "tls-peer-state": TLSState.TLS.value,
+            "tls-client-state": TLSState.TLS.value,
+            "tls-client-certificates-expiring": "",
+            "tls-peer-certificates-expiring": "",
         },
     )
 
@@ -380,11 +385,11 @@ def test_update_status():
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert status_is(state_out, TLSStatuses.TLS_PEER_CERTS_EXPIRING.value)
         assert (
-            state_out.get_relation(1).local_unit_data.get("tls_client_certificates_expiring")
+            state_out.get_relation(1).local_unit_data.get("tls-client-certificates-expiring")
             == "True"
         )
         assert (
-            state_out.get_relation(1).local_unit_data.get("tls_peer_certificates_expiring")
+            state_out.get_relation(1).local_unit_data.get("tls-peer-certificates-expiring")
             == "True"
         )
 
@@ -394,14 +399,16 @@ def test_update_status():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=https://:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=https://ip0:2380",
         },
         local_unit_data={
-            "tls_peer_state": TLSState.TLS.value,
-            "tls_client_state": TLSState.TLS.value,
-            "tls_client_certificates_expiring": "",
-            "tls_peer_certificates_expiring": "",
+            "private-ip": "ip0",
+            "state": "started",
+            "tls-peer-state": TLSState.TLS.value,
+            "tls-client-state": TLSState.TLS.value,
+            "tls-client-certificates-expiring": "",
+            "tls-peer-certificates-expiring": "",
         },
     )
 
@@ -415,10 +422,10 @@ def test_update_status():
         state_out = ctx.run(ctx.on.update_status(), state_in)
         assert state_out.unit_status == ops.ActiveStatus()
         assert (
-            state_out.get_relation(1).local_unit_data.get("tls_client_certificates_expiring") == ""
+            state_out.get_relation(1).local_unit_data.get("tls-client-certificates-expiring") == ""
         )
         assert (
-            state_out.get_relation(1).local_unit_data.get("tls_peer_certificates_expiring") == ""
+            state_out.get_relation(1).local_unit_data.get("tls-peer-certificates-expiring") == ""
         )
 
 
@@ -444,9 +451,9 @@ def test_removal_of_inconsistent_members():
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={
-            "cluster_state": "existing",
+            "cluster-state": "existing",
             "authentication": "enabled",
-            "cluster_members": "remote0=http://ip0:2380,remote1=http://ip1:2380",
+            "cluster-members": "remote0=http://ip0:2380,remote1=http://ip1:2380",
         },
     )
     status_peers_relation = testing.PeerRelation(
@@ -512,10 +519,10 @@ def test_cluster_majority_failure():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://ip0:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://ip0:2380",
         },
-        local_unit_data={"private_ip": "ip0", "state": "started"},
+        local_unit_data={"private-ip": "ip0", "state": "started"},
     )
     status_peer_relation = testing.PeerRelation(
         id=2,
@@ -561,7 +568,7 @@ def test_cluster_majority_failure():
 
 
 def test_peer_relation_created():
-    test_data = {"hostname": "my_hostname", "private_ip": "my_ip"}
+    test_data = {"hostname": "my_hostname", "private-ip": "my_ip"}
 
     ctx = testing.Context(EtcdOperatorCharm)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
@@ -635,8 +642,8 @@ def test_set_config_options():
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_unit_data={"private_ip": "my_ip", "state": "started"},
-        local_app_data={"cluster_state": "existing", "authentication": "enabled"},
+        local_unit_data={"private-ip": "my_ip", "state": "started"},
+        local_app_data={"cluster-state": "existing", "authentication": "enabled"},
     )
     ctx = testing.Context(EtcdOperatorCharm)
 
@@ -775,8 +782,8 @@ def test_secret_changed():
         endpoint=PEER_RELATION,
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://:2380",
         },
     )
     status_peer_relation = testing.PeerRelation(
@@ -830,7 +837,7 @@ def test_peer_relation_joined():
         endpoint=PEER_RELATION,
         local_unit_data={
             "hostname": "charmed-etcd0",
-            "private_ip": "ip0",
+            "private-ip": "ip0",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -842,12 +849,12 @@ def test_peer_relation_joined():
         endpoint=PEER_RELATION,
         local_unit_data={
             "hostname": "charmed-etcd0",
-            "private_ip": "ip0",
+            "private-ip": "ip0",
         },
         peers_data={
             1: {
                 "hostname": "charmed-etcd1",
-                "private_ip": "ip1",
+                "private-ip": "ip1",
             },
         },
     )
@@ -874,9 +881,9 @@ def test_peer_relation_joined():
     ):
         state_out = ctx.run(ctx.on.relation_joined(relation=relation, remote_unit=1), state_in)
         relation = state_out.get_relation(relation.id)
-        assert relation.local_app_data.get("learning_member") == f"{4477466968462020105:x}"
+        assert relation.local_app_data.get("learning-member") == f"{4477466968462020105:x}"
         assert (
-            relation.local_app_data.get("cluster_members")
+            relation.local_app_data.get("cluster-members")
             == "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380"
         )
 
@@ -888,7 +895,7 @@ def test_peer_relation_changed():
         endpoint=PEER_RELATION,
         local_unit_data={
             "hostname": "charmed-etcd0",
-            "private_ip": "ip0",
+            "private-ip": "ip0",
         },
     )
     state_in = testing.State(relations={relation}, leader=True)
@@ -901,17 +908,17 @@ def test_peer_relation_changed():
         peers_data={
             1: {
                 "hostname": "charmed-etcd1",
-                "private_ip": "ip1",
+                "private-ip": "ip1",
                 "state": "started",
             },
         },
         local_app_data={
             "authentication": "enabled",
-            "cluster_state": "existing",
-            "cluster_members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
-            "learning_member": "4477466968462020105",
+            "cluster-state": "existing",
+            "cluster-members": "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380",
+            "learning-member": "3e23287c34b94e0a",
         },
-        local_unit_data={"hostname": "charmed-etcd0", "private_ip": "ip0", "state": "started"},
+        local_unit_data={"hostname": "charmed-etcd0", "private-ip": "ip0", "state": "started"},
     )
     state_in = testing.State(relations={relation}, leader=True)
     with patch(
@@ -929,15 +936,15 @@ def test_peer_relation_changed():
     ):
         state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
         relation = state_out.get_relation(relation.id)
-        assert relation.local_app_data.get("learning_member") is None
+        assert relation.local_app_data.get("learning-member") is None
         assert (
-            relation.local_app_data.get("cluster_members")
+            relation.local_app_data.get("cluster-members")
             == "charmed-etcd0=http://ip0:2380,charmed-etcd1=http://ip1:2380"
         )
         run_etcdctl_args = run_etcdctl.call_args[1]
         assert run_etcdctl_args["command"] == "member"
         assert run_etcdctl_args["subcommand"] == "promote"
-        assert run_etcdctl_args["member"] == "4477466968462020105"
+        assert run_etcdctl_args["member"] == "3e23287c34b94e0a"
         assert (
             run_etcdctl_args["endpoints"] == "http://ip0:2379,http://ip1:2379"
             or run_etcdctl_args["endpoints"] == "http://ip1:2379,http://ip0:2379"
@@ -950,9 +957,9 @@ def test_unit_removal():
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={
-            "cluster_state": "existing",
+            "cluster-state": "existing",
             "authentication": "enabled",
-            "cluster_members": "charmed-etcd0=http://:2380",
+            "cluster-members": "charmed-etcd0=http://:2380",
         },
     )
     status_peer_relation = testing.PeerRelation(
@@ -973,8 +980,8 @@ def test_unit_removal():
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert status_is(state_out, ClusterStatuses.REMOVED.value)
         assert state_out.get_relation(1).local_app_data.get("authentication")
-        assert state_out.get_relation(1).local_app_data.get("cluster_state")
-        assert state_out.get_relation(1).local_app_data.get("cluster_members")
+        assert state_out.get_relation(1).local_app_data.get("cluster-state")
+        assert state_out.get_relation(1).local_app_data.get("cluster-members")
 
     # in case of error when removing the member, unit should in error state
     with (
@@ -1007,8 +1014,8 @@ def test_unit_removal():
         state_out = ctx.run(ctx.on.storage_detaching(data_storage), state_in)
         assert status_is(state_out, ClusterStatuses.REMOVED.value)
         assert not state_out.get_relation(1).local_app_data.get("authentication")
-        assert not state_out.get_relation(1).local_app_data.get("cluster_state")
-        assert not state_out.get_relation(1).local_app_data.get("cluster_members")
+        assert not state_out.get_relation(1).local_app_data.get("cluster-state")
+        assert not state_out.get_relation(1).local_app_data.get("cluster-members")
 
 
 def test_rebuild_cluster_action_error_cases():
@@ -1100,14 +1107,14 @@ def test_rebuild_cluster_action_happy_path():
         disable_etcd.assert_called_once()
         assert ctx.action_results == {"result": "cluster rebuild in progress"}
         assert status_is(state_out, ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
-        assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
+        assert state_out.get_relation(1).local_app_data.get("rebuild-cluster")
         assert not state_out.get_relation(1).local_unit_data.get("state") == "started"
 
     # ensure action can be run multiple times
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True"},
+        local_app_data={"rebuild-cluster": "True"},
     )
     state_in = testing.State(relations={peer_relation, status_peer_relation}, leader=True)
     with (
@@ -1119,7 +1126,7 @@ def test_rebuild_cluster_action_happy_path():
 
         assert ctx.action_results == {"result": "cluster rebuild in progress"}
         assert status_is(state_out, ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
-        assert state_out.get_relation(1).local_app_data.get("rebuild_cluster")
+        assert state_out.get_relation(1).local_app_data.get("rebuild-cluster")
 
 
 def test_rebuild_cluster_workflow_synchronisation():
@@ -1129,7 +1136,7 @@ def test_rebuild_cluster_workflow_synchronisation():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True", "cluster_state": "existing"},
+        local_app_data={"rebuild-cluster": "True", "cluster-state": "existing"},
         local_unit_data={"state": "started"},
     )
     state_in = testing.State(relations={peer_relation}, leader=False)
@@ -1150,7 +1157,7 @@ def test_rebuild_cluster_workflow_synchronisation():
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
-        local_app_data={"rebuild_cluster": "True", "cluster_state": "existing"},
+        local_app_data={"rebuild-cluster": "True", "cluster-state": "existing"},
         local_unit_data={},
     )
     state_in = testing.State(relations={peer_relation}, leader=True)
@@ -1168,18 +1175,18 @@ def test_rebuild_cluster_workflow_synchronisation():
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
-        assert state_out.get_relation(1).local_unit_data.get("rebuild_completed") == "True"
+        assert state_out.get_relation(1).local_unit_data.get("rebuild-completed") == "True"
 
     # after leader has initialised and non-leader unit was added, it starts
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={
-            "rebuild_cluster": "True",
-            "cluster_state": "existing",
-            "cluster_members": "etcd0=http://ip0:2380,etcd1=http://ip1:2380",
+            "rebuild-cluster": "True",
+            "cluster-state": "existing",
+            "cluster-members": "etcd0=http://ip0:2380,etcd1=http://ip1:2380",
         },
-        local_unit_data={"hostname": "etcd0", "private_ip": "ip0"},
+        local_unit_data={"hostname": "etcd0", "private-ip": "ip0"},
     )
     state_in = testing.State(relations={peer_relation}, leader=False)
 
@@ -1195,22 +1202,22 @@ def test_rebuild_cluster_workflow_synchronisation():
         start_etcd.assert_called_once()
         enable_etcd.assert_called_once()
         assert state_out.get_relation(1).local_unit_data.get("state") == "started"
-        assert state_out.get_relation(1).local_unit_data.get("rebuild_completed") == "True"
+        assert state_out.get_relation(1).local_unit_data.get("rebuild-completed") == "True"
 
     # after all units started, leader performs health check and completes workflow
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
         local_app_data={
-            "rebuild_cluster": "True",
-            "cluster_state": "existing",
-            "cluster_members": "etcd0=http://ip0:2380,etcd1=http://ip1:2380",
+            "rebuild-cluster": "True",
+            "cluster-state": "existing",
+            "cluster-members": "etcd0=http://ip0:2380,etcd1=http://ip1:2380",
         },
         local_unit_data={
             "state": "started",
-            "rebuild_completed": "True",
+            "rebuild-completed": "True",
             "hostname": "etcd0",
-            "private_ip": "ip0",
+            "private-ip": "ip0",
         },
     )
     state_in = testing.State(relations={peer_relation}, leader=True)
@@ -1219,4 +1226,4 @@ def test_rebuild_cluster_workflow_synchronisation():
         state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
 
         health_check.assert_called_once()
-        assert not state_out.get_relation(1).local_app_data.get("rebuild_cluster") == "True"
+        assert not state_out.get_relation(1).local_app_data.get("rebuild-cluster") == "True"

@@ -382,5 +382,5 @@ class TLSEvents(Object):
             return
 
         if self.charm.unit.is_leader:
-            self.charm.state.cluster.update({f"tls-{tls_type.value}-private-key": private_key.raw})
+            self.charm.state.cluster.update({f"tls_{tls_type.value}_private_key": private_key.raw})
         self.refresh_tls_certificates_event.emit()

@@ -280,7 +280,7 @@ class BackupEvents(Object):
         ):
             case RestoreStep.DOWNLOAD, RestoreStep.NOT_STARTED:
                 if not self.charm.backup_manager.download_backup_file(
-                    self.charm.state.cluster.restore_id
+                    self.charm.state.cluster.model.restore_id
                 ):
                     self.charm.state.statuses.add(
                         BackupStatuses.RESTORE_FAILED.value, "unit", self.charm.backup_manager.name
@@ -426,7 +426,7 @@ class BackupEvents(Object):
             return
         # if the verification was successful, stop etcd again and continue the workflow
         logger.info(
-            f"Restore verification successful: Backup {self.charm.state.cluster.restore_id} can be restored."
+            f"Restore verification successful: Backup {self.charm.state.cluster.model.restore_id} can be restored."
         )
         self.charm.backup_manager.stop_database()
         self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
