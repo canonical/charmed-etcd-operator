@@ -61,19 +61,13 @@ class EtcdRequires(ops.framework.Object):
 
     @property
     @abstractmethod
-    def common_name(self) -> str:
-        """Return the common name for the certificate."""
-        pass
-
-    @property
-    @abstractmethod
     def etcd_uris(self) -> str | None:
         """Return the etcd uris."""
         pass
 
     @property
     @abstractmethod
-    def credentials(self) -> dict[str, str] | None:
+    def credentials(self) -> dict[str, str | None] | None:
         """Return the etcd credentials."""
         pass
 
@@ -136,22 +130,6 @@ class EtcdRequiresV1(EtcdRequires):
         if not hasattr(self, "etcd_interface"):
             return None
         return self.etcd_interface.relations[0] if len(self.etcd_interface.relations) else None
-
-    @property
-    def common_name(self) -> str:
-        """Return the common name for the certificate."""
-        if not self.etcd_relation:
-            return "requirer-charm"
-
-        request = (
-            self.etcd_relation_local_model.requests[0]
-            if self.etcd_relation_local_model.requests
-            else None
-        )
-        if not request or not request.mtls_cert or request.mtls_cert == "":
-            return "requirer-charm"
-
-        return _get_common_name_from_chain(request.mtls_cert)
 
     @property
     def etcd_uris(self) -> str | None:
@@ -251,17 +229,6 @@ class EtcdRequiresV0(EtcdRequires):
         if not hasattr(self, "etcd_interface"):
             return None
         return self.etcd_interface.relations[0] if len(self.etcd_interface.relations) else None
-
-    @property
-    def common_name(self) -> str:
-        """Return the common name for the certificate."""
-        if not self.etcd_relation:
-            return "requirer-charm"
-        mtls_cert = self.etcd_interface.fetch_my_relation_field(self.etcd_relation.id, "mtls-cert")
-        if not mtls_cert:
-            return "requirer-charm"
-
-        return _get_common_name_from_chain(mtls_cert)
 
     @property
     def etcd_uris(self) -> str | None:
