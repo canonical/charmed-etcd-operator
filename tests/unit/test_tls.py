@@ -854,6 +854,7 @@ def test_set_tls_private_key():
                 ),
             },
             config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
+            leader=True,
         )
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         with pytest.raises(KeyError):
@@ -885,6 +886,7 @@ def test_set_tls_private_key():
                 ),
             },
             config={TLS_PEER_PRIVATE_KEY_CONFIG: secret.id},
+            leader=True,
         )
         newer_private_key = generate_private_key().raw
         secret = dataclasses.replace(
@@ -1019,6 +1021,7 @@ def test_set_tls_private_key():
                 ),
             },
             config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
+            leader=True,
         )
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         with pytest.raises(KeyError):
@@ -1057,6 +1060,7 @@ def test_set_tls_private_key():
                 ),
             },
             config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
+            leader=True,
         )
 
         state_out = ctx.run(ctx.on.secret_changed(secret=secret), state_in)
@@ -1073,6 +1077,7 @@ def test_set_tls_private_key():
         relations=[peer_relation, restart_peer_relation],
         config={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret.id},
         secrets={secret},
+        leader=True,
     )
     current_config_file = {"election-timeout": 1000, "heartbeat-interval": 100}
 
