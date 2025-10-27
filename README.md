@@ -21,13 +21,13 @@ juju add-model sample-model
 To deploy a single unit of charmed etcd, run the following command:
 
 ```shell
-juju deploy charmed-etcd --channel 3.6/edge
+juju deploy charmed-etcd
 ```
 
 To deploy charmed etcd with multiple units, specify the number of desired units with the `-n` option:
 
 ```shell
-juju deploy charmed-etcd --channel 3.6/edge -n 3
+juju deploy charmed-etcd -n 3
 ```
 
 Charmed etcd can be scaled out using the `juju add-unit` command:

@@ -18,7 +18,7 @@ In the following example, we will set `heartbeat-interval` to 300 milliseconds a
 You can either configure these settings at deploy time by adding the configuration to your deploy-command, for example:
 
 ```text
-juju deploy charmed-etcd --channel 3.6/edge -n 3 --config heartbeat-interval=300 --config election-timeout=3000
+juju deploy charmed-etcd -n 3 --config heartbeat-interval=300 --config election-timeout=3000
 ```
 
 Or you can set them on your existing charmed etcd application by running `juju config <application-name>...`, for example:
