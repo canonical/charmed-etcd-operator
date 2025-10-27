@@ -75,8 +75,6 @@ async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> No
 @pytest.mark.abort_on_fail
 async def test_initialize_vault(juju_lxd_model: Juju) -> None:
     """Initialize Vault and wait for it to be ready."""
-    # vault_app = juju_lxd_model.status().apps
-    # vault_unit = vault_app.units[0]
     vault_ip = next(iter(juju_lxd_model.status().get_units(VAULT_NAME).values())).public_address
     secrets = juju_lxd_model.secrets()
     logger.info("Initializing Vault")
