@@ -54,7 +54,7 @@ async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> No
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
 
     # Deploy the TLS charms
     tls_config = {"ca-common-name": "etcd"}
@@ -87,6 +87,7 @@ async def test_initialize_vault(juju_lxd_model: Juju) -> None:
             )
 
     assert vault_ca, "Vault CA certificate not found in secrets"
+    logger.info(f"DEBUG: Value of vault_ca before decoding: {vault_ca!r}")
     vault_ca = base64.b64decode(vault_ca).decode("utf-8")
     Path("./vault_ca.pem").write_text(vault_ca)
 

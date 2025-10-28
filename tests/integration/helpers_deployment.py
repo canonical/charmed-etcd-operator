@@ -302,7 +302,7 @@ def _is_every_condition_on_units_met(
 def apps_active_and_agents_idle(
     status: jubilant.Status,
     *apps: str,
-    idle_period: int = 10,
+    idle_period: int = 0,
     unit_count: Union[int, Dict[str, int]] | None = None,
 ) -> bool:
     return (
@@ -314,9 +314,7 @@ def apps_active_and_agents_idle(
             for app in apps
             for unit in status.get_units(app).values()
         )
-        and True
-        if not unit_count
-        else verify_unit_count(status, *apps, unit_count=unit_count)
+        and (True if not unit_count else verify_unit_count(status, *apps, unit_count=unit_count))
     )
 
 
