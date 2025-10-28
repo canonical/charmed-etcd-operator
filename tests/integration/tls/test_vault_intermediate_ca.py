@@ -87,8 +87,13 @@ async def test_initialize_vault(juju_lxd_model: Juju) -> None:
             )
 
     assert vault_ca, "Vault CA certificate not found in secrets"
+
+    lines = vault_ca.strip().split('\n')
+    base64_lines = lines[1:-1]
+    base64_data = "".join(base64_lines)
     logger.info(f"DEBUG: Value of vault_ca before decoding: {vault_ca!r}")
-    vault_ca = base64.b64decode(vault_ca).decode("utf-8")
+    vault_ca = base64.b64decode(base64_data).decode("utf-8")
+
     Path("./vault_ca.pem").write_text(vault_ca)
 
     vault_env = os.environ.copy()
