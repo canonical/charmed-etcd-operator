@@ -82,7 +82,7 @@ async def test_initialize_vault(juju_lxd_model: Juju) -> None:
     vault_ca = None
     for secret in secrets:
         if secret.label == "self-signed-vault-ca-certificate":
-            vault_ca = juju_lxd_model.show_secret(identifier=secret.name, reveal=True).content.get(
+            vault_ca = juju_lxd_model.show_secret(identifier=secret.uri, reveal=True).content.get(
                 "certificate"
             )
 
