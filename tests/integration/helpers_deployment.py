@@ -328,7 +328,7 @@ def verify_unit_count(status: jubilant.Status, *apps: str, unit_count: Union[int
             if app not in unit_count:
                 unit_count[app] = 1
 
-    all(count == len(status.get_units(app)) for app, count in unit_count.items())
+    return all(count == len(status.get_units(app)) for app, count in unit_count.items())
 
 
 async def _is_every_condition_met(
