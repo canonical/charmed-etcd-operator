@@ -94,7 +94,7 @@ Ensure your backup file was uploaded correctly by repeating the `s3cmd ls s3://e
 Now it's time to deploy charmed etcd. Run the following command to deploy a 3-unit cluster:
 
 ```text
-juju deploy charmed-etcd --channel 3.6/edge -n 3
+juju deploy charmed-etcd -n 3
 ```
 
 Wait for the deployment to become available by checking `watch juju status --color`:

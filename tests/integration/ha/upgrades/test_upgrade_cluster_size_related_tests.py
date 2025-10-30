@@ -277,4 +277,3 @@ async def test_scale_down_during_upgrade(charm: str, ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(
         endpoints=updated_endpoints, user=INTERNAL_USER, password=password, ignore_revision=True
     )
-    await ops_test.model.remove_application(APP_NAME, block_until_done=True)

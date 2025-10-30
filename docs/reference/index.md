@@ -15,5 +15,5 @@ The following guides contain technical specifications, release notes, and other 
 :titlesonly:
 :maxdepth: 2
 
-Versions <versions>
+Releases <releases>
 ```

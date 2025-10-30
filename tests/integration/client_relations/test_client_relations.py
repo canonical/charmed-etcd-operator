@@ -100,11 +100,21 @@ async def get_requirer_mtls_certificate(ops_test: OpsTest) -> str | None:
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(charm: str, requirer_charm: str, ops_test: OpsTest) -> None:
+@pytest.mark.parametrize(
+    "data_interfaces_version",
+    [pytest.param("0", marks=pytest.mark.v0), pytest.param("1", marks=pytest.mark.v1)],
+)
+async def test_build_and_deploy(
+    charm: str, requirer_charm: str, ops_test: OpsTest, data_interfaces_version: str
+) -> None:
     """Build and deploy the charm-under-test and the requirer charm."""
     tls_config = {"ca-common-name": "etcd"}
     await asyncio.gather(
-        ops_test.model.deploy(requirer_charm, application_name=REQUIRER_NAME),
+        ops_test.model.deploy(
+            requirer_charm,
+            application_name=REQUIRER_NAME,
+            config={"data-interfaces-version": data_interfaces_version},
+        ),
         ops_test.model.deploy(charm, num_units=NUM_UNITS),
         ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config),
         ops_test.model.deploy(
@@ -120,6 +130,8 @@ async def test_build_and_deploy(charm: str, requirer_charm: str, ops_test: OpsTe
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.v0
+@pytest.mark.v1
 async def test_relate_client_charm(ops_test: OpsTest) -> None:
     """Test normal client charm relation."""
     await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
@@ -163,6 +175,8 @@ async def test_relate_client_charm(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.v0
+@pytest.mark.v1
 async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
     """Test write and read to the key prefix with the requirer charm."""
     requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
@@ -190,6 +204,8 @@ async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.v0
+@pytest.mark.v1
 async def test_update_mtls_cert(ops_test: OpsTest) -> None:
     """Test updating the common name used by the requirer app."""
     # generate new mtls cert
@@ -201,7 +217,7 @@ async def test_update_mtls_cert(ops_test: OpsTest) -> None:
     requirer_unit: Unit = ops_test.model.applications[REQUIRER_NAME].units[0]
     # we send all chain to test that etcd only stores the leaf certificate
     action = await requirer_unit.run_action(
-        "update-common-name", **{"chain": "\n".join([mtls_cert, mtls_ca])}
+        "update-mtls-cert", **{"chain": "\n".join([mtls_cert, mtls_ca])}
     )
     action = await action.wait()
 
@@ -230,6 +246,8 @@ async def test_update_mtls_cert(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.v0
+@pytest.mark.v1
 async def test_etcd_updates_ca(ops_test: OpsTest) -> None:
     """Update the common name used by the requirer app."""
     requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
@@ -263,6 +281,8 @@ async def test_etcd_updates_ca(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.v0
+@pytest.mark.v1
 async def test_remove_client_relation(ops_test: OpsTest) -> None:
     """Test removing the client relation and check if the user and role are removed."""
     common_name = "new-common-name"
@@ -307,6 +327,8 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.v0
+@pytest.mark.v1
 async def test_certificate_transfer(ops_test: OpsTest) -> None:
     """Test if the certificate transfer interface works correctly."""
     # integrate etcd with requirer tls provider on certificate_transfer relation
@@ -335,6 +357,8 @@ async def test_certificate_transfer(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.v0
+@pytest.mark.v1
 async def test_requirer_sends_ca(ops_test: OpsTest) -> None:
     """Test when the requirer charm sends a ca certificate instead of an end-entity."""
     # configure the requirer charm to send a ca certificate

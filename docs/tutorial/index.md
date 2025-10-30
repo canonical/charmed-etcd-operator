@@ -126,7 +126,7 @@ etcd   dev-controller  localhost/localhost  3.6.0    unsupported  17:26:15Z
 To deploy charmed etcd, all you need to do is run the following command:
 
 ```text
-juju deploy charmed-etcd -n 3 --channel 3.6/edge
+juju deploy charmed-etcd -n 3
 ```
 
 ```{note}
