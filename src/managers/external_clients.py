@@ -42,47 +42,64 @@ class ExternalClientsManager(ManagerStatusProtocol):
         self.workload = workload
         self.substrate = substrate
 
-    def remove_managed_user(self, relation_id: int) -> None:
+    def _generate_key(self, relation_id: int, request_id: str | None) -> str:
+        """Generate the key for the managed users dictionary.
+
+        Args:
+            relation_id (int): The relation id.
+            request_id (str | None): The request id.
+
+        Returns:
+            (str): The generated key.
+        """
+        return f"{relation_id}-{request_id}" if request_id else str(relation_id)
+
+    def remove_managed_user(self, relation_id: int, request_id: str | None = None) -> None:
         """Remove the user.
 
         Args:
             relation_id (int): The relation id.
+            request_id (str | None): The request id.
         """
         managed_users = self.state.cluster.model.managed_users
-        del managed_users[relation_id]
+        del managed_users[self._generate_key(relation_id, request_id)]
         self.state.cluster.update(
             {
                 "managed_users": managed_users,
             }
         )
 
-    def add_managed_user(self, relation_id: int, common_name: str) -> None:
+    def add_managed_user(self, relation_id: int, request_id: str | None, common_name: str) -> None:
         """Add the user.
 
         Args:
             relation_id (int): The relation id.
+            request_id (str | None): The request id.
             common_name (str): The common name.
         """
-        managed_users = self.state.cluster.model.managed_users
-        managed_users[relation_id] = common_name
-
         self.state.cluster.update(
             {
-                "managed_users": managed_users,
+                "managed_users": {
+                    **self.state.cluster.model.managed_users,
+                    **{self._generate_key(relation_id, request_id): common_name},
+                },
             }
         )
 
-    def get_relation_managed_user(self, relation_id: int) -> str | None:
+    def get_relation_managed_user(
+        self, relation_id: int, request_id: str | None = None
+    ) -> str | None:
         """Get the relation's managed user.
 
         Args:
             relation_id (int): The relation id.
+            request_id (str | None): The request id.
 
         Returns:
             (str): The managed user.
         """
         return (
-            self.state.cluster.model.managed_users.get(relation_id)
+            self.state.cluster.model.managed_users.get(self._generate_key(relation_id, request_id))
             if self.state.cluster.model
             else None
         )

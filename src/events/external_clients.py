@@ -13,6 +13,7 @@ from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificateTransferRequires,
 )
 from charms.data_platform_libs.v1.data_interfaces import (
+    BulkResourcesRequestedEvent,
     MtlsCertUpdatedEvent,
     RequirerCommonModel,
     ResourceProviderEventHandler,
@@ -63,6 +64,118 @@ class ExternalClientsEvents(Object):
             self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_broken, self._on_relation_broken
         )
 
+    def _on_bulk_resources_requested(
+        self, event: BulkResourcesRequestedEvent[RequirerCommonModel]
+    ) -> None:
+        """Handle bulk resources requested event."""
+        if not self.charm.unit.is_leader():
+            return
+
+        if not self.charm.state.cluster.model or not self.charm.state.unit_server.model:
+            logger.error("peer data not available")
+            event.defer()
+            return
+
+        if (
+            self.charm.state.cluster.is_restore_in_progress
+            or self.charm.state.cluster.rebuild_cluster_in_progress
+            or self.charm.refresh_in_progress
+        ):
+            logger.warning(
+                "Cannot update certificates while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
+            )
+            event.defer()
+            return
+
+        if self.charm.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
+            logger.error("TLS is not enabled")
+            event.defer()
+            return
+
+        if self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS:
+            logger.error("TLS is not ready")
+            event.defer()
+            return
+
+        if (
+            self.charm.state.unit_server.tls_client_ca_rotation_state
+            != TLSCARotationState.NO_ROTATION
+        ):
+            logger.debug("CA rotation is in progress")
+            event.defer()
+            return
+
+        if not self.charm.state.cluster.auth_enabled:
+            logger.error("Cluster authentication is not enabled")
+            event.defer()
+            return
+
+        for request in event.requests:
+            if not request.mtls_cert or not request.resource:
+                logger.error("CA chain, keys prefix, or common name not provided")
+                return
+
+        for request in event.requests:
+            assert request.mtls_cert is not None and request.resource is not None  # for linter
+
+            common_name = self.charm.external_clients_manager.get_common_name_from_chain(
+                request.mtls_cert
+            )
+
+            # validate leaf certificate
+            if not is_leaf_certificate_valid(request.mtls_cert):
+                logger.error(f"Invalid end-entity certificate for user {common_name}")
+                continue
+
+            relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
+                event.relation.id, request.request_id
+            )
+
+            if relation_managed_user is not None:
+                logger.error("User already exists for this request in the relation")
+                continue
+
+            if self.charm.cluster_manager.get_user(common_name) is not None:
+                if common_name == relation_managed_user:
+                    logger.debug("User is already being added for this relation")
+                else:
+                    logger.error("User already exists in database for another request")
+                continue
+
+            if relation_managed_user is None:
+                logger.info(f"Creating new user: {common_name}")
+                try:
+                    self.charm.cluster_manager.add_managed_user(common_name, request.resource)
+                except EtcdUserManagementError as e:
+                    self.charm.status.set_running_status(
+                        ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value,
+                        scope="app",
+                        component_name=self.charm.external_clients_manager.name,
+                        statuses_state=self.charm.state.statuses,
+                    )
+                    logger.error(e)
+                    continue
+
+                self.charm.external_clients_manager.add_managed_user(
+                    event.relation.id, request.request_id, common_name
+                )
+                response = self._get_or_create_resource_response(
+                    event.relation,
+                    common_name,
+                    request.request_id,
+                    request.resource,
+                    request.salt,
+                )
+                response.username = common_name
+                response.endpoints = self.charm.external_clients_manager.get_endpoints()
+                response.uris = self.charm.external_clients_manager.get_uris()
+                response.tls_ca = self.charm.state.tls_client_certificate.ca.raw
+                response.version = self.charm.cluster_manager.get_version()
+                self.etcd_provides.set_response(
+                    event.relation.id,
+                    response,
+                )
+
     def _on_mtls_cert_updated(self, event: MtlsCertUpdatedEvent[RequirerCommonModel]) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
         if not self.charm.state.cluster.model or not self.charm.state.unit_server.model:
@@ -110,7 +223,7 @@ class ExternalClientsEvents(Object):
 
         # Get common name from mtls_cert
         old_common_name = None
-        if self.charm.state.cluster.model.managed_users.get(event.relation.id):
+        if self.charm.state.cluster.model.managed_users.get(str(event.relation.id)):
             old_common_name = (
                 self.charm.external_clients_manager.get_common_name_from_chain(event.old_mtls_cert)
                 if event.old_mtls_cert
@@ -172,7 +285,7 @@ class ExternalClientsEvents(Object):
                         return
 
                     self.charm.external_clients_manager.add_managed_user(
-                        event.relation.id, common_name
+                        event.relation.id, event.request.request_id, common_name
                     )
                     response = self._get_or_create_resource_response(
                         event.relation,
