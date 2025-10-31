@@ -77,3 +77,8 @@ config:
       description: Version of data interfaces to use
       type: int
       default: 1
+
+    bulk:
+      description: Enable bulk operations for client relations
+      type: boolean
+      default: false

@@ -10,9 +10,9 @@ import subprocess
 from pathlib import Path
 
 import ops
+from charms.data_platform_libs.v1.data_interfaces import RequirerCommonModel
 from charms.operator_libs_linux.v2 import snap
 from charms.tls_certificates_interface.v4.tls_certificates import (
-    Certificate,
     CertificateAvailableEvent,
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
@@ -42,10 +42,11 @@ class RequirerCharm(ops.CharmBase):
             "certificates",
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name="requirer-charm",
+                    common_name=common_name,
                     sans_ip=frozenset({socket.gethostbyname(socket.gethostname())}),
                     sans_dns=frozenset({self.unit.name, socket.gethostname()}),
-                ),
+                )
+                for common_name in self.common_names
             ],
             refresh_events=[self.refresh_tls_certificates_event],
         )
@@ -54,7 +55,7 @@ class RequirerCharm(ops.CharmBase):
             case 0:
                 self.etcd_requires = EtcdRequiresV0(self)
             case 1:
-                self.etcd_requires = EtcdRequiresV1(self)
+                self.etcd_requires = EtcdRequiresV1(self, self.v1_client_requests)
             case _:
                 self.app.status = ops.BlockedStatus(
                     f"Invalid data-interfaces-version config value: {self.data_interfaces_version}. Only 0 and 1 are supported."
@@ -72,7 +73,7 @@ class RequirerCharm(ops.CharmBase):
         framework.observe(self.on.put_action, self._on_put_action)
         framework.observe(self.on.get_action, self._on_get_action)
         framework.observe(self.on.get_credentials_action, self._on_get_credentials_action)
-        framework.observe(self.on.config_changed, self._on_certificate_available)
+        framework.observe(self.on.config_changed, self._config_changed)
         framework.observe(self.on.get_certificate_action, self._on_get_certificate_action)
 
     @property
@@ -82,6 +83,32 @@ class RequirerCharm(ops.CharmBase):
         if version is None or not isinstance(version, int) or version not in [0, 1]:
             return None
         return version
+
+    @property
+    def bulk(self) -> bool:
+        """Return True if bulk operations are enabled."""
+        return bool(self.config.get("bulk", False))
+
+    @property
+    def common_names(self) -> list[str]:
+        """Return the common names for the client certificates."""
+        if self.bulk:
+            return [
+                "client1.requirer-charm",
+                "client2.requirer-charm",
+            ]
+        return ["requirer-charm"]
+
+    @property
+    def v1_client_requests(self) -> list:
+        """Return the client requests for the etcd requirer interface."""
+        return [
+            RequirerCommonModel(
+                resource=f"/{common_name}/",
+                mtls_cert=self._get_certificate_of_common_name(common_name) or "",
+            )
+            for common_name in self.common_names
+        ]
 
     @property
     def server_ca_chain(self) -> str | None:
@@ -121,6 +148,16 @@ class RequirerCharm(ops.CharmBase):
         """Return True if the CA chain is available."""
         return bool(self.config.get("send-ca-cert", False))
 
+    def _get_certificate_of_common_name(self, common_name: str) -> str | None:
+        """Return the certificate for a given common name."""
+        certs, _ = self.certificates.get_assigned_certificates()
+        if not certs:
+            return None
+        for cert in certs:
+            if cert.certificate.common_name == common_name:
+                return cert.certificate.raw if not self.send_ca_option else cert.ca.raw
+        return None
+
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
         self.unit.status = ops.ActiveStatus()
@@ -159,8 +196,21 @@ class RequirerCharm(ops.CharmBase):
         Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
 
         if self.etcd_requires.etcd_relation:
-            raw_cert = self.raw_certificate or cert.certificate.raw
-            self.etcd_requires.set_mtls_cert(raw_cert)
+            self.etcd_requires.update_requests_from_certs(
+                [cert.certificate if self.send_ca_option else cert.ca for cert in certs]
+            )
+
+    def _config_changed(self, event: ops.ConfigChangedEvent) -> None:
+        """Handle config changed event."""
+        if self.bulk and self.data_interfaces_version != 1:
+            self.app.status = ops.BlockedStatus(
+                "Bulk operations are only supported with data-interfaces-version 1."
+            )
+            return
+        else:
+            self.app.status = ops.ActiveStatus()
+
+        self.refresh_tls_certificates_event.emit()
 
     def _on_put_action(self, event: ops.ActionEvent) -> None:
         """Handle put action."""
@@ -317,16 +367,6 @@ def _get(endpoints: str, key: str) -> str | None:
         return
 
     return output.decode("utf-8").strip()
-
-
-def _get_common_name_from_chain(mtls_cert: str) -> str:
-    """Get common name from chain."""
-    raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
-    raw_cas.remove("")
-    # add the marker back to the certificate
-    # we take the last certificate from the provided mtls_cert, assuming this is the client cert
-    cert = raw_cas[-1].strip() + "\n-----END CERTIFICATE-----"
-    return Certificate.from_string(cert).common_name
 
 
 if __name__ == "__main__":  # pragma: nocover
