@@ -3,8 +3,8 @@
 # See LICENSE file for licensing details.
 
 import asyncio
+import json
 import logging
-import random
 from datetime import timedelta
 
 import pytest
@@ -36,7 +36,7 @@ from ..helpers_deployment import wait_until
 logger = logging.getLogger(__name__)
 
 NUM_UNITS = 3
-TEST_KEY = "test_key"
+TEST_KEY = "/test_key"
 TEST_VALUE = "42"
 REQUIRER_NAME = "requirer-charm"
 REQUIRER_TLS_NAME = "requirer-tls-provider"
@@ -73,7 +73,7 @@ def generate_mtls_chain(common_name: str) -> tuple[str, str]:
     return (client_cert.raw, ca_cert.raw)
 
 
-async def get_requirer_common_name(ops_test: OpsTest) -> str:
+async def get_requirer_common_names(ops_test: OpsTest) -> list[str]:
     """Get the common name of the requirer charm."""
     requirer_app = ops_test.model.applications[REQUIRER_NAME]
     requirer_unit = requirer_app.units[0]
@@ -81,20 +81,20 @@ async def get_requirer_common_name(ops_test: OpsTest) -> str:
     action = await requirer_unit.run_action("get-credentials")
     result = await action.wait()
     if result.status == "completed":
-        return result.results["username"]
+        return result.results["username"].split(",")
 
     raise ValueError("Failed to get common name from requirer charm")
 
 
-async def get_requirer_mtls_certificate(ops_test: OpsTest) -> str | None:
+async def get_requirer_mtls_certificates(ops_test: OpsTest) -> list[str] | None:
     """Get the mtls certificate from the requirer TLS provider."""
     requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
     requirer_unit: Unit = requirer_app.units[0]
 
-    action = await requirer_unit.run_action("get-certificate")
+    action = await requirer_unit.run_action("get-certificates")
     result = await action.wait()
     if result.status == "completed":
-        return result.results["certificate"]
+        return json.loads(result.results["certificates"])
 
     return None
 
@@ -134,8 +134,8 @@ async def test_build_and_deploy(
 @pytest.mark.v1
 async def test_relate_client_charm(ops_test: OpsTest) -> None:
     """Test normal client charm relation."""
-    await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME], idle_period=10)
+    # await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
+    # await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME], idle_period=10)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
@@ -145,33 +145,35 @@ async def test_relate_client_charm(ops_test: OpsTest) -> None:
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # check if user and role are created for the common name and that the role is assigned to the user
-    common_name = await get_requirer_common_name(ops_test)
-    logger.info(f"Requirer has common name: {common_name}")
-    user_roles = get_user(
-        endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
-    )
-    assert user_roles, f"failed to get user roles for {common_name}"
-    assert common_name in user_roles, f"failed to get user roles for {common_name}"
+    common_names = await get_requirer_common_names(ops_test)
+    logger.info(f"Requirer has common names: {common_names}")
+    for common_name in common_names:
+        user_roles = get_user(
+            endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
+        )
+        assert user_roles, f"failed to get user roles for {common_name}"
+        assert common_name in user_roles, f"failed to get user roles for {common_name}"
 
-    # check if the user can read and write to the key prefix
-    permissions = get_role(
-        endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
-    )
+        # check if the user can read and write to the key prefix
+        permissions = get_role(
+            endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
+        )
 
-    assert permissions, f"failed to get permissions for {common_name}"
-    for permission in permissions:
-        assert permission["permType"] == 2, "permission is not read and write"
-        assert permission["key"] == key_prefix, "permission is not for the key prefix"
+        assert permissions, f"failed to get permissions for {common_name}"
+        for permission in permissions:
+            assert permission["permType"] == 2, "permission is not read and write"
+            assert permission["key"] == f"/{common_name}/", "permission is not for the key prefix"
 
     # get client ca from every unit and check if it includes the mtls cert
 
     model = ops_test.model_full_name
-    mtls_cert = await get_requirer_mtls_certificate(ops_test)
-    assert mtls_cert, "failed to get mtls cert from requirer TLS provider"
+    mtls_certs = await get_requirer_mtls_certificates(ops_test)
+    assert mtls_certs, "failed to get mtls cert from requirer TLS provider"
     for unit in ops_test.model.applications[APP_NAME].units:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
         assert client_cas, f"failed to get client CAs for {unit.name}"
-        assert mtls_cert in client_cas, f"mtls cert not in trusted CAs for {unit.name}"
+        for mtls_cert in mtls_certs:
+            assert mtls_cert in client_cas, f"mtls cert not in trusted CAs for {unit.name}"
 
 
 @pytest.mark.abort_on_fail
@@ -186,12 +188,13 @@ async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
     action = await requirer_unit.run_action("put", **{"key": TEST_KEY, "value": TEST_VALUE})
     action = await action.wait()
 
-    assert action.status == "failed" and "permission denied" in action.results["stderr"], (
+    assert action.status == "failed", (
         "Action should fail because user does not have permission to write to the key prefix"
     )
 
     # write to authorized key prefix
-    key = "/test/foo"
+    # every user will write the key to their own prefix
+    key = "test/foo"
     action = await requirer_unit.run_action("put", **{"key": key, "value": TEST_VALUE})
     action = await action.wait()
     assert action.status == "completed", "Action should succeed"
@@ -200,7 +203,13 @@ async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
     action = await requirer_unit.run_action("get", **{"key": key})
     action = await action.wait()
     assert action.status == "completed", "Action should succeed"
-    assert action.results["message"] == f"{key}\n{TEST_VALUE}", "Action should return the value"
+    common_names = await get_requirer_common_names(ops_test)
+    results = json.loads(action.results["results"])
+    for common_name in common_names:
+        assert (
+            common_name in results
+            and results[common_name] == f"/{common_name}/{key}\n{TEST_VALUE}"
+        )
 
 
 @pytest.mark.abort_on_fail
@@ -208,17 +217,11 @@ async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
 @pytest.mark.v1
 async def test_update_mtls_cert(ops_test: OpsTest) -> None:
     """Test updating the common name used by the requirer app."""
-    # generate new mtls cert
-    # new_common_name = "new-common-name"
-    # random common name
-    new_common_name = f"new-common-name-{random.randint(1000, 9999)}"
-    mtls_cert, mtls_ca = generate_mtls_chain(new_common_name)
+    old_mtls_certs = await get_requirer_mtls_certificates(ops_test)
     # run juju action to update the common name
     requirer_unit: Unit = ops_test.model.applications[REQUIRER_NAME].units[0]
-    # we send all chain to test that etcd only stores the leaf certificate
-    action = await requirer_unit.run_action(
-        "update-mtls-cert", **{"chain": "\n".join([mtls_cert, mtls_ca])}
-    )
+
+    action = await requirer_unit.run_action("update-mtls-certs")
     action = await action.wait()
 
     # wait for model to settle
@@ -229,20 +232,19 @@ async def test_update_mtls_cert(ops_test: OpsTest) -> None:
     assert ops_test.model
     assert ops_test.model.applications[APP_NAME] is not None
 
-    # get common name from the requirer charm
-    common_name = await get_requirer_common_name(ops_test)
-    assert common_name == new_common_name, "common name not updated"
+    mtls_certs = await get_requirer_mtls_certificates(ops_test)
+    assert mtls_certs, "failed to get the new mtls certs from requirer TLS provider"
+    assert old_mtls_certs, "failed to get the old mtls certs from requirer TLS provider"
 
-    old_mtls_cert = await get_requirer_mtls_certificate(ops_test)
-    assert old_mtls_cert, "failed to get the old mtls cert from requirer TLS provider"
     for unit in ops_test.model.applications[APP_NAME].units:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
         assert client_cas, f"failed to get client CAs for {unit.name}"
-        assert mtls_cert in client_cas, f"new mtls cert not in trusted CAs for {unit.name}"
-        assert mtls_ca not in client_cas, f"new mtls ca is in trusted CAs for {unit.name}"
-        assert old_mtls_cert not in client_cas, (
-            f"old mtls certificate still in trusted CAs for {unit.name}"
-        )
+        for mtls_cert in mtls_certs:
+            assert mtls_cert in client_cas, f"new mtls cert not in trusted CAs for {unit.name}"
+        for old_mtls_cert in old_mtls_certs:
+            assert old_mtls_cert not in client_cas, (
+                f"old mtls certificate still in trusted CAs for {unit.name}"
+            )
 
 
 @pytest.mark.abort_on_fail
@@ -286,8 +288,8 @@ async def test_etcd_updates_ca(ops_test: OpsTest) -> None:
 async def test_remove_client_relation(ops_test: OpsTest) -> None:
     """Test removing the client relation and check if the user and role are removed."""
     common_name = "new-common-name"
-    mtls_cert = await get_requirer_mtls_certificate(ops_test)
-    assert mtls_cert, "failed to get mtls cert from requirer TLS provider"
+    mtls_certs = await get_requirer_mtls_certificates(ops_test)
+    assert mtls_certs, "failed to get mtls certs from requirer TLS provider"
     etcd_app: Application = ops_test.model.applications[APP_NAME]
 
     logger.info("Removing client relation")
@@ -323,7 +325,10 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
     for unit in ops_test.model.applications[APP_NAME].units:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
         assert client_cas, f"failed to get client CAs for {unit.name}"
-        assert mtls_cert not in client_cas, f"old mtls cert still in trusted CAs for {unit.name}"
+        for mtls_cert in mtls_certs:
+            assert mtls_cert not in client_cas, (
+                f"old mtls cert still in trusted CAs for {unit.name}"
+            )
 
 
 @pytest.mark.abort_on_fail

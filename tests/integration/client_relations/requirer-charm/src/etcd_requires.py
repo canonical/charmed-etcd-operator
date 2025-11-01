@@ -50,7 +50,7 @@ class EtcdRequires(ops.framework.Object):
         pass
 
     @abstractmethod
-    def set_mtls_cert(self, cert: str) -> None:
+    def update_mtls_certs(self, cert: str) -> None:
         """Set the mtls cert in the relation data bag."""
         pass
 
@@ -81,12 +81,15 @@ class EtcdRequires(ops.framework.Object):
 class EtcdRequiresV1(EtcdRequires):
     """EtcdRequires implementation for data interfaces version 1."""
 
-    def __init__(self, charm: "RequirerCharm", requests: list[RequirerCommonModel]) -> None:
+    def __init__(
+        self,
+        charm: "RequirerCharm",
+    ) -> None:
         super().__init__(charm=charm)
         self.etcd_interface = ResourceRequirerEventHandler(
             self.charm,
             relation_name="etcd-client",
-            requests=requests,
+            requests=self.client_requests,
             response_model=ResourceProviderModel,
         )
 
@@ -120,7 +123,7 @@ class EtcdRequiresV1(EtcdRequires):
         Path(f"{SNAP_DIR}/ca.pem").write_text(response.tls_ca)
 
     @override
-    def set_mtls_cert(self, cert: str) -> None:
+    def update_mtls_certs(self, cert: str) -> None:
         """Set the mtls cert in the relation data bag."""
         if not self.etcd_relation:
             return
@@ -164,9 +167,10 @@ class EtcdRequiresV1(EtcdRequires):
     @property
     def etcd_uris(self) -> str | None:
         """Return the etcd uris."""
-        remote_response = self.remote_response
-        if not remote_response or not remote_response.uris:
+        remote_responses = self.remote_responses
+        if not remote_responses:
             return None
+        remote_response = remote_responses[0]
         return remote_response.uris
 
     @property
@@ -184,13 +188,13 @@ class EtcdRequiresV1(EtcdRequires):
         """Return the remote response model."""
         if not self.etcd_relation:
             return None
-        remote_model = build_model(
+
+        return build_model(
             self.etcd_interface.interface.repository(
                 self.etcd_relation.id, self.etcd_relation.app
             ),
             DataContractV1[ResourceProviderModel],
-        )
-        return remote_model.requests
+        ).requests
 
     @property
     def credentials(self) -> dict[str, str | None] | None:
@@ -207,6 +211,17 @@ class EtcdRequiresV1(EtcdRequires):
             "tls-ca": remote_response.tls_ca if remote_response.tls_ca else None,
         }
 
+    @property
+    def client_requests(self) -> list:
+        """Return the client requests for the etcd requirer interface."""
+        return [
+            RequirerCommonModel(
+                resource=f"/{common_name}/",
+                mtls_cert=self.charm.get_certificate_of_common_name(common_name) or "",
+            )
+            for common_name in self.charm.common_names
+        ]
+
 
 class EtcdRequiresV0(EtcdRequires):
     """EtcdRequires implementation for legacy relation interface."""
@@ -216,8 +231,8 @@ class EtcdRequiresV0(EtcdRequires):
         self.etcd_interface = EtcdRequiresV0Base(
             charm=self.charm,
             relation_name="etcd-client",
-            prefix="/test/",
-            mtls_cert=self.charm.raw_certificate or "",
+            prefix="/requirer-charm/",
+            mtls_cert=self.raw_certificate,
         )
 
         self.charm.framework.observe(
@@ -247,7 +262,7 @@ class EtcdRequiresV0(EtcdRequires):
         Path(f"{SNAP_DIR}/ca.pem").write_text(event.tls_ca)
 
     @override
-    def set_mtls_cert(self, cert: str) -> None:
+    def update_mtls_certs(self, cert: str) -> None:
         """Set the mtls cert in the relation data bag."""
         if not self.etcd_relation:
             return
@@ -292,6 +307,16 @@ class EtcdRequiresV0(EtcdRequires):
             "version": self.etcd_interface.fetch_relation_field(self.etcd_relation.id, "version"),
             "tls-ca": self.etcd_interface.fetch_relation_field(self.etcd_relation.id, "tls-ca"),
         }
+
+    @property
+    def raw_certificate(self) -> str:
+        """Return the raw certificate."""
+        if not hasattr(self, "certificates"):
+            return ""
+        certs, _ = self.charm.certificates.get_assigned_certificates()
+        if not certs:
+            return ""
+        return certs[0].ca.raw if self.charm.send_ca_option else certs[0].certificate.raw
 
 
 def _get_common_name_from_chain(mtls_cert: str) -> str:
