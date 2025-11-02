@@ -91,8 +91,8 @@ async def test_initialize_vault(juju_lxd_model: Juju) -> None:
     lines = vault_ca.strip().split("\n")
     base64_lines = lines[1:-1]
     base64_data = "".join(base64_lines)
-    logger.info(f"DEBUG: Value of vault_ca before decoding: {vault_ca!r}")
-    vault_ca = base64.b64decode(base64_data).decode("utf-8")
+    logger.info(f"DEBUG: Value of vault_ca before decoding: {base64_data!r}")
+    vault_ca = base64.b64decode(base64_data)
 
     Path("./vault_ca.pem").write_text(vault_ca)
 
