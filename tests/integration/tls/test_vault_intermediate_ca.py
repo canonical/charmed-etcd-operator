@@ -2,7 +2,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import base64
 import logging
 import os
 import re
@@ -75,7 +74,8 @@ async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> No
 @pytest.mark.abort_on_fail
 async def test_initialize_vault(juju_lxd_model: Juju) -> None:
     """Initialize Vault and wait for it to be ready."""
-    vault_ip = next(iter(juju_lxd_model.status().get_units(VAULT_NAME).values())).public_address
+    vault_units = juju_lxd_model.status().get_units(VAULT_NAME)
+    vault_ip = next(iter(vault_units.values())).public_address
     secrets = juju_lxd_model.secrets()
     logger.info("Initializing Vault")
 
@@ -87,12 +87,6 @@ async def test_initialize_vault(juju_lxd_model: Juju) -> None:
             )
 
     assert vault_ca, "Vault CA certificate not found in secrets"
-
-    lines = vault_ca.strip().split("\n")
-    base64_lines = lines[1:-1]
-    base64_data = "".join(base64_lines)
-    logger.info(f"DEBUG: Value of vault_ca before decoding: {base64_data!r}")
-    vault_ca = base64.b64decode(base64_data)
 
     Path("./vault_ca.pem").write_text(vault_ca)
 
@@ -161,10 +155,13 @@ async def test_initialize_vault(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.grant_secret("vault-token", VAULT_NAME)
 
+
+    vault_unit_name = next(iter(vault_units.keys()))
     action = juju_lxd_model.run(
-        "authorize-charm",
-        **{
-            "secret-id": secret_id,
+        unit=vault_unit_name,
+        action="authorize-charm",
+        params={
+            "secret-id": str(secret_id),
         },
     )
 

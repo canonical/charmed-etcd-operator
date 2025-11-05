@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 # TODO jubilant: remove juju, pytest-operator, and pytest-asyncio when all tests migrated
-import jubilant
 import yaml
 from jubilant import Juju
 from pytest_operator.plugin import OpsTest
@@ -159,7 +158,7 @@ def get_cluster_endpoints(
 
 # TODO jubilant: remove suffix when all tests migrated
 def get_cluster_endpoints_jubilant(
-    juju: jubilant.Juju, app_name: str = APP_NAME, tls_enabled: bool = False
+    juju: Juju, app_name: str = APP_NAME, tls_enabled: bool = False
 ) -> str:
     """Resolve the etcd endpoints for a given juju application."""
     return ",".join(
@@ -415,13 +414,11 @@ def get_certificate_from_unit(
 
 
 def get_certificate_from_unit_jubilant(
-    juju: jubilant.Juju, unit: str, cert_type: TLSType, is_ca: bool = False
+    juju: Juju, unit: str, cert_type: TLSType, is_ca: bool = False
 ) -> str | None:
     """Retrieve a certificate from a unit."""
     command = f"cat {TLS_ROOT_DIR}/{cert_type.value}{'_ca' if is_ca else ''}.pem"
     output = juju.ssh(target=unit, command=command)
-    # command = f'juju ssh --model={model} {unit} "cat {TLS_ROOT_DIR}/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
-    # output = subprocess.getoutput(command)
     if output.startswith("-----BEGIN CERTIFICATE-----"):
         return output
 
@@ -529,7 +526,7 @@ async def download_client_certificate_from_unit(
 
 
 def download_client_certificate_from_unit_jubilant(
-    juju: jubilant.Juju, app_name: str = APP_NAME
+    juju: Juju, app_name: str = APP_NAME
 ) -> None:
     """Copy the client certificate files from a unit to the host's filesystem."""
     unit = next(iter(juju.status().get_units(app_name).keys()))

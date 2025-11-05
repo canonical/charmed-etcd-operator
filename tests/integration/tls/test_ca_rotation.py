@@ -20,7 +20,7 @@ from ..helpers import (
     get_secret_by_label_jubilant,
     put_key,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, tls_certs_expiring
+from ..helpers_deployment import apps_active_and_agents_idle, tls_peer_certs_expiring
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +247,7 @@ async def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
     }
     juju_lxd_model.config(app=TLS_NAME, values=tls_config)
 
-    juju_lxd_model.wait(tls_certs_expiring)
+    juju_lxd_model.wait(tls_peer_certs_expiring)
 
     logger.info("Getting the current CA certificates")
     leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
@@ -280,7 +280,7 @@ async def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
     logger.info(f"Certificates will expire in {waiting_time} seconds")
     time.sleep(waiting_time)
 
-    juju_lxd_model.wait(tls_certs_expiring)
+    juju_lxd_model.wait(tls_peer_certs_expiring)
 
     logger.info("Checking if the CA certificates are rotated")
     new_peer_ca = get_certificate_from_unit_jubilant(

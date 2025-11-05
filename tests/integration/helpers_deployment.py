@@ -13,7 +13,6 @@ from uuid import uuid4
 import jubilant
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from dateutil.parser import parse
-from jubilant import Juju
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
@@ -305,6 +304,17 @@ def apps_active_and_agents_idle(
     idle_period: int = 0,
     unit_count: Union[int, Dict[str, int]] | None = None,
 ) -> bool:
+    """Check that all given apps are active, their agents idle (optional idle interval too) and optionally verify unit count as well.
+
+    Args:
+        status: represents the jubilant model's current status
+        apps: A list of applications whose statuses to test against
+        idle_period: Seconds to wait for the agents of each application unit to be idle.
+        unit_count: The desired number of units to wait for, can be >= to -1
+            if set as int, this value is expected for all apps but if more granularity is needed,
+            pass a dictionary such as: {"app1": 2, "app2": 1, ...}, if set to -1, the check
+            only happens at the application level.
+    """
     return (
         jubilant.all_active(status, *apps)
         and jubilant.all_agents_idle(status, *apps)
@@ -319,6 +329,16 @@ def apps_active_and_agents_idle(
 
 
 def verify_unit_count(status: jubilant.Status, *apps: str, unit_count: Union[int, Dict[str, int]]):
+    """Helper function that verifies unit count for an application.
+
+    Args:
+        status: represents the jubilant model's current status
+        apps: A list of applications whose statuses to test against
+        unit_count: The desired number of units to wait for, can be >= to -1
+            if set as int, this value is expected for all apps but if more granularity is needed,
+            pass a dictionary such as: {"app1": 2, "app2": 1, ...}, if set to -1, the check
+            only happens at the application level.
+    """
     if isinstance(unit_count, int):
         unit_count = dict.fromkeys(apps, unit_count)
     elif not unit_count:
@@ -467,265 +487,12 @@ async def wait_until(  # noqa: C901
         raise
 
 
-def get_unit_hostname_jubilant(juju: Juju, unit_id: int, app: str) -> str:
-    """Get the hostname of a specific unit."""
-    _, hostname, _ = juju.ssh(f"{app}/{unit_id}", "hostname")
-    logger.info(f"HOstname: {hostname}")
-    return hostname.strip()
-
-
-def get_application_units_jubilant(juju: Juju, app: str) -> List[Unit]:
-    """Get fully detailed units of an application."""
-    raw_status = juju.status()
-    units = []
-    for u_name, u_status in raw_status.get_units(app).items():
-        unit_id = int(u_name.split("/")[-1])
-
-        if not u_status.public_address:
-            # unit not ready yet...
-            continue
-
-        app_id = f"{juju.model}/{app}"
-        app_short_id = md5(app_id.encode()).hexdigest()[:3]
-        raw_app_status = raw_status.apps.get(app).app_status
-        unit = Unit(
-            id=unit_id,
-            short_name=u_name.replace("/", "-"),
-            name=f"{u_name.replace('/', '-')}.{app_short_id}",
-            ip=u_status.public_address,
-            hostname=get_unit_hostname_jubilant(juju, unit_id, app),
-            is_leader=u_status.leader,
-            machine_id=int(u_status.machine),
-            workload_status=Status(
-                value=u_status.workload_status.current,
-                since=u_status.workload_status.since,
-                message=u_status.workload_status.message,
-            ),
-            agent_status=Status(
-                value=u_status.juju_status.current, since=u_status.juju_status.since
-            ),
-            app_status=Status(
-                value=raw_app_status.current,
-                since=raw_app_status.since,
-                message=raw_app_status.message,
-            ),
-        )
-
-        units.append(unit)
-
-    logger.info(f"Identified {len(units)} units...")
-    return units
-
-
-def get_application_subordinate_units_jubilant(
-    juju: Juju, principal_app: str, app: str
-) -> List[Unit]:
-    """Get fully detailed units of an application."""
-    raw_app_status = juju.status().apps.get(app).app_status
-    # raw_app = get_raw_application(ops_test, app)
-    units = []
-    for principal_unit in juju.status().get_units(principal_app).values():
-        u_name, unit = None, None
-        for u_name, unit in principal_unit.subordinates.items():
-            if app in u_name:
-                break
-        else:
-            raise ValueError(f"Subordinate unit for {app} not found in {principal_app}")
-
-        unit_id = int(u_name.split("/")[-1])
-
-        if not unit.public_address:
-            # unit not ready yet...
-            continue
-
-        app_id = f"{juju.model}/{app}"
-        app_short_id = md5(app_id.encode()).hexdigest()[:3]
-        unit = Unit(
-            id=unit_id,
-            short_name=u_name.replace("/", "-"),
-            name=f"{u_name.replace('/', '-')}.{app_short_id}",
-            ip=unit.public_address,
-            hostname=get_unit_hostname_jubilant(juju, unit_id, app),
-            is_leader=unit.leader,
-            machine_id=-1,
-            workload_status=Status(
-                value=unit.workload_status.current,
-                since=unit.workload_status.since,
-                message=unit.workload_status.message,
-            ),
-            agent_status=Status(value=unit.juju_status.current, since=unit.juju_status.since),
-            app_status=Status(
-                value=raw_app_status.current,
-                since=raw_app_status.since,
-                message=raw_app_status.message,
-            ),
-        )
-
-        units.append(unit)
-
-    return units
-
-
-def _is_every_condition_on_app_met_jubilant(
-    juju: Juju,
-    app: str,
-    units: List[Unit] | None,
-    apps_statuses: List[str] | None,
-    apps_full_statuses: Dict[str, List[StatusObject]] | None,
-) -> bool:
-    """Evaluate if all the conditions of an application are met."""
-    if units:
-        app_status = units[0].app_status
-    else:
-        app_status = juju.status().apps.get(app).app_status
-        app_status = Status(
-            value=app_status.current, since=app_status.since, message=app_status.message
-        )
-
-    if apps_statuses:
-        if app_status.value not in apps_statuses:
-            return False
-    else:
-        app_statuses = apps_full_statuses.get(app, [])
-        if not app_statuses:
-            return app_status.message != ""
-        return any(does_message_match(app_status.message, status) for status in app_statuses)
-
-    return True
-
-
-def _is_every_condition_met_jubilant(
-    juju: Juju,
-    apps: List[str],
-    wait_for_exact_units: Dict[str, int],
-    apps_statuses: List[str] | None,
-    apps_full_statuses: Dict[str, List[StatusObject]] | None,
-    units_statuses: List[str] | None,
-    units_full_statuses: Dict[str, List[StatusObject]] | None,
-    idle_period: int = 30,
-) -> bool:
-    """Evaluate if all the deployment status conditions are met."""
-    for app in apps:
-        app_status = juju.status().apps.get(app)
-        # app_dict = get_raw_application(ops_test, app)
-        expected_units = wait_for_exact_units[app]
-        logger.info(f"For app {app}, expected units: {expected_units}")
-        if app_status.subordinate_to:
-            logger.info(f"Subordinate app: {app}")  # change to debug log
-            # In this case, we must search for the principal app
-            units = get_application_subordinate_units_jubilant(
-                juju, app_status.subordinate_to[0], app
-            )
-            # units = juju.status().get_units(app_status.subordinate_to[0])
-        else:
-            logger.info(f"This is a principal app: {app}")  # change to debug log
-            units = get_application_units_jubilant(juju, app)
-
-        if -1 < expected_units != len(units):
-            logger.info(f"{app} -- expected units: {expected_units} -- current: {len(units)}")
-            return False
-
-        if (apps_statuses or apps_full_statuses) and not _is_every_condition_on_app_met_jubilant(
-            juju=juju,
-            app=app,
-            units=(units if expected_units > -1 else None),
-            apps_statuses=apps_statuses,
-            apps_full_statuses=apps_full_statuses,
-        ):
-            logger.info(f"\tApp: {app} - conditions unmet.")
-            logger.info(_progress_line(units))
-            return False
-
-        if (
-            # expected_units > -1 and
-            (units_statuses or units_full_statuses)
-            and not _is_every_condition_on_units_met(
-                model=juju.model,
-                app=app,
-                units=units,
-                units_statuses=units_statuses,
-                units_full_statuses=units_full_statuses,
-                idle_period=idle_period,
-            )
-        ):
-            logger.info(f"\tApp: {app} - Units - conditions unmet.")
-            logger.info(_progress_line(units))
-            return False
-
-    return True
-
-
-async def wait_until_jubilant(  # noqa: C901
-    juju: Juju,
-    apps: List[str],
-    apps_statuses: List[str] | None = None,
-    apps_full_statuses: Dict[str, List[StatusObject]] | None = None,
-    units_statuses: List[str] | None = None,
-    units_full_statuses: Dict[str, List[StatusObject]] | None = None,
-    wait_for_exact_units: Union[int, Dict[str, int]] = -1,
-    idle_period: int = 30,
-    timeout: int = 1200,
-) -> None:
-    """Wait until a set of statuses and timeouts are met.
+def tls_peer_certs_expiring(status: jubilant.Status) -> bool:
+    """Check that workload status is TLSStatuses.TLS_PEER_CERTS_EXPIRING
 
     Args:
-        juju: An instance of Jubilant's Juju class on which to run Juju commands
-        apps: A list of applications whose statuses to test against
-        apps_statuses: List of acceptable application statuses to wait for, for all apps.
-            ["blocked", "active", ...]
-        apps_full_statuses: List of acceptable unit statuses to wait for, for each app with more
-            granularity: {"app1": [status1, status2]}, "app2": ...}
-        units_statuses: List of acceptable statuses to wait for, for all units of all apps.
-            ["blocked", "active", ...]
-        units_full_statuses: List of acceptable statuses to wait for, for each unit with more
-            granularity: {"unit1": [status1, status2]}, "unit2": ...}
-        wait_for_exact_units: The desired number of units to wait for, can be >= to -1
-            if set as int, this value is expected for all apps but if more granularity is needed to
-            be set, pass a dictionary such as: {"app1": 2, "app2": 1, ...}, if set to -1, the check
-            only happens at the application level.
-        idle_period: Seconds to wait for the agents of each application unit to be idle.
-        timeout: Time to wait before giving up on waiting.
+        status: represents the jubilant model's current status
     """
-    if not apps:
-        raise ValueError("apps must be specified.")
-    if not (apps_statuses or apps_full_statuses or units_statuses or units_full_statuses):
-        apps_statuses = ["active"]
-        units_statuses = ["active"]
-    if isinstance(wait_for_exact_units, int):
-        wait_for_exact_units = dict.fromkeys(apps, wait_for_exact_units)
-    elif not wait_for_exact_units:
-        wait_for_exact_units = dict.fromkeys(apps, -1)
-    else:
-        for app in apps:
-            if app not in wait_for_exact_units:
-                wait_for_exact_units[app] = 1
-    try:
-        logger.info("\n\n\n")
-        logger.info(juju.status().__str__())
-        for attempt in Retrying(stop=stop_after_delay(timeout), wait=wait_fixed(10)):
-            with attempt:
-                logger.info(f"\n\n\n{now()} -- Waiting for model...")
-                if _is_every_condition_met_jubilant(
-                    juju=juju,
-                    apps=apps,
-                    wait_for_exact_units=wait_for_exact_units,
-                    apps_statuses=apps_statuses,
-                    apps_full_statuses=apps_full_statuses,
-                    units_statuses=units_statuses,
-                    units_full_statuses=units_full_statuses,
-                    idle_period=idle_period,
-                ):
-                    logger.info(f"{now()} -- Waiting for model: complete.\n\n\n")
-                    return
-                raise Exception
-    except RetryError:
-        logger.error("wait_until -- Timed out!\n\n\n")
-        logger.info(juju.status().__str__())
-        _dump_juju_logs(model=juju.model, lines=3000)
-        raise
-
-
-def tls_certs_expiring(status: jubilant.Status) -> bool:
     return all(
         does_message_match(
             unit_status.workload_status.message, TLSStatuses.TLS_PEER_CERTS_EXPIRING.value
