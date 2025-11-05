@@ -285,7 +285,7 @@ class BackupManager(ManagerStatusProtocol):
 
     def restore_backup(self) -> None:
         """Perform the actual restore-operation on the etcd database."""
-        backup_id_to_restore = self.state.cluster.restore_id
+        backup_id_to_restore = self.state.cluster.model.restore_id
         logger.info(f"Restoring database backup {backup_id_to_restore}")
 
         # existing data directory has to be purged, otherwise restore will fail
@@ -302,7 +302,7 @@ class BackupManager(ManagerStatusProtocol):
             data_directory=SNAP_DATA_PATH,
             cluster_config=self.state.unit_server.member_endpoint
             if self.state.cluster.restore_instruction == RestoreStep.VERIFY
-            else self.state.cluster.cluster_members,
+            else self.state.cluster.model.cluster_members,
             peer_url=self.state.unit_server.peer_url,
             member_name=self.state.unit_server.member_name,
         ):
@@ -402,6 +402,9 @@ class BackupManager(ManagerStatusProtocol):
         status_list: list[StatusObject] = self.state.statuses.get(
             scope=scope, component=self.name
         ).root
+
+        if not self.state.cluster.model:
+            return status_list or [CharmStatuses.ACTIVE_IDLE.value]
 
         if self.state.cluster.is_backup_in_progress:
             status_list.append(BackupStatuses.BACKUP_IN_PROGRESS.value)

@@ -220,9 +220,14 @@ class BackupEvents(Object):
             event.fail(error)
             return
 
-        backup_list = self.charm.backup_manager.list_backups()
-        logger.debug(f"backup list: {backup_list}")
+        try:
+            backup_list = self.charm.backup_manager.list_backups()
+        except EtcdBackupError as e:
+            event.set_results({"error": e})
+            event.fail("Listing backups failed. Check the error logs for more details.")
+            return
 
+        logger.debug(f"backup list: {backup_list}")
         event.set_results({"backups": self.charm.backup_manager.format_backup_list(backup_list)})
 
     def _on_restore_action(self, event: ActionEvent) -> None:
@@ -236,8 +241,13 @@ class BackupEvents(Object):
             event.fail("Must provide backup-id to restore.")
             return
 
-        if backup_id_to_restore not in self.charm.backup_manager.list_backups():
-            event.fail("Backup ID not found.")
+        try:
+            if backup_id_to_restore not in self.charm.backup_manager.list_backups():
+                event.fail("Backup ID not found.")
+                return
+        except EtcdBackupError as e:
+            event.set_results({"error": e})
+            event.fail("Restoring a backup failed. Check the error logs for more details.")
             return
 
         event.log(f"Initiating restore process for backup-id {backup_id_to_restore}")
@@ -270,7 +280,7 @@ class BackupEvents(Object):
         ):
             case RestoreStep.DOWNLOAD, RestoreStep.NOT_STARTED:
                 if not self.charm.backup_manager.download_backup_file(
-                    self.charm.state.cluster.restore_id
+                    self.charm.state.cluster.model.restore_id
                 ):
                     self.charm.state.statuses.add(
                         BackupStatuses.RESTORE_FAILED.value, "unit", self.charm.backup_manager.name
@@ -416,7 +426,7 @@ class BackupEvents(Object):
             return
         # if the verification was successful, stop etcd again and continue the workflow
         logger.info(
-            f"Restore verification successful: Backup {self.charm.state.cluster.restore_id} can be restored."
+            f"Restore verification successful: Backup {self.charm.state.cluster.model.restore_id} can be restored."
         )
         self.charm.backup_manager.stop_database()
         self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)

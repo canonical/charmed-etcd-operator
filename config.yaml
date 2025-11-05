@@ -60,5 +60,18 @@ options:
     default: first
     description: |
       Wait for manual confirmation to resume refresh after these units refresh
-
       Allowed values: "all", "first", "none"
+
+  quota-backend-bytes:
+    type: string
+    default: auto
+    description: |
+      Sets the backend database size limit in bytes for each etcd member. When this limit is exceeded, 
+      the cluster raises a NOSPACE alarm and enters a read-only mode, rejecting all write requests. 
+      This value should be sized according to the cluster's workload and available RAM. 
+      The value needs to be `auto` or an integer representing the size in bytes.
+      If value is set to 'auto' the formula used is min(100GiB, 0.9*memory, 0.9*data_storage_size) 
+      The community-recommended maximum is 8 GiB. 
+      A minimum of 100MiB is enforced. 
+      WARNING: The LXD 'dir' storage driver exposes the host's total disk space to containers, which 
+      can cause inaccurate quota calculations. 

@@ -54,17 +54,15 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
     destroy_unit_cmd = f"remove-unit {unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
     return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
     assert return_code == 0, "Failed to remove unit"
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
+
+    # wait for the next `update_status` for the cluster membership to be updated
+    async with ops_test.fast_forward("15s"):
+        await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
-
-    # wait for the next `update_status` for the cluster membership to be updated
-    async with ops_test.fast_forward("5s"):
-        assert_continuous_writes_increasing(
-            endpoints=endpoints, user=INTERNAL_USER, password=password
-        )
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]

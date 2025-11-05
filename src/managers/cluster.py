@@ -11,7 +11,6 @@ from typing import List
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
-from ops import BlockedStatus
 from requests import RequestException
 from tenacity import Retrying, retry, stop_after_attempt, wait_fixed, wait_random_exponential
 
@@ -76,7 +75,7 @@ class ClusterManager(ManagerStatusProtocol):
         client = EtcdClient(
             username=self.admin_user,
             password=self.admin_password,
-            client_url=f"http://{self.state.unit_server.ip}:{METRICS_PORT}/metrics",
+            client_url=f"http://{self.state.unit_server.model.private_ip}:{METRICS_PORT}/metrics",
         )
 
         if client.get_metric(metric_name="etcd_server_has_leader") == "0":
@@ -162,7 +161,10 @@ class ClusterManager(ManagerStatusProtocol):
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
         )
-        client.broadcast_peer_url(self.member.id, peer_urls)
+        try:
+            client.broadcast_peer_url(self.member.id, peer_urls)
+        except ValueError as e:
+            logger.error(e)
 
     def is_healthy(self, cluster: bool = True) -> bool:
         """Run the `endpoint health` command and return True if healthy.
@@ -206,7 +208,7 @@ class ClusterManager(ManagerStatusProtocol):
             raise KeyError(f"Peer relation data for unit {unit_name} not found.")
 
         # we need to make sure all required information are available before adding the member
-        if server.member_name and server.ip and server.peer_url:
+        if server.model and server.member_name and server.model.private_ip and server.peer_url:
             peer_url = server.peer_url
             # When the peer relation joined event is triggered, the peer_url is in http:// format
             # because the node would still not have gotten its certificates
@@ -233,12 +235,12 @@ class ClusterManager(ManagerStatusProtocol):
     def start_member(self) -> None:
         """Start a cluster member and update its status."""
         self.workload.start()
-        if not self.workload.is_reachable(self.state.unit_server.ip, CLIENT_PORT):
+        if not self.workload.is_reachable(self.state.unit_server.model.private_ip, CLIENT_PORT):
             raise EtcdServiceError("Etcd service failed to start")
         # this triggers a relation_changed event which the leader will use to promote
         # a learner-member to fully-voting member
         self.state.unit_server.update({"state": "started"})
-        if not self.state.cluster.cluster_state:
+        if not self.state.cluster.model.cluster_state:
             # mark the cluster as initialized
             self.state.cluster.update(
                 {
@@ -249,7 +251,7 @@ class ClusterManager(ManagerStatusProtocol):
 
     def promote_learning_member(self) -> None:
         """Promote a learning member to full-voting member."""
-        member_id = self.state.cluster.learning_member
+        member_id = self.state.cluster.model.learning_member
 
         try:
             client = EtcdClient(
@@ -348,7 +350,7 @@ class ClusterManager(ManagerStatusProtocol):
 
     def update_cluster_member_state(self) -> None:
         """Get up-to-date member information and store in cluster state."""
-        if not self.state.cluster.cluster_state:
+        if not self.state.cluster.model.cluster_state:
             return
 
         client = EtcdClient(
@@ -371,18 +373,13 @@ class ClusterManager(ManagerStatusProtocol):
             scope=scope, component=self.name, running_status_only=True, running_status_type="async"
         ).root
 
-        if self.state.unit_server.unit.status == BlockedStatus(
-            EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value.message
-        ):
-            return [EtcdServiceStatuses.SERVICE_NOT_INSTALLED.value]
-
-        if not self.state.peer_relation:
+        if not self.state.cluster.model or not self.state.unit_server.model:
             status_list.append(EtcdServiceStatuses.SERVICE_INSTALLING.value)
             return status_list
 
         if self.state.unit_server.is_started:
             if (
-                self.state.cluster.cluster_state != EtcdClusterState.EXISTING.value
+                self.state.cluster.model.cluster_state != EtcdClusterState.EXISTING.value
                 and not self.state.cluster.is_restore_in_progress
                 and not self.state.cluster.rebuild_cluster_in_progress
             ):
@@ -397,16 +394,16 @@ class ClusterManager(ManagerStatusProtocol):
             except RequestException as e:
                 logger.warning(f"Could not determine if cluster failed: {e}")
 
-        if not self.state.cluster.cluster_state:
+        if not self.state.cluster.model.cluster_state:
             status_list.append(ClusterStatuses.CLUSTER_INITIALIZING.value)
 
-        if self.state.unit_server.member_name not in self.state.cluster.cluster_members:
+        if self.state.unit_server.member_name not in self.state.cluster.model.cluster_members:
             status_list.append(ClusterStatuses.CLUSTER_NOT_JOINED.value)
 
         if self.state.cluster.rebuild_cluster_in_progress:
             status_list.append(ClusterStatuses.CLUSTER_REBUILD_IN_PROGRESS.value)
 
-        if self.state.cluster.learning_member and self.state.unit_server.is_juju_leader:
+        if self.state.cluster.model.learning_member and self.state.unit_server.is_juju_leader:
             status_list.append(ClusterStatuses.CLUSTER_MEMBER_NOT_PROMOTED.value)
 
         return status_list if status_list else [CharmStatuses.ACTIVE_IDLE.value]
@@ -491,7 +488,7 @@ class ClusterManager(ManagerStatusProtocol):
         """Clean up users that errored on deletion."""
         etcd_users = set(self.list_users())
         etcd_users.discard(INTERNAL_USER)
-        active_users = set(self.state.cluster.managed_users.values())
+        active_users = set(self.state.cluster.model.managed_users.values())
 
         for inactive_user in etcd_users - active_users:
             try:

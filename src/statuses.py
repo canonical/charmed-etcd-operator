@@ -80,6 +80,9 @@ class ClusterStatuses(Enum):
     )
     HEALTH_CHECK_FAILED = StatusObject(status="maintenance", message="health check failed")
     REMOVED = StatusObject(status="blocked", message="unit removed from cluster", running="async")
+    RESTART_FAILED = StatusObject(
+        status="maintenance", message="unhealthy after restarting", running="async"
+    )
     PASSWORD_UPDATE_FAILED = StatusObject(
         status="blocked", message="failed to update password", running="async"
     )
@@ -90,7 +93,7 @@ class ConfigStatuses(Enum):
 
     TUNING_CONFIG_INVALID = StatusObject(
         status="blocked",
-        message="Invalid values set for the config options: 'election-timeout', 'heartbeat-interval'",
+        message="Invalid values set for the config options: 'election-timeout', 'heartbeat-interval', or 'quota-backend-bytes'",
     )
 
 
@@ -145,7 +148,7 @@ class ExternalClientsStatuses(Enum):
 
     EC_INVALID_CERTIFICATE = StatusObject(
         status="blocked",
-        message="Client relation: The certificate provided is a CA certificate. Please provide an end-entity certificate",
+        message="Client relation: The provided certificate is invalid. Please provide a valid certificate",
     )
     EC_MISSING_CREDENTIALS = StatusObject(
         status="blocked", message="Client relation: Missing certificate or prefix"
@@ -156,6 +159,11 @@ class ExternalClientsStatuses(Enum):
     )
     EC_TLS_IS_DISABLED = StatusObject(
         status="blocked", message="Client relation: TLS is disabled. Please enable TLS"
+    )
+    EC_USER_MANAGEMENT_ERROR = StatusObject(
+        status="blocked",
+        message="Client relation: User management error. Please check logs",
+        running="async",
     )
 
 
@@ -168,11 +176,6 @@ class EtcdServiceStatuses(Enum):
     )
     SERVICE_STARTING = StatusObject(
         status="maintenance", message="Waiting for etcd to start...", running="async"
-    )
-    SERVICE_NOT_INSTALLED = StatusObject(
-        status="blocked",
-        message="unable to install etcd snap",
-        running="async",
     )
     SERVICE_NOT_RUNNING = StatusObject(
         status="blocked", message="etcd service not running", running="async"

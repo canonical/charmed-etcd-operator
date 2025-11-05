@@ -12,11 +12,13 @@ from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificatesRemovedEvent,
     CertificateTransferRequires,
 )
-from charms.data_platform_libs.v0.data_interfaces import (
-    EtcdProvides,
-    MTLSCertUpdatedEvent,
+from charms.data_platform_libs.v1.data_interfaces import (
+    MtlsCertUpdatedEvent,
+    RequirerCommonModel,
+    ResourceProviderEventHandler,
+    ResourceProviderModel,
 )
-from ops import Object, RelationBrokenEvent
+from ops import Object, Relation, RelationBrokenEvent
 
 from common.certificates import is_leaf_certificate_valid
 from common.exceptions import EtcdUserManagementError
@@ -27,6 +29,7 @@ from literals import (
     TLSState,
     TLSType,
 )
+from statuses import ExternalClientsStatuses
 
 if TYPE_CHECKING:
     from charm import EtcdOperatorCharm
@@ -41,7 +44,9 @@ class ExternalClientsEvents(Object):
         super().__init__(charm, key="etcd_events")
         self.charm = charm
 
-        self.etcd_provides = EtcdProvides(self.charm, EXTERNAL_CLIENTS_RELATION)
+        self.etcd_provides = ResourceProviderEventHandler(
+            self.charm, EXTERNAL_CLIENTS_RELATION, RequirerCommonModel, mtls_enabled=True
+        )
 
         self.certificate_transfer = CertificateTransferRequires(
             self.charm, CERTIFICATE_TRANSFER_RELATION
@@ -58,8 +63,13 @@ class ExternalClientsEvents(Object):
             self.charm.on[EXTERNAL_CLIENTS_RELATION].relation_broken, self._on_relation_broken
         )
 
-    def _on_mtls_cert_updated(self, event: MTLSCertUpdatedEvent) -> None:  # noqa: C901
+    def _on_mtls_cert_updated(self, event: MtlsCertUpdatedEvent[RequirerCommonModel]) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
+        if not self.charm.state.cluster.model or not self.charm.state.unit_server.model:
+            logger.error("peer data not available")
+            event.defer()
+            return
+
         if (
             self.charm.state.cluster.is_restore_in_progress
             or self.charm.state.cluster.rebuild_cluster_in_progress
@@ -71,7 +81,7 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
 
-        if not event.mtls_cert or not event.prefix:
+        if not event.request.mtls_cert or not event.request.resource:
             logger.error("CA chain, keys prefix, or common name not provided")
             return
 
@@ -100,18 +110,18 @@ class ExternalClientsEvents(Object):
 
         # Get common name from mtls_cert
         old_common_name = None
-        if self.charm.state.cluster.managed_users.get(event.relation.id):
+        if self.charm.state.cluster.model.managed_users.get(event.relation.id):
             old_common_name = (
                 self.charm.external_clients_manager.get_common_name_from_chain(event.old_mtls_cert)
                 if event.old_mtls_cert
                 else None
             )
         common_name = self.charm.external_clients_manager.get_common_name_from_chain(
-            event.mtls_cert
+            event.request.mtls_cert
         )
 
         # validate leaf certificate
-        if not is_leaf_certificate_valid(event.mtls_cert):
+        if not is_leaf_certificate_valid(event.request.mtls_cert):
             logger.error("Invalid end-entity certificate")
             # clean the old user if exists
             if old_common_name:
@@ -147,13 +157,38 @@ class ExternalClientsEvents(Object):
 
                 if relation_managed_user is None:
                     logger.info(f"Creating new user: {common_name}")
-                    self.charm.cluster_manager.add_managed_user(common_name, event.prefix)
+                    try:
+                        self.charm.cluster_manager.add_managed_user(
+                            common_name, event.request.resource
+                        )
+                    except EtcdUserManagementError as e:
+                        self.charm.status.set_running_status(
+                            ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value,
+                            scope="app",
+                            component_name=self.charm.external_clients_manager.name,
+                            statuses_state=self.charm.state.statuses,
+                        )
+                        logger.error(e)
+                        return
+
                     self.charm.external_clients_manager.add_managed_user(
                         event.relation.id, common_name
                     )
-                    self.etcd_provides.set_credentials(event.relation.id, common_name, "")
-                    self.charm.external_clients_manager.update_client_relations_data(
-                        etcd_version=self.charm.cluster_manager.get_version()
+                    response = self._get_or_create_resource_response(
+                        event.relation,
+                        common_name,
+                        event.request.request_id,
+                        event.request.resource,
+                        event.request.salt,
+                    )
+                    response.username = common_name
+                    response.endpoints = self.charm.external_clients_manager.get_endpoints()
+                    response.uris = self.charm.external_clients_manager.get_uris()
+                    response.tls_ca = self.charm.state.tls_client_certificate.ca.raw
+                    response.version = self.charm.cluster_manager.get_version()
+                    self.etcd_provides.set_response(
+                        event.relation.id,
+                        response,
                     )
 
         relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
@@ -165,6 +200,47 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
         self._update_client_truststore()
+        self.charm.state.statuses.delete(
+            ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value,
+            scope="app",
+            component=self.charm.external_clients_manager.name,
+        )
+
+    def _get_or_create_resource_response(
+        self,
+        relation: Relation,
+        common_name: str,
+        request_id: str | None,
+        resource: str,
+        salt: str,
+    ) -> ResourceProviderModel:
+        """Get or create the resource response for the relation.
+
+        Args:
+            relation (Relation): The relation of the event.
+            common_name (str): The common name of the user.
+            request_id (str): The request id.
+            resource (str): The resource requested.
+            salt (str): The salt used for password hashing.
+
+        Returns:
+            The ResourceProviderModel response.
+        """
+        response = next(
+            (
+                res
+                for res in self.etcd_provides.responses(relation, ResourceProviderModel)
+                if res.request_id == request_id
+            ),
+            None,
+        ) or ResourceProviderModel(
+            username=common_name,
+            request_id=request_id,
+            resource=resource,
+            salt=salt,
+        )
+
+        return response
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle the relation broken event."""
