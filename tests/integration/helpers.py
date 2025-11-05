@@ -525,9 +525,7 @@ async def download_client_certificate_from_unit(
         await unit.scp_from(f"{tls_path}/{file}", file)
 
 
-def download_client_certificate_from_unit_jubilant(
-    juju: Juju, app_name: str = APP_NAME
-) -> None:
+def download_client_certificate_from_unit_jubilant(juju: Juju, app_name: str = APP_NAME) -> None:
     """Copy the client certificate files from a unit to the host's filesystem."""
     unit = next(iter(juju.status().get_units(app_name).keys()))
 

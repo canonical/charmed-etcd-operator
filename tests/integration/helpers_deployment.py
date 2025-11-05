@@ -329,7 +329,7 @@ def apps_active_and_agents_idle(
 
 
 def verify_unit_count(status: jubilant.Status, *apps: str, unit_count: Union[int, Dict[str, int]]):
-    """Helper function that verifies unit count for an application.
+    """Verify the unit count for an application.
 
     Args:
         status: represents the jubilant model's current status
@@ -488,7 +488,7 @@ async def wait_until(  # noqa: C901
 
 
 def tls_peer_certs_expiring(status: jubilant.Status) -> bool:
-    """Check that workload status is TLSStatuses.TLS_PEER_CERTS_EXPIRING
+    """Check that workload status is TLSStatuses.TLS_PEER_CERTS_EXPIRING.
 
     Args:
         status: represents the jubilant model's current status

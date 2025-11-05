@@ -155,7 +155,6 @@ async def test_initialize_vault(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.grant_secret("vault-token", VAULT_NAME)
 
-
     vault_unit_name = next(iter(vault_units.keys()))
     action = juju_lxd_model.run(
         unit=vault_unit_name,
