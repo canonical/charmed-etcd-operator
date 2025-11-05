@@ -8,7 +8,7 @@ variable "etcd" {
     model             = string
     base              = optional(string, "ubuntu@24.04")
     config            = optional(map(string), {})
-    channel           = optional(string, "3.5/edge")
+    channel           = optional(string, "3.6/stable")
     revision          = optional(string, null)
     units             = optional(number, 3)
     constraints       = optional(string, "arch=amd64")
