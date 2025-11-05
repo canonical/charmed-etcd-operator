@@ -5,6 +5,7 @@
 """Implementation of WorkloadBase for running on VMs."""
 
 import logging
+import shutil
 import subprocess
 from os.path import exists
 from pathlib import Path
@@ -22,7 +23,7 @@ from typing_extensions import override
 
 from common.exceptions import EtcdServiceError
 from core.workload import WorkloadBase
-from literals import SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
+from literals import DATABASE_DIR, SNAP_DATA_PATH, SNAP_NAME, SNAP_SERVICE, VERSIONS_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -191,3 +192,63 @@ class EtcdWorkload(WorkloadBase):
     def snap_revision(self) -> str:
         """Get the snap revision that is currently installed."""
         return self.etcd.revision
+
+    @override
+    def memory_size(self) -> int:
+        """Get the total memory size of the system in Bytes.
+
+        Read the /proc/meminfo file and return the values.
+        According to the kernel source code, the values are always in kB:
+            https://github.com/torvalds/linux/blob/
+                2a130b7e1fcdd83633c4aa70998c314d7c38b476/fs/proc/meminfo.c#L31
+
+        Returns:
+            int: The total memory size in Bytes.
+        """
+        with open("/proc/meminfo") as f:
+            meminfo = f.read().split("\n")
+            meminfo = [line.split() for line in meminfo if line.strip()]
+
+        memory_sizes = {line[0][:-1]: float(line[1]) for line in meminfo}
+        return int(memory_sizes["MemTotal"] * 1024)  # convert from kB to Bytes
+
+    @override
+    def data_storage_size(self) -> int:
+        """Get the size of the data storage in Bytes.
+
+        Returns:
+            int: The size of the data storage in Bytes.
+        """
+        return shutil.disk_usage(SNAP_DATA_PATH).total
+
+    @override
+    def get_db_file_size(self) -> int:
+        """Get the size of the etcd database file in bytes.
+
+        Returns:
+            int: Size of the etcd database file in bytes.
+        """
+        db_file_path = Path(DATABASE_DIR) / "snap" / "db"
+        if db_file_path.exists() and db_file_path.is_file():
+            return db_file_path.stat().st_size
+        return 0
+
+    @override
+    def is_lxd_cloud(self) -> bool:
+        """Check if the workload is running in an LXD cloud environment.
+
+        Returns:
+            bool: True if running in LXD cloud, False otherwise.
+        """
+        # LXD sets up a Unix socket at /dev/lxd/sock inside the container
+        # https://documentation.ubuntu.com/lxd/latest/dev-lxd/#implementation-details
+        return Path("/dev/lxd/sock").exists()
+
+    @override
+    def data_storage_attached(self) -> bool:
+        """Check if the data storage is attached.
+
+        Returns:
+            bool: True if data storage is attached, False otherwise.
+        """
+        return Path(SNAP_DATA_PATH).exists()

@@ -86,6 +86,7 @@ minversion = "6.0"
 log_cli_level = "INFO"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = ["v0", "v1"]
 
 # Linting tools configuration
 [tool.ruff]

@@ -4,11 +4,13 @@
 
 """Manager for handling external clients."""
 
-import json
 import logging
 from pathlib import Path
 
-from charms.tls_certificates_interface.v4.tls_certificates import Certificate
+from charms.data_platform_libs.v1.data_interfaces import (
+    ResourceProviderModel,
+)
+from charms.tls_certificates_interface.v4.tls_certificates import Certificate, TLSCertificatesError
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
@@ -46,11 +48,11 @@ class ExternalClientsManager(ManagerStatusProtocol):
         Args:
             relation_id (int): The relation id.
         """
-        managed_users = self.state.cluster.managed_users
+        managed_users = self.state.cluster.model.managed_users
         del managed_users[relation_id]
         self.state.cluster.update(
             {
-                "managed_users": json.dumps(managed_users),
+                "managed_users": managed_users,
             }
         )
 
@@ -61,12 +63,12 @@ class ExternalClientsManager(ManagerStatusProtocol):
             relation_id (int): The relation id.
             common_name (str): The common name.
         """
-        managed_users = self.state.cluster.managed_users
+        managed_users = self.state.cluster.model.managed_users
         managed_users[relation_id] = common_name
 
         self.state.cluster.update(
             {
-                "managed_users": json.dumps(managed_users),
+                "managed_users": managed_users,
             }
         )
 
@@ -79,7 +81,11 @@ class ExternalClientsManager(ManagerStatusProtocol):
         Returns:
             (str): The managed user.
         """
-        return self.state.cluster.managed_users.get(relation_id)
+        return (
+            self.state.cluster.model.managed_users.get(relation_id)
+            if self.state.cluster.model
+            else None
+        )
 
     def get_common_name_from_chain(self, mtls_cert: str) -> str:
         """Get the common name from the mtls chain.
@@ -94,19 +100,23 @@ class ExternalClientsManager(ManagerStatusProtocol):
         raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
         # add the marker back to the certificate
         cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
-        return Certificate.from_string(cert).common_name
+        try:
+            return Certificate.from_string(cert).common_name
+        except TLSCertificatesError as e:
+            logger.error(e)
+            return ""
 
     def update_client_relations_data(self, etcd_version: str) -> None:
         """Update the ECR data."""
-        if not self.state.etcd_provides.relations:
+        if not self.state.etcd_provides_interface.relations:
             return
 
-        if not self.state.cluster.cluster_state:
+        if not self.state.cluster.model.cluster_state:
             logger.debug("Cluster not yet initialized, cannot update client relation data.")
             return
 
         cluster_server_names = {
-            uri.split("=")[0] for uri in self.state.cluster.cluster_members.split(",")
+            uri.split("=")[0] for uri in self.state.cluster.model.cluster_members.split(",")
         }
         cluster_servers = {
             server
@@ -116,54 +126,61 @@ class ExternalClientsManager(ManagerStatusProtocol):
         }
 
         uris = {server.client_url for server in cluster_servers}
-        endpoints = {f"{server.ip}:{CLIENT_PORT}" for server in cluster_servers}
+        endpoints = {f"{server.model.private_ip}:{CLIENT_PORT}" for server in cluster_servers}
 
         server_ca = self.state.tls_client_certificate.ca.raw
 
-        for relation in self.state.etcd_provides.relations:
-            if not self.state.etcd_provides.fetch_relation_field(
-                relation.id, "prefix"
-            ) or not self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert"):
-                # Skip relations with invalid payloads
-                logger.warning(f"Skipping relation {relation.id} with invalid payloads.")
+        for relation in self.state.etcd_provides_interface.relations:
+            responses = self.state.etcd_provides_event_handler.responses(
+                relation, ResourceProviderModel
+            )
+            if not responses:
+                logger.warning("Skipping relation %s with no responses.", relation.id)
                 continue
+            for request in self.state.etcd_provides_event_handler.requests(relation):
+                if not request.resource or not request.mtls_cert:
+                    logger.warning("Skipping relation %s with invalid payloads.", relation.id)
+                    continue
+                current_response = next(
+                    (res for res in responses if res.request_id == request.request_id), None
+                )
+                if not current_response:
+                    logger.warning(
+                        "Skipping relation %s did not find a matching response.", relation.id
+                    )
+                    continue
 
-            relation_data = self.state.etcd_provides.fetch_my_relation_data(
-                [relation.id], ["uris", "endpoints", "tls-ca", "version"]
-            )[relation.id]
+                current_response.endpoints = ",".join(endpoints)
+                current_response.uris = ",".join(uris)
+                current_response.tls_ca = server_ca
+                current_response.version = etcd_version
+            self.state.etcd_provides_event_handler.set_responses(relation.id, responses)
 
-            if set(relation_data.get("uris", "").split(",")) != uris:
-                self.state.etcd_provides.set_uris(relation.id, ",".join(uris))
-
-            if set(relation_data.get("endpoints", "").split(",")) != endpoints:
-                self.state.etcd_provides.set_endpoints(relation.id, ",".join(endpoints))
-
-            if relation_data.get("tls-ca") != server_ca:
-                self.state.etcd_provides.set_tls_ca(relation.id, server_ca)
-
-            if relation_data.get("version") != etcd_version:
-                self.state.etcd_provides.set_version(relation.id, etcd_version)
-
-    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:  # noqa: C901
         """Compute the component status."""
-        status_list: list[StatusObject] = []
+        status_list: list[StatusObject] = self.state.statuses.get(
+            scope=scope, component=self.name, running_status_only=True, running_status_type="async"
+        ).root
 
-        for relation in self.state.etcd_provides.relations:
-            mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
-            prefix = self.state.etcd_provides.fetch_relation_field(relation.id, "prefix")
-            # for client relation created hook
-            if not mtls_cert or not prefix:
-                status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
-                continue
-            if not is_leaf_certificate_valid(mtls_cert):
-                status_list.append(ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value)
+        for relation in self.state.etcd_provides_interface.relations:
+            for request in self.state.etcd_provides_event_handler.requests(relation):
+                mtls_cert = request.mtls_cert
+                prefix = request.resource
+                # for client relation created hook
+                if not mtls_cert or not prefix:
+                    status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
+                    continue
+                if not is_leaf_certificate_valid(mtls_cert):
+                    status_list.append(ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value)
 
-            common_name = self.get_common_name_from_chain(mtls_cert)
-            relation_managed_user = self.get_relation_managed_user(relation.id)
-            if relation_managed_user and relation_managed_user != common_name:
-                status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
+                # Only the leader manages the usernames
+                if self.state.charm.unit.is_leader():
+                    common_name = self.get_common_name_from_chain(mtls_cert)
+                    relation_managed_user = self.get_relation_managed_user(relation.id)
+                    if relation_managed_user and relation_managed_user != common_name:
+                        status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
 
-        if self.state.etcd_provides.relations:
+        if self.state.etcd_provides_interface.relations:
             if self.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
                 status_list.append(ExternalClientsStatuses.EC_TLS_IS_DISABLED.value)
 
@@ -180,3 +197,45 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 status_list.append(ClusterStatuses.CLUSTER_NOT_INITIALIZED.value)
 
         return status_list or [CharmStatuses.ACTIVE_IDLE.value]
+
+    def get_uris(self) -> str:
+        """Get the URIs of the cluster.
+
+        Returns:
+            (list[str]): The URIs of the cluster.
+        """
+        if not self.state.cluster.model or not self.state.cluster.model.cluster_state:
+            return ""
+
+        cluster_server_names = {
+            uri.split("=")[0] for uri in self.state.cluster.model.cluster_members.split(",")
+        }
+        cluster_servers = {
+            server
+            for server in self.state.servers
+            if server.member_name in cluster_server_names
+            and server.tls_client_state == TLSState.TLS
+        }
+
+        return ",".join([server.client_url for server in cluster_servers])
+
+    def get_endpoints(self) -> str:
+        """Get the endpoints of the cluster.
+
+        Returns:
+            (list[str]): The endpoints of the cluster.
+        """
+        if not self.state.cluster.model or not self.state.cluster.model.cluster_state:
+            return ""
+
+        cluster_server_names = {
+            uri.split("=")[0] for uri in self.state.cluster.model.cluster_members.split(",")
+        }
+        cluster_servers = {
+            server
+            for server in self.state.servers
+            if server.member_name in cluster_server_names
+            and server.tls_client_state == TLSState.TLS
+        }
+
+        return ",".join([f"{server.model.private_ip}:{CLIENT_PORT}" for server in cluster_servers])

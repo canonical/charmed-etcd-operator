@@ -5,6 +5,7 @@
 """Manager for handling TLS related events."""
 
 import base64
+import binascii
 import logging
 import re
 from ipaddress import ip_address
@@ -441,13 +442,16 @@ class TLSManager(ManagerStatusProtocol):
             logger.warning("No client CA found in the TLS client certificate.")
 
         # managed users cas
-        for relation in self.state.etcd_provides.relations:
-            mtls_cert = self.state.etcd_provides.fetch_relation_field(relation.id, "mtls-cert")
-            logger.debug(
-                f"Collecting CA from relation {relation.id}, chain exists: {bool(mtls_cert)}"
-            )
-            if mtls_cert and is_leaf_certificate_valid(mtls_cert):
-                cas.add(leaf_certificate(mtls_cert))
+        for relation in self.state.etcd_provides_interface.relations:
+            for request in self.state.etcd_provides_event_handler.requests(relation):
+                mtls_cert = request.mtls_cert
+                logger.debug(
+                    "Collecting CA from relation %s, chain exists: %s",
+                    relation.id,
+                    bool(mtls_cert),
+                )
+                if mtls_cert and is_leaf_certificate_valid(mtls_cert):
+                    cas.add(leaf_certificate(mtls_cert))
 
         # certificate transfer cas
         cas.update(self.state.tls_certificate_transfer_certificates)
@@ -483,11 +487,16 @@ class TLSManager(ManagerStatusProtocol):
             logger.error(f"Secret {private_key_secret_id} does not contain a private key.")
             return None
 
-        private_key = (
-            secret_content
-            if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
-            else base64.b64decode(secret_content).decode("utf-8").strip()
-        )
+        try:
+            private_key = (
+                secret_content
+                if re.match(r"(-+(BEGIN|END) [A-Z ]+-+)", secret_content)
+                else base64.b64decode(secret_content).decode("utf-8").strip()
+            )
+        except (UnicodeDecodeError, binascii.Error) as e:
+            logger.error(e)
+            return None
+
         private_key = PrivateKey(raw=private_key)
         if not private_key.is_valid():
             logger.error("Invalid private key format.")

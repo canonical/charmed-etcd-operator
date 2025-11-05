@@ -18,7 +18,7 @@ In the following example, we will set `heartbeat-interval` to 300 milliseconds a
 You can either configure these settings at deploy time by adding the configuration to your deploy-command, for example:
 
 ```text
-juju deploy charmed-etcd --channel 3.6/edge -n 3 --config heartbeat-interval=300 --config election-timeout=3000
+juju deploy charmed-etcd -n 3 --config heartbeat-interval=300 --config election-timeout=3000
 ```
 
 Or you can set them on your existing charmed etcd application by running `juju config <application-name>...`, for example:
@@ -78,6 +78,32 @@ Machine  State    Address        Inst id         Base          AZ  Message
 
 Please refer to the [official etcd docs](https://etcd.io/docs/v3.6/tuning/#time-parameters) for more information on how
 to decide the correct adjustments to the parameters for your specific requirements.
+
+## Storage quota
+
+By default, etcd imposes a storage quota of 2 GiB as the maximum permissible size of the etcd database
+on each cluster member. While this limit may be sufficient for small-scale deployments, it might become
+inadequate for bigger production clusters.
+
+To adjust the storage quota of etcd, configure the `quota-backend-bytes` option. The following example
+will set etcd's storage quota to 4 GiB:
+
+```text
+juju config charmed-etcd quota-backend-bytes="4000000000" 
+```
+
+The value of this configuration option should be sized according to the cluster's workload and available RAM.
+When this configured limit is exceeded, the cluster will raise a `NOSPACE` alarm and enter a read-only mode,
+rejecting all write requests.
+
+Charmed etcd will validate the configuration value and apply it to all units in the deployment (with a rolling
+restart in case of an existing deployment). The value needs to be `auto` or an integer representing the size 
+in bytes.
+
+If value is set to `auto`, the formula used is `min(100GiB, 0.9*memory, 0.9*data_storage_size)`.
+A minimum of 100MiB is enforced.
+
+For more information, please refer to the [official etcd docs](https://etcd.io/docs/v3.6/op-guide/maintenance/#space-quota).
 
 ## Certificate SANs configuration
 

@@ -36,11 +36,11 @@ parts:
       # cp requirements.txt "$CRAFT_PART_INSTALL/requirements.txt"
 
 actions:
-  update-common-name:
-    description: Update the common name of the certificate
+  update-mtls-cert:
+    description: Update the mtls certificate
     params:
       chain:
-        description: The CA certificate
+        description: The mtls certificate
         type: string
 
   put:
@@ -72,3 +72,8 @@ config:
       description: Send the CA certificate instead of end-entity certificate
       type: boolean
       default: false
+    
+    data-interfaces-version:
+      description: Version of data interfaces to use
+      type: int
+      default: 1
