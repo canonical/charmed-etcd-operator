@@ -33,6 +33,8 @@ async def test_deploy_and_configure(
     charm: str, ops_test: OpsTest, storage_credentials, storage_config
 ) -> None:
     """Deploy and configure the charm and s3-integrator."""
+    await ops_test.model.set_config({"image-stream": "daily"})
+
     await ops_test.model.deploy(charm, num_units=NUM_UNITS)
     await ops_test.model.deploy(S3_INTEGRATOR, channel="1/stable", num_units=1)
     await wait_until(ops_test, apps=[S3_INTEGRATOR], apps_statuses=["blocked"])
