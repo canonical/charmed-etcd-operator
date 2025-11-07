@@ -42,7 +42,7 @@ TEST_VALUE = "42"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
+def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
@@ -65,7 +65,7 @@ async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> No
 
 
 @pytest.mark.abort_on_fail
-async def test_tls_enabled(juju_lxd_model: Juju) -> None:
+def test_tls_enabled(juju_lxd_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
     assert juju_lxd_model.model is not None, "Model is not set"
@@ -114,7 +114,7 @@ async def test_tls_enabled(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_set_private_key(juju_lxd_model: Juju) -> None:
+def test_set_private_key(juju_lxd_model: Juju) -> None:
     """Set a new private key and check if the cluster is still accessible."""
     model = juju_lxd_model.model
 

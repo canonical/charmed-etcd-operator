@@ -40,7 +40,7 @@ CERTIFICATE_EXPIRY_TIME = 250
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
+def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
@@ -64,7 +64,7 @@ async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> No
 
 
 @pytest.mark.abort_on_fail
-async def test_tls_enabled(juju_lxd_model: Juju) -> None:
+def test_tls_enabled(juju_lxd_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
@@ -112,7 +112,7 @@ async def test_tls_enabled(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_disable_tls(juju_lxd_model: Juju) -> None:
+def test_disable_tls(juju_lxd_model: Juju) -> None:
     """Disable TLS on a running cluster and check if it is still accessible."""
     logger.info("Removing peer-certificates and client-certificates relations")
     juju_lxd_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
@@ -165,7 +165,7 @@ async def test_disable_tls(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_enable_tls(juju_lxd_model: Juju) -> None:
+def test_enable_tls(juju_lxd_model: Juju) -> None:
     """Enable TLS on a running cluster and check if it is still accessible."""
     logger.info("Integrating peer-certificates and client-certificates relations")
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
@@ -225,7 +225,7 @@ async def test_enable_tls(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
+def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
     """Configure extra sans for the TLS certificates."""
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
@@ -239,14 +239,6 @@ async def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
         )
         and NUM_UNITS == len(status.get_units(APP_NAME))
     )
-    # await wait_until(
-    #     ops_test,
-    #     apps=[APP_NAME],
-    #     apps_full_statuses={
-    #         APP_NAME: [TLSStatuses.SANS_CONFIG_INVALID.value],
-    #     },
-    #     wait_for_exact_units=NUM_UNITS,
-    # )
 
     download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
     client_cert_sans = subprocess.getoutput(
@@ -293,7 +285,7 @@ async def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
+def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     """Disable then enable peer TLS on a running cluster and check if it is still accessible."""
     model = juju_lxd_model.model
 
@@ -420,7 +412,7 @@ async def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
+def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
     """Disable then enable client TLS on a running cluster and check if it is still accessible."""
     model = juju_lxd_model.model
 
@@ -544,7 +536,7 @@ async def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_certificate_expiration(juju_lxd_model: Juju) -> None:
+def test_certificate_expiration(juju_lxd_model: Juju) -> None:
     """Test the TLS certificate expiration on a running cluster."""
     model = juju_lxd_model.model
 

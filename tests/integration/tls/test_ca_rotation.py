@@ -32,7 +32,7 @@ CERTIFICATE_EXPIRY_TIME = 90
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
+def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 
     The initial cluster should be formed and accessible.
@@ -93,7 +93,7 @@ async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> No
 
 
 @pytest.mark.abort_on_fail
-async def test_ca_rotation_by_config_change(juju_lxd_model: Juju) -> None:
+def test_ca_rotation_by_config_change(juju_lxd_model: Juju) -> None:
     """Test the CA rotation.
 
     The CA certificate should be rotated and the cluster should still be accessible.
@@ -223,7 +223,7 @@ def _prepare_units_for_ca_expiration_test(juju: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
+def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
     """Test the CA rotation.
 
     The CA certificate should be rotated and the cluster should still be accessible.

@@ -46,7 +46,7 @@ def _install_dependencies() -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
+def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
     """Set up the TLS provider charms and etcd."""
     _install_dependencies()
 
@@ -72,7 +72,7 @@ async def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> No
 
 
 @pytest.mark.abort_on_fail
-async def test_initialize_vault(juju_lxd_model: Juju) -> None:
+def test_initialize_vault(juju_lxd_model: Juju) -> None:
     """Initialize Vault and wait for it to be ready."""
     vault_units = juju_lxd_model.status().get_units(VAULT_NAME)
     vault_ip = next(iter(vault_units.values())).public_address
@@ -170,7 +170,7 @@ async def test_initialize_vault(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_tls_enabled(juju_lxd_model: Juju) -> None:
+def test_tls_enabled(juju_lxd_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     logger.info("Integrating peer-certificates and client-certificates relations")
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", VAULT_NAME)
@@ -224,7 +224,7 @@ async def test_tls_enabled(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_restrict_certificate_domain(juju_lxd_model: Juju) -> None:
+def test_restrict_certificate_domain(juju_lxd_model: Juju) -> None:
     """Restrict the allowed domains and request new certificates."""
     logger.info("Restrict allowed certificate domains in Vault")
     vault_domain_config_value = "domain1, domain2, domain3"
@@ -256,7 +256,7 @@ async def test_restrict_certificate_domain(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_invalid_certificate_domain(juju_lxd_model: Juju) -> None:
+def test_invalid_certificate_domain(juju_lxd_model: Juju) -> None:
     """Ensure no new certificates are requested if invalid domain is configured."""
     logger.info("Set config in etcd to invalid value")
     etcd_invalid_domain_config_value = "192.168.2.200"
