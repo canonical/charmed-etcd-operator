@@ -3,9 +3,7 @@ environment:
   TEST_MODULE: backup/test_restore_verification_failed.py
 systems:
   - self-hosted-linux-amd64-noble-medium
-  # s3-integrator requires ubuntu22.04 which is broken and no workaround is known
-  # https://bugs.launchpad.net/snapd/+bug/2127244
-  # self-hosted-linux-arm64-noble-medium
+  - self-hosted-linux-arm64-noble-medium
 execute: |
   tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
 artifacts:
