@@ -33,6 +33,7 @@ async def test_deploy_and_configure(
     charm: str, ops_test: OpsTest, storage_credentials, storage_config
 ) -> None:
     """Deploy and configure the charm and s3-integrator."""
+    # workaround for https://bugs.launchpad.net/snapd/+bug/2127244
     await ops_test.model.set_config({"image-stream": "daily"})
 
     await ops_test.model.deploy(charm, num_units=NUM_UNITS)
