@@ -47,7 +47,6 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
 
     The initial cluster should be formed and accessible.
     """
-    assert juju_lxd_model.model is not None, "Model is not set"
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
     juju_lxd_model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
@@ -68,7 +67,6 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
 def test_tls_enabled(juju_lxd_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
-    assert juju_lxd_model.model is not None, "Model is not set"
     endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
     download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
 

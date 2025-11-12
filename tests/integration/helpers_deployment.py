@@ -302,7 +302,7 @@ def apps_active_and_agents_idle(
     status: jubilant.Status,
     *apps: str,
     idle_period: int = 0,
-    unit_count: Union[int, Dict[str, int]] | None = None,
+    unit_count: int | dict[str, int] = None,
 ) -> bool:
     """Check that all given apps are active, their agents idle (optional idle interval too) and optionally verify unit count as well.
 
@@ -318,17 +318,23 @@ def apps_active_and_agents_idle(
     return (
         jubilant.all_active(status, *apps)
         and jubilant.all_agents_idle(status, *apps)
-        and all(
-            parse(unit.juju_status.since, ignoretz=True) + timedelta(seconds=idle_period)
-            < datetime.now()
-            for app in apps
-            for unit in status.get_units(app).values()
-        )
-        and (True if not unit_count else verify_unit_count(status, *apps, unit_count=unit_count))
+        and check_apps_idle_period(status, *apps, idle_period=idle_period)
+        and verify_unit_count(status, *apps, unit_count=unit_count)
     )
 
 
-def verify_unit_count(status: jubilant.Status, *apps: str, unit_count: Union[int, Dict[str, int]]):
+def check_apps_idle_period(status: jubilant.Status, *apps: str, idle_period: int) -> bool:
+    return all(
+        parse(unit.juju_status.since, ignoretz=True) + timedelta(seconds=idle_period)
+        < datetime.now()
+        for app in apps
+        for unit in status.get_units(app).values()
+    )
+
+
+def verify_unit_count(
+    status: jubilant.Status, *apps: str, unit_count: int | dict[str, int] = None
+):
     """Verify the unit count for an application.
 
     Args:
@@ -339,7 +345,12 @@ def verify_unit_count(status: jubilant.Status, *apps: str, unit_count: Union[int
             pass a dictionary such as: {"app1": 2, "app2": 1, ...}, if set to -1, the check
             only happens at the application level.
     """
+    if not unit_count:
+        return True
+
     if isinstance(unit_count, int):
+        if unit_count == 0:
+            return True
         unit_count = dict.fromkeys(apps, unit_count)
     elif not unit_count:
         unit_count = dict.fromkeys(apps, -1)

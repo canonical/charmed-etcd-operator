@@ -211,7 +211,7 @@ def test_ca_rotation_by_config_change(juju_lxd_model: Juju) -> None:
 
 def _prepare_units_for_ca_expiration_test(juju: Juju) -> None:
     """Prepare the units for the CA expiration test."""
-    for unit_name in juju.status().get_units(APP_NAME).keys():
+    for unit_name in juju.status().get_units(APP_NAME):
         logger.info("Updating renewal relative time to 0.6 for unit %s", unit_name)
         search_expression = "\\(refresh_events=\\[self.refresh_tls_certificates_event\\],\\)"
         replace_expression = "\\1renewal_relative_time=0.6,"

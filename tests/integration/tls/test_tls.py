@@ -45,7 +45,6 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
 
     The initial cluster should be formed and accessible.
     """
-    assert juju_lxd_model.model is not None, "Model is not set"
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
     juju_lxd_model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
@@ -262,7 +261,7 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
     client_cert_sans = subprocess.getoutput(
         "openssl x509 -noout -ext subjectAltName -in client.pem "
     )
-    unit_name = next(iter(juju_lxd_model.status().get_units(APP_NAME).keys()))
+    unit_name = next(iter(juju_lxd_model.status().get_units(APP_NAME)))
     expected_sans = config_value.replace("{unit}", unit_name.split("/")[-1])
     assert expected_sans in client_cert_sans, (
         f"expected sans {expected_sans} not found in certificate sans {client_cert_sans}"

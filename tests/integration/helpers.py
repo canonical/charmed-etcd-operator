@@ -527,7 +527,7 @@ async def download_client_certificate_from_unit(
 
 def download_client_certificate_from_unit_jubilant(juju: Juju, app_name: str = APP_NAME) -> None:
     """Copy the client certificate files from a unit to the host's filesystem."""
-    unit = next(iter(juju.status().get_units(app_name).keys()))
+    unit = next(iter(juju.status().get_units(app_name)))
 
     tls_path = TLS_ROOT_DIR
 
