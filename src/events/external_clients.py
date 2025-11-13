@@ -289,7 +289,9 @@ class ExternalClientsEvents(Object):
                 if not key.startswith(f"{event.relation.id}"):
                     continue
                 user = self.charm.state.cluster.model.managed_users[key]
-                _, request_id = key.split("-", 1)
+
+                _, request_id = key.split("-", 1) if "-" in key else (key, None)
+
                 try:
                     self.charm.cluster_manager.remove_managed_user(user)
                 except EtcdUserManagementError as e:

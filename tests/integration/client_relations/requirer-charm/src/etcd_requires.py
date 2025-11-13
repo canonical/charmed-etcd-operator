@@ -311,8 +311,6 @@ class EtcdRequiresV0(EtcdRequires):
     @property
     def raw_certificate(self) -> str:
         """Return the raw certificate."""
-        if not hasattr(self, "certificates"):
-            return ""
         certs, _ = self.charm.certificates.get_assigned_certificates()
         if not certs:
             return ""
