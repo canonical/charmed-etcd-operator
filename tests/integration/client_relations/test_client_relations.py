@@ -41,9 +41,6 @@ TEST_VALUE = "42"
 REQUIRER_NAME = "requirer-charm"
 REQUIRER_TLS_NAME = "requirer-tls-provider"
 
-common_name = REQUIRER_NAME
-key_prefix = "/test/"
-
 
 @pytest.fixture
 def requirer_charm(platform: str) -> str:
@@ -134,8 +131,8 @@ async def test_build_and_deploy(
 @pytest.mark.v1
 async def test_relate_client_charm(ops_test: OpsTest) -> None:
     """Test normal client charm relation."""
-    # await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
-    # await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME], idle_period=10)
+    await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME], idle_period=10)
 
     endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     await download_client_certificate_from_unit(ops_test, APP_NAME)
@@ -218,6 +215,7 @@ async def test_write_read_with_requirer(ops_test: OpsTest) -> None:
 async def test_update_mtls_cert(ops_test: OpsTest) -> None:
     """Test updating the common name used by the requirer app."""
     old_mtls_certs = await get_requirer_mtls_certificates(ops_test)
+    assert old_mtls_certs, "failed to get the old mtls certs from requirer TLS provider"
     # run juju action to update the common name
     requirer_unit: Unit = ops_test.model.applications[REQUIRER_NAME].units[0]
 
@@ -234,7 +232,6 @@ async def test_update_mtls_cert(ops_test: OpsTest) -> None:
 
     mtls_certs = await get_requirer_mtls_certificates(ops_test)
     assert mtls_certs, "failed to get the new mtls certs from requirer TLS provider"
-    assert old_mtls_certs, "failed to get the old mtls certs from requirer TLS provider"
 
     for unit in ops_test.model.applications[APP_NAME].units:
         client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
@@ -287,9 +284,21 @@ async def test_etcd_updates_ca(ops_test: OpsTest) -> None:
 @pytest.mark.v1
 async def test_remove_client_relation(ops_test: OpsTest) -> None:
     """Test removing the client relation and check if the user and role are removed."""
-    common_name = "new-common-name"
     mtls_certs = await get_requirer_mtls_certificates(ops_test)
     assert mtls_certs, "failed to get mtls certs from requirer TLS provider"
+
+    # get common names from requirer
+    logger.debug("Getting common names from requirer")
+    requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
+    requirer_unit: Unit = requirer_app.units[0]
+
+    action = await requirer_unit.run_action("get-credentials")
+    action = await action.wait()
+
+    assert action.status == "completed", "Action should succeed"
+    common_names = action.results["username"].split(",")
+    assert common_names, "failed to get common names from requirer"
+
     etcd_app: Application = ops_test.model.applications[APP_NAME]
 
     logger.info("Removing client relation")
@@ -308,16 +317,16 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
-    user_roles = get_user(
-        endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
-    )
-    assert user_roles is None, "user still exist"
-
-    # check if the user can read and write to the key prefix
-    permissions = get_role(
-        endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
-    )
-    assert permissions is None, "role still exist"
+    for common_name in common_names:
+        user_roles = get_user(
+            endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
+        )
+        assert user_roles is None, "user still exist"
+        # check if the user can read and write to the key prefix
+        permissions = get_role(
+            endpoints, common_name, user=INTERNAL_USER, password=password, tls_enabled=True
+        )
+        assert permissions is None, "role still exist"
 
     # get client ca from every unit and check if it includes the test_ca
     model = ops_test.model_full_name
