@@ -289,12 +289,12 @@ class ExternalClientsEvents(Object):
             return
 
         if self.charm.unit.is_leader():
-            for key in self.charm.state.cluster.model.managed_users:
+            for key in list(self.charm.state.cluster.model.managed_users.keys()):
                 if not key.startswith(f"{event.relation.id}"):
                     continue
                 user = self.charm.state.cluster.model.managed_users[key]
 
-                _, request_id = key.split("-", 1) if "-" in key else (key, None)
+                request_id = key.split("-", 1)[1] if "-" in key else None
 
                 try:
                     self.charm.cluster_manager.remove_managed_user(user)
