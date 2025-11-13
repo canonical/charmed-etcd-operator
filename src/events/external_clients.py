@@ -81,14 +81,14 @@ class ExternalClientsEvents(Object):
                 event.defer()
             return
 
-        for request in event.requests:
-            if not request.mtls_cert or not request.resource:
-                logger.error("CA chain, keys prefix, or common name not provided")
-                return
+        invalid_requests = []
 
         responses = []
         for request in event.requests:
-            assert request.mtls_cert is not None and request.resource is not None  # for linter
+            if request.mtls_cert is None or request.resource is None:
+                logger.error("mTLS certificate or resource not provided")
+                invalid_requests.append(request)
+                continue
 
             common_name = self.charm.external_clients_manager.get_common_name_from_chain(
                 request.mtls_cert
@@ -129,6 +129,10 @@ class ExternalClientsEvents(Object):
         if responses:
             self.etcd_provides.set_responses(event.relation.id, responses)
             self._update_client_truststore()
+
+        if invalid_requests:
+            logger.error("Invalid requests found: %s", invalid_requests)
+            event.defer()
 
     def _on_mtls_cert_updated(self, event: MtlsCertUpdatedEvent[RequirerCommonModel]) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
