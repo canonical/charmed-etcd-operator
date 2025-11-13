@@ -97,6 +97,7 @@ class ExternalClientsEvents(Object):
             # validate leaf certificate
             if not is_leaf_certificate_valid(request.mtls_cert):
                 logger.error(f"Invalid end-entity certificate for user {common_name}")
+                invalid_requests.append(request)
                 continue
 
             relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
