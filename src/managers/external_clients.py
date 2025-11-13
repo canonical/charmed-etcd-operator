@@ -193,7 +193,9 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 # Only the leader manages the usernames
                 if self.state.charm.unit.is_leader():
                     common_name = self.get_common_name_from_chain(mtls_cert)
-                    relation_managed_user = self.get_relation_managed_user(relation.id)
+                    relation_managed_user = self.get_relation_managed_user(
+                        relation.id, request.request_id
+                    )
                     if relation_managed_user and relation_managed_user != common_name:
                         status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
 
