@@ -146,7 +146,7 @@ class RequirerCharm(ops.CharmBase):
 
         if self.etcd_requires.etcd_relation:
             self.etcd_requires.update_requests_from_certs(
-                [cert.certificate if self.send_ca_option else cert.ca for cert in certs]
+                [cert.ca if self.send_ca_option else cert.certificate for cert in certs]
             )
 
     def _config_changed(self, event: ops.ConfigChangedEvent) -> None:
@@ -326,7 +326,7 @@ class RequirerCharm(ops.CharmBase):
             return None
         for cert in certs:
             if cert.certificate.common_name == common_name:
-                return cert.certificate.raw if not self.send_ca_option else cert.ca.raw
+                return cert.ca.raw if self.send_ca_option else cert.certificate.raw
         return None
 
 

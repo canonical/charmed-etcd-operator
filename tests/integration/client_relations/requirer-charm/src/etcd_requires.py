@@ -324,6 +324,6 @@ def _get_common_name_from_chain(mtls_cert: str) -> str:
     raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
     raw_cas.remove("")
     # add the marker back to the certificate
-    # we take the last certificate from the provided mtls_cert, assuming this is the client cert
-    cert = raw_cas[-1].strip() + "\n-----END CERTIFICATE-----"
+    # we take the first certificate from the provided mtls_cert, assuming this is the client cert
+    cert = raw_cas[0].strip() + "\n-----END CERTIFICATE-----"
     return Certificate.from_string(cert).common_name
