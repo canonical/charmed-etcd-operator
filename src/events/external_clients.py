@@ -132,7 +132,6 @@ class ExternalClientsEvents(Object):
 
         if invalid_requests:
             logger.error("Invalid requests found: %s", invalid_requests)
-            event.defer()
 
     def _on_mtls_cert_updated(self, event: MtlsCertUpdatedEvent[RequirerCommonModel]) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
