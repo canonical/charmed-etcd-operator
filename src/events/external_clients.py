@@ -144,7 +144,9 @@ class ExternalClientsEvents(Object):
 
         # Get common name from mtls_cert
         old_common_name = None
-        if self.charm.external_clients_manager.get_relation_managed_user(event.relation.id):
+        if self.charm.external_clients_manager.get_relation_managed_user(
+            event.relation.id, event.request.request_id
+        ):
             old_common_name = (
                 self.charm.external_clients_manager.get_common_name_from_chain(event.old_mtls_cert)
                 if event.old_mtls_cert
@@ -170,11 +172,11 @@ class ExternalClientsEvents(Object):
 
                 # The old username is deleted even if creating the new user fails
                 if old_common_name:
-                    self._remove_user(old_common_name, event.relation.id)
+                    self._remove_user(old_common_name, event.relation.id, event.request.request_id)
 
                 relation_managed_user = (
                     self.charm.external_clients_manager.get_relation_managed_user(
-                        event.relation.id
+                        event.relation.id, event.request.request_id
                     )
                 )
                 if self.charm.cluster_manager.get_user(common_name) is not None:
@@ -199,7 +201,7 @@ class ExternalClientsEvents(Object):
                     )
 
         relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
-            event.relation.id
+            event.relation.id, event.request.request_id
         )
 
         if relation_managed_user != common_name:
@@ -282,16 +284,19 @@ class ExternalClientsEvents(Object):
             event.defer()
             return
 
-        relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
-            event.relation.id
-        )
-
-        if self.charm.unit.is_leader() and relation_managed_user:
-            try:
-                self.charm.cluster_manager.remove_managed_user(relation_managed_user)
-            except EtcdUserManagementError as e:
-                logger.error(f"Failed to remove user from etcd: {e}")
-            self.charm.external_clients_manager.remove_managed_user(event.relation.id)
+        if self.charm.unit.is_leader():
+            for key in self.charm.state.cluster.model.managed_users:
+                if not key.startswith(f"{event.relation.id}"):
+                    continue
+                user = self.charm.state.cluster.model.managed_users[key]
+                _, request_id = key.split("-", 1)
+                try:
+                    self.charm.cluster_manager.remove_managed_user(user)
+                except EtcdUserManagementError as e:
+                    logger.error(f"Failed to remove user from etcd: {e}")
+                self.charm.external_clients_manager.remove_managed_user(
+                    event.relation.id, request_id
+                )
 
         self._update_client_truststore()
 
