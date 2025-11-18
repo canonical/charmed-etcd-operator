@@ -183,7 +183,7 @@ def test_add_ecr_new_user_leader(cluster_tls_context, mtls_cert):
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
         response = json.loads(ecr_relation.local_app_data["requests"])[0]
-        managed_user_key = charm.external_clients_manager._generate_key(
+        managed_user_key = charm.external_clients_manager._resolve_key(
             ecr_relation.id, response["request-id"]
         )
         assert managed_user_key in charm.state.cluster.model.managed_users
@@ -485,7 +485,7 @@ def test_ecr_update_common_name_leader(cluster_tls_context, mtls_cert, mtls_cert
             charm: EtcdOperatorCharm = manager.charm
             state_out = manager.run()
             ecr_relation = state_out.get_relation(ecr_relation.id)
-            managed_user_key = charm.external_clients_manager._generate_key(
+            managed_user_key = charm.external_clients_manager._resolve_key(
                 ecr_relation.id, "0cbbc9781f189ea5"
             )
             assert managed_user_key in charm.state.cluster.model.managed_users
@@ -590,7 +590,7 @@ def test_ecr_update_common_name_leader_crash(
             charm: EtcdOperatorCharm = manager.charm
             remove_managed_user.side_effect = EtcdUserManagementError("User not found")
             manager.run()
-            managed_user_key = charm.external_clients_manager._generate_key(
+            managed_user_key = charm.external_clients_manager._resolve_key(
                 ecr_relation.id, request_id
             )
             assert managed_user_key in charm.state.cluster.model.managed_users
@@ -681,7 +681,7 @@ def test_ecr_update_chain_same_common_name(
         ):
             charm: EtcdOperatorCharm = manager.charm
             manager.run()
-            managed_user_key = charm.external_clients_manager._generate_key(
+            managed_user_key = charm.external_clients_manager._resolve_key(
                 ecr_relation.id, request_id
             )
             assert managed_user_key in charm.state.cluster.model.managed_users
@@ -725,9 +725,7 @@ def test_ecr_update_common_name_non_leader(
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        managed_user_key = charm.external_clients_manager._generate_key(
-            ecr_relation.id, request_id
-        )
+        managed_user_key = charm.external_clients_manager._resolve_key(ecr_relation.id, request_id)
         assert managed_user_key in charm.state.cluster.model.managed_users
 
     secret = Secret(
@@ -758,9 +756,7 @@ def test_ecr_update_common_name_non_leader(
         )
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        managed_user_key = charm.external_clients_manager._generate_key(
-            ecr_relation.id, request_id
-        )
+        managed_user_key = charm.external_clients_manager._resolve_key(ecr_relation.id, request_id)
         assert managed_user_key in charm.state.cluster.model.managed_users
         assert "mtls_cert_updated" not in [event.name for event in state_out.deferred]
 
@@ -936,9 +932,7 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
         )
         response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
         tls_secret = _get_secret_from_state(state_out, response_dict.get("secret-tls"))
-        managed_user_key = charm.external_clients_manager._generate_key(
-            ecr_relation.id, request_id
-        )
+        managed_user_key = charm.external_clients_manager._resolve_key(ecr_relation.id, request_id)
         assert managed_user_key in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert (
@@ -1030,9 +1024,7 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
         )
         response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
         user_secret = _get_secret_from_state(state_out, response_dict.get("secret-user"))
-        managed_user_key = charm.external_clients_manager._generate_key(
-            ecr_relation.id, request_id
-        )
+        managed_user_key = charm.external_clients_manager._resolve_key(ecr_relation.id, request_id)
         assert managed_user_key in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert (
@@ -1128,9 +1120,7 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
             relation for relation in state_out.relations if relation.id == ecr_relation.id
         )
         response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
-        managed_user_key = charm.external_clients_manager._generate_key(
-            ecr_relation.id, request_id
-        )
+        managed_user_key = charm.external_clients_manager._resolve_key(ecr_relation.id, request_id)
         assert managed_user_key in charm.state.cluster.model.managed_users
         assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert response_dict.get("version") == "3.6"

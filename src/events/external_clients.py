@@ -75,10 +75,9 @@ class ExternalClientsEvents(Object):
         self, event: BulkResourcesRequestedEvent[RequirerCommonModel]
     ) -> None:
         """Handle bulk resources requested event."""
-        prevent_reason, should_defer = self._exists_preventing_reason()
+        prevent_reason = self._exists_preventing_reason()
         if prevent_reason or not self.charm.unit.is_leader():
-            if should_defer:
-                event.defer()
+            event.defer()
             return
 
         invalid_requests = []
@@ -96,7 +95,7 @@ class ExternalClientsEvents(Object):
 
             # validate leaf certificate
             if not is_leaf_certificate_valid(request.mtls_cert):
-                logger.error(f"Invalid end-entity certificate for user {common_name}")
+                logger.error("Invalid end-entity certificate for user %s", common_name)
                 invalid_requests.append(request)
                 continue
 
@@ -110,6 +109,7 @@ class ExternalClientsEvents(Object):
 
             if self.charm.cluster_manager.get_user(common_name) is not None:
                 logger.error("User already exists in database for another request")
+                invalid_requests.append(request)
                 continue
 
             if relation_managed_user:
@@ -140,10 +140,9 @@ class ExternalClientsEvents(Object):
             logger.error("CA chain, keys prefix, or common name not provided")
             return
 
-        prevent_reason, should_defer = self._exists_preventing_reason()
+        prevent_reason = self._exists_preventing_reason()
         if prevent_reason:
-            if should_defer:
-                event.defer()
+            event.defer()
             return
 
         # Get common name from mtls_cert
@@ -361,16 +360,15 @@ class ExternalClientsEvents(Object):
             self.charm.tls_manager.update_cas(all_cas, TLSType.CLIENT)
             self.charm.rolling_restart()
 
-    def _exists_preventing_reason(self) -> tuple[bool, bool]:
+    def _exists_preventing_reason(self) -> bool:
         """Check if there is any reason preventing handling external clients relations.
 
         Returns:
-            A tuple where the first element indicates if there is a preventing reason,
-            and the second element indicates if event should be deferred.
+            A tuple where the first element indicates if there is a preventing reason
         """
         if not self.charm.state.cluster.model or not self.charm.state.unit_server.model:
             logger.error("peer data not available")
-            return True, True
+            return True
 
         if (
             self.charm.state.cluster.is_restore_in_progress
@@ -380,28 +378,28 @@ class ExternalClientsEvents(Object):
             logger.warning(
                 "Cannot update certificates while cluster is in vulnerable state because of restore, refresh or cluster-rebuild"
             )
-            return True, True
+            return True
 
         if self.charm.state.unit_server.tls_client_state in [TLSState.NO_TLS, TLSState.TO_NO_TLS]:
             logger.error("TLS is not enabled")
-            return True, True
+            return True
 
         if self.charm.state.unit_server.tls_client_state == TLSState.TO_TLS:
             logger.error("TLS is not ready")
-            return True, True
+            return True
 
         if (
             self.charm.state.unit_server.tls_client_ca_rotation_state
             != TLSCARotationState.NO_ROTATION
         ):
             logger.debug("CA rotation is in progress")
-            return True, True
+            return True
 
         if not self.charm.state.cluster.auth_enabled:
             logger.error("Cluster authentication is not enabled")
-            return True, True
+            return True
 
-        return False, False
+        return False
 
     def _add_user(
         self,

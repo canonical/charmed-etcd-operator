@@ -42,7 +42,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
         self.workload = workload
         self.substrate = substrate
 
-    def _generate_key(self, relation_id: int, request_id: str | None) -> str:
+    def _resolve_key(self, relation_id: int, request_id: str | None) -> str:
         """Generate the key for the managed users dictionary.
 
         Args:
@@ -62,7 +62,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
             request_id (str | None): The request id.
         """
         managed_users = self.state.cluster.model.managed_users
-        del managed_users[self._generate_key(relation_id, request_id)]
+        del managed_users[self._resolve_key(relation_id, request_id)]
         self.state.cluster.update(
             {
                 "managed_users": managed_users,
@@ -81,7 +81,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
             {
                 "managed_users": {
                     **self.state.cluster.model.managed_users,
-                    **{self._generate_key(relation_id, request_id): common_name},
+                    **{self._resolve_key(relation_id, request_id): common_name},
                 },
             }
         )
@@ -99,7 +99,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
             (str): The managed user.
         """
         return (
-            self.state.cluster.model.managed_users.get(self._generate_key(relation_id, request_id))
+            self.state.cluster.model.managed_users.get(self._resolve_key(relation_id, request_id))
             if self.state.cluster.model
             else None
         )
