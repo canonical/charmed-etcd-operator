@@ -46,13 +46,6 @@ async def test_deploy_and_configure(
     await ops_test.model.grant_secret(secret_name, S3_INTEGRATOR)
     await ops_test.model.applications[S3_INTEGRATOR].set_config({"credentials": secret_id})
     await ops_test.model.applications[S3_INTEGRATOR].set_config(storage_config)
-
-    s3_unit = ops_test.model.applications[S3_INTEGRATOR].units[0]
-    set_credentials_action = await s3_unit.run_action(
-        "sync-s3-credentials",
-        **storage_credentials,
-    )
-    await set_credentials_action.wait()
     await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
 
 
