@@ -10,7 +10,7 @@ import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
-from statuses import TLSStatuses
+from statuses import CharmStatuses, TLSStatuses
 
 from ..helpers import (
     APP_NAME,
@@ -28,7 +28,7 @@ from ..helpers import (
 from ..helpers_deployment import (
     apps_active_and_agents_idle,
     does_message_match,
-    tls_peer_certs_expiring,
+    does_status_match,
 )
 
 logger = logging.getLogger(__name__)
@@ -600,7 +600,15 @@ def test_certificate_expiration(juju_lxd_model: Juju) -> None:
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    juju_lxd_model.wait(tls_peer_certs_expiring)
+    juju_lxd_model.wait(
+        lambda status: does_status_match(
+            status,
+            expected_unit_statuses={
+                APP_NAME: TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
+                TLS_NAME: CharmStatuses.ACTIVE_IDLE.value,
+            },
+        )
+    )
 
     endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
     leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)

@@ -16,9 +16,6 @@ from dateutil.parser import parse
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
-from statuses import CharmStatuses, TLSStatuses
-from tests.integration.helpers import APP_NAME, TLS_NAME
-
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s", datefmt="%H:%M:%S"
 )
@@ -498,18 +495,55 @@ async def wait_until(  # noqa: C901
         raise
 
 
-def tls_peer_certs_expiring(status: jubilant.Status) -> bool:
-    """Check that workload status is TLSStatuses.TLS_PEER_CERTS_EXPIRING.
+def does_status_match(
+    model_status: jubilant.Status,
+    expected_unit_statuses: dict[str, StatusObject] | None = None,
+    expected_app_statuses: dict[str, StatusObject] | None = None,
+) -> bool:
+    """Check that current app and/or unit status matches expectation for given apps.
 
     Args:
-        status: represents the jubilant model's current status
+        model_status: represents the jubilant model's current status
+        expected_unit_statuses: dict mapping app name to expected StatusObject for units
+        expected_app_statuses: dict mapping app name to its expected StatusObject
+    """
+    return (
+        expected_unit_statuses is None
+        or _does_unit_workload_status_match(model_status, expected_unit_statuses)
+    ) and (
+        expected_app_statuses is None
+        or _does_app_status_match(model_status, expected_app_statuses)
+    )
+
+
+def _does_unit_workload_status_match(
+    model_status: jubilant.Status, expected_statuses: dict[str, StatusObject]
+) -> bool:
+    """Check that current workload status matches expectation for given apps' units.
+
+    Args:
+        model_status: represents the jubilant model's current status
+        expected_statuses: dict mapping app names to expected StatusObject
     """
     return all(
-        does_message_match(
-            unit_status.workload_status.message, TLSStatuses.TLS_PEER_CERTS_EXPIRING.value
+        all(
+            does_message_match(unit_status.workload_status.message, expected_status)
+            for unit_status in model_status.get_units(app).values()
         )
-        for unit_status in status.get_units(APP_NAME).values()
-    ) and all(
-        does_message_match(unit_status.workload_status.message, CharmStatuses.ACTIVE_IDLE.value)
-        for unit_status in status.get_units(TLS_NAME).values()
+        for app, expected_status in expected_statuses.items()
+    )
+
+
+def _does_app_status_match(
+    model_status: jubilant.Status, expected_statuses: dict[str, StatusObject]
+) -> bool:
+    """Check that current app status matches expectation for given apps.
+
+    Args:
+        model_status: represents the jubilant model's current status
+        expected_statuses: dict mapping app names to expected StatusObject
+    """
+    return all(
+        does_message_match(model_status.apps.get(app).app_status.message, expected_status)
+        for app, expected_status in expected_statuses.items()
     )
