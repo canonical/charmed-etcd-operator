@@ -11,6 +11,7 @@ from literals import INTERNAL_USER
 
 from ..helpers import (
     APP_NAME,
+    add_secret,
     get_cluster_endpoints,
     get_key,
     put_key,
@@ -34,18 +35,15 @@ async def test_deploy_and_configure(
 ) -> None:
     """Deploy and configure the charm and s3-integrator."""
     await ops_test.model.deploy(charm, num_units=NUM_UNITS)
-    await ops_test.model.deploy(S3_INTEGRATOR, channel="1/stable", num_units=1)
+    await ops_test.model.deploy(S3_INTEGRATOR, channel="2/edge", num_units=1)
     await wait_until(ops_test, apps=[S3_INTEGRATOR], apps_statuses=["blocked"])
 
     logger.info(f"Configure {S3_INTEGRATOR}")
+    secret_name = "s3-credentials"
+    secret_id = await add_secret(ops_test, secret_name, storage_credentials)
+    await ops_test.model.grant_secret(secret_name, S3_INTEGRATOR)
+    await ops_test.model.applications[S3_INTEGRATOR].set_config({"credentials": secret_id})
     await ops_test.model.applications[S3_INTEGRATOR].set_config(storage_config)
-
-    s3_unit = ops_test.model.applications[S3_INTEGRATOR].units[0]
-    set_credentials_action = await s3_unit.run_action(
-        "sync-s3-credentials",
-        **storage_credentials,
-    )
-    await set_credentials_action.wait()
     await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
 
     logger.info("Configure admin credentials in etcd")

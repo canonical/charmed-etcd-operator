@@ -13,7 +13,7 @@ The use cases can be broken down into two groups:
 or
 - reusing storage from another etcd cluster/database (see: [](#different-cluster-scenario))
 
-Charmed etcd uses two different storage volumes:
+Charmed etcd uses three different storage volumes:
 - `data` containing the raw data files (the actual database) written and managed by etcd
 - `archive` for temporarily storing a backup file before uploading it to object storage or when downloading it from object storage
 - `logs` for log files written by etcd
