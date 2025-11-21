@@ -27,7 +27,6 @@ from ..helpers import (
 )
 from ..helpers_deployment import (
     apps_active_and_agents_idle,
-    does_message_match,
     does_status_match,
 )
 
@@ -233,10 +232,11 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
     juju_lxd_model.config(app=APP_NAME, values={"certificate-extra-sans": config_value})
 
     juju_lxd_model.wait(
-        lambda status: does_message_match(
-            status.apps[APP_NAME].app_status.message, TLSStatuses.SANS_CONFIG_INVALID.value
+        lambda status: does_status_match(
+            status,
+            expected_app_statuses={APP_NAME: TLSStatuses.SANS_CONFIG_INVALID.value},
+            num_units={APP_NAME: NUM_UNITS},
         )
-        and NUM_UNITS == len(status.get_units(APP_NAME))
     )
 
     download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)

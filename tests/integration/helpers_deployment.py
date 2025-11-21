@@ -13,6 +13,7 @@ from uuid import uuid4
 import jubilant
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from dateutil.parser import parse
+from ops import StatusBase
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
@@ -251,14 +252,22 @@ def _is_every_condition_on_app_met(
     return True
 
 
-def does_message_match(status_message: str, status: StatusObject) -> bool:
+def does_message_match(expected_status_message: str, status: StatusObject) -> bool:
     """Check if the status message matches the expected message."""
-    return (
-        status_message == status.message
-        or status_message.startswith(status.message)
-        or status_message.startswith(f"{status.message:.40}")
-        or (status.short_message is not None and status_message.startswith(status.short_message))
-    )
+    try:
+        juju_status = StatusBase.from_name(status.status, status.message)
+        return (
+            expected_status_message == juju_status.message
+            or expected_status_message.startswith(juju_status.message)
+            or expected_status_message.startswith(f"{juju_status.message:.40}")
+            or (
+                status.short_message is not None
+                and expected_status_message.startswith(status.short_message)
+            )
+        )
+    except KeyError as e:
+        logger.error(f"Error attempting to convert StatusObject to ops.StatusBase: {e}")
+        return False
 
 
 def _is_every_condition_on_units_met(
@@ -497,37 +506,47 @@ async def wait_until(  # noqa: C901
 
 def does_status_match(
     model_status: jubilant.Status,
-    expected_unit_statuses: dict[str, StatusObject] | None = None,
-    expected_app_statuses: dict[str, StatusObject] | None = None,
+    expected_unit_statuses: dict[str, List[StatusObject]] | None = None,
+    expected_app_statuses: dict[str, List[StatusObject]] | None = None,
+    num_units: dict[str, int] | None = None,
 ) -> bool:
     """Check that current app and/or unit status matches expectation for given apps.
 
     Args:
         model_status: represents the jubilant model's current status
-        expected_unit_statuses: dict mapping app name to expected StatusObject for units
-        expected_app_statuses: dict mapping app name to its expected StatusObject
+        expected_unit_statuses: dict mapping app name to list of expected StatusObject for units
+        expected_app_statuses: dict mapping app name to its list of expected StatusObject
+        num_units: dict mapping app name to expected number of units
     """
     return (
-        expected_unit_statuses is None
-        or _does_unit_workload_status_match(model_status, expected_unit_statuses)
-    ) and (
-        expected_app_statuses is None
-        or _does_app_status_match(model_status, expected_app_statuses)
+        (
+            expected_unit_statuses is None
+            or _does_unit_workload_status_match(model_status, expected_unit_statuses)
+        )
+        and (
+            expected_app_statuses is None
+            or _does_app_status_match(model_status, expected_app_statuses)
+        )
+        and (num_units is None or verify_unit_count(model_status, unit_count=num_units))
+        and _all_agents_idle(model_status, expected_unit_statuses, expected_app_statuses)
     )
 
 
 def _does_unit_workload_status_match(
-    model_status: jubilant.Status, expected_statuses: dict[str, StatusObject]
+    model_status: jubilant.Status, expected_statuses: dict[str, List[StatusObject]]
 ) -> bool:
     """Check that current workload status matches expectation for given apps' units.
 
     Args:
         model_status: represents the jubilant model's current status
-        expected_statuses: dict mapping app names to expected StatusObject
+        expected_statuses: dict mapping app names to list of expected StatusObject
     """
     return all(
         all(
-            does_message_match(unit_status.workload_status.message, expected_status)
+            any(
+                does_message_match(unit_status.workload_status.message, status)
+                for status in expected_status
+            )
             for unit_status in model_status.get_units(app).values()
         )
         for app, expected_status in expected_statuses.items()
@@ -535,15 +554,39 @@ def _does_unit_workload_status_match(
 
 
 def _does_app_status_match(
-    model_status: jubilant.Status, expected_statuses: dict[str, StatusObject]
+    model_status: jubilant.Status, expected_statuses: dict[str, List[StatusObject]]
 ) -> bool:
     """Check that current app status matches expectation for given apps.
 
     Args:
         model_status: represents the jubilant model's current status
-        expected_statuses: dict mapping app names to expected StatusObject
+        expected_statuses: dict mapping app names to list of expected StatusObject
     """
     return all(
-        does_message_match(model_status.apps.get(app).app_status.message, expected_status)
+        any(
+            does_message_match(model_status.apps.get(app).app_status.message, status)
+            for status in expected_status
+        )
         for app, expected_status in expected_statuses.items()
     )
+
+
+def _all_agents_idle(
+    model_status: jubilant.Status,
+    expected_unit_statuses: dict[str, List[StatusObject]] | None = None,
+    expected_app_statuses: dict[str, List[StatusObject]] | None = None,
+) -> bool:
+    """Check that all agents are idle for apps with expected statuses.
+
+    Args:
+        model_status: represents the jubilant model's current status
+        expected_unit_statuses: dict mapping app name to list of expected StatusObject for units
+        expected_app_statuses: dict mapping app name to its list of expected StatusObject
+    """
+    apps_to_check = set()
+    if expected_unit_statuses:
+        apps_to_check.update(expected_unit_statuses.keys())
+    if expected_app_statuses:
+        apps_to_check.update(expected_app_statuses.keys())
+
+    return jubilant.all_agents_idle(model_status, *apps_to_check)

@@ -31,6 +31,7 @@ from .helpers import (
     put_key,
     set_password_jubilant,
 )
+from .helpers_deployment import does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +125,10 @@ async def test_user_secret_permissions(juju_lxd_model: Juju) -> None:
     juju_lxd_model.config(app=APP_NAME, values={INTERNAL_USER_PASSWORD_CONFIG: secret_id})
 
     juju_lxd_model.wait(
-        lambda status: CharmStatuses.SECRET_ACCESS_ERROR.value.message
-        == status.apps[APP_NAME].app_status.message,
+        lambda status: does_status_match(
+            status,
+            expected_app_statuses={APP_NAME: CharmStatuses.SECRET_ACCESS_ERROR.value.message},
+        ),
         timeout=1200,
     )
 

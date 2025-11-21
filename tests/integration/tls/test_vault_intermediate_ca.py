@@ -25,7 +25,7 @@ from ..helpers import (
     get_secret_by_label_jubilant,
     put_key,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, does_message_match
+from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -266,13 +266,12 @@ def test_invalid_certificate_domain(juju_lxd_model: Juju) -> None:
     )
 
     juju_lxd_model.wait(
-        lambda status: does_message_match(
-            status.apps[APP_NAME].app_status.message,
-            TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value,
+        lambda status: does_status_match(
+            status,
+            expected_app_statuses={APP_NAME: TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value},
+            num_units={APP_NAME: NUM_UNITS},
         )
-        and NUM_UNITS == len(status.get_units(APP_NAME))
     )
-    juju_lxd_model.wait(lambda status: jubilant.all_agents_idle(status, APP_NAME))
 
     download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
     client_cert_subject = subprocess.getoutput("openssl x509 -noout -subject -in client.pem ")
