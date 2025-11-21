@@ -425,11 +425,9 @@ async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str
         str: The secret ID.
     """
     assert ops_test.model is not None, "Model is not set"
-    return_code, std_out, std_err = await ops_test.juju(
-        "add-secret",
-        secret_name,
-        " ".join([f"{key}={value}" for key, value in content.items()]),
-    )
+    add_secret_cmd = ["add-secret", secret_name]
+    add_secret_cmd.extend([f"{key}={value}" for key, value in content.items()])
+    return_code, std_out, std_err = await ops_test.juju(*add_secret_cmd, check=True)
 
     assert return_code == 0, f"Failed to add secret: {std_err}"
     logger.info(f"Added secret {secret_name} to the model")

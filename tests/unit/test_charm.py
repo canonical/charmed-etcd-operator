@@ -967,7 +967,11 @@ def test_unit_removal():
         endpoint=STATUS_PEERS_RELATION,
     )
     data_storage = testing.Storage("data")
-    state_in = testing.State(storages=[data_storage], relations={relation, status_peer_relation})
+    state_in = testing.State(
+        storages=[data_storage],
+        relations={relation, status_peer_relation},
+        planned_units=1,
+    )
 
     # test the happy path
     with (
