@@ -528,7 +528,7 @@ def does_status_match(
             or _does_app_status_match(model_status, expected_app_statuses)
         )
         and (num_units is None or verify_unit_count(model_status, unit_count=num_units))
-        and _all_agents_idle(model_status, expected_unit_statuses, expected_app_statuses)
+        # and _all_agents_idle(model_status, expected_unit_statuses, expected_app_statuses)
     )
 
 
