@@ -234,7 +234,7 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={APP_NAME: TLSStatuses.SANS_CONFIG_INVALID.value},
+            expected_app_statuses={APP_NAME: [TLSStatuses.SANS_CONFIG_INVALID.value]},
             num_units={APP_NAME: NUM_UNITS},
         )
     )
@@ -604,8 +604,8 @@ def test_certificate_expiration(juju_lxd_model: Juju) -> None:
         lambda status: does_status_match(
             status,
             expected_unit_statuses={
-                APP_NAME: TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
-                TLS_NAME: CharmStatuses.ACTIVE_IDLE.value,
+                APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
+                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
             },
         )
     )

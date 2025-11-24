@@ -127,7 +127,7 @@ async def test_user_secret_permissions(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={APP_NAME: CharmStatuses.SECRET_ACCESS_ERROR.value.message},
+            expected_app_statuses={APP_NAME: [CharmStatuses.SECRET_ACCESS_ERROR.value.message]},
         ),
         timeout=1200,
     )

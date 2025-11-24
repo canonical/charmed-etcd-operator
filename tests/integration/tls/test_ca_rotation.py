@@ -255,8 +255,8 @@ def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
         lambda status: does_status_match(
             status,
             expected_unit_statuses={
-                APP_NAME: TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
-                TLS_NAME: CharmStatuses.ACTIVE_IDLE.value,
+                APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
+                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
             },
         )
     )
@@ -296,8 +296,8 @@ def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
         lambda status: does_status_match(
             status,
             expected_unit_statuses={
-                APP_NAME: TLSStatuses.TLS_PEER_CERTS_EXPIRING.value,
-                TLS_NAME: CharmStatuses.ACTIVE_IDLE.value,
+                APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
+                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
             },
         )
     )

@@ -268,7 +268,7 @@ def test_invalid_certificate_domain(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={APP_NAME: TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value},
+            expected_app_statuses={APP_NAME: [TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value]},
             num_units={APP_NAME: NUM_UNITS},
         )
     )
