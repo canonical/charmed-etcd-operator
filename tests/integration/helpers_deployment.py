@@ -528,7 +528,6 @@ def does_status_match(
             or _does_app_status_match(model_status, expected_app_statuses)
         )
         and (num_units is None or verify_unit_count(model_status, unit_count=num_units))
-        # and _all_agents_idle(model_status, expected_unit_statuses, expected_app_statuses)
     )
 
 
@@ -569,24 +568,3 @@ def _does_app_status_match(
         )
         for app, expected_status in expected_statuses.items()
     )
-
-
-def _all_agents_idle(
-    model_status: jubilant.Status,
-    expected_unit_statuses: dict[str, List[StatusObject]] | None = None,
-    expected_app_statuses: dict[str, List[StatusObject]] | None = None,
-) -> bool:
-    """Check that all agents are idle for apps with expected statuses.
-
-    Args:
-        model_status: represents the jubilant model's current status
-        expected_unit_statuses: dict mapping app name to list of expected StatusObject for units
-        expected_app_statuses: dict mapping app name to its list of expected StatusObject
-    """
-    apps_to_check = set()
-    if expected_unit_statuses:
-        apps_to_check.update(expected_unit_statuses.keys())
-    if expected_app_statuses:
-        apps_to_check.update(expected_app_statuses.keys())
-
-    return jubilant.all_agents_idle(model_status, *apps_to_check)
