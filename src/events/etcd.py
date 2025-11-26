@@ -765,6 +765,7 @@ class EtcdEvents(Object):
         return ""
 
     def _update_client_relations(self) -> None:
+        """Update client relations data for external clients if TLS is enabled."""
         if self.charm.state.unit_server.tls_client_state == TLSState.TLS:
             try:
                 self.charm.external_clients_manager.update_client_relations_data(
