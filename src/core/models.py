@@ -51,7 +51,7 @@ class PeerAppModel(PeerModel):
     # put the unit's `member_id` here. After promoting to full voting member, the juju leader
     # will unset the `member_id` here.
     learning_member: str = Field(default="")
-    managed_users: dict[int, str] = Field(default_factory=dict)
+    managed_users: dict[str, str] = Field(default_factory=dict)
     s3_credentials: ExtraSecretStr = Field(default=None)
     azure_credentials: ExtraSecretStr = Field(default=None)
     backup_id: str | None = Field(default=None)

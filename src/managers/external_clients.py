@@ -42,47 +42,66 @@ class ExternalClientsManager(ManagerStatusProtocol):
         self.workload = workload
         self.substrate = substrate
 
-    def remove_managed_user(self, relation_id: int) -> None:
+    def _construct_managed_user_key(self, relation_id: int, request_id: str | None) -> str:
+        """Construct the key for the managed users dictionary.
+
+        Args:
+            relation_id (int): The relation id.
+            request_id (str | None): The request id.
+
+        Returns:
+            (str): The generated key.
+        """
+        return f"{relation_id}-{request_id}" if request_id else str(relation_id)
+
+    def remove_managed_user(self, relation_id: int, request_id: str | None = None) -> None:
         """Remove the user.
 
         Args:
             relation_id (int): The relation id.
+            request_id (str | None): The request id.
         """
         managed_users = self.state.cluster.model.managed_users
-        del managed_users[relation_id]
+        del managed_users[self._construct_managed_user_key(relation_id, request_id)]
         self.state.cluster.update(
             {
                 "managed_users": managed_users,
             }
         )
 
-    def add_managed_user(self, relation_id: int, common_name: str) -> None:
+    def add_managed_user(self, relation_id: int, request_id: str | None, common_name: str) -> None:
         """Add the user.
 
         Args:
             relation_id (int): The relation id.
+            request_id (str | None): The request id.
             common_name (str): The common name.
         """
-        managed_users = self.state.cluster.model.managed_users
-        managed_users[relation_id] = common_name
-
         self.state.cluster.update(
             {
-                "managed_users": managed_users,
+                "managed_users": {
+                    **self.state.cluster.model.managed_users,
+                    **{self._construct_managed_user_key(relation_id, request_id): common_name},
+                },
             }
         )
 
-    def get_relation_managed_user(self, relation_id: int) -> str | None:
+    def get_relation_managed_user(
+        self, relation_id: int, request_id: str | None = None
+    ) -> str | None:
         """Get the relation's managed user.
 
         Args:
             relation_id (int): The relation id.
+            request_id (str | None): The request id.
 
         Returns:
             (str): The managed user.
         """
         return (
-            self.state.cluster.model.managed_users.get(relation_id)
+            self.state.cluster.model.managed_users.get(
+                self._construct_managed_user_key(relation_id, request_id)
+            )
             if self.state.cluster.model
             else None
         )
@@ -176,7 +195,9 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 # Only the leader manages the usernames
                 if self.state.charm.unit.is_leader():
                     common_name = self.get_common_name_from_chain(mtls_cert)
-                    relation_managed_user = self.get_relation_managed_user(relation.id)
+                    relation_managed_user = self.get_relation_managed_user(
+                        relation.id, request.request_id
+                    )
                     if relation_managed_user and relation_managed_user != common_name:
                         status_list.append(ExternalClientsStatuses.EC_USERNAME_EXISTS.value)
 

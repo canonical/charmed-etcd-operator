@@ -4,6 +4,7 @@
 
 """Charm the application."""
 
+import json
 import logging
 import socket
 import subprocess
@@ -12,7 +13,6 @@ from pathlib import Path
 import ops
 from charms.operator_libs_linux.v2 import snap
 from charms.tls_certificates_interface.v4.tls_certificates import (
-    Certificate,
     CertificateAvailableEvent,
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
@@ -42,10 +42,11 @@ class RequirerCharm(ops.CharmBase):
             "certificates",
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name="requirer-charm",
+                    common_name=common_name,
                     sans_ip=frozenset({socket.gethostbyname(socket.gethostname())}),
                     sans_dns=frozenset({self.unit.name, socket.gethostname()}),
-                ),
+                )
+                for common_name in self.common_names
             ],
             refresh_events=[self.refresh_tls_certificates_event],
         )
@@ -68,12 +69,12 @@ class RequirerCharm(ops.CharmBase):
         # Charm events
         framework.observe(self.on.start, self._on_start)
         framework.observe(self.on.install, self._on_install)
-        framework.observe(self.on.update_mtls_cert_action, self._on_update_action)
+        framework.observe(self.on.update_mtls_certs_action, self._on_update_action)
         framework.observe(self.on.put_action, self._on_put_action)
         framework.observe(self.on.get_action, self._on_get_action)
         framework.observe(self.on.get_credentials_action, self._on_get_credentials_action)
-        framework.observe(self.on.config_changed, self._on_certificate_available)
-        framework.observe(self.on.get_certificate_action, self._on_get_certificate_action)
+        framework.observe(self.on.config_changed, self._config_changed)
+        framework.observe(self.on.get_certificates_action, self._on_get_certificates_action)
 
     @property
     def data_interfaces_version(self) -> int | None:
@@ -84,6 +85,16 @@ class RequirerCharm(ops.CharmBase):
         return version
 
     @property
+    def common_names(self) -> list[str]:
+        """Return the common names for the client certificates."""
+        if self.data_interfaces_version == 1:
+            return [
+                "client1.requirer-charm",
+                "client2.requirer-charm",
+            ]
+        return ["requirer-charm"]
+
+    @property
     def server_ca_chain(self) -> str | None:
         """Return the server CA chain."""
         try:
@@ -91,30 +102,6 @@ class RequirerCharm(ops.CharmBase):
         except FileNotFoundError:
             return None
         return ca_chain
-
-    @property
-    def ca_chain(self) -> str | None:
-        """Return the CA chain."""
-        certs, _ = self.certificates.get_assigned_certificates()
-        if not certs:
-            return None
-        return "\n".join(cert.raw for cert in certs[0].chain[::])
-
-    @property
-    def ca_cert(self) -> str | None:
-        """Return the CA certificate."""
-        certs, _ = self.certificates.get_assigned_certificates()
-        if not certs:
-            return None
-        return certs[0].ca.raw
-
-    @property
-    def raw_certificate(self) -> str | None:
-        """Return the raw certificate."""
-        if not hasattr(self, "certificates"):
-            return None
-        raw_cert = self.ca_cert if self.send_ca_option else self.ca_chain
-        return raw_cert or ""
 
     @property
     def send_ca_option(self) -> bool:
@@ -139,11 +126,15 @@ class RequirerCharm(ops.CharmBase):
             event.fail("etcd-client relation not found")
             return
 
-        if event.params.get("chain"):
-            cert = event.params["chain"].replace("\\n", "\n")
-            self.etcd_requires.set_mtls_cert(cert)
+        certs, _ = self.certificates.get_assigned_certificates()
+        if not certs:
+            event.fail("No certificates available")
+            return
 
-        event.set_results({"message": "chain updated on data bag"})
+        for cert in certs:
+            self.certificates.renew_certificate(cert)
+
+        event.set_results({"message": "certificates renewed"})
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         """Handle certificate available event."""
@@ -153,14 +144,14 @@ class RequirerCharm(ops.CharmBase):
             logger.error("No certificates available")
             return
 
-        cert = certs[0]
-        Path(SNAP_DIR).mkdir(exist_ok=True)
-        Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
-        Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
-
         if self.etcd_requires.etcd_relation:
-            raw_cert = self.raw_certificate or cert.certificate.raw
-            self.etcd_requires.set_mtls_cert(raw_cert)
+            self.etcd_requires.update_requests_from_certs(
+                [cert.ca if self.send_ca_option else cert.certificate for cert in certs]
+            )
+
+    def _config_changed(self, event: ops.ConfigChangedEvent) -> None:
+        """Handle config changed event."""
+        self.refresh_tls_certificates_event.emit()
 
     def _on_put_action(self, event: ops.ActionEvent) -> None:
         """Handle put action."""
@@ -168,40 +159,112 @@ class RequirerCharm(ops.CharmBase):
             event.fail("The action can be run only after relation is created.")
             event.set_results({"ok": False})
             return
-        key = event.params["key"]
-        value = event.params["value"]
+        orig_key = str(event.params.get("key", ""))
+        value = str(event.params.get("value", ""))
+        if not orig_key or not value:
+            event.fail("Both key and value parameters are required.")
+            event.set_results({"ok": False})
+            return
+
         uris = self.etcd_requires.etcd_uris
+
         if not uris:
             event.fail("No uris available")
             event.set_results({"ok": False})
             return
-        if result := _put(uris, key, value):
-            event.set_results({"message": result})
-        else:
-            event.fail("etcdctl put failed")
+
+        certs, private_key = self.certificates.get_assigned_certificates()
+        if not certs or not private_key:
+            event.fail("No certificates available")
+            return
+
+        results = {}
+        for cert in certs:
+            Path(SNAP_DIR).mkdir(exist_ok=True)
+            Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
+            Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
+            key = (
+                orig_key
+                if orig_key.startswith("/")
+                else f"/{cert.certificate.common_name}/{orig_key}"
+            )
+            if result := _put(uris, key, value):
+                results[cert.certificate.common_name] = result
+            else:
+                results[cert.certificate.common_name] = "Failed"
+
+        for common_name, result in results.items():
+            if result == "Failed":
+                event.set_results(
+                    {
+                        "ok": False,
+                        "results": json.dumps(results),
+                    }
+                )
+                event.fail(f"etcdctl put failed for certificate with common name: {common_name}")
+                return
+        event.set_results(
+            {
+                "ok": True,
+                "results": json.dumps(results),
+            }
+        )
 
     def _on_get_action(self, event: ops.ActionEvent) -> None:
         """Handle get action."""
-        certs, _ = self.certificates.get_assigned_certificates()
-        if not certs:
+        certs, private_key = self.certificates.get_assigned_certificates()
+        if not certs or not private_key:
             event.fail("No certificates available")
             return
+
         if not self.etcd_requires.etcd_relation:
             event.fail("The action can be run only after relation is created.")
             event.set_results({"ok": False})
             return
+
+        orig_key = str(event.params.get("key", ""))
+        if not orig_key:
+            event.fail("Key parameter is required.")
+            event.set_results({"ok": False})
+            return
+
         uris = self.etcd_requires.etcd_uris
         if not uris:
             event.fail("No uris available")
             event.set_results({"ok": False})
             return
-        certs[0].chain
-        key = event.params["key"]
-        result = _get(uris, key)
-        if result:
-            event.set_results({"message": result})
-        else:
-            event.fail("etcdctl get failed")
+
+        results = {}
+        for cert in certs:
+            Path(SNAP_DIR).mkdir(exist_ok=True)
+            Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
+            Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
+            key = (
+                orig_key
+                if orig_key.startswith("/")
+                else f"/{cert.certificate.common_name}/{orig_key}"
+            )
+            if result := _get(uris, key):
+                results[cert.certificate.common_name] = result
+            else:
+                results[cert.certificate.common_name] = "Failed"
+
+        for common_name, result in results.items():
+            if result == "Failed":
+                event.set_results(
+                    {
+                        "ok": False,
+                        "results": json.dumps(results),
+                    }
+                )
+                event.fail(f"etcdctl get failed for certificate with common name: {common_name}")
+                return
+        event.set_results(
+            {
+                "ok": True,
+                "results": json.dumps(results),
+            }
+        )
 
     def _on_get_credentials_action(self, event: ops.ActionEvent) -> None:
         """Return the credentials an action response."""
@@ -229,16 +292,21 @@ class RequirerCharm(ops.CharmBase):
             }
         )
 
-    def _on_get_certificate_action(self, event: ops.ActionEvent) -> None:
+    def _on_get_certificates_action(self, event: ops.ActionEvent) -> None:
         """Return the certificate an action response."""
-        if self.send_ca_option:
-            event.set_results({"certificate": self.ca_cert})
-        else:
-            certs, _ = self.certificates.get_assigned_certificates()
-            if not certs:
-                event.fail("No certificates available")
-                return
-            event.set_results({"certificate": certs[0].certificate.raw})
+        certs, _ = self.certificates.get_assigned_certificates()
+        if not certs:
+            event.fail("No certificates available")
+            return
+
+        certs_to_send = [
+            cert.ca.raw if self.send_ca_option else cert.certificate.raw for cert in certs
+        ]
+        event.set_results(
+            {
+                "certificates": json.dumps(certs_to_send),
+            }
+        )
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True)
     def _install_etcd_snap(self) -> bool:
@@ -250,6 +318,16 @@ class RequirerCharm(ops.CharmBase):
         except snap.SnapError as e:
             logger.error(str(e))
             return False
+
+    def get_certificate_of_common_name(self, common_name: str) -> str | None:
+        """Return the certificate for a given common name."""
+        certs, _ = self.certificates.get_assigned_certificates()
+        if not certs:
+            return None
+        for cert in certs:
+            if cert.certificate.common_name == common_name:
+                return cert.ca.raw if self.send_ca_option else cert.certificate.raw
+        return None
 
 
 def _put(endpoints: str, key: str, value: str) -> str | None:
@@ -317,16 +395,6 @@ def _get(endpoints: str, key: str) -> str | None:
         return
 
     return output.decode("utf-8").strip()
-
-
-def _get_common_name_from_chain(mtls_cert: str) -> str:
-    """Get common name from chain."""
-    raw_cas = mtls_cert.split("-----END CERTIFICATE-----")
-    raw_cas.remove("")
-    # add the marker back to the certificate
-    # we take the last certificate from the provided mtls_cert, assuming this is the client cert
-    cert = raw_cas[-1].strip() + "\n-----END CERTIFICATE-----"
-    return Certificate.from_string(cert).common_name
 
 
 if __name__ == "__main__":  # pragma: nocover
