@@ -75,8 +75,8 @@ class ExternalClientsEvents(Object):
         self, event: BulkResourcesRequestedEvent[RequirerCommonModel]
     ) -> None:
         """Handle bulk resources requested event."""
-        prevent_reason = self._exists_preventing_reason()
-        if prevent_reason or not self.charm.unit.is_leader():
+        preventing_reason = self._exists_preventing_reason()
+        if preventing_reason or not self.charm.unit.is_leader():
             event.defer()
             return
 
@@ -84,7 +84,7 @@ class ExternalClientsEvents(Object):
 
         responses = []
         for request in event.requests:
-            if request.mtls_cert is None or request.resource is None:
+            if not request.mtls_cert or not request.resource:
                 logger.error("mTLS certificate or resource not provided")
                 invalid_requests.append(request)
                 continue
@@ -103,7 +103,7 @@ class ExternalClientsEvents(Object):
                 event.relation.id, request.request_id
             )
 
-            if relation_managed_user is not None and relation_managed_user == common_name:
+            if relation_managed_user and relation_managed_user == common_name:
                 logger.warning("User already created for this request in the relation")
                 continue
 
@@ -140,8 +140,7 @@ class ExternalClientsEvents(Object):
             logger.error("CA chain, keys prefix, or common name not provided")
             return
 
-        prevent_reason = self._exists_preventing_reason()
-        if prevent_reason:
+        if self._exists_preventing_reason():
             event.defer()
             return
 
@@ -223,6 +222,13 @@ class ExternalClientsEvents(Object):
     def _remove_user(
         self, old_common_name: str, relation_id: int, request_id: str | None = None
     ) -> None:
+        """Remove an existing managed user from the etcd cluster.
+
+        Args:
+            old_common_name (str): The common name of the user to be removed.
+            relation_id (int): The relation id.
+            request_id (str): The request id.
+        """
         logger.warning("Removing relation's old user")
         try:
             self.charm.cluster_manager.remove_managed_user(old_common_name)
