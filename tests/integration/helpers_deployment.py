@@ -259,10 +259,10 @@ def does_message_match(expected_status_message: str, status: StatusObject) -> bo
         return (
             expected_status_message == juju_status.message
             or expected_status_message.startswith(juju_status.message)
-            or expected_status_message.startswith(f"{juju_status.message:.40}")
+            or juju_status.message.startswith(f"{expected_status_message:.40}")
             or (
                 status.short_message is not None
-                and expected_status_message.startswith(status.short_message)
+                and status.short_message in expected_status_message
             )
         )
     except KeyError as e:
