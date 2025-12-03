@@ -19,6 +19,7 @@ from ops.charm import (
     RelationJoinedEvent,
 )
 from ops.model import ModelError, SecretNotFoundError
+from pydantic_core import PydanticSerializationError
 from requests.exceptions import RequestException
 
 from common.exceptions import (
@@ -764,10 +765,11 @@ class EtcdEvents(Object):
         return ""
 
     def _update_client_relations(self) -> None:
+        """Update client relations data for external clients if TLS is enabled."""
         if self.charm.state.unit_server.tls_client_state == TLSState.TLS:
             try:
                 self.charm.external_clients_manager.update_client_relations_data(
                     etcd_version=self.charm.cluster_manager.get_version()
                 )
-            except KeyError as e:
-                logger.warning(f"Error updating client relations data: {e}")
+            except (KeyError, PydanticSerializationError) as e:
+                logger.error(f"Error updating client relations data: {e}")

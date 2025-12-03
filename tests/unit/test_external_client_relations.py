@@ -183,8 +183,11 @@ def test_add_ecr_new_user_leader(cluster_tls_context, mtls_cert):
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
         response = json.loads(ecr_relation.local_app_data["requests"])[0]
-        assert ecr_relation.id in charm.state.cluster.model.managed_users
-        assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+        managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+            ecr_relation.id, response["request-id"]
+        )
+        assert managed_user_key in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert (
             _get_secret_from_state(state_out, response["secret-tls"]).tracked_content.get("tls-ca")
             == "test_ca_server"
@@ -323,7 +326,7 @@ def test_add_ecr_new_user_no_tls_leader(cluster_no_tls_context, mtls_cert):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         defered_event_names = [event.name for event in state_out.deferred]
-        assert "mtls_cert_updated" in defered_event_names
+        assert "bulk_resources_requested" in defered_event_names
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
 
 
@@ -399,7 +402,7 @@ def test_ecr_update_common_name_leader(cluster_tls_context, mtls_cert, mtls_cert
 
     peer_relation = relations[0]
     old_common_name = CLIENT_COMMON_NAME
-    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+    peer_relation.local_app_data["managed_users"] = f'{{"5-0cbbc9781f189ea5":"{old_common_name}"}}'
 
     secret = Secret(
         tracked_content={"mtls-cert": mtls_cert},
@@ -471,6 +474,7 @@ def test_ecr_update_common_name_leader(cluster_tls_context, mtls_cert, mtls_cert
             patch(
                 "managers.external_clients.ExternalClientsManager.get_relation_managed_user",
                 side_effect=[
+                    f"{CLIENT_COMMON_NAME}",
                     None,
                     f"diff-{CLIENT_COMMON_NAME}",
                     f"diff-{CLIENT_COMMON_NAME}",
@@ -481,9 +485,12 @@ def test_ecr_update_common_name_leader(cluster_tls_context, mtls_cert, mtls_cert
             charm: EtcdOperatorCharm = manager.charm
             state_out = manager.run()
             ecr_relation = state_out.get_relation(ecr_relation.id)
-            assert ecr_relation.id in charm.state.cluster.model.managed_users
+            managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+                ecr_relation.id, "0cbbc9781f189ea5"
+            )
+            assert managed_user_key in charm.state.cluster.model.managed_users
             assert (
-                charm.state.cluster.model.managed_users[ecr_relation.id]
+                charm.state.cluster.model.managed_users[managed_user_key]
                 == f"diff-{CLIENT_COMMON_NAME}"
             )
             remove_role.assert_called_once_with(old_common_name)
@@ -498,7 +505,8 @@ def test_ecr_update_common_name_leader_crash(
 
     peer_relation = relations[0]
     old_common_name = CLIENT_COMMON_NAME
-    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+    request_id = "0cbbc9781f189ea5"
+    peer_relation.local_app_data["managed_users"] = f'{{"5-{request_id}":"{old_common_name}"}}'
 
     secret = Secret(
         tracked_content={"mtls-cert": mtls_cert},
@@ -571,19 +579,23 @@ def test_ecr_update_common_name_leader_crash(
             patch(
                 "managers.external_clients.ExternalClientsManager.get_relation_managed_user",
                 side_effect=[
+                    CLIENT_COMMON_NAME,
                     None,
-                    f"diff-{CLIENT_COMMON_NAME}",
-                    f"diff-{CLIENT_COMMON_NAME}",
-                    f"diff-{CLIENT_COMMON_NAME}",
+                    CLIENT_COMMON_NAME,
+                    CLIENT_COMMON_NAME,
+                    CLIENT_COMMON_NAME,
                 ],
             ),
         ):
             charm: EtcdOperatorCharm = manager.charm
             remove_managed_user.side_effect = EtcdUserManagementError("User not found")
             manager.run()
-            assert ecr_relation.id in charm.state.cluster.model.managed_users
+            managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+                ecr_relation.id, request_id
+            )
+            assert managed_user_key in charm.state.cluster.model.managed_users
             assert (
-                charm.state.cluster.model.managed_users[ecr_relation.id]
+                charm.state.cluster.model.managed_users[managed_user_key]
                 == f"diff-{CLIENT_COMMON_NAME}"
             )
 
@@ -596,7 +608,8 @@ def test_ecr_update_chain_same_common_name(
 
     peer_relation = relations[0]
     old_common_name = CLIENT_COMMON_NAME
-    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+    request_id = "0cbbc9781f189ea5"
+    peer_relation.local_app_data["managed_users"] = f'{{"5-{request_id}":"{old_common_name}"}}'
 
     secret = Secret(
         tracked_content={"mtls-cert": mtls_cert},
@@ -668,8 +681,11 @@ def test_ecr_update_chain_same_common_name(
         ):
             charm: EtcdOperatorCharm = manager.charm
             manager.run()
-            assert ecr_relation.id in charm.state.cluster.model.managed_users
-            assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+            managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+                ecr_relation.id, request_id
+            )
+            assert managed_user_key in charm.state.cluster.model.managed_users
+            assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
             remove_role.assert_not_called()
             remove_user.assert_not_called()
 
@@ -682,7 +698,8 @@ def test_ecr_update_common_name_non_leader(
 
     peer_relation = relations[0]
     old_common_name = CLIENT_COMMON_NAME
-    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+    request_id = "0cbbc9781f189ea5"
+    peer_relation.local_app_data["managed_users"] = f'{{"5-{request_id}":"{old_common_name}"}}'
 
     secret = Secret(
         {"mtls-cert": mtls_cert},
@@ -708,7 +725,10 @@ def test_ecr_update_common_name_non_leader(
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        assert ecr_relation.id in charm.state.cluster.model.managed_users
+        managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+            ecr_relation.id, request_id
+        )
+        assert managed_user_key in charm.state.cluster.model.managed_users
 
     secret = Secret(
         tracked_content={"mtls-cert": mtls_cert},
@@ -733,10 +753,15 @@ def test_ecr_update_common_name_non_leader(
         patch("workload.EtcdWorkload.write_file"),
         patch("managers.tls.TLSManager.collect_client_cas", return_value=["test_ca", "test_ca1"]),
     ):
-        peer_relation.local_app_data["managed_users"] = f'{{"5":"diff-{CLIENT_COMMON_NAME}"}}'
+        peer_relation.local_app_data["managed_users"] = (
+            f'{{"5-{request_id}":"diff-{CLIENT_COMMON_NAME}"}}'
+        )
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        assert ecr_relation.id in charm.state.cluster.model.managed_users
+        managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+            ecr_relation.id, request_id
+        )
+        assert managed_user_key in charm.state.cluster.model.managed_users
         assert "mtls_cert_updated" not in [event.name for event in state_out.deferred]
 
 
@@ -744,8 +769,9 @@ def test_ecr_update_ca_chain_while_rotation_happening(cluster_tls_context, mtls_
     """Test updating the CA chain for an external client relation while rotation is happening."""
     ctx, relations = cluster_tls_context
 
+    request_id = "0cbbc9781f189ea5"
     peer_relation = relations[0]
-    peer_relation.local_app_data["managed_users"] = f'{{"5":"{CLIENT_COMMON_NAME}"}}'
+    peer_relation.local_app_data["managed_users"] = f'{{"5-{request_id}":"{CLIENT_COMMON_NAME}"}}'
 
     peer_relation.local_unit_data["tls_client_ca_rotation"] = TLSCARotationState.NEW_CA_ADDED.value
 
@@ -783,8 +809,9 @@ def test_ecr_relation_broken_leader(cluster_tls_context, mtls_cert):
     """Test removing an external client relation from the charm."""
     ctx, relations = cluster_tls_context
 
+    request_id = "0cbbc9781f189ea5"
     peer_relation = relations[0]
-    peer_relation.local_app_data["managed_users"] = f'{{"5":"{CLIENT_COMMON_NAME}"}}'
+    peer_relation.local_app_data["managed_users"] = f'{{"5-{request_id}":"{CLIENT_COMMON_NAME}"}}'
 
     secret = Secret(
         {"mtls-cert": mtls_cert},
@@ -828,8 +855,9 @@ def test_ecr_relation_broken_not_leader(cluster_tls_context):
     """Test removing an external client relation from the charm when not leader."""
     ctx, relations = cluster_tls_context
 
+    request_id = "0cbbc9781f189ea5"
     peer_relation = relations[0]
-    peer_relation.local_app_data["managed_users"] = f'{{"5":"{CLIENT_COMMON_NAME}"}}'
+    peer_relation.local_app_data["managed_users"] = f'{{"5-{request_id}":"{CLIENT_COMMON_NAME}"}}'
 
     secret = Secret(
         {"mtls-cert": "test_ca"},
@@ -866,9 +894,10 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
     """Test rotating the CA chain of etcd for an external client relation."""
     ctx, relations = cluster_tls_context
     secret = Secret({"mtls-cert": mtls_cert}, owner="app")
+    request_id = "0cbbc9781f189ea5"
     request_dict = {
         "resource": "/test/keys",
-        "request-id": "0cbbc9781f189ea5",
+        "request-id": request_id,
         "salt": "mWpK32IQW4bsu65t",
         "secret-mtls": f"{secret.id}",
     }
@@ -907,8 +936,11 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
         )
         response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
         tls_secret = _get_secret_from_state(state_out, response_dict.get("secret-tls"))
-        assert ecr_relation.id in charm.state.cluster.model.managed_users
-        assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+        managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+            ecr_relation.id, request_id
+        )
+        assert managed_user_key in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert (
             tls_secret
             and tls_secret.latest_content
@@ -959,13 +991,14 @@ def test_etcd_rotates_ca(cluster_tls_context, mtls_cert):
 def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
     """Test updating the endpoints of etcd for an external client relation."""
     ctx, relations = cluster_tls_context
+    request_id = "0cbbc9781f189ea5"
     secret = Secret({"mtls-cert": mtls_cert}, owner="app")
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
             "version": "v1",
-            "requests": f'[{{"resource": "/test/keys", "request-id": "0cbbc9781f189ea5", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
+            "requests": f'[{{"resource": "/test/keys", "request-id": "{request_id}", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
         },
     )
 
@@ -997,8 +1030,11 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
         )
         response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
         user_secret = _get_secret_from_state(state_out, response_dict.get("secret-user"))
-        assert ecr_relation.id in charm.state.cluster.model.managed_users
-        assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+        managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+            ecr_relation.id, request_id
+        )
+        assert managed_user_key in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert (
             user_secret
             and user_secret.latest_content
@@ -1038,8 +1074,8 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
         )
         response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
         user_secret = _get_secret_from_state(state_out, response_dict.get("secret-user"))
-        assert ecr_relation.id in charm.state.cluster.model.managed_users
-        assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+        assert managed_user_key in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert (
             user_secret
             and user_secret.latest_content
@@ -1054,13 +1090,15 @@ def test_etcd_updates_endpoints(cluster_tls_context, mtls_cert):
 def test_etcd_updates_version(cluster_tls_context, mtls_cert):
     """Test updating the version of etcd for an external client relation."""
     ctx, relations = cluster_tls_context
+
+    request_id = "0cbbc9781f189ea5"
     secret = Secret({"mtls-cert": mtls_cert}, owner="app")
     ecr_relation = testing.Relation(
         id=5,
         endpoint=EXTERNAL_CLIENTS_RELATION,
         remote_app_data={
             "version": "v1",
-            "requests": f'[{{"resource": "/test/keys", "request-id": "0cbbc9781f189ea5", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
+            "requests": f'[{{"resource": "/test/keys", "request-id": "{request_id}", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
         },
     )
 
@@ -1090,8 +1128,11 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
             relation for relation in state_out.relations if relation.id == ecr_relation.id
         )
         response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
-        assert ecr_relation.id in charm.state.cluster.model.managed_users
-        assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+        managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+            ecr_relation.id, request_id
+        )
+        assert managed_user_key in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert response_dict.get("version") == "3.6"
 
     with (
@@ -1113,8 +1154,8 @@ def test_etcd_updates_version(cluster_tls_context, mtls_cert):
             relation for relation in state_out.relations if relation.id == ecr_relation.id
         )
         response_dict = json.loads(state_out_client_relation.local_app_data["requests"])[0]
-        assert ecr_relation.id in charm.state.cluster.model.managed_users
-        assert charm.state.cluster.model.managed_users[ecr_relation.id] == CLIENT_COMMON_NAME
+        assert managed_user_key in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
         assert response_dict.get("version") == "3.6.0"
 
 
@@ -1230,7 +1271,8 @@ def test_ecr_update_chain_invalid_new_value(cluster_tls_context, mtls_cert, ca_c
 
     peer_relation = relations[0]
     old_common_name = CLIENT_COMMON_NAME
-    peer_relation.local_app_data["managed_users"] = f'{{"5":"{old_common_name}"}}'
+    request_id = "0cbbc9781f189ea5"
+    peer_relation.local_app_data["managed_users"] = f'{{"5-{request_id}":"{old_common_name}"}}'
 
     secret = Secret(
         tracked_content={"mtls-cert": mtls_cert},

@@ -36,12 +36,8 @@ parts:
       # cp requirements.txt "$CRAFT_PART_INSTALL/requirements.txt"
 
 actions:
-  update-mtls-cert:
-    description: Update the mtls certificate
-    params:
-      chain:
-        description: The mtls certificate
-        type: string
+  update-mtls-certs:
+    description: Update the mtls certificates
 
   put:
     description: Put a key value pair in etcd
@@ -63,8 +59,8 @@ actions:
   get-credentials:
     description: Action for fetching all available credentials from relations.
 
-  get-certificate:
-    description: Get the certificate of the app
+  get-certificates:
+    description: Get the certificate from the certificate provider
 
 config:
   options:
