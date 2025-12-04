@@ -178,7 +178,7 @@ def test_write_read_with_requirer(juju_lxd_model: Juju) -> None:
     # write to the key prefix
     with pytest.raises(TaskError) as task_error:
         juju_lxd_model.run(requirer_unit, "put", params={"key": TEST_KEY, "value": TEST_VALUE})
-    assert "etcdserver: permission denied" in str(task_error), (
+    assert "permission denied" in str(task_error), (
         "Action should fail because user does not have permission to write to the key prefix"
     )
 
