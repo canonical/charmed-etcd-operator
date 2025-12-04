@@ -176,7 +176,9 @@ def test_write_read_with_requirer(juju_lxd_model: Juju) -> None:
     requirer_unit = next(iter(juju_lxd_model.status().get_units(REQUIRER_NAME)))
 
     # write to the key prefix
-    action = juju_lxd_model.run(requirer_unit, "put", params={"key": TEST_KEY, "value": TEST_VALUE})
+    action = juju_lxd_model.run(
+        requirer_unit, "put", params={"key": TEST_KEY, "value": TEST_VALUE}
+    )
 
     assert action.status == "failed", (
         "Action should fail because user does not have permission to write to the key prefix"
