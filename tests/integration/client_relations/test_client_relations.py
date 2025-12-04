@@ -83,7 +83,7 @@ def get_requirer_mtls_certificates(juju: Juju) -> list[str] | None:
     """Get the mtls certificate from the requirer TLS provider."""
     requirer_unit = next(iter(juju.status().get_units(REQUIRER_NAME)))
 
-    action_result = juju.run(requirer_unit, "get-certificate")
+    action_result = juju.run(requirer_unit, "get-certificates")
     if action_result.status == "completed":
         return json.loads(action_result.results["certificate"])
 
@@ -171,7 +171,7 @@ def test_relate_client_charm(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
-async def test_write_read_with_requirer(juju_lxd_model: Juju) -> None:
+def test_write_read_with_requirer(juju_lxd_model: Juju) -> None:
     """Test write and read to the key prefix with the requirer charm."""
     requirer_unit = next(iter(juju_lxd_model.status().get_units(REQUIRER_NAME)))
 
@@ -203,7 +203,7 @@ async def test_write_read_with_requirer(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
-async def test_update_mtls_cert(juju_lxd_model: Juju) -> None:
+def test_update_mtls_cert(juju_lxd_model: Juju) -> None:
     """Test updating the common name used by the requirer app."""
     old_mtls_certs = get_requirer_mtls_certificates(juju_lxd_model)
     assert old_mtls_certs, "failed to get the old mtls certs from requirer TLS provider"
@@ -238,7 +238,7 @@ async def test_update_mtls_cert(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
-async def test_etcd_updates_ca(juju_lxd_model: Juju) -> None:
+def test_etcd_updates_ca(juju_lxd_model: Juju) -> None:
     """Update the common name used by the requirer app."""
     requirer_unit = next(iter(juju_lxd_model.status().get_units(REQUIRER_NAME)))
 
@@ -270,7 +270,7 @@ async def test_etcd_updates_ca(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
-async def test_remove_client_relation(juju_lxd_model: Juju) -> None:
+def test_remove_client_relation(juju_lxd_model: Juju) -> None:
     """Test removing the client relation and check if the user and role are removed."""
     mtls_certs = get_requirer_mtls_certificates(juju_lxd_model)
     assert mtls_certs, "failed to get mtls certs from requirer TLS provider"
@@ -332,14 +332,14 @@ async def test_remove_client_relation(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
-async def test_certificate_transfer(juju_lxd_model: Juju) -> None:
+def test_certificate_transfer(juju_lxd_model: Juju) -> None:
     """Test if the certificate transfer interface works correctly."""
     # integrate etcd with requirer tls provider on certificate_transfer relation
     juju_lxd_model.integrate(f"{APP_NAME}:client-cas", REQUIRER_TLS_NAME)
 
     # wait for model to settle
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_TLS_NAME)
     )
 
     # get ca from the REQUIRER_TLS_NAME
@@ -360,7 +360,7 @@ async def test_certificate_transfer(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
-async def test_requirer_sends_ca(juju_lxd_model: Juju) -> None:
+def test_requirer_sends_ca(juju_lxd_model: Juju) -> None:
     """Test when the requirer charm sends a ca certificate instead of an end-entity."""
     # configure the requirer charm to send a ca certificate
     juju_lxd_model.config(REQUIRER_NAME, {"send-ca-cert": "True"})
