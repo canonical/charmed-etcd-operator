@@ -122,7 +122,7 @@ async def test_build_and_deploy(
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await ops_test.model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
+    await ops_test.model.integrate(REQUIRER_NAME, TLS_NAME)
     await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME])
 
 
@@ -247,7 +247,7 @@ async def test_update_mtls_cert(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
-async def test_updates_ca_certificates(ops_test: OpsTest) -> None:
+async def test_update_ca_certificates(ops_test: OpsTest) -> None:
     """Update the common name used by the requirer app."""
     requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
     requirer_unit: Unit = requirer_app.units[0]
@@ -261,17 +261,14 @@ async def test_updates_ca_certificates(ops_test: OpsTest) -> None:
     assert action.status == "completed", "Action should succeed"
     old_ca = action.results["tls-ca"]
 
-    # Update common name on TLS provider for etcd
+    # Update common name on TLS provider for etcd and the client application
     logger.debug("Updating common name on TLS provider")
 
-    etcd_tls_operator: Application = ops_test.model.applications[TLS_NAME]
-    await etcd_tls_operator.set_config({"ca-common-name": "NEW_CN_CA"})
-
-    requirer_tls_operator: Application = ops_test.model.applications[REQUIRER_TLS_NAME]
-    await requirer_tls_operator.set_config({"ca-common-name": "NEW_CN_CA"})
+    tls_operator: Application = ops_test.model.applications[TLS_NAME]
+    await tls_operator.set_config({"ca-common-name": "NEW_CN_CA"})
 
     # wait for model to settle
-    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME])
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME])
 
     logger.debug("Getting new server ca")
     action = await requirer_unit.run_action("get-credentials")
