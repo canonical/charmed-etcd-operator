@@ -13,7 +13,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
-from jubilant import Juju
+from jubilant import Juju, TaskError
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
 from statuses import CharmStatuses, ExternalClientsStatuses
@@ -176,11 +176,9 @@ def test_write_read_with_requirer(juju_lxd_model: Juju) -> None:
     requirer_unit = next(iter(juju_lxd_model.status().get_units(REQUIRER_NAME)))
 
     # write to the key prefix
-    action = juju_lxd_model.run(
-        requirer_unit, "put", params={"key": TEST_KEY, "value": TEST_VALUE}
-    )
-
-    assert action.status == "failed", (
+    with pytest.raises(TaskError) as task_error:
+        juju_lxd_model.run(requirer_unit, "put", params={"key": TEST_KEY, "value": TEST_VALUE})
+    assert "etcdserver: permission denied" in str(task_error), (
         "Action should fail because user does not have permission to write to the key prefix"
     )
 
