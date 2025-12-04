@@ -285,13 +285,8 @@ def test_remove_client_relation(juju_lxd_model: Juju) -> None:
     common_names = action.results["username"].split(",")
     assert common_names, "failed to get common names from requirer"
 
-    # etcd_app: Application = ops_test.model.applications[APP_NAME]
-
     logger.info("Removing client relation")
     juju_lxd_model.remove_relation(APP_NAME, REQUIRER_NAME)
-    # await etcd_app.remove_relation(
-    #     EXTERNAL_CLIENTS_RELATION, f"{REQUIRER_NAME}:{EXTERNAL_CLIENTS_RELATION}"
-    # )
 
     # wait for model to settle
     juju_lxd_model.wait(
