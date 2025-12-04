@@ -85,7 +85,7 @@ def get_requirer_mtls_certificates(juju: Juju) -> list[str] | None:
 
     action_result = juju.run(requirer_unit, "get-certificates")
     if action_result.status == "completed":
-        return json.loads(action_result.results["certificate"])
+        return json.loads(action_result.results["certificates"])
 
     return None
 
@@ -176,7 +176,7 @@ def test_write_read_with_requirer(juju_lxd_model: Juju) -> None:
     requirer_unit = next(iter(juju_lxd_model.status().get_units(REQUIRER_NAME)))
 
     # write to the key prefix
-    action = juju_lxd_model.run(requirer_unit, "put", **{"key": TEST_KEY, "value": TEST_VALUE})
+    action = juju_lxd_model.run(requirer_unit, "put", params={"key": TEST_KEY, "value": TEST_VALUE})
 
     assert action.status == "failed", (
         "Action should fail because user does not have permission to write to the key prefix"
@@ -185,11 +185,11 @@ def test_write_read_with_requirer(juju_lxd_model: Juju) -> None:
     # write to authorized key prefix
     # every user will write the key to their own prefix
     key = "test/foo"
-    action = juju_lxd_model.run(requirer_unit, "put", **{"key": key, "value": TEST_VALUE})
+    action = juju_lxd_model.run(requirer_unit, "put", params={"key": key, "value": TEST_VALUE})
     assert action.status == "completed", "Action should succeed"
 
     # read from the key prefix
-    action = juju_lxd_model.run(requirer_unit, "get", **{"key": key})
+    action = juju_lxd_model.run(requirer_unit, "get", params={"key": key})
     assert action.status == "completed", "Action should succeed"
     common_names = get_requirer_common_names(juju_lxd_model)
     results = json.loads(action.results["results"])
