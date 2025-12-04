@@ -122,7 +122,7 @@ async def test_build_and_deploy(
     logger.info("Integrating peer-certificates and client-certificates relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await ops_test.model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
+    await ops_test.model.integrate(REQUIRER_NAME, TLS_NAME)
     await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME])
 
 
