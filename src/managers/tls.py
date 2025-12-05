@@ -177,10 +177,7 @@ class TLSManager(ManagerStatusProtocol):
                 if cert_type == TLSType.PEER
                 else server.tls_client_ca_rotation_state
             )
-            if server_ca_rotation_state in [
-                TLSCARotationState.NO_ROTATION,
-                TLSCARotationState.NEW_CA_DETECTED,
-            ]:
+            if server_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
                 return False
         return True
 
