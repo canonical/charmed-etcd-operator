@@ -354,15 +354,14 @@ class EtcdOperatorCharm(ops.CharmBase):
                     component_name=self.cluster_manager.name,
                     statuses_state=self.state.statuses,
                 )
-                return
             except CalledProcessError:
                 logger.warning("Health check failed, TLS client certificates expired")
-
-        self.state.statuses.delete(
-            ClusterStatuses.RESTART_FAILED.value,
-            scope="unit",
-            component=self.cluster_manager.name,
-        )
+        else:
+            self.state.statuses.delete(
+                ClusterStatuses.RESTART_FAILED.value,
+                scope="unit",
+                component=self.cluster_manager.name,
+            )
 
         if self.state.unit_server.tls_peer_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
             self.tls_manager.set_ca_rotation_state(TLSType.PEER, TLSCARotationState.NEW_CA_ADDED)
