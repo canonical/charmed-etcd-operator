@@ -172,12 +172,18 @@ class TLSManager(ManagerStatusProtocol):
             cert_type (TLSType): The certificate type.
         """
         for server in self.state.servers:
-            server_ca_rotation_state = (
-                server.tls_peer_ca_rotation_state
-                if cert_type == TLSType.PEER
-                else server.tls_client_ca_rotation_state
-            )
-            if server_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED:
+            if cert_type == TLSType.PEER and server.tls_peer_ca_rotation_state in [
+                TLSCARotationState.NO_ROTATION,
+                TLSCARotationState.NEW_CA_DETECTED,
+            ]:
+                return False
+
+            # not all units must be in CA rotation state for client TLS because
+            # the client CA might already have been updated via the client relation
+            if (
+                cert_type == TLSType.CLIENT
+                and server.tls_client_ca_rotation_state == TLSCARotationState.NEW_CA_DETECTED
+            ):
                 return False
         return True
 

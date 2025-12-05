@@ -1148,24 +1148,6 @@ def test_ca_peer_rotation(certificate_available_context):
             "tls-peer-state": "tls",
             "state": "started",
         },
-        peers_data={
-            1: {
-                "private-ip": "localhost",
-                "client-cert-ready": "True",
-                "peer-cert-ready": "True",
-                "tls-client-state": "tls",
-                "tls-peer-state": "tls",
-                "tls-peer-ca-rotation": "new-ca-detected",
-            },
-            2: {
-                "private-ip": "localhost",
-                "client-cert-ready": "True",
-                "peer-cert-ready": "True",
-                "tls-client-state": "tls",
-                "tls-peer-state": "tls",
-                "tls-peer-ca-rotation": "new-ca-detected",
-            },
-        },
     )
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
