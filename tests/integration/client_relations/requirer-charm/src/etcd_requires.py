@@ -23,7 +23,7 @@ from charms.data_platform_libs.v1.data_interfaces import (
     ResourceRequirerEventHandler,
     build_model,
 )
-from charms.tls_certificates_interface.v4.tls_certificates import Certificate
+from charmlibs.interfaces.tls_certificates import Certificate
 from constants import SNAP_DIR
 
 if TYPE_CHECKING:
