@@ -380,7 +380,7 @@ async def test_different_tls_providers(ops_test: OpsTest) -> None:
 
     # Update common name on TLS provider for etcd
     logger.info("Updating common name on TLS provider")
-    tls_operator: Application = ops_test.model.applications[TLS_NAME]
+    tls_operator: Application = ops_test.model.applications[REQUIRER_TLS_NAME]
     await tls_operator.set_config({"ca-common-name": "EVEN_NEWER_CA"})
 
     # wait for model to settle
