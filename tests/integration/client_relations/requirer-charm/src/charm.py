@@ -15,7 +15,7 @@ from charmlibs import snap
 from charmlibs.interfaces.tls_certificates import (
     CertificateAvailableEvent,
     CertificateRequestAttributes,
-    TLSCertificatesRequiresV4
+    TLSCertificatesRequiresV4,
 )
 from constants import SNAP_DIR, SNAP_NAME
 from etcd_requires import EtcdRequiresV0, EtcdRequiresV1
