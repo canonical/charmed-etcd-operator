@@ -371,27 +371,13 @@ async def test_different_tls_providers(ops_test: OpsTest) -> None:
     await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
     await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME], idle_period=10)
 
-    logger.info("Getting current server ca")
-    action = await requirer_unit.run_action("get-credentials")
-    action = await action.wait()
-
-    assert action.status == "completed", "Action should succeed"
-    old_ca = action.results["tls-ca"]
-
-    # Update common name on TLS provider for etcd
+    # Update common name on TLS provider for client application
     logger.info("Updating common name on TLS provider")
     tls_operator: Application = ops_test.model.applications[REQUIRER_TLS_NAME]
     await tls_operator.set_config({"ca-common-name": "EVEN_NEWER_CA"})
 
     # wait for model to settle
     await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME])
-
-    logger.info("Getting new server ca")
-    action = await requirer_unit.run_action("get-credentials")
-    action = await action.wait()
-    assert action.status == "completed", "Action should succeed"
-    new_ca = action.results["tls-ca"]
-    assert old_ca != new_ca, "CA should be updated"
 
     logger.info("Ensure updated mtls-certs are trusted on etcd")
     mtls_certs = await get_requirer_mtls_certificates(ops_test)
