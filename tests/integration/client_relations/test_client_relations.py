@@ -360,7 +360,7 @@ async def test_different_tls_providers(ops_test: OpsTest) -> None:
     model = ops_test.model_full_name
 
     logger.info("Remove TLS relation for requirer.")
-    await requirer_app.remove_relation("tls-certificates", f"{TLS_NAME}:tls-certificates")
+    await requirer_app.remove_relation("certificates", f"{TLS_NAME}:certificates")
     await wait_until(ops_test, apps=[REQUIRER_NAME], idle_period=10)
 
     logger.info("Integrate requirer with different TLS provider and etcd again.")
