@@ -353,6 +353,64 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
+async def test_different_tls_providers(ops_test: OpsTest) -> None:
+    """Ensure a CA rotation also works when using separate TLS providers."""
+    requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
+    requirer_unit: Unit = requirer_app.units[0]
+    model = ops_test.model_full_name
+
+    logger.info("Remove TLS relation for requirer.")
+    await requirer_app.remove_relation("tls-certificates", f"{TLS_NAME}:tls-certificates")
+    await wait_until(ops_test, apps=[REQUIRER_NAME], idle_period=10)
+
+    logger.info("Integrate requirer with different TLS provider and etcd again.")
+    await ops_test.model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
+    await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME], idle_period=10)
+
+    logger.info("Getting current server ca")
+    action = await requirer_unit.run_action("get-credentials")
+    action = await action.wait()
+
+    assert action.status == "completed", "Action should succeed"
+    old_ca = action.results["tls-ca"]
+
+    # Update common name on TLS provider for etcd
+    logger.info("Updating common name on TLS provider")
+    tls_operator: Application = ops_test.model.applications[TLS_NAME]
+    await tls_operator.set_config({"ca-common-name": "EVEN_NEWER_CA"})
+
+    # wait for model to settle
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME])
+
+    logger.info("Getting new server ca")
+    action = await requirer_unit.run_action("get-credentials")
+    action = await action.wait()
+    assert action.status == "completed", "Action should succeed"
+    new_ca = action.results["tls-ca"]
+    assert old_ca != new_ca, "CA should be updated"
+
+    logger.info("Ensure updated mtls-certs are trusted on etcd")
+    mtls_certs = await get_requirer_mtls_certificates(ops_test)
+    assert mtls_certs, "failed to get the new mtls certs from requirer TLS provider"
+
+    for unit in ops_test.model.applications[APP_NAME].units:
+        client_cas = get_certificate_from_unit(model, unit.name, TLSType.CLIENT, is_ca=True)
+        for mtls_cert in mtls_certs:
+            assert mtls_cert in client_cas, f"new mtls cert not in trusted CAs for {unit.name}"
+
+    logger.info("Removing client relation")
+    await requirer_app.remove_relation(
+        EXTERNAL_CLIENTS_RELATION, f"{APP_NAME}:{EXTERNAL_CLIENTS_RELATION}"
+    )
+
+    # wait for model to settle
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME])
+
+
+@pytest.mark.abort_on_fail
+@pytest.mark.v0
+@pytest.mark.v1
 async def test_certificate_transfer(ops_test: OpsTest) -> None:
     """Test if the certificate transfer interface works correctly."""
     # integrate etcd with requirer tls provider on certificate_transfer relation
