@@ -356,7 +356,6 @@ async def test_remove_client_relation(ops_test: OpsTest) -> None:
 async def test_different_tls_providers(ops_test: OpsTest) -> None:
     """Ensure a CA rotation also works when using separate TLS providers."""
     requirer_app: Application = ops_test.model.applications[REQUIRER_NAME]
-    requirer_unit: Unit = requirer_app.units[0]
     model = ops_test.model_full_name
 
     logger.info("Remove TLS relation for requirer.")
