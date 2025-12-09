@@ -771,5 +771,7 @@ class EtcdEvents(Object):
                 self.charm.external_clients_manager.update_client_relations_data(
                     etcd_version=self.charm.cluster_manager.get_version()
                 )
+            # Pydantic serialization error: temporary workaround because of
+            # https://github.com/canonical/data-platform-libs/issues/251
             except (KeyError, PydanticSerializationError) as e:
                 logger.error(f"Error updating client relations data: {e}")

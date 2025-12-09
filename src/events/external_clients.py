@@ -364,7 +364,7 @@ class ExternalClientsEvents(Object):
         if all_cas != self.charm.tls_manager.load_trusted_ca(TLSType.CLIENT):
             logger.debug("CAs have changed, updating client truststore")
             self.charm.tls_manager.update_cas(all_cas, TLSType.CLIENT)
-            self.charm.rolling_restart()
+            self.charm.rolling_restart("_restart_ca_rotation")
 
     def _exists_preventing_reason(self) -> bool:
         """Check if there is any reason preventing handling external clients relations.

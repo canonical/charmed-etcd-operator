@@ -2400,7 +2400,12 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         repository = OpsRelationRepository(self.model, relation, component=relation.app)
         version = repository.get_field("version") or "v0"
 
-        old_mtls_cert = event.secret.get_content().get("mtls-cert")
+        try:
+            old_mtls_cert = event.secret.get_content().get("mtls-cert")
+        except ModelError as e:
+            logger.warning("Could not get old mtls-cert: %s", e)
+            old_mtls_cert = None
+
         logger.info("mtls-cert-updated")
 
         # V0, just fire the event.
