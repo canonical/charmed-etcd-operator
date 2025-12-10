@@ -840,7 +840,7 @@ def test_ecr_relation_broken_leader(cluster_tls_context, mtls_cert):
         patch("common.client.EtcdClient.remove_user") as remove_user,
         patch("managers.tls.TLSManager.collect_client_cas") as collect_client_cas,
         patch("managers.tls.TLSManager.update_cas") as update_cas,
-        patch("charm.EtcdOperatorCharm._restart") as restart,
+        patch("charm.EtcdOperatorCharm._restart_ca_rotation") as restart,
         patch("managers.tls.TLSManager.load_trusted_ca", return_value={mtls_cert}),
     ):
         manager.run()
@@ -1559,7 +1559,7 @@ def test_removing_user_crash(cluster_tls_context, mtls_cert):
         patch("common.client.EtcdClient.remove_user") as remove_user,
         patch("managers.tls.TLSManager.collect_client_cas") as collect_client_cas,
         patch("managers.tls.TLSManager.update_cas") as update_cas,
-        patch("charm.EtcdOperatorCharm._restart") as restart,
+        patch("charm.EtcdOperatorCharm._restart_ca_rotation") as restart,
     ):
         remove_user.side_effect = EtcdUserManagementError(
             "User could not be removed from etcd cluster"
