@@ -21,6 +21,7 @@ from ops import (
     SecretChangedEvent,
 )
 from ops.framework import EventBase, Object
+from pydantic_core import PydanticSerializationError
 
 from literals import (
     CLIENT_TLS_RELATION_NAME,
@@ -252,7 +253,9 @@ class TLSEvents(Object):
                         self.charm.external_clients_manager.update_client_relations_data(
                             etcd_version=self.charm.cluster_manager.get_version()
                         )
-                    except KeyError as e:
+                    # Pydantic serialization error: temporary workaround because of
+                    # https://github.com/canonical/data-platform-libs/issues/251
+                    except (KeyError, PydanticSerializationError) as e:
                         logger.warning(f"Error updating client relations data: {e}")
             self.clean_ca_event.emit(cert_type=cert_type)
             return
