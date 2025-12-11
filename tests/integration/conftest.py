@@ -148,6 +148,16 @@ def juju_lxd_model(arch: str, lxd_cloud: str, lxd_controller: str):
     with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
         juju_lxd.wait_timeout = 1000
         juju_lxd.cli("set-model-constraints", f"arch={arch}")
+
+        # default used by `juju ssh` is ~/.ssh/id_ed25519, see:
+        # https://documentation.ubuntu.com/juju/latest/reference/juju-cli/list-of-juju-cli-commands/ssh/#details
+        ssh_key_path = "home/ubuntu/.ssh/id_ed25519"
+        generate_juju_ssh_key(ssh_key_path)
+        with open(f"{ssh_key_path}.pub") as f:
+            content = f.read()
+            public_key = content.split()[1]
+        juju_lxd.cli("add-ssh-key", public_key)
+
         yield juju_lxd
 
 
@@ -157,3 +167,9 @@ def juju_k8s_model(arch: str, k8s_cloud: str, lxd_controller: str):
         juju_k8s.wait_timeout = 1000
         juju_k8s.cli("set-model-constraints", f"arch={arch}")
         yield juju_k8s
+
+
+def generate_juju_ssh_key(filepath: str) -> None:
+    """Generate a ssh key pair to be added to the juju model and used for ssh access."""
+    keygen_command = ["ssh-keygen", "-t", "ed25519", "-q", "-N", "''", "-f", filepath]
+    subprocess.run(keygen_command, text=True, capture_output=True, check=True)
