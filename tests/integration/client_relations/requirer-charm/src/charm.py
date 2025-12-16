@@ -11,8 +11,8 @@ import subprocess
 from pathlib import Path
 
 import ops
-from charms.operator_libs_linux.v2 import snap
-from charms.tls_certificates_interface.v4.tls_certificates import (
+from charmlibs import snap
+from charmlibs.interfaces.tls_certificates import (
     CertificateAvailableEvent,
     CertificateRequestAttributes,
     TLSCertificatesRequiresV4,
