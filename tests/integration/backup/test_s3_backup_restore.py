@@ -174,7 +174,7 @@ async def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: J
     # download the backup from storage and restore it
     logger.info(f"Restoring backup {backup_id}")
     restore_backup_response = juju_lxd_model.run(leader_unit, "restore", {"backup-id": backup_id})
-    assert restore_backup_response.results.get("return-code") == 0, "restore failed"
+    assert restore_backup_response.return_code == 0, "restore failed"
 
     # wait for the restore to be performed across all units and check the restored data
     juju_lxd_model.wait(
