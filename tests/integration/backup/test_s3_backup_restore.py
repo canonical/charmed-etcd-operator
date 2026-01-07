@@ -125,7 +125,7 @@ async def test_restore_backup_on_same_cluster(juju_lxd_model: Juju) -> None:
     # download the backup from storage and restore it
     logger.info(f"Restoring backup {backup_id}")
     restore_backup_response = juju_lxd_model.run(leader_unit, "restore", {"backup-id": backup_id})
-    assert restore_backup_response.results.get("return-code") == 0, "restore failed"
+    assert restore_backup_response.return_code == 0, "restore failed"
 
     # wait for the restore to be performed across all units and check the restored data
     juju_lxd_model.wait(
@@ -144,6 +144,7 @@ async def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: J
     logger.info("Remove existing etcd cluster and deploy a new one.")
     juju_lxd_model.remove_application(APP_NAME)
     juju_lxd_model.remove_secret(identifier="system_users_secret")
+    juju_lxd_model.wait(lambda status: status.apps.get(APP_NAME) is None)
 
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
     juju_lxd_model.wait(

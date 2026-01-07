@@ -138,7 +138,7 @@ async def test_restore_verification_failed(juju_lxd_model: Juju):
     restore_backup_response = juju_lxd_model.run(
         leader_unit, "restore", params={"backup-id": backup_id}
     )
-    assert restore_backup_response.results.get("return-code") == 0, "restore action failed"
+    assert restore_backup_response.return_code == 0, "restore action failed"
 
     # the restore will fail because the current password is not valid for the backup-file
     juju_lxd_model.wait(
