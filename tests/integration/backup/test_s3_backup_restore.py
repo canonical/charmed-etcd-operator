@@ -5,19 +5,19 @@
 import logging
 
 import pytest
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
 
 from literals import INTERNAL_USER
 
 from ..helpers import (
     APP_NAME,
-    add_secret,
-    get_cluster_endpoints,
+    get_cluster_endpoints_jubilant,
     get_key,
+    get_leader_unit_name,
     put_key,
-    set_password,
+    set_password_jubilant,
 )
-from ..helpers_deployment import wait_until
+from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -31,35 +31,44 @@ backup_id = ""
 
 @pytest.mark.abort_on_fail
 async def test_deploy_and_configure(
-    charm: str, ops_test: OpsTest, storage_credentials, storage_config
+    charm: str, juju_lxd_model: Juju, storage_credentials, storage_config
 ) -> None:
     """Deploy and configure the charm and s3-integrator."""
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
-    await ops_test.model.deploy(S3_INTEGRATOR, channel="2/edge", num_units=1)
-    await wait_until(ops_test, apps=[S3_INTEGRATOR], apps_statuses=["blocked"])
+    juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
+    juju_lxd_model.deploy(S3_INTEGRATOR, channel="2/edge", num_units=1)
+    juju_lxd_model.wait(
+        lambda status: does_status_match(
+            status, expected_app_statuses={S3_INTEGRATOR: ["blocked"]}
+        )
+    )
 
     logger.info(f"Configure {S3_INTEGRATOR}")
     secret_name = "s3-credentials"
-    secret_id = await add_secret(ops_test, secret_name, storage_credentials)
-    await ops_test.model.grant_secret(secret_name, S3_INTEGRATOR)
-    await ops_test.model.applications[S3_INTEGRATOR].set_config({"credentials": secret_id})
-    await ops_test.model.applications[S3_INTEGRATOR].set_config(storage_config)
-    await wait_until(ops_test, apps=[APP_NAME, S3_INTEGRATOR], apps_statuses=["active"])
+    secret_uri = juju_lxd_model.add_secret(secret_name, storage_credentials)
+    juju_lxd_model.grant_secret(secret_uri, S3_INTEGRATOR)
+    juju_lxd_model.config(S3_INTEGRATOR, {"credentials": secret_uri})
+    juju_lxd_model.config(S3_INTEGRATOR, storage_config)
+    juju_lxd_model.wait(
+        lambda status: does_status_match(
+            status, expected_app_statuses={APP_NAME: ["active"], S3_INTEGRATOR: ["active"]}
+        )
+    )
 
     logger.info("Configure admin credentials in etcd")
-    await set_password(ops_test, PASSWORD)
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    set_password_jubilant(juju_lxd_model, PASSWORD)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+    )
 
 
 @pytest.mark.abort_on_fail
-async def test_s3_integration(ops_test: OpsTest, s3_bucket) -> None:
+async def test_s3_integration(juju_lxd_model: Juju, s3_bucket) -> None:
     """Integrate charm and s3-integrator."""
-    await ops_test.model.integrate(APP_NAME, S3_INTEGRATOR)
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME, S3_INTEGRATOR],
-        apps_statuses=["active"],
-        units_statuses=["active"],
+    juju_lxd_model.integrate(APP_NAME, S3_INTEGRATOR)
+    juju_lxd_model.wait(
+        lambda status: does_status_match(
+            status, expected_app_statuses={APP_NAME: ["active"], S3_INTEGRATOR: ["active"]}
+        )
     )
 
     # bucket should be created when integrating both
@@ -67,12 +76,12 @@ async def test_s3_integration(ops_test: OpsTest, s3_bucket) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_create_backup(ops_test: OpsTest) -> None:
+async def test_create_backup(juju_lxd_model: Juju) -> None:
     """Create a backup and upload to s3-storage."""
     global backup_id
 
     # Before creating a backup, enter some data
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
     assert (
         put_key(
             endpoints,
@@ -85,21 +94,17 @@ async def test_create_backup(ops_test: OpsTest) -> None:
     )
     assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE
 
-    for unit in ops_test.model.applications[APP_NAME].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
-    logger.info(f"Creating backup on unit {leader_unit.name}")
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
+    logger.info(f"Creating backup on unit {leader_unit}")
 
     # `create-backup` will upload the backup to storage
-    create_action = await leader_unit.run_action("create-backup")
-    create_backup_response = await create_action.wait()
+    create_backup_response = juju_lxd_model.run(leader_unit, "create-backup")
 
     backup_id = create_backup_response.results.get("backup-id", "")
     assert backup_id, "No backup-id in response"
 
     # `list-backups` will look up the backups in storage
-    list_action = await leader_unit.run_action("list-backups")
-    list_backups_response = await list_action.wait()
+    list_backups_response = juju_lxd_model.run(leader_unit, "list-backups")
     backups = list_backups_response.results.get("backups", "")
     # example: 'backup-id | backup-status\n--------------------\n2025-04-01T08:40:45Z  | finished'
     assert backups.split("\n")[2].startswith(backup_id), (
@@ -113,64 +118,69 @@ async def test_create_backup(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_restore_backup_on_same_cluster(ops_test: OpsTest) -> None:
+async def test_restore_backup_on_same_cluster(juju_lxd_model: Juju) -> None:
     """Restore a backup and check if data is recovered."""
-    for unit in ops_test.model.applications[APP_NAME].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 
     # download the backup from storage and restore it
     logger.info(f"Restoring backup {backup_id}")
-    restore_action = await leader_unit.run_action("restore", **{"backup-id": backup_id})
-    restore_backup_response = await restore_action.wait()
+    restore_backup_response = juju_lxd_model.run(leader_unit, "restore", {"backup-id": backup_id})
     assert restore_backup_response.results.get("return-code") == 0, "restore failed"
 
     # wait for the restore to be performed across all units and check the restored data
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+    )
 
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
     assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE, (
         "data not recovered"
     )
 
 
 @pytest.mark.abort_on_fail
-async def test_restore_backup_on_different_cluster(charm: str, ops_test: OpsTest):
+async def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: Juju):
     """Restore a backup and check if data is recovered."""
     logger.info("Remove existing etcd cluster and deploy a new one.")
-    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
-    await ops_test.model.remove_secret(secret_name="system_users_secret")
+    juju_lxd_model.remove_application(APP_NAME)
+    juju_lxd_model.remove_secret(identifier="system_users_secret")
 
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS, idle_period=60)
-
-    logger.info("Configure admin credentials in etcd")
-    await set_password(ops_test, PASSWORD)
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
-
-    logger.info(f"Integrate the newly deployed application with {S3_INTEGRATOR}")
-    await ops_test.model.integrate(APP_NAME, S3_INTEGRATOR)
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME, S3_INTEGRATOR],
-        apps_statuses=["active"],
-        units_statuses=["active"],
+    juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(
+            status, APP_NAME, unit_count=NUM_UNITS, idle_period=60
+        )
     )
 
-    for unit in ops_test.model.applications[APP_NAME].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
+    logger.info("Configure admin credentials in etcd")
+    set_password_jubilant(juju_lxd_model, PASSWORD)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+    )
+
+    logger.info(f"Integrate the newly deployed application with {S3_INTEGRATOR}")
+    juju_lxd_model.integrate(APP_NAME, S3_INTEGRATOR)
+    juju_lxd_model.wait(
+        lambda status: does_status_match(
+            status,
+            expected_app_statuses={APP_NAME: ["active"], S3_INTEGRATOR: ["active"]},
+            expected_unit_statuses={APP_NAME: ["active"], S3_INTEGRATOR: ["active"]},
+        )
+    )
+
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 
     # download the backup from storage and restore it
     logger.info(f"Restoring backup {backup_id}")
-    restore_action = await leader_unit.run_action("restore", **{"backup-id": backup_id})
-    restore_backup_response = await restore_action.wait()
+    restore_backup_response = juju_lxd_model.run(leader_unit, "restore", {"backup-id": backup_id})
     assert restore_backup_response.results.get("return-code") == 0, "restore failed"
 
     # wait for the restore to be performed across all units and check the restored data
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+    )
 
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
     assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE, (
         "data not recovered"
     )

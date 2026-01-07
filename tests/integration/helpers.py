@@ -633,6 +633,19 @@ def get_etcd_version(
         raise
 
 
+def get_leader_unit_name(juju: Juju, app: str = APP_NAME) -> str:
+    """Retrieve the leader unit's name.
+
+    Raises:
+        RuntimeError: if no leader unit is found.
+    """
+    for name, unit in juju.status().get_units(app).items():
+        if unit.leader:
+            return name
+
+    raise RuntimeError(f"No leader unit found for app {app}")
+
+
 def get_leader_unit_ip(juju: Juju, app: str = APP_NAME) -> str:
     """Retrieve the leader unit's public address.
 
