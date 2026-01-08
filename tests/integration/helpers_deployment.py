@@ -13,6 +13,7 @@ from uuid import uuid4
 import jubilant
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from dateutil.parser import parse
+from jubilant.statustypes import StatusInfo
 from ops import StatusBase
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
@@ -115,6 +116,9 @@ def _progress_line(units: List[Unit]) -> str:
         )
 
     return log
+
+
+ExpectedStatus = StatusObject | str
 
 
 async def get_unit_hostname(ops_test: OpsTest, unit_id: int, app: str) -> str:
@@ -268,6 +272,28 @@ def does_message_match(expected_status_message: str, status: StatusObject) -> bo
     except KeyError as e:
         logger.error(f"Error attempting to convert StatusObject to ops.StatusBase: {e}")
         return False
+
+
+def does_message_match_jubilant(model_status: StatusInfo, expected_status: ExpectedStatus) -> bool:
+    """Check if the status message matches the expected message."""
+    if isinstance(expected_status, StatusObject):
+        try:
+            juju_status = StatusBase.from_name(expected_status.status, expected_status.message)
+            current_status = model_status.message
+            return (
+                current_status == juju_status.message
+                or current_status.startswith(juju_status.message)
+                or juju_status.message.startswith(f"{current_status:.40}")
+                or (
+                    expected_status.short_message is not None
+                    and expected_status.short_message in current_status
+                )
+            )
+        except KeyError as e:
+            logger.error(f"Error attempting to convert StatusObject to ops.StatusBase: {e}")
+            return False
+    else:
+        return model_status.current == expected_status
 
 
 def _is_every_condition_on_units_met(
@@ -506,16 +532,16 @@ async def wait_until(  # noqa: C901
 
 def does_status_match(
     model_status: jubilant.Status,
-    expected_unit_statuses: dict[str, List[StatusObject]] | None = None,
-    expected_app_statuses: dict[str, List[StatusObject]] | None = None,
+    expected_unit_statuses: dict[str, List[ExpectedStatus]] | None = None,
+    expected_app_statuses: dict[str, List[ExpectedStatus]] | None = None,
     num_units: dict[str, int] | None = None,
 ) -> bool:
     """Check that current app and/or unit status matches expectation for given apps.
 
     Args:
         model_status: represents the jubilant model's current status
-        expected_unit_statuses: dict mapping app name to list of expected StatusObject for units
-        expected_app_statuses: dict mapping app name to its list of expected StatusObject
+        expected_unit_statuses: dict mapping app name to list of ExpectedStatus for units
+        expected_app_statuses: dict mapping app name to its list of ExpectedStatus
         num_units: dict mapping app name to expected number of units
     """
     return (
@@ -532,18 +558,18 @@ def does_status_match(
 
 
 def _does_unit_workload_status_match(
-    model_status: jubilant.Status, expected_statuses: dict[str, List[StatusObject]]
+    model_status: jubilant.Status, expected_statuses: dict[str, List[ExpectedStatus]]
 ) -> bool:
     """Check that current workload status matches expectation for given apps' units.
 
     Args:
         model_status: represents the jubilant model's current status
-        expected_statuses: dict mapping app names to list of expected StatusObject
+        expected_statuses: dict mapping app names to list of ExpectedStatus
     """
     return all(
         all(
             any(
-                does_message_match(unit_status.workload_status.message, status)
+                does_message_match_jubilant(unit_status.workload_status, status)
                 for status in expected_status
             )
             for unit_status in model_status.get_units(app).values()
@@ -553,17 +579,17 @@ def _does_unit_workload_status_match(
 
 
 def _does_app_status_match(
-    model_status: jubilant.Status, expected_statuses: dict[str, List[StatusObject]]
+    model_status: jubilant.Status, expected_statuses: dict[str, List[ExpectedStatus]]
 ) -> bool:
     """Check that current app status matches expectation for given apps.
 
     Args:
         model_status: represents the jubilant model's current status
-        expected_statuses: dict mapping app names to list of expected StatusObject
+        expected_statuses: dict mapping app names to list of ExpectedStatus
     """
     return all(
         any(
-            does_message_match(model_status.apps.get(app).app_status.message, status)
+            does_message_match_jubilant(model_status.apps.get(app).app_status, status)
             for status in expected_status
         )
         for app, expected_status in expected_statuses.items()
