@@ -165,8 +165,9 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
                 time.sleep(10)
 
     logger.info("Rebuilding cluster after majority failure")
-    rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
-    assert rebuild_response.return_code == 0, "rebuild failed"
+    with pytest.raises(TaskError) as task_error:
+        juju_lxd_model.run(leader_unit, "rebuild-cluster")
+    assert "Use `force`" in str(task_error), "rebuild should fail without `force` option"
 
     # wait for the rebuild to be performed
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2))
