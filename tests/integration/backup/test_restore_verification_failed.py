@@ -32,7 +32,7 @@ backup_id = ""
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_and_configure(
+def test_deploy_and_configure(
     charm: str, juju_lxd_model: Juju, storage_credentials, storage_config
 ) -> None:
     """Deploy and configure the charm and s3-integrator."""
@@ -58,7 +58,7 @@ async def test_deploy_and_configure(
 
 
 @pytest.mark.abort_on_fail
-async def test_s3_integration(juju_lxd_model: Juju, s3_bucket) -> None:
+def test_s3_integration(juju_lxd_model: Juju, s3_bucket) -> None:
     """Integrate charm and s3-integrator."""
     juju_lxd_model.integrate(APP_NAME, S3_INTEGRATOR)
     juju_lxd_model.wait(
@@ -74,7 +74,7 @@ async def test_s3_integration(juju_lxd_model: Juju, s3_bucket) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_create_backup(juju_lxd_model: Juju) -> None:
+def test_create_backup(juju_lxd_model: Juju) -> None:
     """Create a backup and upload to s3-storage."""
     global backup_id
 
@@ -122,7 +122,7 @@ async def test_create_backup(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_restore_verification_failed(juju_lxd_model: Juju):
+def test_restore_verification_failed(juju_lxd_model: Juju):
     """Restore a backup with invalid admin password."""
     logger.info("Configure admin credentials in etcd")
     invalid_password = "invalid_password"
