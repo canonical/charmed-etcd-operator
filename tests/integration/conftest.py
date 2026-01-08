@@ -144,11 +144,10 @@ async def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
 
 
 @pytest.fixture(scope="module")
-def juju_lxd_model(arch: str, lxd_cloud: str, lxd_controller: str):
-    with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
-        juju_lxd.wait_timeout = 1000
-        juju_lxd.cli("set-model-constraints", f"arch={arch}")
-        yield juju_lxd
+def juju_lxd_model(arch: str, lxd_controller: str):
+    juju_lxd = jubilant.Juju(model=f"{lxd_controller}:testing", wait_timeout=1000)
+    juju_lxd.cli("set-model-constraints", f"arch={arch}")
+    yield juju_lxd
 
 
 @pytest.fixture(scope="module")

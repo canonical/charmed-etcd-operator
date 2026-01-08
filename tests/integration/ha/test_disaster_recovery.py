@@ -6,7 +6,7 @@ import logging
 import time
 
 import pytest
-from jubilant import Juju
+from jubilant import Juju, TaskError
 
 from literals import INTERNAL_USER, PEER_RELATION
 from statuses import ClusterStatuses
@@ -88,7 +88,7 @@ def test_membership_reconfiguration_after_unit_loss(juju_lxd_model: Juju) -> Non
 
 @pytest.mark.abort_on_fail
 def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
-    """Users can run `rebuild-cluster` on a healthy cluster if the use the `force` parameter."""
+    """Users can run `rebuild-cluster` on a healthy cluster if they use the `force` parameter."""
     juju_lxd_model.wait(
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
     )
@@ -96,13 +96,13 @@ def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 
     logger.info("Executing rebuild-cluster on healthy cluster - this should fail")
-    rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
-    assert rebuild_response.return_code == 0, "rebuild failed"
-    assert rebuild_response.status == "failed"
+    with pytest.raises(TaskError) as task_error:
+        juju_lxd_model.run(leader_unit, "rebuild-cluster")
+    assert "Use `force`" in str(task_error), "rebuild should fail without `force` option"
 
     logger.info("Try again with `force` option")
     rebuild_force_response = juju_lxd_model.run(leader_unit, "rebuild-cluster", {"force": True})
-    assert rebuild_force_response.results.get("return-code") == 0, "rebuild failed"
+    assert rebuild_force_response.return_code == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
     juju_lxd_model.wait(
