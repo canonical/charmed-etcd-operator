@@ -660,10 +660,15 @@ def get_leader_unit_ip(juju: Juju, app: str = APP_NAME) -> str:
 
 
 @contextlib.contextmanager
-def fast_forward(juju: Juju):
-    """Context manager that temporarily speeds up update-status hooks to fire every 10s."""
+def fast_forward(juju: Juju, interval: int = 10):
+    """Context manager that temporarily speeds up update-status hooks.
+
+    Args:
+        juju: An instance of Jubilant's Juju class on which to run Juju commands
+        interval: How frequently (in seconds) to fire the update-status hook. Default value is 10.
+    """
     old = juju.model_config()["update-status-hook-interval"]
-    juju.model_config({"update-status-hook-interval": "10s"})
+    juju.model_config({"update-status-hook-interval": f"{interval}s"})
     try:
         yield
     finally:

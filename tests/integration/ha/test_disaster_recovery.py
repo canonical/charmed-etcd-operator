@@ -6,18 +6,20 @@ import logging
 import time
 
 import pytest
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
 from statuses import ClusterStatuses
 
 from ..helpers import (
     APP_NAME,
-    get_cluster_endpoints,
+    fast_forward,
+    get_cluster_endpoints_jubilant,
     get_cluster_members,
-    get_secret_by_label,
+    get_leader_unit_name,
+    get_secret_by_label_jubilant,
 )
-from ..helpers_deployment import wait_until
+from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -31,13 +33,12 @@ NUM_UNITS = 5
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
+def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build and deploy the charm."""
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
-
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -45,32 +46,36 @@ async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> None:
+def test_membership_reconfiguration_after_unit_loss(juju_lxd_model: Juju) -> None:
     """Make sure a forcefully removed unit is removed as cluster member."""
-    unit_to_remove = ops_test.model.applications[APP_NAME].units[-1]
-    removed_member_name = unit_to_remove.name.replace("/", "")
-    logger.info(f"Forcefully removing unit {unit_to_remove.name}")
+    units = list(juju_lxd_model.status().get_units(APP_NAME))
+    unit_to_remove = units[-1]
+    removed_member_name = unit_to_remove.replace("/", "")
+    logger.info(f"Forcefully removing unit {unit_to_remove}")
 
-    destroy_unit_cmd = f"remove-unit {unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
-    return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
-    assert return_code == 0, "Failed to remove unit"
+    juju_lxd_model.remove_unit(unit_to_remove, force=True)
+    # destroy_unit_cmd = f"remove-unit {unit_to_remove} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
+    # return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
+    # assert return_code == 0, "Failed to remove unit"
 
     # wait for the next `update_status` for the cluster membership to be updated
-    async with ops_test.fast_forward("15s"):
-        await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
+    with fast_forward(juju_lxd_model, 15):
+        juju_lxd_model.wait(
+            lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+        )
 
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
-    for unit in ops_test.model.applications[APP_NAME].units:
-        assert unit.name.replace("/", "") in member_names, (
-            f"unit {unit.name} not in cluster members"
+    for unit_name in juju_lxd_model.status().get_units(APP_NAME):
+        assert unit_name.replace("/", "") in member_names, (
+            f"unit {unit_name} not in cluster members"
         )
-        logger.info(f"{unit.name} in cluster members")
+        logger.info(f"{unit_name} in cluster members")
     assert removed_member_name not in member_names, (
         f"{removed_member_name} still in cluster members"
     )
@@ -82,90 +87,97 @@ async def test_membership_reconfiguration_after_unit_loss(ops_test: OpsTest) -> 
 
 
 @pytest.mark.abort_on_fail
-async def test_rebuild_on_healthy_cluster(ops_test: OpsTest) -> None:
+def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
     """Users can run `rebuild-cluster` on a healthy cluster if the use the `force` parameter."""
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+    )
 
-    for unit in ops_test.model.applications[APP_NAME].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 
     logger.info("Executing rebuild-cluster on healthy cluster - this should fail")
-    rebuild_action = await leader_unit.run_action("rebuild-cluster")
-    rebuild_response = await rebuild_action.wait()
-    assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
+    rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
+    assert rebuild_response.return_code == 0, "rebuild failed"
     assert rebuild_response.status == "failed"
 
     logger.info("Try again with `force` option")
-    rebuild_force_action = await leader_unit.run_action("rebuild-cluster", **{"force": True})
-    rebuild_force_response = await rebuild_force_action.wait()
+    rebuild_force_response = juju_lxd_model.run(leader_unit, "rebuild-cluster", {"force": True})
     assert rebuild_force_response.results.get("return-code") == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+    )
 
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
-    for unit in ops_test.model.applications[APP_NAME].units:
-        assert unit.name.replace("/", "") in member_names, (
-            f"unit {unit.name} not in cluster members"
+    for unit_name in juju_lxd_model.status().get_units(APP_NAME):
+        assert unit_name.replace("/", "") in member_names, (
+            f"unit {unit_name} not in cluster members"
         )
-        logger.info(f"{unit.name} in cluster members")
+        logger.info(f"{unit_name} in cluster members")
 
 
 @pytest.mark.abort_on_fail
-async def test_recover_from_majority_failure(ops_test: OpsTest) -> None:
+def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
     """When the majority of the cluster is lost, users can run `rebuild-cluster`."""
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
-
-    first_unit_to_remove = ops_test.model.applications[APP_NAME].units[0]
-    first_removed_member_name = first_unit_to_remove.name.replace("/", "")
-    second_unit_to_remove = ops_test.model.applications[APP_NAME].units[1]
-    second_removed_member_name = second_unit_to_remove.name.replace("/", "")
-    logger.info(
-        f"Forcefully removing units {first_unit_to_remove.name} and {second_unit_to_remove.name}"
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
     )
 
-    destroy_unit_cmd = f"remove-unit {first_unit_to_remove.name} {second_unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
-    return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
-    assert return_code == 0, "Failed to remove units"
+    # first_unit_to_remove = ops_test.model.applications[APP_NAME].units[0]
+    # first_removed_member_name = first_unit_to_remove.name.replace("/", "")
+    # second_unit_to_remove = ops_test.model.applications[APP_NAME].units[1]
+    # second_removed_member_name = second_unit_to_remove.name.replace("/", "")
+    # logger.info(
+    #     f"Forcefully removing units {first_unit_to_remove} and {second_unit_to_remove}"
+    # )
 
-    async with ops_test.fast_forward("10s"):
-        await wait_until(
-            ops_test,
-            apps=[APP_NAME],
-            units_full_statuses={
-                APP_NAME: [ClusterStatuses.CLUSTER_FAILED.value],
-            },
-            wait_for_exact_units=2,
+    units = list(juju_lxd_model.status().get_units(APP_NAME))
+    first_unit_to_remove = units[0]
+    first_removed_member_name = first_unit_to_remove.replace("/", "")
+    second_unit_to_remove = units[1]
+    second_removed_member_name = second_unit_to_remove.replace("/", "")
+    logger.info(f"Forcefully removing units {first_unit_to_remove} and {second_unit_to_remove}")
+
+    juju_lxd_model.remove_unit(first_unit_to_remove, second_unit_to_remove, force=True)
+    # destroy_unit_cmd = f"remove-unit {first_unit_to_remove.name} {second_unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
+    # return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
+    # assert return_code == 0, "Failed to remove units"
+
+    with fast_forward(juju_lxd_model):
+        juju_lxd_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_app_statuses={APP_NAME: [ClusterStatuses.CLUSTER_FAILED.value]},
+                num_units={APP_NAME: 2},
+            )
         )
         leader_unit = None
         while leader_unit is None:
-            for unit in ops_test.model.applications[APP_NAME].units:
-                if await unit.is_leader_from_status():
-                    leader_unit = unit
+            for unit_name, unit_details in juju_lxd_model.status().get_units(APP_NAME).items():
+                if unit_details.leader:
+                    leader_unit = unit_name
 
             if leader_unit is None:
                 logger.info("Waiting for a leader to be elected")
                 time.sleep(10)
 
     logger.info("Rebuilding cluster after majority failure")
-    rebuild_action = await leader_unit.run_action("rebuild-cluster")
-    rebuild_response = await rebuild_action.wait()
-    assert rebuild_response.results.get("return-code") == 0, "rebuild failed"
+    rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
+    assert rebuild_response.return_code == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=2)
-
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2))
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
-    for unit in ops_test.model.applications[APP_NAME].units:
-        assert unit.name.replace("/", "") in member_names, (
-            f"unit {unit.name} not in cluster members"
+    for unit_name in juju_lxd_model.status().get_units(APP_NAME):
+        assert unit_name.replace("/", "") in member_names, (
+            f"unit {unit_name} not in cluster members"
         )
-        logger.info(f"{unit.name} in cluster members")
+        logger.info(f"{unit_name} in cluster members")
     assert first_removed_member_name not in member_names, (
         f"{first_removed_member_name} still in cluster members"
     )
