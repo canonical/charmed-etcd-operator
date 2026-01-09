@@ -165,6 +165,17 @@ async def patch_restart_delay(ops_test: OpsTest, unit_name: str, delay: int) -> 
     await ops_test.juju(*reload_cmd.split(), check=True)
 
 
+def patch_restart_delay_jubilant(juju: Juju, unit_name: str, delay: int) -> None:
+    """Update the restart delay in the snap's systemd service file."""
+    juju.exec(
+        command=f"sudo sed -i -e '/^[Service]/a RestartSec={delay}' {ETCD_SERVICE_PATH}",
+        unit=unit_name,
+    )
+
+    # reload the daemon for systemd to reflect changes
+    juju.exec(command="sudo systemctl daemon-reload", unit=unit_name)
+
+
 async def remove_database_file(ops_test: OpsTest, unit_name: str) -> None:
     """Delete the database file of etcd on a unit."""
     delete_db_cmd = f"exec --unit {unit_name} -- rm {DATABASE_DIR}/snap/db"
@@ -176,10 +187,26 @@ async def remove_database_file(ops_test: OpsTest, unit_name: str) -> None:
     logger.info(f"etcd database file deleted on {unit_name}.")
 
 
+def remove_database_file_jubilant(juju: Juju, unit_name: str) -> None:
+    """Delete the database file of etcd on a unit."""
+    # we can delete the database file containing the data content
+    # but never the write-ahead-log file, which contains the committed Raft information
+    # otherwise the member would not be functional anymore
+    # see: https://etcd.io/docs/v3.5/learning/persistent-storage-files/#logical-content
+    juju.exec(command=f"rm {DATABASE_DIR}/snap/db", unit=unit_name)
+    logger.info(f"etcd database file deleted on {unit_name}.")
+
+
 async def reboot_unit(ops_test: OpsTest, unit_name: str) -> None:
     """Reboot the VM of a unit."""
     reboot_cmd = f"exec --unit {unit_name} -- sudo reboot"
     await ops_test.juju(*reboot_cmd.split(), check=True)
+    logger.info(f"Rebooted unit {unit_name}.")
+
+
+def reboot_unit_jubilant(juju: Juju, unit_name: str) -> None:
+    """Reboot the VM of a unit."""
+    juju.exec(command="sudo reboot", unit=unit_name)
     logger.info(f"Rebooted unit {unit_name}.")
 
 
