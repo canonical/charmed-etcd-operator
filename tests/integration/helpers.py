@@ -181,6 +181,19 @@ def get_unit_endpoint(
             return f"{'https' if tls_enabled else 'http'}://{unit.public_address}:{CLIENT_PORT}"
 
 
+def get_unit_endpoint_jubilant(
+    juju: Juju,
+    unit_name: str,
+    app_name: str = APP_NAME,
+    tls_enabled: bool = False,
+) -> str | None:
+    """Resolve the etcd endpoint for a given unit name."""
+    for name, details in juju.status().get_units(app_name).items():
+        if unit_name == name:
+            return f"{'https' if tls_enabled else 'http'}://{details.public_address}:{CLIENT_PORT}"
+    return None
+
+
 def get_remaining_endpoints(all_endpoints: str, endpoints_to_subtract: str) -> str:
     """Subtract one comma-delimited list of endpoints from another."""
     remaining_endpoints = all_endpoints.split(",")

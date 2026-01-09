@@ -54,9 +54,6 @@ def test_membership_reconfiguration_after_unit_loss(juju_lxd_model: Juju) -> Non
     logger.info(f"Forcefully removing unit {unit_to_remove}")
 
     juju_lxd_model.remove_unit(unit_to_remove, force=True)
-    # destroy_unit_cmd = f"remove-unit {unit_to_remove} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
-    # return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
-    # assert return_code == 0, "Failed to remove unit"
 
     # wait for the next `update_status` for the cluster membership to be updated
     with fast_forward(juju_lxd_model, 15):
@@ -126,14 +123,6 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
     )
 
-    # first_unit_to_remove = ops_test.model.applications[APP_NAME].units[0]
-    # first_removed_member_name = first_unit_to_remove.name.replace("/", "")
-    # second_unit_to_remove = ops_test.model.applications[APP_NAME].units[1]
-    # second_removed_member_name = second_unit_to_remove.name.replace("/", "")
-    # logger.info(
-    #     f"Forcefully removing units {first_unit_to_remove} and {second_unit_to_remove}"
-    # )
-
     units = list(juju_lxd_model.status().get_units(APP_NAME))
     first_unit_to_remove = units[0]
     first_removed_member_name = first_unit_to_remove.replace("/", "")
@@ -142,9 +131,6 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
     logger.info(f"Forcefully removing units {first_unit_to_remove} and {second_unit_to_remove}")
 
     juju_lxd_model.remove_unit(first_unit_to_remove, second_unit_to_remove, force=True)
-    # destroy_unit_cmd = f"remove-unit {first_unit_to_remove.name} {second_unit_to_remove.name} --model={ops_test.model.info.name} --force --no-wait --no-prompt"
-    # return_code, _, _ = await ops_test.juju(*destroy_unit_cmd.split())
-    # assert return_code == 0, "Failed to remove units"
 
     with fast_forward(juju_lxd_model):
         juju_lxd_model.wait(

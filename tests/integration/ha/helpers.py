@@ -9,6 +9,7 @@ import subprocess
 import time
 from typing import Tuple
 
+from jubilant import Juju
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
@@ -35,6 +36,19 @@ async def existing_app(ops_test: OpsTest) -> str | None:
     etcd_apps = {name: desc for name, desc in apps.items() if desc["charm-name"] == "charmed-etcd"}
 
     return list(etcd_apps.keys())[0] if etcd_apps else None
+
+
+def existing_app_jubilant(juju: Juju) -> str | None:
+    """Return the name of an existing etcd cluster.
+
+    Returns:
+        str | None: name of an application deployment for `charmed-etcd`
+    """
+    for app_name, app_status in juju.status().apps.items():
+        if "charmed-etcd" == app_status.charm_name:
+            return app_name
+
+    return None
 
 
 def start_continuous_writes(endpoints: str, user: str, password: str) -> None:
