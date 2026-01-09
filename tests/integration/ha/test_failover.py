@@ -43,7 +43,7 @@ TEST_VALUE = "42"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
+def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
     if existing_app_jubilant(juju_lxd_model):
@@ -55,7 +55,7 @@ async def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_kill_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
+def test_kill_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
     """Make sure the cluster can self-heal when the leader goes down."""
     app = existing_app_jubilant(juju_lxd_model) or APP_NAME
 
@@ -140,7 +140,7 @@ async def test_kill_db_process_on_raft_leader(etcd_process: str, juju_lxd_model:
 
 
 @pytest.mark.abort_on_fail
-async def test_freeze_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
+def test_freeze_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
     """Make sure the cluster can self-heal when the leader stops."""
     app = existing_app_jubilant(juju_lxd_model) or APP_NAME
 
@@ -231,7 +231,7 @@ async def test_freeze_db_process_on_raft_leader(etcd_process: str, juju_lxd_mode
 
 
 @pytest.mark.abort_on_fail
-async def test_restart_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
+def test_restart_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
     """Make sure the cluster can self-heal when the leader goes down."""
     app = existing_app_jubilant(juju_lxd_model) or APP_NAME
 
@@ -315,7 +315,7 @@ async def test_restart_db_process_on_raft_leader(etcd_process: str, juju_lxd_mod
 
 
 @pytest.mark.abort_on_fail
-async def test_full_cluster_restart(etcd_process: str, juju_lxd_model: Juju) -> None:
+def test_full_cluster_restart(etcd_process: str, juju_lxd_model: Juju) -> None:
     """Make sure the cluster can self-heal after all members went down."""
     app = existing_app_jubilant(juju_lxd_model) or APP_NAME
 
@@ -382,7 +382,7 @@ async def test_full_cluster_restart(etcd_process: str, juju_lxd_model: Juju) -> 
 
 
 @pytest.mark.abort_on_fail
-async def test_full_cluster_crash(etcd_process: str, juju_lxd_model: Juju) -> None:
+def test_full_cluster_crash(etcd_process: str, juju_lxd_model: Juju) -> None:
     """Make sure the cluster can self-heal after all members went down."""
     app = existing_app_jubilant(juju_lxd_model) or APP_NAME
 
@@ -449,7 +449,7 @@ async def test_full_cluster_crash(etcd_process: str, juju_lxd_model: Juju) -> No
 
 
 @pytest.mark.abort_on_fail
-async def test_restart_raft_leader_after_deleting_database_file(
+def test_restart_raft_leader_after_deleting_database_file(
     etcd_process: str, juju_lxd_model: Juju
 ) -> None:
     """Make sure the cluster can self-heal when the leader's data is deleted."""
@@ -541,7 +541,7 @@ async def test_restart_raft_leader_after_deleting_database_file(
 
 
 @pytest.mark.abort_on_fail
-async def test_reboot_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
+def test_reboot_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
     """Make sure a unit comes back cleanly after rebooting the VM."""
     app = existing_app_jubilant(juju_lxd_model) or APP_NAME
 

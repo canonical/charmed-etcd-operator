@@ -11,6 +11,7 @@ import logging
 import subprocess
 
 import yaml
+from jubilant import Juju
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
@@ -33,6 +34,22 @@ async def hostname_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     return hostname.strip()
 
 
+def hostname_from_unit_jubilant(juju: Juju, unit_name: str) -> str:
+    """Get the machine hostname from a specific unit.
+
+    Args:
+        juju: An instance of Jubilant's Juju class on which to run Juju commands
+        unit_name: The name of the unit to get the machine
+
+    Returns:
+        The hostname of the machine.
+    """
+    task_result = juju.exec(command="hostname", unit=unit_name)
+
+    logger.info(f"logged taskresult: {task_result}")  # TODO cleanup
+    return task_result.results["hostname"]
+
+
 async def ip_address_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     """Get the machine ip address from a specific unit.
 
@@ -49,6 +66,22 @@ async def ip_address_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     return ip_address.strip()
 
 
+def ip_address_from_unit_jubilant(juju: Juju, unit_name: str) -> str:
+    """Get the machine ip address from a specific unit.
+
+    Args:
+        juju: An instance of Jubilant's Juju class on which to run Juju commands
+        unit_name: The name of the unit to get the machine
+
+    Returns:
+        The ip address of the machine.
+    """
+    task_result = juju.exec("hostname -i", unit=unit_name)
+
+    logger.info(f"logged taskresult: {task_result}")  # TODO cleanup
+    return task_result.results["hostname"]
+
+
 async def get_controller_hostname(ops_test: OpsTest) -> str:
     """Return controller machine hostname."""
     _, raw_controller, _ = await ops_test.juju("show-controller")
@@ -58,6 +91,21 @@ async def get_controller_hostname(ops_test: OpsTest) -> str:
     return [
         machine.get("instance-id")
         for machine in controller[ops_test.controller_name]["controller-machines"].values()
+    ][0]
+
+
+def get_controller_hostname_jubilant(juju: Juju) -> str:
+    """Return controller machine hostname."""
+    raw_model = juju.cli("show-model", juju.model)
+    raw_controller = juju.cli("show-controller", include_model=False)
+
+    model_details = yaml.safe_load(raw_model)
+    controller_details = yaml.safe_load(raw_controller)
+    controller_name = model_details[juju.model]["controller-name"]
+
+    return [
+        machine.get("instance-id")
+        for machine in controller_details[controller_name]["controller-machines"].values()
     ][0]
 
 

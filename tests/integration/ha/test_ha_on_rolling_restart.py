@@ -5,22 +5,21 @@
 import logging
 
 import pytest
-from juju.application import Application
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION, TuningOptions
 from statuses import ConfigStatuses
 
 from ..helpers import (
     APP_NAME,
-    get_cluster_endpoints,
-    get_secret_by_label,
+    get_cluster_endpoints_jubilant,
+    get_secret_by_label_jubilant,
 )
-from ..helpers_deployment import wait_until
+from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
-    existing_app,
+    existing_app_jubilant,
     start_continuous_writes,
     stop_continuous_writes,
 )
@@ -32,22 +31,22 @@ NUM_UNITS = 3
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_with_peer_tls(charm: str, ops_test: OpsTest) -> None:
+def test_deploy_with_peer_tls(charm: str, juju_lxd_model: Juju) -> None:
     """Deploy a cluster with three units and peer-certificates."""
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
+    juju_lxd_model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
 
-    if await existing_app(ops_test):
+    if existing_app_jubilant(juju_lxd_model):
         return
 
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
+    juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
 
 
 @pytest.mark.abort_on_fail
-async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
+def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     """Disable and enable peer TLS on a running cluster.
 
     By enabling/disabling the peer TLS option, we initiate rolling restarts on the etcd cluster.
@@ -56,14 +55,13 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
     """
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates relations")
-    await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+    juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
 
-    app_name = (await existing_app(ops_test)) or APP_NAME
-    etcd_app: Application = ops_test.model.applications[app_name]
+    app_name = existing_app_jubilant(juju_lxd_model) or APP_NAME
 
-    endpoints = get_cluster_endpoints(ops_test, app_name)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app_name}.app")
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app_name)
+    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -71,15 +69,15 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
     # disable peer TLS and check continuous writes
     logger.info("Removing peer-certificates relations")
-    await etcd_app.remove_relation("peer-certificates", f"{TLS_NAME}:certificates")
-    await wait_until(ops_test, apps=[app_name], timeout=1000)
+    juju_lxd_model.remove_relation(f"{app_name}:peer-certificates", f"{TLS_NAME}:certificates")
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # enable peer TLS and check continuous writes
     logger.info("Integrating peer-certificates relations")
-    await ops_test.model.integrate(f"{app_name}:peer-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[app_name], timeout=1000)
+    juju_lxd_model.integrate(f"{app_name}:peer-certificates", TLS_NAME)
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
@@ -87,27 +85,32 @@ async def test_disable_and_enable_peer_tls(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_tuning_config_options(ops_test: OpsTest) -> None:
+def test_tuning_config_options(juju_lxd_model: Juju) -> None:
     """Tune the network latency parameters in etcd and ensure the cluster is available."""
-    app_name = (await existing_app(ops_test)) or APP_NAME
-    await wait_until(ops_test, apps=[app_name], wait_for_exact_units=NUM_UNITS)
+    app_name = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, app_name, unit_count=NUM_UNITS)
+    )
 
     # start writing data to the cluster
-    endpoints = get_cluster_endpoints(ops_test, app_name)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app_name}.app")
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app_name)
+    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # set tuning parameters to reasonable values in high-latency environments
-    await ops_test.model.applications[app_name].set_config(
-        {
+    juju_lxd_model.config(
+        app=app_name,
+        values={
             TuningOptions.ELECTION_TIMEOUT_CONFIG.value: "5000",
             TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: "500",
-        }
+        },
     )
 
     # wait for the rolling restart to apply the config changes
-    await wait_until(ops_test, apps=[app_name], wait_for_exact_units=NUM_UNITS)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+    )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
@@ -115,32 +118,34 @@ async def test_tuning_config_options(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_invalid_tuning_config_options(ops_test: OpsTest) -> None:
+def test_invalid_tuning_config_options(juju_lxd_model: Juju) -> None:
     """Ensure the cluster keeps running with invalid tuning options."""
-    app_name = (await existing_app(ops_test)) or APP_NAME
-    await wait_until(ops_test, apps=[app_name], wait_for_exact_units=NUM_UNITS)
+    app_name = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, app_name, unit_count=NUM_UNITS)
+    )
 
     # start writing data to the cluster
-    endpoints = get_cluster_endpoints(ops_test, app_name)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app_name}.app")
+    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app_name)
+    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # set tuning parameters to invalid values (election timeout must be >= 10x heartbeat interval)
-    await ops_test.model.applications[app_name].set_config(
-        {
+    juju_lxd_model.config(
+        app=app_name,
+        values={
             TuningOptions.ELECTION_TIMEOUT_CONFIG.value: "4000",
             TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value: "500",
-        }
+        },
     )
 
-    await wait_until(
-        ops_test,
-        apps=[app_name],
-        apps_full_statuses={
-            APP_NAME: [ConfigStatuses.TUNING_CONFIG_INVALID.value],
-        },
-        wait_for_exact_units=NUM_UNITS,
+    juju_lxd_model.wait(
+        lambda status: does_status_match(
+            status,
+            expected_app_statuses={app_name: [ConfigStatuses.TUNING_CONFIG_INVALID.value]},
+            num_units={app_name: NUM_UNITS},
+        )
     )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
