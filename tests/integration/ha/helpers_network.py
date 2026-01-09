@@ -46,7 +46,6 @@ def hostname_from_unit_jubilant(juju: Juju, unit_name: str) -> str:
     """
     task_result = juju.exec(command="hostname", unit=unit_name)
 
-    logger.info(f"logged taskresult: {str(task_result)}")  # TODO cleanup
     return task_result.stdout
 
 
@@ -78,7 +77,6 @@ def ip_address_from_unit_jubilant(juju: Juju, unit_name: str) -> str:
     """
     task_result = juju.exec("hostname -i", unit=unit_name)
 
-    logger.info(f"logged taskresult: {str(task_result)}")  # TODO cleanup
     return task_result.stdout
 
 
@@ -96,7 +94,7 @@ async def get_controller_hostname(ops_test: OpsTest) -> str:
 
 def get_controller_hostname_jubilant(juju: Juju) -> str:
     """Return controller machine hostname."""
-    raw_model = juju.cli("show-model", juju.model)
+    raw_model = juju.cli("show-model", juju.model, include_model=False)
     raw_controller = juju.cli("show-controller", include_model=False)
 
     model_details = yaml.safe_load(raw_model)
