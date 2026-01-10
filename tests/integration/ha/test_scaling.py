@@ -232,7 +232,7 @@ def test_scale_to_zero_and_back(juju_lxd_model: Juju) -> None:
         juju_lxd_model.remove_unit(unit)
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, app, unit_count=0), timeout=1000
+        lambda status: len(juju_lxd_model.status().get_units(app)) == 0, timeout=1000
     )
 
     # scale up again

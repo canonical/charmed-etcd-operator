@@ -99,7 +99,7 @@ def get_controller_hostname_jubilant(juju: Juju) -> str:
 
     model_details = yaml.safe_load(raw_model)
     controller_details = yaml.safe_load(raw_controller)
-    controller_name = model_details[juju.model]["controller-name"]
+    controller_name = model_details[juju.model.split(":")[1]]["controller-name"]
 
     return [
         machine.get("instance-id")
