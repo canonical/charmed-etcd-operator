@@ -219,10 +219,26 @@ async def disable_etcd_service(ops_test: OpsTest, unit_name: str) -> None:
     logger.info(f"Stopped and disabled etcd service on unit {unit_name}.")
 
 
+def disable_etcd_service_jubilant(juju: Juju, unit_name: str) -> None:
+    """Stop and disable the etcd service on a unit."""
+    juju.exec(unit=unit_name, command="sudo systemctl stop snap.charmed-etcd.etcd")
+    juju.exec(unit=unit_name, command="sudo systemctl disable snap.charmed-etcd.etcd")
+
+    logger.info(f"Stopped and disabled etcd service on unit {unit_name}.")
+
+
 async def enable_etcd_service(ops_test: OpsTest, unit_name: str) -> None:
     """Enable and start the etcd service on a unit."""
     enable_cmd = f"exec --unit {unit_name} -- sudo systemctl enable snap.charmed-etcd.etcd"
     start_cmd = f"exec --unit {unit_name} -- sudo systemctl start snap.charmed-etcd.etcd"
     await ops_test.juju(*enable_cmd.split(), check=True)
     await ops_test.juju(*start_cmd.split(), check=True)
+    logger.info(f"Enabled and started etcd service on unit {unit_name}.")
+
+
+def enable_etcd_service_jubilant(juju: Juju, unit_name: str) -> None:
+    """Enable and start the etcd service on a unit."""
+    juju.exec(unit=unit_name, command="sudo systemctl enable snap.charmed-etcd.etcd")
+    juju.exec(unit=unit_name, command="sudo systemctl start snap.charmed-etcd.etcd")
+
     logger.info(f"Enabled and started etcd service on unit {unit_name}.")
