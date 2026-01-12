@@ -30,6 +30,7 @@ from tests.integration.helpers import (
     get_unit_endpoint_jubilant,
 )
 from tests.integration.helpers_deployment import (
+    ExpectedStatus,
     apps_active_and_agents_idle,
     does_status_match,
 )
@@ -139,7 +140,9 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         juju_lxd_model.run(refresh_order[0], "force-refresh-start", {"check-compatibility": False})
 
     juju_lxd_model.wait(
-        lambda status: does_status_match(status, expected_app_statuses={APP_NAME: ["blocked"]})
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
     )
 
     logger.info("Scale up")
@@ -147,9 +150,11 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={APP_NAME: ["blocked"]},
-            num_units={APP_NAME: NUM_UNITS + 1},
-            idle_period={APP_NAME: 60},
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=["blocked"], unit_count=NUM_UNITS + 1, idle_period=60
+                )
+            },
         )
     )
 
@@ -229,7 +234,9 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         juju_lxd_model.run(refresh_order[0], "force-refresh-start", {"check-compatibility": False})
 
     juju_lxd_model.wait(
-        lambda status: does_status_match(status, expected_app_statuses={APP_NAME: ["blocked"]})
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
     )
 
     logger.info(f"Remove unit {refresh_order[0]}")
@@ -239,9 +246,11 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={APP_NAME: ["blocked"]},
-            num_units={APP_NAME: NUM_UNITS - 1},
-            idle_period={APP_NAME: 60},
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=["blocked"], unit_count=NUM_UNITS - 1, idle_period=60
+                )
+            },
         )
     )
 
@@ -261,7 +270,9 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         assert force_refresh_response.results.get("return-code") == 0, "action failed"
 
     juju_lxd_model.wait(
-        lambda status: does_status_match(status, expected_app_statuses={APP_NAME: ["blocked"]})
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
     )
 
     logger.info("Complete refresh with `resume-refresh` action")

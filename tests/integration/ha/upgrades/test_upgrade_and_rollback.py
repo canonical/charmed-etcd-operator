@@ -33,6 +33,7 @@ from tests.integration.helpers import (
     get_unit_endpoint_jubilant,
 )
 from tests.integration.helpers_deployment import (
+    ExpectedStatus,
     apps_active_and_agents_idle,
     does_status_match,
 )
@@ -216,7 +217,9 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     juju_lxd_model.wait(
-        lambda status: does_status_match(status, expected_app_statuses={APP_NAME: ["blocked"]})
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
     )
     assert "resume-refresh" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message, (
         "Refresh should wait for user to continue with `resume-refresh` action"
