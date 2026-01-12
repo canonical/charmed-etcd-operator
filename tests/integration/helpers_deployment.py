@@ -350,12 +350,12 @@ def apps_active_and_agents_idle(
     return (
         jubilant.all_active(status, *apps)
         and jubilant.all_agents_idle(status, *apps)
-        and check_apps_idle_period(status, *apps, idle_period=idle_period)
+        and _check_apps_idle_period(status, *apps, idle_period=idle_period)
         and verify_unit_count(status, *apps, unit_count=unit_count)
     )
 
 
-def check_apps_idle_period(status: jubilant.Status, *apps: str, idle_period: int) -> bool:
+def _check_apps_idle_period(status: jubilant.Status, *apps: str, idle_period: int) -> bool:
     return all(
         parse(unit.juju_status.since, ignoretz=True) + timedelta(seconds=idle_period)
         < datetime.now()
@@ -535,6 +535,7 @@ def does_status_match(
     expected_unit_statuses: dict[str, List[ExpectedStatus]] | None = None,
     expected_app_statuses: dict[str, List[ExpectedStatus]] | None = None,
     num_units: dict[str, int] | None = None,
+    idle_period: dict[str, int] | None = None,
 ) -> bool:
     """Check that current app and/or unit status matches expectation for given apps.
 
@@ -543,6 +544,7 @@ def does_status_match(
         expected_unit_statuses: dict mapping app name to list of ExpectedStatus for units
         expected_app_statuses: dict mapping app name to its list of ExpectedStatus
         num_units: dict mapping app name to expected number of units
+        idle_period: Seconds to wait for the agents of each application unit to be idle.
     """
     return (
         (
@@ -554,6 +556,13 @@ def does_status_match(
             or _does_app_status_match(model_status, expected_app_statuses)
         )
         and (num_units is None or verify_unit_count(model_status, unit_count=num_units))
+        and (
+            idle_period is None
+            or all(
+                _check_apps_idle_period(model_status, app, idle_period=period)
+                for app, period in idle_period.items()
+            )
+        )
     )
 
 
