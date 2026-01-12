@@ -17,7 +17,7 @@ from ..helpers import (
     put_key,
     set_password_jubilant,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def test_deploy_and_configure(
     juju_lxd_model.deploy(S3_INTEGRATOR, channel="2/edge", num_units=1)
     juju_lxd_model.wait(
         lambda status: does_status_match(
-            status, expected_app_statuses={S3_INTEGRATOR: ["blocked"]}
+            status, expected_status={S3_INTEGRATOR: ExpectedStatus(app_status=["blocked"])}
         )
     )
 
@@ -50,7 +50,11 @@ def test_deploy_and_configure(
     juju_lxd_model.config(S3_INTEGRATOR, storage_config)
     juju_lxd_model.wait(
         lambda status: does_status_match(
-            status, expected_app_statuses={APP_NAME: ["active"], S3_INTEGRATOR: ["active"]}
+            status,
+            expected_status={
+                APP_NAME: ExpectedStatus(app_status=["active"]),
+                S3_INTEGRATOR: ExpectedStatus(app_status=["active"]),
+            },
         )
     )
 
@@ -67,7 +71,11 @@ def test_s3_integration(juju_lxd_model: Juju, s3_bucket) -> None:
     juju_lxd_model.integrate(APP_NAME, S3_INTEGRATOR)
     juju_lxd_model.wait(
         lambda status: does_status_match(
-            status, expected_app_statuses={APP_NAME: ["active"], S3_INTEGRATOR: ["active"]}
+            status,
+            expected_status={
+                APP_NAME: ExpectedStatus(app_status=["active"]),
+                S3_INTEGRATOR: ExpectedStatus(app_status=["active"]),
+            },
         )
     )
 
@@ -164,8 +172,10 @@ def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: Juju):
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={APP_NAME: ["active"], S3_INTEGRATOR: ["active"]},
-            expected_unit_statuses={APP_NAME: ["active"], S3_INTEGRATOR: ["active"]},
+            expected_status={
+                APP_NAME: ExpectedStatus(app_status=["active"], unit_status=["active"]),
+                S3_INTEGRATOR: ExpectedStatus(app_status=["active"], unit_status=["active"]),
+            },
         )
     )
 

@@ -29,7 +29,7 @@ from ..helpers import (
     get_secret_by_label_jubilant,
     get_user,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -431,15 +431,19 @@ def test_requirer_sends_ca(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={
-                APP_NAME: [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value],
-                REQUIRER_NAME: [CharmStatuses.ACTIVE_IDLE.value],
-                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
-            },
-            expected_unit_statuses={
-                APP_NAME: [ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value],
-                REQUIRER_NAME: [CharmStatuses.ACTIVE_IDLE.value],
-                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=[ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value],
+                    unit_status=[ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value],
+                ),
+                REQUIRER_NAME: ExpectedStatus(
+                    app_status=[CharmStatuses.ACTIVE_IDLE.value],
+                    unit_status=[CharmStatuses.ACTIVE_IDLE.value],
+                ),
+                TLS_NAME: ExpectedStatus(
+                    app_status=[CharmStatuses.ACTIVE_IDLE.value],
+                    unit_status=[CharmStatuses.ACTIVE_IDLE.value],
+                ),
             },
         )
     )
