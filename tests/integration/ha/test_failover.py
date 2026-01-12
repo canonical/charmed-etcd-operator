@@ -20,7 +20,7 @@ from ..helpers import (
     get_unit_endpoint_jubilant,
     is_endpoint_up,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -65,9 +65,11 @@ def test_kill_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Juju)
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -150,9 +152,11 @@ def test_freeze_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Juj
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -241,9 +245,11 @@ def test_restart_db_process_on_raft_leader(etcd_process: str, juju_lxd_model: Ju
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -325,9 +331,11 @@ def test_full_cluster_restart(etcd_process: str, juju_lxd_model: Juju) -> None:
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -392,9 +400,11 @@ def test_full_cluster_crash(etcd_process: str, juju_lxd_model: Juju) -> None:
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -461,9 +471,11 @@ def test_restart_raft_leader_after_deleting_database_file(
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -551,9 +563,11 @@ def test_reboot_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -620,9 +634,11 @@ def test_reboot_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={app: ["active"]},
-            expected_unit_statuses={app: ["active"]},
-            num_units={app: units_count},
+            expected_status={
+                app: ExpectedStatus(
+                    app_status=["active"], unit_status=["active"], unit_count=units_count
+                )
+            },
         )
     )
 

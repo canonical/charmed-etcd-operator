@@ -21,7 +21,7 @@ from ..helpers import (
     get_unit_endpoint_jubilant,
     is_endpoint_up,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -73,9 +73,11 @@ def test_network_cut_on_raft_leader_without_ip_change(juju_lxd_model: Juju) -> N
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -142,9 +144,11 @@ def test_network_cut_on_raft_leader_without_ip_change(juju_lxd_model: Juju) -> N
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={app: ["active"]},
-            expected_unit_statuses={app: ["active"]},
-            num_units={app: init_units_count},
+            expected_status={
+                app: ExpectedStatus(
+                    app_status=["active"], unit_status=["active"], unit_count=init_units_count
+                )
+            },
         )
     )
 
@@ -183,9 +187,11 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 
@@ -263,9 +269,11 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={app: ["active"]},
-            expected_unit_statuses={app: ["active"]},
-            num_units={app: init_units_count},
+            expected_status={
+                app: ExpectedStatus(
+                    app_status=["active"], unit_status=["active"], unit_count=init_units_count
+                )
+            },
         )
     )
 
@@ -312,9 +320,11 @@ def test_ip_change_with_client_tls(juju_lxd_model: Juju) -> None:
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={app: ["active"]},
-                expected_unit_statuses={app: ["active"]},
-                num_units={app: 2},
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
             )
         )
 

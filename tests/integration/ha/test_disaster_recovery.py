@@ -19,7 +19,7 @@ from ..helpers import (
     get_leader_unit_name,
     get_secret_by_label_jubilant,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -136,8 +136,11 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
         juju_lxd_model.wait(
             lambda status: does_status_match(
                 status,
-                expected_app_statuses={APP_NAME: [ClusterStatuses.CLUSTER_FAILED.value]},
-                num_units={APP_NAME: 2},
+                expected_status={
+                    APP_NAME: ExpectedStatus(
+                        app_status=[ClusterStatuses.CLUSTER_FAILED.value], unit_count=2
+                    )
+                },
             )
         )
         leader_unit = None

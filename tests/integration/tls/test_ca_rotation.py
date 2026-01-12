@@ -22,6 +22,7 @@ from ..helpers import (
     put_key,
 )
 from ..helpers_deployment import (
+    ExpectedStatus,
     apps_active_and_agents_idle,
     does_status_match,
 )
@@ -254,9 +255,9 @@ def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_unit_statuses={
-                APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
-                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
+            expected_status={
+                APP_NAME: ExpectedStatus(unit_status=[TLSStatuses.TLS_PEER_CERTS_EXPIRING.value]),
+                TLS_NAME: ExpectedStatus(unit_status=[CharmStatuses.ACTIVE_IDLE.value]),
             },
         )
     )
@@ -295,9 +296,9 @@ def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_unit_statuses={
-                APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
-                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
+            expected_status={
+                APP_NAME: ExpectedStatus(unit_status=[TLSStatuses.TLS_PEER_CERTS_EXPIRING.value]),
+                TLS_NAME: ExpectedStatus(unit_status=[CharmStatuses.ACTIVE_IDLE.value]),
             },
         )
     )

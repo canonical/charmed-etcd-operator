@@ -25,7 +25,7 @@ from ..helpers import (
     get_secret_by_label_jubilant,
     put_key,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -268,8 +268,12 @@ def test_invalid_certificate_domain(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={APP_NAME: [TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value]},
-            num_units={APP_NAME: NUM_UNITS},
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=[TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value],
+                    unit_count=NUM_UNITS,
+                )
+            },
         )
     )
 

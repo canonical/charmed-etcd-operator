@@ -139,7 +139,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
 
     # clean up and remove the application to allow for further upgrade tests
     stop_continuous_writes()
-    juju_lxd_model.remove_application(APP_NAME)
+    juju_lxd_model.remove_application(APP_NAME, force=True)
 
 
 @pytest.mark.abort_on_fail
@@ -270,7 +270,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     assert_continuous_writes_consistent(
         endpoints=endpoints_updated, user=INTERNAL_USER, password=password
     )
-    juju_lxd_model.remove_application(APP_NAME)
+    juju_lxd_model.remove_application(APP_NAME, force=True)
 
 
 @pytest.mark.abort_on_fail

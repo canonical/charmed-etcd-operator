@@ -15,7 +15,7 @@ from ..helpers import (
     get_cluster_endpoints_jubilant,
     get_secret_by_label_jubilant,
 )
-from ..helpers_deployment import apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -143,8 +143,11 @@ def test_invalid_tuning_config_options(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={app_name: [ConfigStatuses.TUNING_CONFIG_INVALID.value]},
-            num_units={app_name: NUM_UNITS},
+            expected_status={
+                app_name: ExpectedStatus(
+                    app_status=[ConfigStatuses.TUNING_CONFIG_INVALID.value], unit_count=NUM_UNITS
+                )
+            },
         )
     )
 
