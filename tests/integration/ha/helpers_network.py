@@ -42,7 +42,7 @@ def ip_address_from_unit(juju: Juju, unit_name: str) -> str:
     Returns:
         The ip address of the machine.
     """
-    task_result = juju.exec("hostname -i", unit=unit_name)
+    task_result = juju.exec(command="hostname -i", unit=unit_name)
 
     return task_result.stdout
 
