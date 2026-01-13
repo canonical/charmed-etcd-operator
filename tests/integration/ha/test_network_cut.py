@@ -5,6 +5,7 @@
 import logging
 import time
 
+import jubilant
 import pytest
 from jubilant import Juju
 
@@ -275,6 +276,7 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
                 )
             },
         )
+        and jubilant.all_agents_idle(status, app)
     )
 
     # ensure the member is up again

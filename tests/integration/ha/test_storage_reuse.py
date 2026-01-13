@@ -51,9 +51,9 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     # }
 
     storage = {
-        "data": "etcd-pool,2048",
-        "archive": "etcd-pool,2048",
-        "logs": "etcd-pool,2048",
+        "data": "etcd-pool,2G",
+        "archive": "etcd-pool,2G",
+        "logs": "etcd-pool,2G",
     }
 
     # {'data': 'tmpfs,1G'}

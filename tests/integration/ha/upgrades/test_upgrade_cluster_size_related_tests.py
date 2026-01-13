@@ -95,6 +95,7 @@ def test_upgrade_single_unit_cluster(charm: str, juju_lxd_model: Juju) -> None:
     # clean up and remove the application to allow for further upgrade tests
     stop_continuous_writes()
     juju_lxd_model.remove_application(APP_NAME, force=True)
+    juju_lxd_model.wait(lambda status: juju_lxd_model.status().apps[APP_NAME] is None)
 
 
 @pytest.mark.abort_on_fail
@@ -188,6 +189,7 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         endpoints=updated_endpoints, user=INTERNAL_USER, password=password
     )
     juju_lxd_model.remove_application(APP_NAME, force=True)
+    juju_lxd_model.wait(lambda status: juju_lxd_model.status().apps[APP_NAME] is None)
 
 
 @pytest.mark.abort_on_fail
