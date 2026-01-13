@@ -12,13 +12,13 @@ from statuses import CharmStatuses, TLSStatuses
 
 from ..helpers import (
     APP_NAME,
-    download_client_certificate_from_unit_jubilant,
-    get_certificate_from_unit_jubilant,
-    get_cluster_endpoints_jubilant,
+    download_client_certificate_from_unit,
+    get_certificate_from_unit,
+    get_cluster_endpoints,
     get_cluster_members,
     get_key,
-    get_leader_unit_name_jubilant,
-    get_secret_by_label_jubilant,
+    get_leader_unit_name,
+    get_secret_by_label,
     put_key,
 )
 from ..helpers_deployment import (
@@ -59,11 +59,11 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME, idle_period=60)
     )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
 
     # make sure data can be written to the cluster
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
@@ -106,23 +106,23 @@ def test_ca_rotation_by_config_change(juju_lxd_model: Juju) -> None:
     """
     # Rotate the CA certificate
     logger.info("Getting the current CA certificates")
-    leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
-    current_peer_ca = get_certificate_from_unit_jubilant(
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
+    current_peer_ca = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER, is_ca=True
     )
     assert current_peer_ca, "Failed to get the current peer CA certificate"
 
-    current_client_ca = get_certificate_from_unit_jubilant(
+    current_client_ca = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT, is_ca=True
     )
     assert current_client_ca, "Failed to get the current client CA certificate"
 
-    current_peer_certificate = get_certificate_from_unit_jubilant(
+    current_peer_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER, is_ca=False
     )
     assert current_peer_certificate, "Failed to get the current peer certificate"
 
-    current_client_certificate = get_certificate_from_unit_jubilant(
+    current_client_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT, is_ca=False
     )
     assert current_client_certificate, "Failed to get the current client certificate"
@@ -134,22 +134,22 @@ def test_ca_rotation_by_config_change(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     logger.info("Checking if the CA certificates are rotated")
-    new_peer_ca = get_certificate_from_unit_jubilant(
+    new_peer_ca = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER, is_ca=True
     )
     assert new_peer_ca, "Failed to get the new peer CA certificate"
 
-    new_client_ca = get_certificate_from_unit_jubilant(
+    new_client_ca = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT, is_ca=True
     )
     assert new_client_ca, "Failed to get the new client CA certificate"
 
-    new_peer_certificate = get_certificate_from_unit_jubilant(
+    new_peer_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER, is_ca=False
     )
     assert new_peer_certificate, "Failed to get the new peer certificate"
 
-    new_client_certificate = get_certificate_from_unit_jubilant(
+    new_client_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT, is_ca=False
     )
     assert new_client_certificate, "Failed to get the new client certificate"
@@ -166,12 +166,12 @@ def test_ca_rotation_by_config_change(juju_lxd_model: Juju) -> None:
 
     logger.info("Both certificates are rotated")
 
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
     # Check if the cluster is still accessible
     logger.info("Checking if the cluster is still accessible")
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
 
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
 
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -263,23 +263,23 @@ def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
     )
 
     logger.info("Getting the current CA certificates")
-    leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
-    current_peer_ca = get_certificate_from_unit_jubilant(
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
+    current_peer_ca = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER, is_ca=True
     )
     assert current_peer_ca, "Failed to get the current peer CA certificate"
 
-    current_client_ca = get_certificate_from_unit_jubilant(
+    current_client_ca = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT, is_ca=True
     )
     assert current_client_ca, "Failed to get the current client CA certificate"
 
-    current_peer_certificate = get_certificate_from_unit_jubilant(
+    current_peer_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER, is_ca=False
     )
     assert current_peer_certificate, "Failed to get the current peer certificate"
 
-    current_client_certificate = get_certificate_from_unit_jubilant(
+    current_client_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT, is_ca=False
     )
     assert current_client_certificate, "Failed to get the current client certificate"
@@ -304,22 +304,22 @@ def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
     )
 
     logger.info("Checking if the CA certificates are rotated")
-    new_peer_ca = get_certificate_from_unit_jubilant(
+    new_peer_ca = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER, is_ca=True
     )
     assert new_peer_ca, "Failed to get the new peer CA certificate"
 
-    new_client_ca = get_certificate_from_unit_jubilant(
+    new_client_ca = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT, is_ca=True
     )
     assert new_client_ca, "Failed to get the new client CA certificate"
 
-    new_peer_certificate = get_certificate_from_unit_jubilant(
+    new_peer_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER, is_ca=False
     )
     assert new_peer_certificate, "Failed to get the new peer certificate"
 
-    new_client_certificate = get_certificate_from_unit_jubilant(
+    new_client_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT, is_ca=False
     )
     assert new_client_certificate, "Failed to get the new client certificate"
@@ -336,15 +336,15 @@ def test_ca_rotation_by_expiration(juju_lxd_model: Juju) -> None:
 
     logger.info("Both certificates are rotated")
 
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
     # Check if the cluster is still accessible
     logger.info("Checking if the cluster is still accessible")
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
 
     cluster_members = get_cluster_members(endpoints, tls_enabled=True)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
 
     password = secret.get(f"{INTERNAL_USER}-password")

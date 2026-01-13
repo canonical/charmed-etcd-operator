@@ -10,7 +10,6 @@ import time
 from typing import Tuple
 
 from jubilant import Juju
-from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from literals import DATABASE_DIR
@@ -21,24 +20,7 @@ WRITES_LAST_WRITTEN_VAL_PATH = "last_written_value"
 ETCD_SERVICE_PATH = "/etc/systemd/system/snap.charmed-etcd.etcd.service"
 
 
-async def existing_app(ops_test: OpsTest) -> str | None:
-    """Return the name of an existing etcd cluster.
-
-    Returns:
-        str | None: name of an application deployment for `charmed-etcd`
-    """
-    apps = json.loads(
-        subprocess.check_output(
-            f"juju status --model {ops_test.model.info.name} --format=json".split()
-        )
-    )["applications"]
-
-    etcd_apps = {name: desc for name, desc in apps.items() if desc["charm-name"] == "charmed-etcd"}
-
-    return list(etcd_apps.keys())[0] if etcd_apps else None
-
-
-def existing_app_jubilant(juju: Juju) -> str | None:
+def existing_app(juju: Juju) -> str | None:
     """Return the name of an existing etcd cluster.
 
     Returns:
@@ -151,21 +133,7 @@ def send_process_control_signal(
     logger.info(f"Signal {signal} sent to etcd process on unit {unit_name}.")
 
 
-async def patch_restart_delay(ops_test: OpsTest, unit_name: str, delay: int) -> None:
-    """Update the restart delay in the snap's systemd service file."""
-    add_delay_cmd = (
-        f"exec --unit {unit_name} -- "
-        f"sudo sed -i -e '/^[Service]/a RestartSec={delay}' "
-        f"{ETCD_SERVICE_PATH}"
-    )
-    await ops_test.juju(*add_delay_cmd.split(), check=True)
-
-    # reload the daemon for systemd to reflect changes
-    reload_cmd = f"exec --unit {unit_name} -- sudo systemctl daemon-reload"
-    await ops_test.juju(*reload_cmd.split(), check=True)
-
-
-def patch_restart_delay_jubilant(juju: Juju, unit_name: str, delay: int) -> None:
+def patch_restart_delay(juju: Juju, unit_name: str, delay: int) -> None:
     """Update the restart delay in the snap's systemd service file."""
     juju.exec(
         command=f"sudo sed -i -e '/^[Service]/a RestartSec={delay}' {ETCD_SERVICE_PATH}",
@@ -176,18 +144,7 @@ def patch_restart_delay_jubilant(juju: Juju, unit_name: str, delay: int) -> None
     juju.exec(command="sudo systemctl daemon-reload", unit=unit_name)
 
 
-async def remove_database_file(ops_test: OpsTest, unit_name: str) -> None:
-    """Delete the database file of etcd on a unit."""
-    delete_db_cmd = f"exec --unit {unit_name} -- rm {DATABASE_DIR}/snap/db"
-    # we can delete the database file containing the data content
-    # but never the write-ahead-log file, which contains the committed Raft information
-    # otherwise the member would not be functional anymore
-    # see: https://etcd.io/docs/v3.5/learning/persistent-storage-files/#logical-content
-    await ops_test.juju(*delete_db_cmd.split(), check=True)
-    logger.info(f"etcd database file deleted on {unit_name}.")
-
-
-def remove_database_file_jubilant(juju: Juju, unit_name: str) -> None:
+def remove_database_file(juju: Juju, unit_name: str) -> None:
     """Delete the database file of etcd on a unit."""
     # we can delete the database file containing the data content
     # but never the write-ahead-log file, which contains the committed Raft information
@@ -197,29 +154,13 @@ def remove_database_file_jubilant(juju: Juju, unit_name: str) -> None:
     logger.info(f"etcd database file deleted on {unit_name}.")
 
 
-async def reboot_unit(ops_test: OpsTest, unit_name: str) -> None:
-    """Reboot the VM of a unit."""
-    reboot_cmd = f"exec --unit {unit_name} -- sudo reboot"
-    await ops_test.juju(*reboot_cmd.split(), check=True)
-    logger.info(f"Rebooted unit {unit_name}.")
-
-
-def reboot_unit_jubilant(juju: Juju, unit_name: str) -> None:
+def reboot_unit(juju: Juju, unit_name: str) -> None:
     """Reboot the VM of a unit."""
     juju.exec(command="sudo reboot", unit=unit_name)
     logger.info(f"Rebooted unit {unit_name}.")
 
 
-async def disable_etcd_service(ops_test: OpsTest, unit_name: str) -> None:
-    """Stop and disable the etcd service on a unit."""
-    stop_cmd = f"exec --unit {unit_name} -- sudo systemctl stop snap.charmed-etcd.etcd"
-    disable_cmd = f"exec --unit {unit_name} -- sudo systemctl disable snap.charmed-etcd.etcd"
-    await ops_test.juju(*stop_cmd.split(), check=True)
-    await ops_test.juju(*disable_cmd.split(), check=True)
-    logger.info(f"Stopped and disabled etcd service on unit {unit_name}.")
-
-
-def disable_etcd_service_jubilant(juju: Juju, unit_name: str) -> None:
+def disable_etcd_service(juju: Juju, unit_name: str) -> None:
     """Stop and disable the etcd service on a unit."""
     juju.exec(unit=unit_name, command="sudo systemctl stop snap.charmed-etcd.etcd")
     juju.exec(unit=unit_name, command="sudo systemctl disable snap.charmed-etcd.etcd")
@@ -227,16 +168,7 @@ def disable_etcd_service_jubilant(juju: Juju, unit_name: str) -> None:
     logger.info(f"Stopped and disabled etcd service on unit {unit_name}.")
 
 
-async def enable_etcd_service(ops_test: OpsTest, unit_name: str) -> None:
-    """Enable and start the etcd service on a unit."""
-    enable_cmd = f"exec --unit {unit_name} -- sudo systemctl enable snap.charmed-etcd.etcd"
-    start_cmd = f"exec --unit {unit_name} -- sudo systemctl start snap.charmed-etcd.etcd"
-    await ops_test.juju(*enable_cmd.split(), check=True)
-    await ops_test.juju(*start_cmd.split(), check=True)
-    logger.info(f"Enabled and started etcd service on unit {unit_name}.")
-
-
-def enable_etcd_service_jubilant(juju: Juju, unit_name: str) -> None:
+def enable_etcd_service(juju: Juju, unit_name: str) -> None:
     """Enable and start the etcd service on a unit."""
     juju.exec(unit=unit_name, command="sudo systemctl enable snap.charmed-etcd.etcd")
     juju.exec(unit=unit_name, command="sudo systemctl start snap.charmed-etcd.etcd")

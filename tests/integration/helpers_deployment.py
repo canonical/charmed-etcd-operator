@@ -36,48 +36,6 @@ class ExpectedStatus:
         self.idle_period = idle_period
 
 
-def does_message_match(expected_status_message: str, status: StatusObject) -> bool:
-    """Check if the status message matches the expected message."""
-    try:
-        juju_status = StatusBase.from_name(status.status, status.message)
-        return (
-            expected_status_message == juju_status.message
-            or expected_status_message.startswith(juju_status.message)
-            or juju_status.message.startswith(f"{expected_status_message:.40}")
-            or (
-                status.short_message is not None
-                and status.short_message in expected_status_message
-            )
-        )
-    except KeyError as e:
-        logger.error(f"Error attempting to convert StatusObject to ops.StatusBase: {e}")
-        return False
-
-
-def does_message_match_jubilant(
-    model_status: StatusInfo, expected_status: StatusObject | str
-) -> bool:
-    """Check if the status message matches the expected message."""
-    if isinstance(expected_status, StatusObject):
-        try:
-            juju_status = StatusBase.from_name(expected_status.status, expected_status.message)
-            current_status = model_status.message
-            return (
-                current_status == juju_status.message
-                or current_status.startswith(juju_status.message)
-                or juju_status.message.startswith(f"{current_status:.40}")
-                or (
-                    expected_status.short_message is not None
-                    and expected_status.short_message in current_status
-                )
-            )
-        except KeyError as e:
-            logger.error(f"Error attempting to convert StatusObject to ops.StatusBase: {e}")
-            return False
-    else:
-        return model_status.current == expected_status
-
-
 def apps_active_and_agents_idle(
     status: jubilant.Status,
     *apps: str,
@@ -99,7 +57,7 @@ def apps_active_and_agents_idle(
         jubilant.all_active(status, *apps)
         and jubilant.all_agents_idle(status, *apps)
         and _check_apps_idle_period(status, *apps, idle_period=idle_period)
-        and verify_unit_count(status, *apps, unit_count=unit_count)
+        and _verify_unit_count(status, *apps, unit_count=unit_count)
     )
 
 
@@ -123,7 +81,7 @@ def agents_idle(
     return (
         jubilant.all_agents_idle(status, *apps)
         and _check_apps_idle_period(status, *apps, idle_period=idle_period)
-        and verify_unit_count(status, *apps, unit_count=unit_count)
+        and _verify_unit_count(status, *apps, unit_count=unit_count)
     )
 
 
@@ -136,7 +94,7 @@ def _check_apps_idle_period(status: jubilant.Status, *apps: str, idle_period: in
     )
 
 
-def verify_unit_count(
+def _verify_unit_count(
     status: jubilant.Status, *apps: str, unit_count: int | dict[str, int] = None
 ):
     """Verify the unit count for an application.
@@ -186,7 +144,7 @@ def does_status_match(
         )
         and (
             expected_status.unit_count is None
-            or verify_unit_count(model_status, app, unit_count=expected_status.unit_count)
+            or _verify_unit_count(model_status, app, unit_count=expected_status.unit_count)
         )
         and (
             expected_status.idle_period is None
@@ -207,10 +165,7 @@ def _does_unit_workload_status_match(
         expected_status: list of acceptable statuses
     """
     return all(
-        any(
-            does_message_match_jubilant(unit_status.workload_status, status)
-            for status in expected_status
-        )
+        any(_does_message_match(unit_status.workload_status, status) for status in expected_status)
         for unit_status in model_status.get_units(app).values()
     )
 
@@ -226,6 +181,28 @@ def _does_app_status_match(
         expected_status: list of acceptable statuses
     """
     return any(
-        does_message_match_jubilant(model_status.apps.get(app).app_status, status)
+        _does_message_match(model_status.apps.get(app).app_status, status)
         for status in expected_status
     )
+
+
+def _does_message_match(model_status: StatusInfo, expected_status: StatusObject | str) -> bool:
+    """Check if the status message matches the expected message."""
+    if isinstance(expected_status, StatusObject):
+        try:
+            juju_status = StatusBase.from_name(expected_status.status, expected_status.message)
+            current_status = model_status.message
+            return (
+                current_status == juju_status.message
+                or current_status.startswith(juju_status.message)
+                or juju_status.message.startswith(f"{current_status:.40}")
+                or (
+                    expected_status.short_message is not None
+                    and expected_status.short_message in current_status
+                )
+            )
+        except KeyError as e:
+            logger.error(f"Error attempting to convert StatusObject to ops.StatusBase: {e}")
+            return False
+    else:
+        return model_status.current == expected_status

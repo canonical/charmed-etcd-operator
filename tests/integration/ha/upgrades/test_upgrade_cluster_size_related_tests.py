@@ -23,11 +23,11 @@ from tests.integration.ha.upgrades.literals import (
 )
 from tests.integration.helpers import (
     APP_NAME,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_cluster_members,
     get_etcd_version,
-    get_secret_by_label_jubilant,
-    get_unit_endpoint_jubilant,
+    get_secret_by_label,
+    get_unit_endpoint,
 )
 from tests.integration.helpers_deployment import (
     ExpectedStatus,
@@ -51,8 +51,8 @@ def test_upgrade_single_unit_cluster(charm: str, juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -82,7 +82,7 @@ def test_upgrade_single_unit_cluster(charm: str, juju_lxd_model: Juju) -> None:
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info("Check etcd version")
-    unit_endpoint = get_unit_endpoint_jubilant(
+    unit_endpoint = get_unit_endpoint(
         juju_lxd_model,
         unit_name=list(juju_lxd_model.status().get_units(APP_NAME))[0],
         app_name=APP_NAME,
@@ -110,8 +110,8 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -163,7 +163,7 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS + 1)
     )
 
-    updated_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    updated_endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     assert_continuous_writes_increasing(
         endpoints=updated_endpoints, user=INTERNAL_USER, password=password
     )
@@ -171,9 +171,7 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint_jubilant(
-            juju_lxd_model, unit_name=unit_name, app_name=APP_NAME
-        )
+        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]
@@ -204,8 +202,8 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -254,7 +252,7 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         )
     )
 
-    updated_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    updated_endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     assert_continuous_writes_increasing(
         endpoints=updated_endpoints, user=INTERNAL_USER, password=password
     )
@@ -289,9 +287,7 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
     member_names = [member["name"] for member in cluster_members]
 
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint_jubilant(
-            juju_lxd_model, unit_name=unit_name, app_name=APP_NAME
-        )
+        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]

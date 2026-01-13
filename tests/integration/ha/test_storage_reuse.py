@@ -12,15 +12,15 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_cluster_id,
     get_cluster_members,
-    get_secret_by_label_jubilant,
-    get_storage_id_jubilant,
-    get_unit_endpoint_jubilant,
+    get_secret_by_label,
+    get_storage_id,
+    get_unit_endpoint,
     is_endpoint_up,
     put_key,
-    set_password_jubilant,
+    set_password,
 )
 from ..helpers_deployment import apps_active_and_agents_idle
 from .helpers import (
@@ -71,11 +71,11 @@ def test_attach_storage_after_scale_down(juju_lxd_model: Juju) -> None:
     app = APP_NAME
     init_units_count = len(juju_lxd_model.status().get_units(app))
     unit = list(juju_lxd_model.status().get_units(app))[-1]
-    data_storage_id = get_storage_id_jubilant(juju_lxd_model, unit, "data")
-    archive_storage_id = get_storage_id_jubilant(juju_lxd_model, unit, "archive")
-    log_storage_id = get_storage_id_jubilant(juju_lxd_model, unit, "log")
-    init_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    data_storage_id = get_storage_id(juju_lxd_model, unit, "data")
+    archive_storage_id = get_storage_id(juju_lxd_model, unit, "archive")
+    log_storage_id = get_storage_id(juju_lxd_model, unit, "log")
+    init_endpoints = get_cluster_endpoints(juju_lxd_model, app)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -112,12 +112,12 @@ def test_attach_storage_after_scale_down(juju_lxd_model: Juju) -> None:
     )
 
     # ensure the newly added endpoint is healthy
-    unit_endpoint = get_unit_endpoint_jubilant(juju_lxd_model, unit_name=new_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=new_unit, app_name=app)
     assert is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{new_unit} is available again.")
 
     # check cluster formation after unit with existing storage was added
-    updated_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    updated_endpoints = get_cluster_endpoints(juju_lxd_model, app)
     cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert new_unit.replace("/", "") in (member["name"] for member in cluster_members), (
         f"{new_unit} is not in {cluster_members}"
@@ -142,16 +142,16 @@ def test_attach_storage_after_scale_to_zero(juju_lxd_model: Juju) -> None:
     """Make sure storage can be re-attached after removing all units."""
     # this test should only be executed with the app we deployed
     app = APP_NAME
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
-    initial_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    initial_endpoints = get_cluster_endpoints(juju_lxd_model, app)
     initial_cluster_id = get_cluster_id(initial_endpoints, user=INTERNAL_USER, password=password)
     initial_writes_value = count_writes(initial_endpoints, INTERNAL_USER, password)
 
     # remove all units while keeping their storage-ids for later reuse
     storage_ids = []
     for unit in juju_lxd_model.status().get_units(app):
-        storage_ids.append(get_storage_id_jubilant(juju_lxd_model, unit, "data"))
+        storage_ids.append(get_storage_id(juju_lxd_model, unit, "data"))
         juju_lxd_model.remove_unit(unit)
 
     juju_lxd_model.wait(
@@ -169,7 +169,7 @@ def test_attach_storage_after_scale_to_zero(juju_lxd_model: Juju) -> None:
     )
 
     # check cluster formation after new cluster was forced
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    endpoints = get_cluster_endpoints(juju_lxd_model, app)
     new_cluster_id = get_cluster_id(endpoints, user=INTERNAL_USER, password=password)
     assert initial_cluster_id == new_cluster_id, "Cluster ID does not match"
 
@@ -203,9 +203,9 @@ def test_attach_storage_after_removing_application(charm: str, juju_lxd_model: J
     """Make sure storage can be re-attached to a completely new etcd application."""
     # this test should only be executed with the app we deployed
     app = APP_NAME
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
-    initial_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    initial_endpoints = get_cluster_endpoints(juju_lxd_model, app)
     initial_cluster_id = get_cluster_id(initial_endpoints, user=INTERNAL_USER, password=password)
     initial_writes_value = count_writes(initial_endpoints, INTERNAL_USER, password)
 
@@ -219,7 +219,7 @@ def test_attach_storage_after_removing_application(charm: str, juju_lxd_model: J
 
     # remove the remaining unit after saving the storage id
     unit = list(juju_lxd_model.status().get_units(app))[0]
-    storage_id = get_storage_id_jubilant(juju_lxd_model, unit, "data")
+    storage_id = get_storage_id(juju_lxd_model, unit, "data")
 
     # remove the entire application
     juju_lxd_model.remove_application(app)
@@ -229,7 +229,7 @@ def test_attach_storage_after_removing_application(charm: str, juju_lxd_model: J
 
     # we are going to deploy a new cluster, but with an existing database
     # that means we need to configure the correct admin password
-    set_password_jubilant(juju_lxd_model, password)
+    set_password(juju_lxd_model, password)
 
     juju_lxd_model.wait(
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=1, idle_period=60)
@@ -237,9 +237,7 @@ def test_attach_storage_after_removing_application(charm: str, juju_lxd_model: J
 
     # make sure the new application/etcd cluster is available
     new_unit = list(juju_lxd_model.status().get_units(app))[-1]
-    unit_endpoint = get_unit_endpoint_jubilant(
-        juju_lxd_model, unit_name=new_unit, app_name=APP_NAME
-    )
+    unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=new_unit, app_name=APP_NAME)
     assert (
         put_key(
             unit_endpoint,
@@ -268,7 +266,7 @@ def test_attach_storage_after_removing_application(charm: str, juju_lxd_model: J
     )
 
     # check cluster formation
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     new_cluster_id = get_cluster_id(endpoints, user=INTERNAL_USER, password=password)
     assert initial_cluster_id == new_cluster_id, "Cluster ID does not match"
 

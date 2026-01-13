@@ -14,10 +14,10 @@ from statuses import ClusterStatuses
 from ..helpers import (
     APP_NAME,
     fast_forward,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_cluster_members,
     get_leader_unit_name,
-    get_secret_by_label_jubilant,
+    get_secret_by_label,
 )
 from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 from .helpers import (
@@ -37,8 +37,8 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build and deploy the charm."""
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -61,8 +61,8 @@ def test_membership_reconfiguration_after_unit_loss(juju_lxd_model: Juju) -> Non
             lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
         )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
@@ -106,7 +106,7 @@ def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
     )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
@@ -160,7 +160,7 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
 
     # wait for the rebuild to be performed
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2))
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):

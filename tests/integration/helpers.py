@@ -141,10 +141,7 @@ def get_cluster_id(
     raise KeyError("cluster_id not found")
 
 
-# TODO jubilant: remove suffix when all tests migrated
-def get_cluster_endpoints_jubilant(
-    juju: Juju, app_name: str = APP_NAME, tls_enabled: bool = False
-) -> str:
+def get_cluster_endpoints(juju: Juju, app_name: str = APP_NAME, tls_enabled: bool = False) -> str:
     """Resolve the etcd endpoints for a given juju application."""
     return ",".join(
         [
@@ -154,7 +151,7 @@ def get_cluster_endpoints_jubilant(
     )
 
 
-def get_unit_endpoint_jubilant(
+def get_unit_endpoint(
     juju: Juju,
     unit_name: str,
     app_name: str = APP_NAME,
@@ -293,16 +290,7 @@ def get_unit_relation_data(
     )
 
 
-def get_leader_unit_name_jubilant(juju: Juju, app_name: str = APP_NAME) -> str:
-    """Retrieve the leader unit name."""
-    for unit_name, unit_status in juju.status().get_units(app_name).items():
-        if unit_status.leader:
-            return unit_name
-
-    raise Exception("No leader unit found")
-
-
-def get_secret_by_label_jubilant(juju: Juju, label: str) -> Dict[str, str]:
+def get_secret_by_label(juju: Juju, label: str) -> Dict[str, str]:
     for secret in juju.secrets():
         if label == secret.label:
             revealed_secret = juju.show_secret(secret.uri, reveal=True)
@@ -312,18 +300,6 @@ def get_secret_by_label_jubilant(juju: Juju, label: str) -> Dict[str, str]:
 
 
 def get_certificate_from_unit(
-    model: str, unit: str, cert_type: TLSType, is_ca: bool = False
-) -> str | None:
-    """Retrieve a certificate from a unit."""
-    command = f'juju ssh --model={model} {unit} "cat {TLS_ROOT_DIR}/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
-    output = subprocess.getoutput(command)
-    if output.startswith("-----BEGIN CERTIFICATE-----"):
-        return output
-
-    return None
-
-
-def get_certificate_from_unit_jubilant(
     juju: Juju, unit: str, cert_type: TLSType, is_ca: bool = False
 ) -> str | None:
     """Retrieve a certificate from a unit."""
@@ -335,7 +311,7 @@ def get_certificate_from_unit_jubilant(
     return None
 
 
-def set_password_jubilant(
+def set_password(
     juju: Juju,
     password: str,
     username: str = INTERNAL_USER,
@@ -366,7 +342,7 @@ def set_password_jubilant(
     juju.config(app=application, values={INTERNAL_USER_PASSWORD_CONFIG: secret_id})
 
 
-def download_client_certificate_from_unit_jubilant(juju: Juju, app_name: str = APP_NAME) -> None:
+def download_client_certificate_from_unit(juju: Juju, app_name: str = APP_NAME) -> None:
     """Copy the client certificate files from a unit to the host's filesystem."""
     unit = next(iter(juju.status().get_units(app_name)))
 
@@ -376,7 +352,7 @@ def download_client_certificate_from_unit_jubilant(juju: Juju, app_name: str = A
         juju.scp(f"{unit}:{tls_path}/{file}", file)
 
 
-def get_storage_id_jubilant(juju: Juju, unit_name: str, storage_name: str) -> str | None:
+def get_storage_id(juju: Juju, unit_name: str, storage_name: str) -> str | None:
     """Retrieve the storage id associated with a unit."""
     storage_data = juju.cli("storage")
     # storage_data = storage_data.decode("utf-8")

@@ -21,15 +21,15 @@ from .helpers import (
     LOKI_APP_NAME,
     PROMETHEUS_APP_NAME,
     fast_forward,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_cluster_members,
     get_key,
     get_leader_unit_ip,
-    get_leader_unit_name_jubilant,
-    get_secret_by_label_jubilant,
+    get_leader_unit_name,
+    get_secret_by_label,
     get_unit_relation_data,
     put_key,
-    set_password_jubilant,
+    set_password,
 )
 from .helpers_deployment import ExpectedStatus, does_status_match
 
@@ -51,8 +51,8 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(lambda status: jubilant.all_active(status, APP_NAME))
 
     # check if all units have been added to the cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
@@ -75,7 +75,7 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_authentication(juju_lxd_model: Juju) -> None:
     """Assert authentication is enabled by default."""
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
 
     # check that reading/writing data without credentials fails
     assert get_key(endpoints, key=TEST_KEY) != TEST_VALUE
@@ -85,11 +85,11 @@ def test_authentication(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_update_admin_password(juju_lxd_model: Juju) -> None:
     """Assert the admin password is updated when adding a user secret to the config."""
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
 
     # create a user secret and grant it to the application
     new_password = "some-password"
-    set_password_jubilant(juju_lxd_model, new_password)
+    set_password(juju_lxd_model, new_password)
 
     # wait for config-changed hook to finish executing
     juju_lxd_model.wait(lambda status: jubilant.all_agents_idle(status, APP_NAME), timeout=1200)
@@ -114,7 +114,7 @@ def test_update_admin_password(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 async def test_user_secret_permissions(juju_lxd_model: Juju) -> None:
     """If a user secret is not granted, ensure we can process updated permissions."""
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
 
     logger.info("Creating new user secret")
     secret_name = "my_secret"
@@ -174,8 +174,8 @@ def test_etcd_integration_with_grafana_agent(juju_lxd_model: Juju):
     )
 
     # get relation data sent to grafana-agent
-    cos_leader_name = get_leader_unit_name_jubilant(juju_lxd_model, GRAFANA_AGENT_APP_NAME)
-    leader_name = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
+    cos_leader_name = get_leader_unit_name(juju_lxd_model, GRAFANA_AGENT_APP_NAME)
+    leader_name = get_leader_unit_name(juju_lxd_model, APP_NAME)
     relation_data = get_unit_relation_data(
         juju_lxd_model, cos_leader_name, leader_name, COS_RELATION_NAME, "config"
     )

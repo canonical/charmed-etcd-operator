@@ -15,14 +15,13 @@ from statuses import CharmStatuses, TLSStatuses
 from ..helpers import (
     APP_NAME,
     TLS_NAME,
-    download_client_certificate_from_unit_jubilant,
+    download_client_certificate_from_unit,
     get_certificate_from_unit,
-    get_certificate_from_unit_jubilant,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_cluster_members,
     get_key,
-    get_leader_unit_name_jubilant,
-    get_secret_by_label_jubilant,
+    get_leader_unit_name,
+    get_secret_by_label,
     put_key,
 )
 from ..helpers_deployment import (
@@ -66,11 +65,11 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
 def test_tls_enabled(juju_lxd_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
 
     # make sure data can be written to the cluster
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
@@ -119,11 +118,11 @@ def test_disable_tls(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
 
@@ -172,10 +171,10 @@ def test_enable_tls(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
 
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
@@ -243,7 +242,7 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
         )
     )
 
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
     client_cert_sans = subprocess.getoutput(
         "openssl x509 -noout -ext subjectAltName -in client.pem "
     )
@@ -261,7 +260,7 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
     )
 
     # this will download the client cert from application.units[0]
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
     client_cert_sans = subprocess.getoutput(
         "openssl x509 -noout -ext subjectAltName -in client.pem "
     )
@@ -278,7 +277,7 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
     client_cert_sans = subprocess.getoutput(
         "openssl x509 -noout -ext subjectAltName -in client.pem "
     )
@@ -290,13 +289,11 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     """Disable then enable peer TLS on a running cluster and check if it is still accessible."""
-    model = juju_lxd_model.model
-
-    leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 
     # get current certificate
     logger.info("Reading the current certificate from leader unit")
-    current_certificate = get_certificate_from_unit_jubilant(
+    current_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER
     )
     assert current_certificate, "Failed to get current certificate"
@@ -307,11 +304,11 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
 
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
@@ -376,7 +373,9 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     logger.info("All cluster members have HTTPS peerURLs and clientURLs")
 
     logger.info("Getting new certificate from leader unit")
-    new_certificate = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER)
+    new_certificate = get_certificate_from_unit(
+        juju_lxd_model, leader_unit, cert_type=TLSType.PEER
+    )
     assert new_certificate, "Failed to get new certificate"
     assert new_certificate != current_certificate, "Certificates are the same after rotation"
     logger.info("Certificates are different after rotation")
@@ -417,13 +416,11 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
     """Disable then enable client TLS on a running cluster and check if it is still accessible."""
-    model = juju_lxd_model.model
-
-    leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 
     # get current certificate
     logger.info("Reading the current certificate from leader unit")
-    current_certificate = get_certificate_from_unit_jubilant(
+    current_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT
     )
     assert current_certificate, "Failed to get current certificate"
@@ -434,11 +431,11 @@ def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
@@ -484,9 +481,9 @@ def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
 
     cluster_members = get_cluster_members(
         endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
@@ -500,7 +497,9 @@ def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
     logger.info("All cluster members have HTTPS peerURLs and clientURLs")
 
     logger.info("Getting new certificate from leader unit")
-    new_certificate = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.CLIENT)
+    new_certificate = get_certificate_from_unit(
+        juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT
+    )
     assert new_certificate, "Failed to get new certificate"
     assert new_certificate != current_certificate, "Certificates are the same after rotation"
     logger.info("Certificates are different after rotation")
@@ -541,8 +540,6 @@ def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_certificate_expiration(juju_lxd_model: Juju) -> None:
     """Test the TLS certificate expiration on a running cluster."""
-    model = juju_lxd_model.model
-
     # disable TLS and check if the cluster is still accessible
     logger.info("Removing peer-certificates relation and client-certificates relation")
     juju_lxd_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
@@ -550,11 +547,11 @@ def test_certificate_expiration(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == NUM_UNITS, f"Cluster members are not equal to {NUM_UNITS}"
@@ -614,9 +611,9 @@ def test_certificate_expiration(juju_lxd_model: Juju) -> None:
         )
     )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, APP_NAME)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
 
     cluster_members = get_cluster_members(
         endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
@@ -631,11 +628,11 @@ def test_certificate_expiration(juju_lxd_model: Juju) -> None:
 
     logger.info("Getting current certificate from leader unit")
     current_peer_certificate = get_certificate_from_unit(
-        model, leader_unit, cert_type=TLSType.PEER
+        juju_lxd_model, leader_unit, cert_type=TLSType.PEER
     )
     assert current_peer_certificate, "Failed to get current peer certificate"
     current_client_certificate = get_certificate_from_unit(
-        model, leader_unit, cert_type=TLSType.CLIENT
+        juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT
     )
     assert current_client_certificate, "Failed to get current client certificate"
 
@@ -677,14 +674,16 @@ def test_certificate_expiration(juju_lxd_model: Juju) -> None:
 
     logger.info("Get new certificates from leader unit")
 
-    new_peer_certificate = get_certificate_from_unit(model, leader_unit, cert_type=TLSType.PEER)
+    new_peer_certificate = get_certificate_from_unit(
+        juju_lxd_model, leader_unit, cert_type=TLSType.PEER
+    )
     assert new_peer_certificate, "Failed to get new peer certificate"
     assert new_peer_certificate != current_peer_certificate, (
         "Certificates are the same after rotation"
     )
 
     new_client_certificate = get_certificate_from_unit(
-        model, leader_unit, cert_type=TLSType.CLIENT
+        juju_lxd_model, leader_unit, cert_type=TLSType.CLIENT
     )
     assert new_client_certificate, "Failed to get new client certificate"
     assert new_client_certificate != current_client_certificate, (
@@ -694,7 +693,7 @@ def test_certificate_expiration(juju_lxd_model: Juju) -> None:
     logger.info("Certificates are different after rotation")
 
     logger.info("Reading and writing keys with HTTPS peerURLs and clientURLs")
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
     assert (
         get_key(
             endpoints,

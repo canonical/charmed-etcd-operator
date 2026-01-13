@@ -19,9 +19,9 @@ from tests.integration.ha.helpers import (
 )
 from tests.integration.ha.helpers_network import (
     cut_network_from_unit_with_ip_change,
-    get_controller_hostname_jubilant,
-    hostname_from_unit_jubilant,
-    ip_address_from_unit_jubilant,
+    get_controller_hostname,
+    hostname_from_unit,
+    ip_address_from_unit,
     is_unit_reachable,
     restore_network_for_unit_with_ip_change,
 )
@@ -35,14 +35,14 @@ from tests.integration.ha.upgrades.literals import (
 from tests.integration.helpers import (
     APP_NAME,
     TLS_NAME,
-    get_certificate_from_unit_jubilant,
-    get_cluster_endpoints_jubilant,
+    get_certificate_from_unit,
+    get_cluster_endpoints,
     get_cluster_members,
     get_etcd_version,
     get_leader_unit_name,
     get_remaining_endpoints,
-    get_secret_by_label_jubilant,
-    get_unit_endpoint_jubilant,
+    get_secret_by_label,
+    get_unit_endpoint,
 )
 from tests.integration.helpers_deployment import (
     ExpectedStatus,
@@ -66,8 +66,8 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2))
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -131,9 +131,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     logger.info("Check etcd versions and cluster membership")
 
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint_jubilant(
-            juju_lxd_model, unit_name=unit_name, app_name=APP_NAME
-        )
+        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]
@@ -160,8 +158,8 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     )
 
     # etcd_application = ops_test.model.applications[APP_NAME]
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -202,13 +200,13 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     )
 
     logger.info(f"Force new ip address for {refresh_order[-1]}")
-    ip_renewal_hostname = hostname_from_unit_jubilant(juju_lxd_model, unit_name=refresh_order[-1])
-    old_unit_ip = ip_address_from_unit_jubilant(juju_lxd_model, unit_name=refresh_order[-1])
-    old_unit_endpoint = get_unit_endpoint_jubilant(juju_lxd_model, unit_name=refresh_order[-1])
+    ip_renewal_hostname = hostname_from_unit(juju_lxd_model, unit_name=refresh_order[-1])
+    old_unit_ip = ip_address_from_unit(juju_lxd_model, unit_name=refresh_order[-1])
+    old_unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=refresh_order[-1])
     cut_network_from_unit_with_ip_change(ip_renewal_hostname)
 
     # make sure the unit is not reachable from the controller
-    controller_hostname = get_controller_hostname_jubilant(juju_lxd_model)
+    controller_hostname = get_controller_hostname(juju_lxd_model)
     assert not is_unit_reachable(controller_hostname, ip_renewal_hostname), (
         f"unit {refresh_order[-1]} is still reachable from controller"
     )
@@ -236,7 +234,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     )
 
     # ensure the unit is up again
-    new_unit_ip = ip_address_from_unit_jubilant(juju_lxd_model, unit_name=refresh_order[-1])
+    new_unit_ip = ip_address_from_unit(juju_lxd_model, unit_name=refresh_order[-1])
     logger.info(f"{refresh_order[-1]} is available again with new ip {new_unit_ip}")
 
     logger.info("Continue refresh with `resume-refresh` action")
@@ -256,9 +254,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(endpoints_updated, user=INTERNAL_USER, password=password)
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint_jubilant(
-            juju_lxd_model, unit_name=unit_name, app_name=APP_NAME
-        )
+        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
         # workaround in case ip address was not updated in `unit.public_address`
         unit_endpoint = unit_endpoint.replace(old_unit_ip, new_unit_ip)
         assert (
@@ -296,8 +292,8 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     # etcd_application = ops_test.model.applications[APP_NAME]
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -328,7 +324,7 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     )
 
     logger.info(f"Getting current certificate from unit {refresh_order[-1]}")
-    current_peer_certificate = get_certificate_from_unit_jubilant(
+    current_peer_certificate = get_certificate_from_unit(
         juju_lxd_model, refresh_order[-1], cert_type=TLSType.PEER
     )
     assert current_peer_certificate, "Failed to get current peer certificate"
@@ -354,7 +350,7 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     logger.info("Waiting for certificate to expire")
     sleep(CERTIFICATE_EXPIRY_TIME)
 
-    new_peer_certificate = get_certificate_from_unit_jubilant(
+    new_peer_certificate = get_certificate_from_unit(
         juju_lxd_model, refresh_order[-1], cert_type=TLSType.PEER
     )
     assert new_peer_certificate, "Failed to get new peer certificate"
@@ -387,9 +383,7 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint_jubilant(
-            juju_lxd_model, unit_name=unit_name, app_name=APP_NAME
-        )
+        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]

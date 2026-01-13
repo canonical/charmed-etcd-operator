@@ -11,11 +11,11 @@ from literals import INTERNAL_USER
 
 from ..helpers import (
     APP_NAME,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_key,
     get_leader_unit_name,
     put_key,
-    set_password_jubilant,
+    set_password,
 )
 from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 
@@ -59,7 +59,7 @@ def test_deploy_and_configure(
     )
 
     logger.info("Configure admin credentials in etcd")
-    set_password_jubilant(juju_lxd_model, PASSWORD)
+    set_password(juju_lxd_model, PASSWORD)
     juju_lxd_model.wait(
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
@@ -89,7 +89,7 @@ def test_create_backup(juju_lxd_model: Juju) -> None:
     global backup_id
 
     # Before creating a backup, enter some data
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     assert (
         put_key(
             endpoints,
@@ -140,7 +140,7 @@ def test_restore_backup_on_same_cluster(juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE, (
         "data not recovered"
     )
@@ -162,7 +162,7 @@ def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: Juju):
     )
 
     logger.info("Configure admin credentials in etcd")
-    set_password_jubilant(juju_lxd_model, PASSWORD)
+    set_password(juju_lxd_model, PASSWORD)
     juju_lxd_model.wait(
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
@@ -191,7 +191,7 @@ def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: Juju):
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     assert get_key(endpoints, user=INTERNAL_USER, password=PASSWORD, key=TEST_KEY) == TEST_VALUE, (
         "data not recovered"
     )

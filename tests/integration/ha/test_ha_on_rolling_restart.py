@@ -12,14 +12,14 @@ from statuses import ConfigStatuses
 
 from ..helpers import (
     APP_NAME,
-    get_cluster_endpoints_jubilant,
-    get_secret_by_label_jubilant,
+    get_cluster_endpoints,
+    get_secret_by_label,
 )
 from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
-    existing_app_jubilant,
+    existing_app,
     start_continuous_writes,
     stop_continuous_writes,
 )
@@ -37,7 +37,7 @@ def test_deploy_with_peer_tls(charm: str, juju_lxd_model: Juju) -> None:
     tls_config = {"ca-common-name": "etcd"}
     juju_lxd_model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
 
-    if existing_app_jubilant(juju_lxd_model):
+    if existing_app(juju_lxd_model):
         return
 
     # Deploy the charm and wait for active/idle status
@@ -58,10 +58,10 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
 
-    app_name = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app_name = existing_app(juju_lxd_model) or APP_NAME
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app_name)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, app_name)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -87,14 +87,14 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_tuning_config_options(juju_lxd_model: Juju) -> None:
     """Tune the network latency parameters in etcd and ensure the cluster is available."""
-    app_name = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app_name = existing_app(juju_lxd_model) or APP_NAME
     juju_lxd_model.wait(
         lambda status: apps_active_and_agents_idle(status, app_name, unit_count=NUM_UNITS)
     )
 
     # start writing data to the cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app_name)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, app_name)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
@@ -120,14 +120,14 @@ def test_tuning_config_options(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_invalid_tuning_config_options(juju_lxd_model: Juju) -> None:
     """Ensure the cluster keeps running with invalid tuning options."""
-    app_name = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app_name = existing_app(juju_lxd_model) or APP_NAME
     juju_lxd_model.wait(
         lambda status: apps_active_and_agents_idle(status, app_name, unit_count=NUM_UNITS)
     )
 
     # start writing data to the cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app_name)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, app_name)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app_name}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 

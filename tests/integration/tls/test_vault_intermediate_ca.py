@@ -18,11 +18,11 @@ from statuses import TLSStatuses
 from ..helpers import (
     APP_NAME,
     TLS_NAME,
-    download_client_certificate_from_unit_jubilant,
-    get_cluster_endpoints_jubilant,
+    download_client_certificate_from_unit,
+    get_cluster_endpoints,
     get_cluster_members,
     get_key,
-    get_secret_by_label_jubilant,
+    get_secret_by_label,
     put_key,
 )
 from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
@@ -179,11 +179,11 @@ def test_tls_enabled(juju_lxd_model: Juju) -> None:
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, VAULT_NAME))
 
     # check if all units have been added to the cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
 
     # make sure data can be written to the cluster
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
@@ -247,7 +247,7 @@ def test_restrict_certificate_domain(juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
     client_cert_subject = subprocess.getoutput("openssl x509 -noout -subject -in client.pem ")
     assert etcd_domain_config_value in client_cert_subject, (
         f"expected domain name {etcd_domain_config_value} not found in certificate subject {client_cert_subject}"
@@ -277,7 +277,7 @@ def test_invalid_certificate_domain(juju_lxd_model: Juju) -> None:
         )
     )
 
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
     client_cert_subject = subprocess.getoutput("openssl x509 -noout -subject -in client.pem ")
     assert etcd_invalid_domain_config_value not in client_cert_subject, (
         f"domain name {etcd_invalid_domain_config_value} found in certificate subject {client_cert_subject}"

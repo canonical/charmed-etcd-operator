@@ -21,12 +21,11 @@ from statuses import CharmStatuses, ExternalClientsStatuses
 from ..helpers import (
     APP_NAME,
     TLS_NAME,
-    download_client_certificate_from_unit_jubilant,
+    download_client_certificate_from_unit,
     get_certificate_from_unit,
-    get_certificate_from_unit_jubilant,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_role,
-    get_secret_by_label_jubilant,
+    get_secret_by_label,
     get_user,
 )
 from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
@@ -131,9 +130,9 @@ def test_relate_client_charm(juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, idle_period=10)
     )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
@@ -158,11 +157,12 @@ def test_relate_client_charm(juju_lxd_model: Juju) -> None:
             assert permission["key"] == f"/{common_name}/", "permission is not for the key prefix"
 
     # get client ca from every unit and check if it includes the mtls cert
-    model = juju_lxd_model.model
     mtls_certs = get_requirer_mtls_certificates(juju_lxd_model)
     assert mtls_certs, "failed to get mtls cert from requirer TLS provider"
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        client_cas = get_certificate_from_unit(model, unit_name, TLSType.CLIENT, is_ca=True)
+        client_cas = get_certificate_from_unit(
+            juju_lxd_model, unit_name, TLSType.CLIENT, is_ca=True
+        )
         assert client_cas, f"failed to get client CAs for {unit_name}"
         for mtls_cert in mtls_certs:
             assert mtls_cert in client_cas, f"mtls cert not in trusted CAs for {unit_name}"
@@ -223,7 +223,7 @@ def test_update_mtls_cert(juju_lxd_model: Juju) -> None:
     assert mtls_certs, "failed to get the new mtls certs from requirer TLS provider"
 
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        client_cas = get_certificate_from_unit_jubilant(
+        client_cas = get_certificate_from_unit(
             juju_lxd_model, unit_name, TLSType.CLIENT, is_ca=True
         )
         assert client_cas, f"failed to get client CAs for {unit_name}"
@@ -271,7 +271,7 @@ def test_etcd_updates_ca(juju_lxd_model: Juju) -> None:
     assert mtls_certs, "failed to get the new mtls certs from requirer TLS provider"
 
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        client_cas = get_certificate_from_unit_jubilant(
+        client_cas = get_certificate_from_unit(
             juju_lxd_model, unit_name, TLSType.CLIENT, is_ca=True
         )
         for mtls_cert in mtls_certs:
@@ -305,10 +305,10 @@ def test_remove_client_relation(juju_lxd_model: Juju) -> None:
     )
 
     # check that the user and role are removed
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME, tls_enabled=True)
-    download_client_certificate_from_unit_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
+    download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
 
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
@@ -325,7 +325,7 @@ def test_remove_client_relation(juju_lxd_model: Juju) -> None:
 
     # get client ca from every unit and check if it includes the test_ca
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        client_cas = get_certificate_from_unit_jubilant(
+        client_cas = get_certificate_from_unit(
             juju_lxd_model, unit_name, TLSType.CLIENT, is_ca=True
         )
         assert client_cas, f"failed to get client CAs for {unit_name}"
@@ -371,7 +371,7 @@ def test_different_tls_providers(juju_lxd_model: Juju) -> None:
     assert mtls_certs, "failed to get the new mtls certs from requirer TLS provider"
 
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        client_cas = get_certificate_from_unit_jubilant(
+        client_cas = get_certificate_from_unit(
             juju_lxd_model, unit_name, TLSType.CLIENT, is_ca=True
         )
         for mtls_cert in mtls_certs:
@@ -409,7 +409,7 @@ def test_certificate_transfer(juju_lxd_model: Juju) -> None:
 
     # get client ca from every unit and check if it includes the ca_cert
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        client_cas = get_certificate_from_unit_jubilant(
+        client_cas = get_certificate_from_unit(
             juju_lxd_model, unit_name, TLSType.CLIENT, is_ca=True
         )
         assert client_cas, f"failed to get client CAs for {unit_name}"

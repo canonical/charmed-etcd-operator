@@ -12,13 +12,13 @@ from statuses import BackupStatuses
 
 from ..helpers import (
     APP_NAME,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_cluster_members,
     get_key,
     get_leader_unit_name,
-    get_secret_by_label_jubilant,
+    get_secret_by_label,
     put_key,
-    set_password_jubilant,
+    set_password,
 )
 from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 
@@ -85,9 +85,9 @@ def test_create_backup(juju_lxd_model: Juju) -> None:
     global backup_id
 
     # Before creating a backup, enter some data
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     initial_password = secret.get(f"{INTERNAL_USER}-password")
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     assert (
         put_key(
             endpoints,
@@ -132,7 +132,7 @@ def test_restore_verification_failed(juju_lxd_model: Juju):
     """Restore a backup with invalid admin password."""
     logger.info("Configure admin credentials in etcd")
     invalid_password = "invalid_password"
-    set_password_jubilant(juju_lxd_model, invalid_password)
+    set_password(juju_lxd_model, invalid_password)
     juju_lxd_model.wait(
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
@@ -159,7 +159,7 @@ def test_restore_verification_failed(juju_lxd_model: Juju):
     )
 
     # ensure test data was not restored
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     assert not (
         get_key(endpoints, user=INTERNAL_USER, password=invalid_password, key=TEST_KEY)
         == TEST_VALUE

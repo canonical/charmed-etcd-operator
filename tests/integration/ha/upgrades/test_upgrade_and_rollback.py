@@ -12,8 +12,8 @@ from literals import INTERNAL_USER, PEER_RELATION
 from tests.integration.ha.helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
-    disable_etcd_service_jubilant,
-    enable_etcd_service_jubilant,
+    disable_etcd_service,
+    enable_etcd_service,
     start_continuous_writes,
     stop_continuous_writes,
 )
@@ -25,12 +25,12 @@ from tests.integration.ha.upgrades.literals import (
 )
 from tests.integration.helpers import (
     APP_NAME,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_cluster_members,
     get_etcd_version,
     get_leader_unit_name,
-    get_secret_by_label_jubilant,
-    get_unit_endpoint_jubilant,
+    get_secret_by_label,
+    get_unit_endpoint,
 )
 from tests.integration.helpers_deployment import (
     ExpectedStatus,
@@ -61,8 +61,8 @@ def test_deploy(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
     """Run a refresh, fail and roll back."""
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -80,7 +80,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
     juju_lxd_model.refresh(app=APP_NAME, path=charm)
 
     logger.info(f"Pause etcd service on unit {refresh_order[-1]} to force upgrade to fail")
-    disable_etcd_service_jubilant(juju_lxd_model, unit_name=refresh_order[-1])
+    disable_etcd_service(juju_lxd_model, unit_name=refresh_order[-1])
 
     # versions will always be marked "incompatible" if refresh to a local version
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
@@ -111,7 +111,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
 
     logger.info(f"Upgrade failed - roll back to previous version v{WORKLOAD_VERSION['previous']}")
     logger.info(f"Continue etcd service on unit {refresh_order[-1]}")
-    enable_etcd_service_jubilant(juju_lxd_model, unit_name=refresh_order[-1])
+    enable_etcd_service(juju_lxd_model, unit_name=refresh_order[-1])
 
     # ops_test.application.refresh can't refresh from local to published charm, use command line
     # in `juju refresh`, --switch and --revision are mutually exclusive
@@ -142,9 +142,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint_jubilant(
-            juju_lxd_model, unit_name=unit_name, app_name=APP_NAME
-        )
+        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["previous"]
@@ -170,8 +168,8 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -233,9 +231,7 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint_jubilant(
-            juju_lxd_model, unit_name=unit_name, app_name=APP_NAME
-        )
+        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]

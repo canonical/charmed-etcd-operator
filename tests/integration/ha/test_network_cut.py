@@ -13,29 +13,29 @@ from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
 from ..helpers import (
     APP_NAME,
-    get_certificate_from_unit_jubilant,
-    get_cluster_endpoints_jubilant,
+    get_certificate_from_unit,
+    get_cluster_endpoints,
     get_cluster_members,
     get_raft_leader,
     get_remaining_endpoints,
-    get_secret_by_label_jubilant,
-    get_unit_endpoint_jubilant,
+    get_secret_by_label,
+    get_unit_endpoint,
     is_endpoint_up,
 )
 from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
-    existing_app_jubilant,
+    existing_app,
     start_continuous_writes,
     stop_continuous_writes,
 )
 from .helpers_network import (
     cut_network_from_unit_with_ip_change,
     cut_network_from_unit_without_ip_change,
-    get_controller_hostname_jubilant,
-    hostname_from_unit_jubilant,
-    ip_address_from_unit_jubilant,
+    get_controller_hostname,
+    hostname_from_unit,
+    ip_address_from_unit,
     is_unit_reachable,
     restore_network_for_unit_with_ip_change,
     restore_network_for_unit_without_ip_change,
@@ -51,7 +51,7 @@ TLS_NAME = "self-signed-certificates"
 def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
-    if existing_app_jubilant(juju_lxd_model):
+    if existing_app(juju_lxd_model):
         return
 
     # Deploy the charm and wait for active/idle status
@@ -66,7 +66,7 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_network_cut_on_raft_leader_without_ip_change(juju_lxd_model: Juju) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app = existing_app(juju_lxd_model) or APP_NAME
 
     # make sure we have at least two units so we can stop one of them
     if len(juju_lxd_model.status().get_units(app)) < 2:
@@ -83,8 +83,8 @@ def test_network_cut_on_raft_leader_without_ip_change(juju_lxd_model: Juju) -> N
         )
 
     init_units_count = len(juju_lxd_model.status().get_units(app))
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, app)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -99,25 +99,25 @@ def test_network_cut_on_raft_leader_without_ip_change(juju_lxd_model: Juju) -> N
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
     # cut network from the current cluster/raft leader
-    leader_hostname = hostname_from_unit_jubilant(juju_lxd_model, unit_name=leader_unit)
+    leader_hostname = hostname_from_unit(juju_lxd_model, unit_name=leader_unit)
     cut_network_from_unit_without_ip_change(leader_hostname)
 
     # make sure the unit is not reachable from the other units
     for unit in juju_lxd_model.status().get_units(app):
         if unit == leader_unit:
             continue
-        hostname = hostname_from_unit_jubilant(juju_lxd_model, unit)
+        hostname = hostname_from_unit(juju_lxd_model, unit)
         assert not is_unit_reachable(hostname, leader_hostname), (
             f"{leader_hostname} is reachable from {hostname}"
         )
 
     # make sure the unit is not reachable from the controller
-    controller_hostname = get_controller_hostname_jubilant(juju_lxd_model)
+    controller_hostname = get_controller_hostname(juju_lxd_model)
     assert not is_unit_reachable(controller_hostname, leader_hostname)
     logger.info(f"{leader_unit} is not reachable via network.")
 
     # verify the cluster member is not up anymore
-    unit_endpoint = get_unit_endpoint_jubilant(juju_lxd_model, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=leader_unit, app_name=app)
     assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"etcd endpoint on {leader_unit} is not available.")
 
@@ -176,7 +176,7 @@ def test_network_cut_on_raft_leader_without_ip_change(juju_lxd_model: Juju) -> N
 @pytest.mark.abort_on_fail
 def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app = existing_app(juju_lxd_model) or APP_NAME
 
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
@@ -202,8 +202,8 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, app, TLS_NAME))
 
     init_units_count = len(juju_lxd_model.status().get_units(app))
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    endpoints = get_cluster_endpoints(juju_lxd_model, app)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -218,31 +218,31 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
     logger.info("Getting certificate from leader unit")
-    initial_peer_certificate = get_certificate_from_unit_jubilant(
+    initial_peer_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER
     )
 
     # cut network from the current cluster/raft leader
-    leader_hostname = hostname_from_unit_jubilant(juju_lxd_model, unit_name=leader_unit)
-    leader_ip = ip_address_from_unit_jubilant(juju_lxd_model, unit_name=leader_unit)
+    leader_hostname = hostname_from_unit(juju_lxd_model, unit_name=leader_unit)
+    leader_ip = ip_address_from_unit(juju_lxd_model, unit_name=leader_unit)
     cut_network_from_unit_with_ip_change(leader_hostname)
 
     # make sure the unit is not reachable from the other units
     for unit in juju_lxd_model.status().get_units(app):
         if unit == leader_unit:
             continue
-        hostname = hostname_from_unit_jubilant(juju_lxd_model, unit)
+        hostname = hostname_from_unit(juju_lxd_model, unit)
         assert not is_unit_reachable(hostname, leader_hostname), (
             f"{leader_hostname} is reachable from {hostname}"
         )
 
     # make sure the unit is not reachable from the controller
-    controller_hostname = get_controller_hostname_jubilant(juju_lxd_model)
+    controller_hostname = get_controller_hostname(juju_lxd_model)
     assert not is_unit_reachable(controller_hostname, leader_hostname)
     logger.info(f"{leader_unit} is not reachable via network.")
 
     # verify the cluster member is not up anymore
-    unit_endpoint = get_unit_endpoint_jubilant(juju_lxd_model, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=leader_unit, app_name=app)
     assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"etcd endpoint on {leader_unit} is not available.")
 
@@ -280,7 +280,7 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
     )
 
     # ensure the member is up again
-    new_unit_ip = ip_address_from_unit_jubilant(juju_lxd_model, unit_name=leader_unit)
+    new_unit_ip = ip_address_from_unit(juju_lxd_model, unit_name=leader_unit)
     unit_endpoint_updated = unit_endpoint.replace(leader_ip, new_unit_ip)
     assert is_endpoint_up(unit_endpoint_updated, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is available again with new ip {new_unit_ip}")
@@ -293,7 +293,7 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
     logger.info(f"Cluster fully formed again with {len(cluster_members)} members.")
 
     logger.info("Getting new certificate from leader unit")
-    new_peer_certificate = get_certificate_from_unit_jubilant(
+    new_peer_certificate = get_certificate_from_unit(
         juju_lxd_model, leader_unit, cert_type=TLSType.PEER
     )
     assert new_peer_certificate != initial_peer_certificate, "Peer certificate not updated."
@@ -314,7 +314,7 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
 @pytest.mark.abort_on_fail
 def test_ip_change_with_client_tls(juju_lxd_model: Juju) -> None:
     """Ensure TLS communication with the cluster works after an ip change."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app = existing_app(juju_lxd_model) or APP_NAME
 
     # make sure we have at least two units so we can stop one of them
     if len(juju_lxd_model.status().get_units(app)) < 2:
@@ -341,20 +341,20 @@ def test_ip_change_with_client_tls(juju_lxd_model: Juju) -> None:
     unit_name = next(iter(juju_lxd_model.status().get_units(app)))
 
     # cut network
-    unit_hostname = hostname_from_unit_jubilant(juju_lxd_model, unit_name=unit_name)
+    unit_hostname = hostname_from_unit(juju_lxd_model, unit_name=unit_name)
     cut_network_from_unit_with_ip_change(unit_hostname)
 
     # make sure the unit is not reachable from the other units
     for unit in juju_lxd_model.status().get_units(app):
         if unit == unit_name:
             continue
-        hostname = hostname_from_unit_jubilant(juju_lxd_model, unit)
+        hostname = hostname_from_unit(juju_lxd_model, unit)
         assert not is_unit_reachable(hostname, unit_hostname), (
             f"{unit_hostname} is reachable from {hostname}"
         )
 
     # make sure the unit is not reachable from the controller
-    controller_hostname = get_controller_hostname_jubilant(juju_lxd_model)
+    controller_hostname = get_controller_hostname(juju_lxd_model)
     assert not is_unit_reachable(controller_hostname, unit_hostname)
     logger.info(f"{unit_name} is not reachable via network.")
 

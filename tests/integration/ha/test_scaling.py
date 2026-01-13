@@ -12,17 +12,17 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    get_cluster_endpoints_jubilant,
+    get_cluster_endpoints,
     get_cluster_members,
-    get_leader_unit_name_jubilant,
+    get_leader_unit_name,
     get_raft_leader,
-    get_secret_by_label_jubilant,
+    get_secret_by_label,
 )
 from ..helpers_deployment import apps_active_and_agents_idle
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
-    existing_app_jubilant,
+    existing_app,
     start_continuous_writes,
     stop_continuous_writes,
 )
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
-    if existing_app_jubilant(juju_lxd_model):
+    if existing_app(juju_lxd_model):
         return
 
     # Deploy the charm and wait for active/idle status
@@ -47,10 +47,10 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_scale_up(juju_lxd_model: Juju) -> None:
     """Make sure new units are added to the etcd cluster without downtime."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app = existing_app(juju_lxd_model) or APP_NAME
     init_units_count = len(juju_lxd_model.status().get_units(app))
-    init_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    init_endpoints = get_cluster_endpoints(juju_lxd_model, app)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -69,7 +69,7 @@ def test_scale_up(juju_lxd_model: Juju) -> None:
     )
 
     # check if all units have been added to the cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    endpoints = get_cluster_endpoints(juju_lxd_model, app)
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count + 2, (
@@ -84,10 +84,10 @@ def test_scale_up(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_scale_down(juju_lxd_model: Juju) -> None:
     """Make sure a unit is removed from the etcd cluster without downtime."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app = existing_app(juju_lxd_model) or APP_NAME
     init_units_count = len(juju_lxd_model.status().get_units(app))
-    init_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    init_endpoints = get_cluster_endpoints(juju_lxd_model, app)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -107,7 +107,7 @@ def test_scale_down(juju_lxd_model: Juju) -> None:
     )
 
     # check if unit has been removed from etcd cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    endpoints = get_cluster_endpoints(juju_lxd_model, app)
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
@@ -122,9 +122,9 @@ def test_scale_down(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_remove_raft_leader(juju_lxd_model: Juju) -> None:
     """Make sure the etcd cluster is still available when the Raft leader is removed."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
-    init_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    app = existing_app(juju_lxd_model) or APP_NAME
+    init_endpoints = get_cluster_endpoints(juju_lxd_model, app)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -139,7 +139,7 @@ def test_remove_raft_leader(juju_lxd_model: Juju) -> None:
     )
 
     # check cluster membership after scaling up
-    updated_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    updated_endpoints = get_cluster_endpoints(juju_lxd_model, app)
     cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count, (
         f"Expected {init_units_count} cluster members, got {len(cluster_members)}."
@@ -162,7 +162,7 @@ def test_remove_raft_leader(juju_lxd_model: Juju) -> None:
     )
 
     # check if unit has been removed from etcd cluster
-    updated_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    updated_endpoints = get_cluster_endpoints(juju_lxd_model, app)
 
     cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
@@ -187,9 +187,9 @@ def test_remove_raft_leader(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_remove_multiple_units(juju_lxd_model: Juju) -> None:
     """Make sure multiple units can be removed from the etcd cluster without downtime."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
-    init_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    app = existing_app(juju_lxd_model) or APP_NAME
+    init_endpoints = get_cluster_endpoints(juju_lxd_model, app)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -210,7 +210,7 @@ def test_remove_multiple_units(juju_lxd_model: Juju) -> None:
     assert num_units == 1, f"Expected 1 unit, got {num_units}."
 
     # check if unit has been removed from etcd cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    endpoints = get_cluster_endpoints(juju_lxd_model, app)
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == 1, f"Expected 1 cluster member, got {len(cluster_members)}."
@@ -223,8 +223,8 @@ def test_remove_multiple_units(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_scale_to_zero_and_back(juju_lxd_model: Juju) -> None:
     """Make sure that removing all units and then adding them again works."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    app = existing_app(juju_lxd_model) or APP_NAME
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # remove all remaining units
@@ -242,7 +242,7 @@ def test_scale_to_zero_and_back(juju_lxd_model: Juju) -> None:
         lambda status: apps_active_and_agents_idle(status, app, unit_count=3, idle_period=60)
     )
 
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    endpoints = get_cluster_endpoints(juju_lxd_model, app)
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
     # give time to write at least some data
     time.sleep(10)
@@ -258,17 +258,17 @@ def test_scale_to_zero_and_back(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_remove_juju_leader(juju_lxd_model: Juju) -> None:
     """Make sure that removing the juju leader unit works."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app = existing_app(juju_lxd_model) or APP_NAME
     init_units_count = len(juju_lxd_model.status().get_units(app))
-    init_endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
-    secret = get_secret_by_label_jubilant(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
+    init_endpoints = get_cluster_endpoints(juju_lxd_model, app)
+    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=init_endpoints, user=INTERNAL_USER, password=password)
 
     # scale down
-    juju_leader_unit = get_leader_unit_name_jubilant(juju_lxd_model, app)
+    juju_leader_unit = get_leader_unit_name(juju_lxd_model, app)
     juju_lxd_model.remove_unit(juju_leader_unit)
 
     juju_lxd_model.wait(
@@ -281,7 +281,7 @@ def test_remove_juju_leader(juju_lxd_model: Juju) -> None:
     )
 
     # check if unit has been removed from etcd cluster
-    endpoints = get_cluster_endpoints_jubilant(juju_lxd_model, app)
+    endpoints = get_cluster_endpoints(juju_lxd_model, app)
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     assert len(cluster_members) == init_units_count - 1, (
@@ -296,6 +296,6 @@ def test_remove_juju_leader(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_remove_application(juju_lxd_model: Juju) -> None:
     """Make sure removing the application works."""
-    app = existing_app_jubilant(juju_lxd_model) or APP_NAME
+    app = existing_app(juju_lxd_model) or APP_NAME
 
     juju_lxd_model.remove_application(app)
