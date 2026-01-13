@@ -44,11 +44,6 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     # create storage to be used in this test
     # this assumes the test is run on a lxd cloud
     juju_lxd_model.cli("create-storage-pool", "etcd-pool", "lxd", include_model=False)
-    # storage = { #TODO cleanup
-    #     "data": {"pool": "etcd-pool", "size": 2048},
-    #     "archive": {"pool": "etcd-pool", "size": 2048},
-    #     "logs": {"pool": "etcd-pool", "size": 2048},
-    # }
 
     storage = {
         "data": "etcd-pool,2G",
@@ -56,8 +51,6 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
         "logs": "etcd-pool,2G",
     }
 
-    # {'data': 'tmpfs,1G'}
-    # Deploy the charm and wait for active/idle status
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS, storage=storage)
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
 
@@ -89,20 +82,9 @@ def test_attach_storage_after_scale_down(juju_lxd_model: Juju) -> None:
         )
     )
 
-    # add unit with previous storage attached
-    # add_unit_cmd = f"""add-unit {app} \
-    #                 --model={ops_test.model.info.name} \
-    #                 --attach-storage={data_storage_id} \
-    #                 --attach-storage={archive_storage_id} \
-    #                 --attach-storage={log_storage_id}
-    #                 """
     juju_lxd_model.add_unit(
         app, attach_storage=[data_storage_id, archive_storage_id, log_storage_id]
     )
-    # return_code, _, std_err = await ops_test.juju(*add_unit_cmd.split())
-    # assert return_code == 0, (
-    #     f"Failed to add unit with storages {data_storage_id}, {archive_storage_id}, {log_storage_id}: {std_err}"
-    # )
 
     new_unit = list(juju_lxd_model.status().get_units(app))[-1]
     juju_lxd_model.wait(
