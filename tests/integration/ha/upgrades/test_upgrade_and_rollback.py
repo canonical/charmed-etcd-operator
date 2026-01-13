@@ -34,6 +34,7 @@ from tests.integration.helpers import (
 )
 from tests.integration.helpers_deployment import (
     ExpectedStatus,
+    agents_idle,
     apps_active_and_agents_idle,
     does_status_match,
 )
@@ -83,9 +84,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
 
     # versions will always be marked "incompatible" if refresh to a local version
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
-    )
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
@@ -99,9 +98,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
         )
 
     # wait for the first refreshed unit to settle
-    juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
-    )
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
 
     assert (
         "health check failed"
@@ -121,9 +118,8 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
     # we can only roll back to the latest released revision from a local charm
     juju_lxd_model.refresh(app=APP_NAME, channel=CHARM_CHANNEL)
 
-    juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, idle_period=30)
-    )
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=30))
+
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         # will be marked "incompatible" if rollback is not to the same revision as initially deployed
         logger.info("Rollback is blocked due to incompatibility")
@@ -201,9 +197,8 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, idle_period=30)
-    )
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=30))
+
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 

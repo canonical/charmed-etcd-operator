@@ -44,7 +44,12 @@ from tests.integration.helpers import (
     get_secret_by_label_jubilant,
     get_unit_endpoint_jubilant,
 )
-from tests.integration.helpers_deployment import apps_active_and_agents_idle, does_status_match
+from tests.integration.helpers_deployment import (
+    ExpectedStatus,
+    agents_idle,
+    apps_active_and_agents_idle,
+    does_status_match,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +80,8 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2, idle_period=30)
-    )
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2, idle_period=30))
+
     last_unit_name, last_unit_status = list(juju_lxd_model.status().get_units(APP_NAME).items())[
         -1
     ]
@@ -87,9 +91,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
         juju_lxd_model.run(last_unit_name, "force-refresh-start", {"check-compatibility": False})
 
-    juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2, idle_period=30)
-    )
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2, idle_period=30))
 
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 
@@ -100,7 +102,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # TODO remove once we have a start upgrade tests with a charm revision with v1
     # data interfaces v1 uses - instead of _ for relation data keys
     # this breaks disaster recovery during upgrades if the upgraded unit is not the leader
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2))
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2))
 
     # cluster should be recovered again
     assert "Cluster failure" not in last_unit_status.workload_status.message, (
@@ -179,9 +181,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
-            status, APP_NAME, unit_count=NUM_UNITS, idle_period=30
-        )
+        lambda status: agents_idle(status, APP_NAME, unit_count=NUM_UNITS, idle_period=30)
     )
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
@@ -195,7 +195,9 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
         assert force_refresh_response.return_code == 0, "action failed"
 
     juju_lxd_model.wait(
-        lambda status: does_status_match(status, expected_app_statuses={APP_NAME: ["blocked"]})
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
     )
 
     logger.info(f"Force new ip address for {refresh_order[-1]}")
@@ -224,9 +226,11 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={APP_NAME: ["blocked"]},
-            expected_unit_statuses={APP_NAME: ["active"]},
-            num_units={APP_NAME: NUM_UNITS},
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=["blocked"], unit_status=["active"], unit_count=NUM_UNITS
+                )
+            },
         )
     )
 
@@ -303,9 +307,9 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_unit_statuses={
-                APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
-                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
+            expected_status={
+                APP_NAME: ExpectedStatus(unit_status=[TLSStatuses.TLS_PEER_CERTS_EXPIRING.value]),
+                TLS_NAME: ExpectedStatus(unit_status=[CharmStatuses.ACTIVE_IDLE.value]),
             },
         )
     )
@@ -330,9 +334,8 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, idle_period=30)
-    )
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=30))
+
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
@@ -340,7 +343,9 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
         juju_lxd_model.run(refresh_order[0], "force-refresh-start", {"check-compatibility": False})
 
     juju_lxd_model.wait(
-        lambda status: does_status_match(status, expected_app_statuses={APP_NAME: ["blocked"]})
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
     )
 
     # wait for certificate to expire
@@ -363,13 +368,15 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     juju_lxd_model.wait(
         lambda status: does_status_match(
             status,
-            expected_app_statuses={
-                APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
-                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
-            },
-            expected_unit_statuses={
-                APP_NAME: [TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
-                TLS_NAME: [CharmStatuses.ACTIVE_IDLE.value],
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=[TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
+                    unit_status=[TLSStatuses.TLS_PEER_CERTS_EXPIRING.value],
+                ),
+                TLS_NAME: ExpectedStatus(
+                    app_status=[CharmStatuses.ACTIVE_IDLE.value],
+                    unit_status=[CharmStatuses.ACTIVE_IDLE.value],
+                ),
             },
         )
     )
