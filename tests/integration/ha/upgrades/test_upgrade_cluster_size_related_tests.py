@@ -155,7 +155,8 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
                     app_status=["blocked"], unit_count=NUM_UNITS + 1, idle_period=60
                 )
             },
-        )
+        ),
+        timeout=1200,
     )
 
     logger.info("Scaling up will continue the refresh on the newly added unit")

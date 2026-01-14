@@ -44,6 +44,7 @@ def ip_address_from_unit(juju: Juju, unit_name: str) -> str:
     """
     task_result = juju.exec(command="hostname -i", unit=unit_name)
 
+    logger.info(f"ip address from unit {unit_name}: {str(task_result)}")
     return task_result.stdout
 
 
