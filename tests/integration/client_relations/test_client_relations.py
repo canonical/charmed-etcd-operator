@@ -8,7 +8,7 @@ import logging
 from datetime import timedelta
 
 import pytest
-from charms.tls_certificates_interface.v4.tls_certificates import (
+from charmlibs.interfaces.tls_certificates import (
     generate_ca,
     generate_certificate,
     generate_csr,

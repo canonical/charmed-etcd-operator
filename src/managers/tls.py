@@ -12,7 +12,7 @@ from ipaddress import ip_address
 from pathlib import Path
 from typing import Dict, Iterable
 
-from charms.tls_certificates_interface.v4.tls_certificates import (
+from charmlibs.interfaces.tls_certificates import (
     PrivateKey,
     ProviderCertificate,
 )
@@ -499,8 +499,11 @@ class TLSManager(ManagerStatusProtocol):
         except (UnicodeDecodeError, binascii.Error) as e:
             logger.error(e)
             return None
-
-        private_key = PrivateKey(raw=private_key)
+        try:
+            private_key = PrivateKey(raw=private_key)
+        except ValueError as e:
+            logger.error(e)
+            return None
         if not private_key.is_valid():
             logger.error("Invalid private key format.")
             return None

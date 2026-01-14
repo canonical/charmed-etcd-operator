@@ -6,7 +6,7 @@ import base64
 import logging
 
 import pytest
-from charms.tls_certificates_interface.v4.tls_certificates import LIBID, generate_private_key
+from charmlibs.interfaces.tls_certificates import generate_private_key
 from pytest_operator.plugin import OpsTest
 
 from literals import (
@@ -40,6 +40,7 @@ TLS_NAME = "self-signed-certificates"
 NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
+TLSLIBID = "afd8c2bccf834997afce12c2706d2ede"
 
 
 @pytest.mark.abort_on_fail
@@ -129,7 +130,7 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     current_peer_private_keys: list[str] = [
         (
             await get_secret_by_label(
-                ops_test, label=f"{LIBID}-private-key-{i}-{PEER_TLS_RELATION_NAME}"
+                ops_test, label=f"{TLSLIBID}-private-key-{i}-{PEER_TLS_RELATION_NAME}"
             )
         )["private-key"]
         for i in range(NUM_UNITS)
@@ -139,7 +140,7 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     current_client_private_keys: list[str] = [
         (
             await get_secret_by_label(
-                ops_test, label=f"{LIBID}-private-key-{i}-{CLIENT_TLS_RELATION_NAME}"
+                ops_test, label=f"{TLSLIBID}-private-key-{i}-{CLIENT_TLS_RELATION_NAME}"
             )
         )["private-key"]
         for i in range(NUM_UNITS)
@@ -225,13 +226,13 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     for i in range(NUM_UNITS):
         with pytest.raises(SecretNotFoundError):
             await get_secret_by_label(
-                ops_test, label=f"{LIBID}-private-key-{i}-{PEER_TLS_RELATION_NAME}"
+                ops_test, label=f"{TLSLIBID}-private-key-{i}-{PEER_TLS_RELATION_NAME}"
             )
 
     new_client_private_keys: list[str] = [
         (
             await get_secret_by_label(
-                ops_test, label=f"{LIBID}-private-key-{i}-{CLIENT_TLS_RELATION_NAME}"
+                ops_test, label=f"{TLSLIBID}-private-key-{i}-{CLIENT_TLS_RELATION_NAME}"
             )
         )["private-key"]
         for i in range(NUM_UNITS)
@@ -302,7 +303,7 @@ async def test_set_private_key(ops_test: OpsTest) -> None:
     for i in range(NUM_UNITS):
         with pytest.raises(SecretNotFoundError):
             await get_secret_by_label(
-                ops_test, label=f"{LIBID}-private-key-{i}-{CLIENT_TLS_RELATION_NAME}"
+                ops_test, label=f"{TLSLIBID}-private-key-{i}-{CLIENT_TLS_RELATION_NAME}"
             )
 
     leader_new_client_cert = get_certificate_from_unit(
