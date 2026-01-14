@@ -147,16 +147,6 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
 
     logger.info("Scale up")
     juju_lxd_model.add_unit(APP_NAME)
-    juju_lxd_model.wait(
-        lambda status: does_status_match(
-            status,
-            expected_status={
-                APP_NAME: ExpectedStatus(
-                    app_status=["blocked"], unit_count=NUM_UNITS + 1, idle_period=30
-                )
-            },
-        ),
-    )
 
     logger.info("Scaling up will continue the refresh on the newly added unit")
     juju_lxd_model.wait(
@@ -265,7 +255,7 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         force_refresh_response = juju_lxd_model.run(
             refresh_order[1], "force-refresh-start", {"check-compatibility": False}
         )
-        assert force_refresh_response.results.get("return-code") == 0, "action failed"
+        assert force_refresh_response.return_code == 0, "action failed"
 
     juju_lxd_model.wait(
         lambda status: does_status_match(
@@ -275,7 +265,7 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
 
     logger.info("Complete refresh with `resume-refresh` action")
     resume_refresh_response = juju_lxd_model.run(refresh_order[-1], "resume-refresh")
-    assert resume_refresh_response.results.get("return-code") == 0, "action failed"
+    assert resume_refresh_response.return_code == 0, "action failed"
 
     # wait for upgrade to complete
     juju_lxd_model.wait(

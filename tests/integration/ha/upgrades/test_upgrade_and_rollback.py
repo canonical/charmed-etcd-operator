@@ -212,7 +212,7 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
         force_refresh_response = juju_lxd_model.run(
             refresh_order[0], "force-refresh-start", {"check-compatibility": False}
         )
-        assert force_refresh_response.results.get("return-code") == 0, "action failed"
+        assert force_refresh_response.return_code == 0, "action failed"
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
