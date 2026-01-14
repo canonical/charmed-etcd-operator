@@ -93,7 +93,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
         juju_lxd_model.run(
             refresh_order[0],
-            "force-refresh-start",
+            "force-refresh-start",  # TODO fix!
             {"check-compatibility": False, "run-pre-refresh-checks": False},
         )
 
