@@ -44,12 +44,7 @@ def ip_address_from_unit(juju: Juju, unit_name: str) -> str:
     """
     task_result = juju.exec(command="hostname -i", unit=unit_name)
 
-    logger.info(f"ip address from unit {unit_name}: {str(task_result)}")  # TODO cleanup logs
-
-    ip = task_result.stdout.strip()
-    logger.info(f"ip address from unit {unit_name}: {ip!r}")
-
-    return ip
+    return task_result.stdout.strip()
 
 
 def get_controller_hostname(juju: Juju) -> str:
