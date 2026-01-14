@@ -10,8 +10,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
-from charms.tls_certificates_interface.v4.tls_certificates import (
-    LIBID,
+from charmlibs.interfaces.tls_certificates import (
     Certificate,
     CertificateAvailableEvent,
     CertificateSigningRequest,
@@ -44,6 +43,8 @@ from managers.tls import TLSType
 from statuses import CharmStatuses, TLSStatuses
 
 from .helpers import status_is
+
+TLSLIBID = "afd8c2bccf834997afce12c2706d2ede"
 
 MEMBER_LIST_DICT = {
     "charmed-etcd0": Member(
@@ -184,7 +185,7 @@ def test_enable_tls_on_start():
         patch("workload.EtcdWorkload.write_file"),
         patch("workload.EtcdWorkload.is_reachable"),
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates"
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates"
         ),
         patch("managers.tls.TLSManager.write_certificate"),
         patch("managers.cluster.ClusterManager.enable_authentication"),
@@ -386,7 +387,7 @@ def test_certificate_available_new_cluster(certificate_available_context):
             event = MagicMock(spec=CertificateAvailableEvent)
             charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.CLIENT)
             with patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                 return_value=([client_provider_certificate], requirer_private_key),
             ):
                 state_out = manager.run()
@@ -397,7 +398,7 @@ def test_certificate_available_new_cluster(certificate_available_context):
                 assert charm.state.client_tls_relation, "Client relation not set"
 
             with patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                 side_effect=[
                     ([client_provider_certificate], requirer_private_key),
                     ([peer_provider_certificate], requirer_private_key),
@@ -466,7 +467,7 @@ def test_certificate_available_enabling_tls(certificate_available_context):
                 # Peer cert added case
                 with (
                     patch(
-                        "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                        "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                         side_effect=[
                             ([client_provider_certificate], requirer_private_key),
                             ([peer_provider_certificate], requirer_private_key),
@@ -485,7 +486,7 @@ def test_certificate_available_enabling_tls(certificate_available_context):
                 # client cert added case
                 with (
                     patch(
-                        "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                        "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                         return_value=([client_provider_certificate], requirer_private_key),
                     ),
                     patch(
@@ -575,7 +576,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
                 charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.CLIENT)
                 with (
                     patch(
-                        "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                        "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                         side_effect=[
                             ([client_provider_certificate], requirer_private_key),
                             ([peer_provider_certificate], requirer_private_key),
@@ -594,7 +595,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
                 # client cert added case and restart handles both peer and client
                 with (
                     patch(
-                        "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                        "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                         return_value=([client_provider_certificate], requirer_private_key),
                     ),
                     patch(
@@ -646,7 +647,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
             charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.CLIENT)
             with (
                 patch(
-                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                     return_value=([client_provider_certificate], requirer_private_key),
                 ),
                 patch(
@@ -759,7 +760,7 @@ def test_certificate_expiration(certificate_available_context):
                 patch("charm.EtcdOperatorCharm.rolling_restart") as restart_mock,
             ):
                 with patch(
-                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                     side_effect=[
                         ([client_provider_certificate], requirer_private_key),
                         ([peer_provider_certificate], requirer_private_key),
@@ -774,7 +775,7 @@ def test_certificate_expiration(certificate_available_context):
                     restart_mock.assert_not_called()
 
                 with patch(
-                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                     return_value=([client_provider_certificate], requirer_private_key),
                 ):
                     event.certificate = client_certificate
@@ -807,8 +808,8 @@ def test_set_tls_private_key():
     client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
 
     private_key = generate_private_key().raw
-    peer_secret_label = f"{LIBID}-private-key-0-{PEER_TLS_RELATION_NAME}"
-    client_secret_label = f"{LIBID}-private-key-0-{CLIENT_TLS_RELATION_NAME}"
+    peer_secret_label = f"{TLSLIBID}-private-key-0-{PEER_TLS_RELATION_NAME}"
+    client_secret_label = f"{TLSLIBID}-private-key-0-{CLIENT_TLS_RELATION_NAME}"
 
     secret = Secret(
         {"private-key": private_key},
@@ -822,13 +823,13 @@ def test_set_tls_private_key():
 
     with (
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
         ),
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._send_certificate_requests"
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4._send_certificate_requests"
         ),
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("subprocess.run"),
@@ -1006,13 +1007,13 @@ def test_set_tls_private_key():
 
     with (
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
         ),
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._send_certificate_requests"
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4._send_certificate_requests"
         ),
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4._find_available_certificates"
         ),
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("subprocess.run"),
@@ -1114,7 +1115,7 @@ def test_set_tls_private_key():
 
     with (
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4._cleanup_certificate_requests"
         ) as cleanup,
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("subprocess.run"),
@@ -1181,7 +1182,7 @@ def test_ca_peer_rotation(certificate_available_context):
                     lambda _, callback: charm._restart_ca_rotation(event),
                 ),
                 patch(
-                    "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                    "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                     side_effect=[
                         ([], requirer_private_key),
                         ([peer_provider_certificate], requirer_private_key),
@@ -1198,7 +1199,7 @@ def test_ca_peer_rotation(certificate_available_context):
                 event.defer.assert_called_once()
 
             with patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                 side_effect=[
                     ([], requirer_private_key),
                     ([peer_provider_certificate], requirer_private_key),
@@ -1238,7 +1239,7 @@ def test_ca_peer_rotation(certificate_available_context):
             patch("charm.EtcdOperatorCharm.rolling_restart") as restart_mock,
             ctx(ctx.on.update_status(), state_out) as manager,
             patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                 side_effect=[
                     ([], requirer_private_key),
                     ([peer_provider_certificate], requirer_private_key),
@@ -1321,7 +1322,7 @@ def test_ca_peer_rotation(certificate_available_context):
             patch("managers.tls.TLSManager.add_trusted_ca"),
             ctx(ctx.on.update_status(), state_out) as manager,
             patch(
-                "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+                "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
                 side_effect=[
                     ([peer_provider_certificate], requirer_private_key),
                 ],
@@ -1393,7 +1394,7 @@ def test_ca_client_rotation(certificate_available_context):
         patch("managers.tls.TLSManager.load_trusted_ca", return_value=[]),
         patch("managers.tls.TLSManager.add_trusted_ca"),
         patch(
-            "charms.tls_certificates_interface.v4.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([client_provider_certificate], requirer_private_key),
         ),
         patch("managers.config.ConfigManager.set_config_properties"),

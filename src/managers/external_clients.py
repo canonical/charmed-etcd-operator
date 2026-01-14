@@ -7,10 +7,10 @@
 import logging
 from pathlib import Path
 
+from charmlibs.interfaces.tls_certificates import Certificate, TLSCertificatesError
 from charms.data_platform_libs.v1.data_interfaces import (
     ResourceProviderModel,
 )
-from charms.tls_certificates_interface.v4.tls_certificates import Certificate, TLSCertificatesError
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
