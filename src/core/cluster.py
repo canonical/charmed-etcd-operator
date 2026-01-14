@@ -7,6 +7,9 @@
 import logging
 from typing import TYPE_CHECKING, Dict, Set
 
+from charmlibs.interfaces.tls_certificates import (
+    ProviderCertificate,
+)
 from charms.data_platform_libs.v1.data_interfaces import (
     OpsOtherPeerUnitRepositoryInterface,
     OpsPeerRepositoryInterface,
@@ -14,9 +17,6 @@ from charms.data_platform_libs.v1.data_interfaces import (
     OpsRelationRepositoryInterface,
     RequirerCommonModel,
     ResourceProviderEventHandler,
-)
-from charms.tls_certificates_interface.v4.tls_certificates import (
-    ProviderCertificate,
 )
 from data_platform_helpers.advanced_statuses.protocol import StatusesState, StatusesStateProtocol
 from ops import ModelError, Object, Relation, SecretNotFoundError, Unit
