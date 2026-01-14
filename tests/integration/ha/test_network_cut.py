@@ -282,8 +282,14 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
     # ensure the member is up again
     new_unit_ip = ip_address_from_unit(juju_lxd_model, unit_name=leader_unit)
     logger.info(f"unit_endpoint: {unit_endpoint}, leader_ip: {leader_ip}, new: {new_unit_ip}")
+    # unit_endpoint: http://10.214.32.215:2379, leader_ip: 10.214.32.215
+    # , new: 10.214.32.171
+    # TODO cleanup logs
+
     unit_endpoint_updated = unit_endpoint.replace(leader_ip, new_unit_ip)
     assert is_endpoint_up(unit_endpoint_updated, user=INTERNAL_USER, password=password)
+    # is_endpoint_up('http://10.214.32.215:2379', user='root', password='mRY7CivR5XxbKoeDKxpy0mNzM71XiDB2')
+
     logger.info(f"{leader_unit} is available again with new ip {new_unit_ip}")
 
     endpoints_updated = endpoints.replace(leader_ip, new_unit_ip)

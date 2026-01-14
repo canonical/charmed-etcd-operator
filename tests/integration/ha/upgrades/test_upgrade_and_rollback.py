@@ -165,7 +165,14 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
 def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: does_status_match(
+            status,
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=["active"], unit_status=["active"], unit_count=NUM_UNITS
+                )
+            },
+        )
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
