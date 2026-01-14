@@ -439,7 +439,7 @@ version = "1.3.0"
 description = "The charmlibs.interfaces.tls_certificates package."
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["main", "integration"]
 files = [
     {file = "charmlibs_interfaces_tls_certificates-1.3.0-py3-none-any.whl", hash = "sha256:20463ff94e9b45d54cbccc5b2dde43ab486f3805461a65d9c11e66c2ce8f1261"},
     {file = "charmlibs_interfaces_tls_certificates-1.3.0.tar.gz", hash = "sha256:db9ccd7af335b51c69c3f82ff4637a77adbfa017e2dc137bed2fcee30839547d"},
@@ -2528,4 +2528,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "24b782cb261c9ed83e28c24dd1f0e750e99d7297a43a363f6eae011aa511197c"
+content-hash = "5b72d8b4eb14df110ac88cc7cdd77727f82128a34e2dd7b96c4f91510d96be5b"
