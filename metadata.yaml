@@ -31,6 +31,8 @@ provides:
     interface: etcd_client
   cos-agent:
     interface: cos_agent
+    limit: 1
+    optional: true
 
 requires:
   peer-certificates:

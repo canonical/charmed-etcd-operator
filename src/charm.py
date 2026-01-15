@@ -10,7 +10,7 @@ from subprocess import CalledProcessError
 import charm_refresh
 import ops
 import ops.log
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from data_platform_helpers.advanced_statuses.handler import StatusHandler
 
@@ -117,10 +117,23 @@ class EtcdOperatorCharm(ops.CharmBase):
                     ],
                 }
             ],
+            tracing_protocols=["otlp_http"],
         )
+
+        self._reconcile_charm_tracing()
 
         if self.refresh and not self.refresh.next_unit_allowed_to_refresh:
             self._post_snap_refresh()
+
+    def _reconcile_charm_tracing(self):
+        """Configure tracing destination if cos-agent relation is present."""
+        endpoint, _ = charm_tracing_config(self._grafana_agent, None)
+        if not endpoint:
+            return
+        ops.tracing.set_destination(
+            url=endpoint + "/v1/traces",
+            ca=None,
+        )
 
     @property
     def refresh_in_progress(self) -> bool:
