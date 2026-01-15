@@ -157,7 +157,6 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
         lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
-    # etcd_application = ops_test.model.applications[APP_NAME]
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -291,7 +290,6 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
 
     juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
-    # etcd_application = ops_test.model.applications[APP_NAME]
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")

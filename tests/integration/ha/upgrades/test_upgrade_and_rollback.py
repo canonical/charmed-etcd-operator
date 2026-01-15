@@ -94,7 +94,8 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
         juju_lxd_model.run(
             refresh_order[0],
             "force-refresh-start",  # TODO fix!
-            {"check-compatibility": False, "run-pre-refresh-checks": False},
+            params={"check-compatibility": False, "run-pre-refresh-checks": False},
+            wait=1200,
         )
 
     # wait for the first refreshed unit to settle
@@ -113,8 +114,6 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
     logger.info(f"Continue etcd service on unit {refresh_order[-1]}")
     enable_etcd_service(juju_lxd_model, unit_name=refresh_order[-1])
 
-    # ops_test.application.refresh can't refresh from local to published charm, use command line
-    # in `juju refresh`, --switch and --revision are mutually exclusive
     # we can only roll back to the latest released revision from a local charm
     juju_lxd_model.refresh(app=APP_NAME, channel=CHARM_CHANNEL)
 
