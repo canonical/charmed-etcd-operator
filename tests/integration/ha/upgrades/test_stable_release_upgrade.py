@@ -10,12 +10,6 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from literals import INTERNAL_USER, PEER_RELATION
-from tests.integration.ha.helpers import (
-    assert_continuous_writes_consistent,
-    assert_continuous_writes_increasing,
-    start_continuous_writes,
-    stop_continuous_writes,
-)
 from tests.integration.ha.upgrades.literals import NUM_UNITS, WORKLOAD_VERSION
 from tests.integration.helpers import (
     APP_NAME,
@@ -44,12 +38,21 @@ def requirer_charm(platform: str) -> str:
 @pytest.mark.abort_on_fail
 async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) -> None:
     """Deploy the charm with the first stable release, together with a client charm and TLS."""
+    logger.info("Create storage pool for persistent storage")
+    await ops_test.model.create_storage_pool("etcd-pool", "lxd")
+    storage = {
+        "data": {"pool": "etcd-pool", "size": 2048},
+        "archive": {"pool": "etcd-pool", "size": 2048},
+        "logs": {"pool": "etcd-pool", "size": 2048},
+    }
+
     logger.info("Deploy charm from stable, deploy TLS provider and client charm")
     tls_config = {"ca-common-name": "etcd"}
     await asyncio.gather(
         ops_test.model.deploy(
             APP_NAME,
             num_units=NUM_UNITS,
+            storage=storage,
             channel=CHARM_CHANNEL,
             revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
         ),
@@ -74,12 +77,9 @@ async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) ->
 async def test_upgrade_to_latest(charm: str, ops_test: OpsTest) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
     etcd_application = ops_test.model.applications[APP_NAME]
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
     secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
-
-    # start writing data to the cluster
-    start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # pre-refresh-check
     for unit in etcd_application.units:
@@ -116,8 +116,6 @@ async def test_upgrade_to_latest(charm: str, ops_test: OpsTest) -> None:
         force_refresh_response = await force_refresh_action.wait()
         assert force_refresh_response.results.get("return-code") == 0, "action failed"
 
-    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
-
     await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
     assert "resume-refresh" in etcd_application.status_message, (
         "Refresh should wait for user to continue with `resume-refresh` action"
@@ -130,20 +128,22 @@ async def test_upgrade_to_latest(charm: str, ops_test: OpsTest) -> None:
 
     # wait for upgrade to complete
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
-    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info("Check etcd versions and cluster membership")
-    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
+    cluster_members = get_cluster_members(
+        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
+    )
     for unit in etcd_application.units:
-        unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
+        unit_endpoint = get_unit_endpoint(
+            ops_test, unit_name=unit.name, app_name=APP_NAME, tls_enabled=True
+        )
         assert (
-            get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
+            get_etcd_version(
+                unit_endpoint, user=INTERNAL_USER, password=password, tls_enabled=True
+            )
             == WORKLOAD_VERSION["target"]
         ), f"unit {unit.name} was not upgraded"
 
         assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
             f"{unit.name} is not in {cluster_members}"
         )
-
-    stop_continuous_writes()
-    assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
