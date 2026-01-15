@@ -93,7 +93,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
         juju_lxd_model.run(
             refresh_order[0],
-            "force-refresh-start",  # TODO fix!
+            "force-refresh-start",
             params={"check-compatibility": False, "run-pre-refresh-checks": False},
             wait=1200,
         )
@@ -115,7 +115,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
     enable_etcd_service(juju_lxd_model, unit_name=refresh_order[-1])
 
     # we can only roll back to the latest released revision from a local charm
-    juju_lxd_model.refresh(app=APP_NAME, channel=CHARM_CHANNEL)
+    juju_lxd_model.cli(f"refresh {APP_NAME} --switch {APP_NAME} --channel {CHARM_CHANNEL}")
 
     juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=30))
 
