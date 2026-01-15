@@ -25,8 +25,10 @@ from tests.integration.helpers_deployment import wait_until
 logger = logging.getLogger(__name__)
 
 CHARM_CHANNEL = "3.6/stable"
+# these revisions are the ones from the first stable release, they are supposed to be kept
 CHARM_REVISIONS_TO_DEPLOY = {"x86_64": 119, "aarch64": 120}
 REQUIRER_NAME = "requirer-charm"
+REQUIRER_TLS_NAME = "requirer-tls-provider"
 
 
 @pytest.fixture
@@ -37,7 +39,7 @@ def requirer_charm(platform: str) -> str:
 
 @pytest.mark.abort_on_fail
 async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) -> None:
-    """Deploy the charm with the first stable release, together with a client charm and TLS."""
+    """Deploy the charm with the first stable release, in a production-like setup."""
     logger.info("Create storage pool for persistent storage")
     await ops_test.model.create_storage_pool("etcd-pool", "lxd")
     storage = {
@@ -61,6 +63,9 @@ async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) ->
             application_name=REQUIRER_NAME,
         ),
         ops_test.model.deploy(TLS_NAME, channel="1/stable", config=tls_config),
+        ops_test.model.deploy(
+            TLS_NAME, channel="1/edge", application_name=REQUIRER_TLS_NAME, config=tls_config
+        ),
     )
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000, wait_for_exact_units=NUM_UNITS)
 
@@ -68,9 +73,9 @@ async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) ->
     logger.info("Integrating TLS and client relations")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await ops_test.model.integrate(REQUIRER_NAME, TLS_NAME)
+    await ops_test.model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
     await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME])
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME])
 
 
 @pytest.mark.abort_on_fail
