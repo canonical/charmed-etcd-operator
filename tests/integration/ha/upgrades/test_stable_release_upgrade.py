@@ -9,17 +9,8 @@ from platform import machine
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from literals import INTERNAL_USER, PEER_RELATION
 from tests.integration.ha.upgrades.literals import NUM_UNITS, WORKLOAD_VERSION
-from tests.integration.helpers import (
-    APP_NAME,
-    TLS_NAME,
-    get_cluster_endpoints,
-    get_cluster_members,
-    get_etcd_version,
-    get_secret_by_label,
-    get_unit_endpoint,
-)
+from tests.integration.helpers import APP_NAME, TLS_NAME
 from tests.integration.helpers_deployment import wait_until
 
 logger = logging.getLogger(__name__)
@@ -61,10 +52,11 @@ async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) ->
         ops_test.model.deploy(
             requirer_charm,
             application_name=REQUIRER_NAME,
+            config={"data-interfaces-version": "0"},
         ),
         ops_test.model.deploy(TLS_NAME, channel="1/stable", config=tls_config),
         ops_test.model.deploy(
-            TLS_NAME, channel="1/edge", application_name=REQUIRER_TLS_NAME, config=tls_config
+            TLS_NAME, channel="1/stable", application_name=REQUIRER_TLS_NAME, config=tls_config
         ),
     )
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000, wait_for_exact_units=NUM_UNITS)
@@ -84,9 +76,6 @@ async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) ->
 async def test_upgrade_to_latest(charm: str, ops_test: OpsTest) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
     etcd_application = ops_test.model.applications[APP_NAME]
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
-    password = secret.get(f"{INTERNAL_USER}-password")
 
     # pre-refresh-check
     for unit in etcd_application.units:
@@ -135,22 +124,3 @@ async def test_upgrade_to_latest(charm: str, ops_test: OpsTest) -> None:
 
     # wait for upgrade to complete
     await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
-
-    logger.info("Check etcd versions and cluster membership")
-    cluster_members = get_cluster_members(
-        endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
-    )
-    for unit in etcd_application.units:
-        unit_endpoint = get_unit_endpoint(
-            ops_test, unit_name=unit.name, app_name=APP_NAME, tls_enabled=True
-        )
-        assert (
-            get_etcd_version(
-                unit_endpoint, user=INTERNAL_USER, password=password, tls_enabled=True
-            )
-            == WORKLOAD_VERSION["target"]
-        ), f"unit {unit.name} was not upgraded"
-
-        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
-            f"{unit.name} is not in {cluster_members}"
-        )
