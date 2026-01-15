@@ -10,7 +10,6 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict
 
-# TODO jubilant: remove juju, pytest-operator, and pytest-asyncio when all tests migrated
 import yaml
 from jubilant import Juju
 from tenacity import retry, stop_after_attempt, wait_fixed
