@@ -69,13 +69,15 @@ async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) ->
     )
     await wait_until(ops_test, apps=[APP_NAME], timeout=1000, wait_for_exact_units=NUM_UNITS)
 
-    # enable TLS and check if the cluster is still accessible
-    logger.info("Integrating TLS and client relations")
+    logger.info("Enable TLS")
     await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
     await ops_test.model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
-    await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
     await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME])
+
+    logger.info("Integrate client application")
+    await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
+    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME])
 
 
 @pytest.mark.abort_on_fail
