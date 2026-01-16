@@ -33,7 +33,7 @@ def requirer_charm(platform: str) -> str:
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_stable_revision(juju_lxd_model: Juju, requirer_charm: str) -> None:
+def test_deploy_stable_revision(juju_lxd_model: Juju, requirer_charm: str) -> None:
     """Deploy the charm with the first stable release, in a production-like setup."""
     logger.info("Create storage pool for persistent storage")
     juju_lxd_model.cli("create-storage-pool", "etcd-pool", "lxd", include_model=False)
@@ -83,7 +83,7 @@ async def test_deploy_stable_revision(juju_lxd_model: Juju, requirer_charm: str)
 
 
 @pytest.mark.abort_on_fail
-async def test_upgrade_to_latest(charm: str, juju_lxd_model: Juju) -> None:
+def test_upgrade_to_latest(charm: str, juju_lxd_model: Juju) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
     # pre-refresh-check
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
