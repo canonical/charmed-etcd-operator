@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, final
 
+from charmlibs.interfaces.tls_certificates import PrivateKey
 from charms.data_platform_libs.v1.data_interfaces import (
     ExtraSecretStr,
     OpsOtherPeerUnitRepositoryInterface,
@@ -16,7 +17,6 @@ from charms.data_platform_libs.v1.data_interfaces import (
     OpsPeerUnitRepositoryInterface,
     PeerModel,
 )
-from charms.tls_certificates_interface.v4.tls_certificates import PrivateKey
 from ops.model import Application, Relation, Unit
 from pydantic import Field
 
