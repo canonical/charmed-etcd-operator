@@ -29,22 +29,6 @@ These refreshes are well-tested and should be preferred.
 +--------------+------------+----------+--------------+------------+----------+--------------------------------------------------------------------------------------------------------+
 ```
 
-### Supported refreshes
-
-These refreshes should be supported.
-If possible, use a [recommended refresh](#recommended-refreshes) instead.
-
-```{eval-rst}
-+------------+------------+----------+------------+------------+----------+
-| .. centered:: From                 | .. centered:: To                   |
-+------------+------------+----------+------------+------------+----------+
-| Charm      | etcd       | Snap     | Charm      | etcd       | Snap     |
-| revision   | Version    | revision | revision   | Version    | revision |
-+============+============+==========+============+============+==========+
-| tbd.       | tbd.       | tbd.     | tbd.       | tbd.       | tbd.     |
-|            |            |          +------------+------------+----------+
-|            |            |          | tbd.       | tbd.       | tbd.     |
-+------------+------------+----------+------------+------------+----------+
 <!--
 ### Supported refreshes
 
