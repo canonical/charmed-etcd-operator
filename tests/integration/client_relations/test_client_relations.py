@@ -8,10 +8,10 @@ from datetime import timedelta
 
 import pytest
 from charmlibs.interfaces.tls_certificates import (
-    generate_ca,
-    generate_certificate,
+    Certificate,
+    CertificateRequestAttributes,
+    PrivateKey,
     generate_csr,
-    generate_private_key,
 )
 from jubilant import Juju, TaskError
 
@@ -54,17 +54,19 @@ def generate_mtls_chain(common_name: str) -> tuple[str, str]:
     Returns:
         tuple[str, str]: The end-entity certificate and the CA certificate.
     """
-    ca_private_key = generate_private_key()
-    ca_cert = generate_ca(
-        private_key=ca_private_key, validity=timedelta(days=365), common_name="ca_common_name"
+    ca_private_key = PrivateKey.generate()
+    ca_cert = Certificate.generate_self_signed_ca(
+        private_key=ca_private_key,
+        validity=timedelta(days=365),
+        attributes=CertificateRequestAttributes(common_name="ca_common_name"),
     )
 
-    client_private_key = generate_private_key()
+    client_private_key = PrivateKey.generate()
     client_csr = generate_csr(private_key=client_private_key, common_name=common_name)
-    client_cert = generate_certificate(
-        client_csr, ca_cert, ca_private_key, validity=timedelta(days=365)
+    client_cert = Certificate.generate(
+        csr=client_csr, ca=ca_cert, ca_private_key=ca_private_key, validity=timedelta(days=365)
     )
-    return (client_cert.raw, ca_cert.raw)
+    return client_cert.raw, ca_cert.raw
 
 
 def get_requirer_common_names(juju: Juju) -> list[str]:
