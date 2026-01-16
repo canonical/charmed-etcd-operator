@@ -229,7 +229,7 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
     )
 
     logger.info("Continue refresh on all other units with `resume-refresh` action")
-    resume_refresh_response = juju_lxd_model.run(refresh_order[0], "resume-refresh")
+    resume_refresh_response = juju_lxd_model.run(refresh_order[1], "resume-refresh")
     assert resume_refresh_response.return_code == 0, "action failed"
 
     # wait for upgrade to complete
