@@ -2,16 +2,20 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import logging
 from platform import machine
 
 import pytest
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
 
 from tests.integration.ha.upgrades.literals import NUM_UNITS, WORKLOAD_VERSION
-from tests.integration.helpers import APP_NAME, TLS_NAME
-from tests.integration.helpers_deployment import wait_until
+from tests.integration.helpers import APP_NAME, TLS_NAME, get_leader_unit_name
+from tests.integration.helpers_deployment import (
+    ExpectedStatus,
+    agents_idle,
+    apps_active_and_agents_idle,
+    does_status_match,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,98 +33,103 @@ def requirer_charm(platform: str) -> str:
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_stable_revision(ops_test: OpsTest, requirer_charm: str) -> None:
+async def test_deploy_stable_revision(juju_lxd_model: Juju, requirer_charm: str) -> None:
     """Deploy the charm with the first stable release, in a production-like setup."""
     logger.info("Create storage pool for persistent storage")
-    await ops_test.model.create_storage_pool("etcd-pool", "lxd")
+    juju_lxd_model.cli("create-storage-pool", "etcd-pool", "lxd", include_model=False)
+
     storage = {
-        "data": {"pool": "etcd-pool", "size": 2048},
-        "archive": {"pool": "etcd-pool", "size": 2048},
-        "logs": {"pool": "etcd-pool", "size": 2048},
+        "data": "etcd-pool,2G",
+        "archive": "etcd-pool,2G",
+        "logs": "etcd-pool,2G",
     }
 
     logger.info("Deploy charm from stable, deploy TLS provider and client charm")
     tls_config = {"ca-common-name": "etcd"}
-    await asyncio.gather(
-        ops_test.model.deploy(
-            APP_NAME,
-            num_units=NUM_UNITS,
-            storage=storage,
-            channel=CHARM_CHANNEL,
-            revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
-        ),
-        ops_test.model.deploy(
-            requirer_charm,
-            application_name=REQUIRER_NAME,
-            config={"data-interfaces-version": "0"},
-        ),
-        ops_test.model.deploy(TLS_NAME, channel="1/stable", config=tls_config),
-        ops_test.model.deploy(
-            TLS_NAME, channel="1/stable", application_name=REQUIRER_TLS_NAME, config=tls_config
-        ),
+    juju_lxd_model.deploy(
+        APP_NAME,
+        num_units=NUM_UNITS,
+        storage=storage,
+        channel=CHARM_CHANNEL,
+        revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000, wait_for_exact_units=NUM_UNITS)
+    juju_lxd_model.deploy(
+        requirer_charm,
+        app=REQUIRER_NAME,
+        config={"data-interfaces-version": "0"},
+    )
+    juju_lxd_model.deploy(TLS_NAME, channel="1/stable", config=tls_config)
+    juju_lxd_model.deploy(TLS_NAME, channel="1/stable", app=REQUIRER_TLS_NAME, config=tls_config)
+
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+    )
 
     logger.info("Enable TLS")
-    await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
-    await ops_test.model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
-    await ops_test.model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME])
+    juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
+    juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
+    juju_lxd_model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(
+            status, APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME
+        )
+    )
 
     logger.info("Integrate client application")
-    await ops_test.model.integrate(APP_NAME, REQUIRER_NAME)
-    await wait_until(ops_test, apps=[APP_NAME, REQUIRER_NAME])
+    juju_lxd_model.integrate(APP_NAME, REQUIRER_NAME)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+    )
 
 
 @pytest.mark.abort_on_fail
-async def test_upgrade_to_latest(charm: str, ops_test: OpsTest) -> None:
+async def test_upgrade_to_latest(charm: str, juju_lxd_model: Juju) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
-    etcd_application = ops_test.model.applications[APP_NAME]
-
     # pre-refresh-check
-    for unit in etcd_application.units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
+    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
     logger.info("Running `pre-refresh-check` action")
-    pre_refresh_action = await leader_unit.run_action("pre-refresh-check")
-    pre_refresh_response = await pre_refresh_action.wait()
-    assert pre_refresh_response.results.get("return-code") == 0, "action failed"
+    pre_refresh_response = juju_lxd_model.run(leader_unit, "pre-refresh-check")
+    assert pre_refresh_response.return_code == 0, "action failed"
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
-        etcd_application.units,
+        juju_lxd_model.status().get_units(APP_NAME),
         key=lambda unit: int(unit.name.split("/")[1]),
         reverse=True,
     )
 
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
-    await etcd_application.refresh(path=charm)
+    juju_lxd_model.refresh(path=charm, app=APP_NAME)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
-    if "incompatible" in etcd_application.status_message:
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=30))
+    if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
-        logger.info(f"Continue refresh on unit {refresh_order[0].name}")
+        logger.info(f"Continue refresh on unit {refresh_order[0]}")
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        force_refresh_action = await refresh_order[0].run_action(
-            "force-refresh-start", **{"check-compatibility": False}
+        force_refresh_response = juju_lxd_model.run(
+            refresh_order[0], "force-refresh-start", {"check-compatibility": False}
         )
-        force_refresh_response = await force_refresh_action.wait()
-        assert force_refresh_response.results.get("return-code") == 0, "action failed"
+        assert force_refresh_response.return_code == 0, "action failed"
 
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
-    assert "resume-refresh" in etcd_application.status_message, (
+    juju_lxd_model.wait(
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
+    )
+    assert "resume-refresh" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message, (
         "Refresh should wait for user to continue with `resume-refresh` action"
     )
 
     logger.info("Continue refresh on all other units with `resume-refresh` action")
-    resume_refresh_action = await refresh_order[1].run_action("resume-refresh")
-    resume_refresh_response = await resume_refresh_action.wait()
-    assert resume_refresh_response.results.get("return-code") == 0, "action failed"
+    resume_refresh_response = juju_lxd_model.run(refresh_order[1], "resume-refresh")
+    assert resume_refresh_response.return_code == 0, "action failed"
 
     # wait for upgrade to complete
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    juju_lxd_model.wait(
+        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+    )

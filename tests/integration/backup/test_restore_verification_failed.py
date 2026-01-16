@@ -152,7 +152,7 @@ def test_restore_verification_failed(juju_lxd_model: Juju):
             status,
             expected_status={
                 APP_NAME: ExpectedStatus(
-                    app_status=[BackupStatuses.RESTORE_VERIFICATION_FAILED.value]
+                    unit_status=[BackupStatuses.RESTORE_VERIFICATION_FAILED.value]
                 ),
             },
         )

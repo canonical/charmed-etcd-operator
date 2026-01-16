@@ -354,7 +354,6 @@ def download_client_certificate_from_unit(juju: Juju, app_name: str = APP_NAME) 
 def get_storage_id(juju: Juju, unit_name: str, storage_name: str) -> str | None:
     """Retrieve the storage id associated with a unit."""
     storage_data = juju.cli("storage")
-    # storage_data = storage_data.decode("utf-8")
     for line in storage_data.splitlines():
         # skip the header and irrelevant lines
         if not line or "Storage" in line or "detached" in line:
@@ -363,7 +362,7 @@ def get_storage_id(juju: Juju, unit_name: str, storage_name: str) -> str | None:
         if line.split()[0] == unit_name and line.split()[1].startswith(storage_name):
             return line.split()[1]
 
-    return None
+    raise RuntimeError(f"Storage {storage_name} not found for unit {unit_name}")
 
 
 def get_user(
