@@ -115,8 +115,9 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
     enable_etcd_service(juju_lxd_model, unit_name=refresh_order[-1])
 
     # we can only roll back to the latest released revision from a local charm
+    refresh_cmd = f"refresh {APP_NAME} --model={juju_lxd_model.model} --switch {APP_NAME} --channel {CHARM_CHANNEL}"
     juju_lxd_model.cli(
-        f"refresh {APP_NAME} --model {juju_lxd_model.model} --switch {APP_NAME} --channel {CHARM_CHANNEL}",
+        *refresh_cmd.split(),
         include_model=False,
     )
 
