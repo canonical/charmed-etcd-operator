@@ -94,7 +94,7 @@ def test_upgrade_to_latest(charm: str, juju_lxd_model: Juju) -> None:
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
         juju_lxd_model.status().get_units(APP_NAME),
-        key=lambda unit: int(unit.name.split("/")[1]),
+        key=lambda unit_name: int(unit_name.split("/")[1]),
         reverse=True,
     )
 

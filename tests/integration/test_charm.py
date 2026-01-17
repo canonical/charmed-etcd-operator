@@ -112,7 +112,7 @@ def test_update_admin_password(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_user_secret_permissions(juju_lxd_model: Juju) -> None:
+def test_user_secret_permissions(juju_lxd_model: Juju) -> None:
     """If a user secret is not granted, ensure we can process updated permissions."""
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
 
@@ -153,7 +153,7 @@ async def test_user_secret_permissions(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_etcd_metrics_endpoint(juju_lxd_model: Juju):
+def test_etcd_metrics_endpoint(juju_lxd_model: Juju):
     # direct metrics scrape
     leader_unit_ip = get_leader_unit_ip(juju_lxd_model, app=APP_NAME)
     endpoint = f"http://{leader_unit_ip}:{METRICS_PORT}/metrics"
