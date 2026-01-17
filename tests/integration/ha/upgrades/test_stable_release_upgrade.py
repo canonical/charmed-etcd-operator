@@ -27,16 +27,16 @@ REQUIRER_TLS_NAME = "requirer-tls-provider"
 
 
 @pytest.fixture
-def requirer_charm(platform: str) -> str:
+def requirer_charm(arch: str) -> str:
     """Path to the requirer charm file to use for testing."""
-    return f"./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-{platform}.charm"
+    return f"./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-{arch}.charm"
 
 
 @pytest.mark.abort_on_fail
 def test_deploy_stable_revision(juju_lxd_model: Juju, requirer_charm: str) -> None:
     """Deploy the charm with the first stable release, in a production-like setup."""
     logger.info("Create storage pool for persistent storage")
-    juju_lxd_model.cli("create-storage-pool", "etcd-pool", "lxd", include_model=False)
+    juju_lxd_model.cli("create-storage-pool", "etcd-pool", "lxd")
 
     storage = {
         "data": "etcd-pool,2G",

@@ -43,7 +43,7 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Deploy the charm with storage volume for data, allowing for skipping if already deployed."""
     # create storage to be used in this test
     # this assumes the test is run on a lxd cloud
-    juju_lxd_model.cli("create-storage-pool", "etcd-pool", "lxd", include_model=False)
+    juju_lxd_model.cli("create-storage-pool", "etcd-pool", "lxd")
 
     storage = {
         "data": "etcd-pool,2G",
