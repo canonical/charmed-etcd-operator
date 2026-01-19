@@ -63,7 +63,7 @@ def lxd_controller(lxd_cloud: str, juju: Juju):
 
 
 @pytest.fixture(scope="module")
-async def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
+def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
     """Provision a microk8s cloud, if a k8s cloud isn't already present, and return the name. Do so only if running on amd64.
 
     This is because arm64 isn't supported by the cos-lite charms for which we are provisioning this k8s cloud.
