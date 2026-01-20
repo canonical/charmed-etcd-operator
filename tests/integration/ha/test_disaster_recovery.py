@@ -36,7 +36,7 @@ NUM_UNITS = 5
 def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build and deploy the charm."""
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -138,7 +138,7 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
                 status,
                 expected_status={
                     APP_NAME: ExpectedStatus(
-                        app_status=[ClusterStatuses.CLUSTER_FAILED.value], unit_count=2
+                        unit_status=[ClusterStatuses.CLUSTER_FAILED.value], unit_count=2
                     )
                 },
             )
