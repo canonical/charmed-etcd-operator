@@ -195,7 +195,7 @@ def _does_message_match(model_status: StatusInfo, expected_status: StatusObject 
             return (
                 current_status == juju_status.message
                 or current_status.startswith(juju_status.message)
-                or juju_status.message.startswith(f"{current_status:.40}")
+                or current_status.startswith(f"{juju_status.message:.40}")
                 or (
                     expected_status.short_message is not None
                     and expected_status.short_message in current_status

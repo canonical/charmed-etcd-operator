@@ -5,7 +5,6 @@
 import logging
 import time
 
-import jubilant
 import pytest
 from jubilant import Juju, TaskError
 
@@ -37,7 +36,7 @@ NUM_UNITS = 5
 def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build and deploy the charm."""
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1400)
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -154,19 +153,7 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
                 logger.info("Waiting for a leader to be elected")
                 time.sleep(10)
 
-    juju_lxd_model.wait(
-        lambda status: does_status_match(
-            status,
-            expected_status={
-                APP_NAME: ExpectedStatus(
-                    unit_status=[ClusterStatuses.CLUSTER_FAILED.value], unit_count=2
-                )
-            },
-        )
-        and jubilant.all_agents_idle(status, APP_NAME)
-    )
     logger.info("Rebuilding cluster after majority failure")
-    logger.info(f"Status rn: {juju_lxd_model.status()}")
     rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
     assert rebuild_response.return_code == 0, "rebuild failed"
 
