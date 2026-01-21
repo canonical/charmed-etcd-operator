@@ -130,9 +130,7 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
     second_removed_member_name = second_unit_to_remove.replace("/", "")
     logger.info(f"Forcefully removing units {first_unit_to_remove} and {second_unit_to_remove}")
 
-    destroy_unit_cmd = f"remove-unit {first_unit_to_remove} {second_unit_to_remove} --model={juju_lxd_model.model} --force --no-wait --no-prompt"
-    juju_lxd_model.cli(*destroy_unit_cmd.split(), include_model=False)
-    # juju_lxd_model.remove_unit(first_unit_to_remove, second_unit_to_remove, force=True)
+    juju_lxd_model.remove_unit(first_unit_to_remove, second_unit_to_remove, force=True)
 
     with fast_forward(juju_lxd_model):
         juju_lxd_model.wait(
@@ -145,6 +143,7 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
                 },
             )
         )
+
         leader_unit = None
         while leader_unit is None:
             for unit_name, unit_details in juju_lxd_model.status().get_units(APP_NAME).items():
