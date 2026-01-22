@@ -139,8 +139,13 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
             logger.info(f"Waiting for the units to be removed....{5 - x}")
             sleep(5)
 
+    leader_unit = None
+    for unit_name, unit_details in get_app_status(juju_lxd_model, APP_NAME).units.items():
+        if unit_details.leader:
+            leader_unit = unit_name
+
     logger.info("Rebuilding cluster after majority failure")
-    rebuild_response = juju_lxd_model.run(f"{APP_NAME}/leader", "rebuild-cluster")
+    rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
     assert rebuild_response.return_code == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
@@ -148,10 +153,7 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
         logger.info(f"Waiting for the rebuild....{10 - x}")
         sleep(5)
 
-    status_cmd = f"status {APP_NAME} --format=json"
-    app_status = AppStatus._from_dict(
-        json.loads(juju_lxd_model.cli(*status_cmd.split()))["applications"][APP_NAME]
-    )
+    app_status = get_app_status(juju_lxd_model, APP_NAME)
 
     endpoints = ",".join(
         [f"'http'://{unit.public_address}:{CLIENT_PORT}" for unit in app_status.units.values()]
@@ -172,3 +174,10 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
         f"{second_removed_member_name} still in cluster members"
     )
     logger.info(f"{second_removed_member_name} not in cluster members")
+
+
+def get_app_status(juju: Juju, app_name: str):
+    status_cmd = f"status {app_name} --format=json"
+    return AppStatus._from_dict(
+        json.loads(juju.cli(*status_cmd.split()))["applications"][app_name]
+    )
