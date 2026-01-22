@@ -134,15 +134,17 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
     destroy_unit_cmd = f"remove-unit {first_unit_to_remove} {second_unit_to_remove} --model={juju_lxd_model.model} --force --no-wait --no-prompt"
     juju_lxd_model.cli(*destroy_unit_cmd.split(), include_model=False)
 
+    leader_unit = None
+
     with fast_forward(juju_lxd_model):
         for x in range(5):
             logger.info(f"Waiting for the units to be removed....{5 - x}")
             sleep(5)
 
-    leader_unit = None
-    for unit_name, unit_details in get_app_status(juju_lxd_model, APP_NAME).units.items():
-        if unit_details.leader:
-            leader_unit = unit_name
+        while leader_unit is None:
+            for unit_name, unit_details in get_app_status(juju_lxd_model, APP_NAME).units.items():
+                if unit_details.leader:
+                    leader_unit = unit_name
 
     logger.info("Rebuilding cluster after majority failure")
     rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
