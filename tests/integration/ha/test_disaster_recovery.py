@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+import json
 import logging
-import time
+from time import sleep
 
 import pytest
 from jubilant import Juju, TaskError
+from jubilant.statustypes import AppStatus
 
-from literals import INTERNAL_USER, PEER_RELATION
-from statuses import ClusterStatuses
+from literals import CLIENT_PORT, INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
@@ -19,7 +19,7 @@ from ..helpers import (
     get_leader_unit_name,
     get_secret_by_label,
 )
-from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import apps_active_and_agents_idle
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -130,40 +130,36 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
     second_removed_member_name = second_unit_to_remove.replace("/", "")
     logger.info(f"Forcefully removing units {first_unit_to_remove} and {second_unit_to_remove}")
 
-    juju_lxd_model.remove_unit(first_unit_to_remove, second_unit_to_remove, force=True)
+    # juju_lxd_model.remove_unit(first_unit_to_remove, second_unit_to_remove, force=True)
+    destroy_unit_cmd = f"remove-unit {first_unit_to_remove} {second_unit_to_remove} --model={juju_lxd_model.model} --force --no-wait --no-prompt"
+    juju_lxd_model.cli(*destroy_unit_cmd.split(), include_model=False)
 
     with fast_forward(juju_lxd_model):
-        juju_lxd_model.wait(
-            lambda status: does_status_match(
-                status,
-                expected_status={
-                    APP_NAME: ExpectedStatus(
-                        unit_status=[ClusterStatuses.CLUSTER_FAILED.value], unit_count=2
-                    )
-                },
-            )
-        )
-
-        leader_unit = None
-        while leader_unit is None:
-            for unit_name, unit_details in juju_lxd_model.status().get_units(APP_NAME).items():
-                if unit_details.leader:
-                    leader_unit = unit_name
-
-            if leader_unit is None:
-                logger.info("Waiting for a leader to be elected")
-                time.sleep(10)
+        for x in range(5):
+            logger.info(f"Waiting for the units to be removed....{5 - x}")
+            sleep(5)
 
     logger.info("Rebuilding cluster after majority failure")
-    rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
+    rebuild_response = juju_lxd_model.run(f"{APP_NAME}/leader", "rebuild-cluster")
     assert rebuild_response.return_code == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2))
-    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    for x in range(10):
+        logger.info(f"Waiting for the rebuild....{10 - x}")
+        sleep(5)
+
+    status_cmd = f"status {APP_NAME} --format=json"
+    app_status = AppStatus._from_dict(
+        json.loads(juju_lxd_model.cli(*status_cmd.split()))["applications"][APP_NAME]
+    )
+
+    endpoints = ",".join(
+        [f"'http'://{unit.public_address}:{CLIENT_PORT}" for unit in app_status.units.values()]
+    )
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
-    for unit_name in juju_lxd_model.status().get_units(APP_NAME):
+
+    for unit_name in app_status.units:
         assert unit_name.replace("/", "") in member_names, (
             f"unit {unit_name} not in cluster members"
         )
