@@ -12,6 +12,7 @@ from typing import Any, Dict
 
 import yaml
 from jubilant import Juju
+from jubilant.statustypes import AppStatus
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from literals import (
@@ -490,3 +491,10 @@ def fast_forward(juju: Juju, interval: int = 10):
         yield
     finally:
         juju.model_config({"update-status-hook-interval": old})
+
+
+def get_app_status(juju: Juju, app_name: str) -> AppStatus:
+    status_cmd = f"status {app_name} --format=json"
+    return AppStatus._from_dict(
+        json.loads(juju.cli(*status_cmd.split()))["applications"][app_name]
+    )

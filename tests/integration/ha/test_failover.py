@@ -634,7 +634,10 @@ def test_reboot_raft_leader(etcd_process: str, juju_lxd_model: Juju) -> None:
             status,
             expected_status={
                 app: ExpectedStatus(
-                    app_status=["active"], unit_status=["active"], unit_count=units_count
+                    app_status=["active"],
+                    unit_status=["active"],
+                    unit_count=units_count,
+                    idle_period=30,
                 )
             },
         )

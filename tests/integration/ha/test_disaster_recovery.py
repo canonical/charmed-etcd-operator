@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-import json
 import logging
 from time import sleep
 
 import pytest
 from jubilant import Juju, TaskError
-from jubilant.statustypes import AppStatus
 
 from literals import CLIENT_PORT, INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
     fast_forward,
+    get_app_status,
     get_cluster_endpoints,
     get_cluster_members,
     get_leader_unit_name,
@@ -176,10 +175,3 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
         f"{second_removed_member_name} still in cluster members"
     )
     logger.info(f"{second_removed_member_name} not in cluster members")
-
-
-def get_app_status(juju: Juju, app_name: str):
-    status_cmd = f"status {app_name} --format=json"
-    return AppStatus._from_dict(
-        json.loads(juju.cli(*status_cmd.split()))["applications"][app_name]
-    )

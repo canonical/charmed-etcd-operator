@@ -80,7 +80,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2, idle_period=30))
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2, idle_period=60))
 
     last_unit_name, last_unit_status = list(juju_lxd_model.status().get_units(APP_NAME).items())[
         -1
@@ -91,7 +91,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
         juju_lxd_model.run(last_unit_name, "force-refresh-start", {"check-compatibility": False})
 
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2, idle_period=30))
+    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2, idle_period=60))
 
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 

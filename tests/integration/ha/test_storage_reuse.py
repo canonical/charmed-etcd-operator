@@ -4,6 +4,7 @@
 
 import logging
 import time
+from time import sleep
 
 import pytest
 from jubilant import Juju
@@ -12,6 +13,7 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
+    get_app_status,
     get_cluster_endpoints,
     get_cluster_id,
     get_cluster_members,
@@ -52,7 +54,22 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     }
 
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS, storage=storage)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
+
+    # jubilant's wait helper has been avoided intentionally,
+    # as it queries the full status of a model (including incompletely set up storage, etc.) thereby erroring out.
+    # instead, we fetch the status every 10s and wait for a maximum of 1000s for the app to become active, and agents to settle.
+    deadline = time.monotonic() + 1000
+    while True:
+        current_app_status = get_app_status(juju_lxd_model, APP_NAME)
+        is_app_ready = "active" == current_app_status.app_status.current and all(
+            "idle" == current_app_status.units.get(unit).juju_status.current
+            for unit in current_app_status.units
+        )
+        if is_app_ready:
+            break
+        if time.monotonic() >= deadline:
+            raise Exception(f"Timed out after waiting 1000s for '{APP_NAME}' to become ready.")
+        sleep(10)
 
     assert len(juju_lxd_model.status().get_units(APP_NAME)) == NUM_UNITS
 
