@@ -52,7 +52,7 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     }
 
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS, storage=storage)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
 
     assert len(juju_lxd_model.status().get_units(APP_NAME)) == NUM_UNITS
 
