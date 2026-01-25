@@ -226,7 +226,10 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
             status,
             expected_status={
                 APP_NAME: ExpectedStatus(
-                    app_status=["blocked"], unit_status=["active"], unit_count=NUM_UNITS
+                    app_status=["blocked"],
+                    unit_status=["active"],
+                    unit_count=NUM_UNITS,
+                    idle_period=30,
                 )
             },
         )
