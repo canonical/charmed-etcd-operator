@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+from time import sleep
 
 import pytest
 from jubilant import Juju
@@ -78,6 +79,8 @@ def test_s3_integration(juju_lxd_model: Juju, s3_bucket) -> None:
             },
         )
     )
+
+    sleep(60)
 
     # bucket should be created when integrating both
     assert s3_bucket.meta.client.head_bucket(Bucket=s3_bucket.name)

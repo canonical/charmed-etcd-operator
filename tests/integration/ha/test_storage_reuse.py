@@ -55,6 +55,8 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS, storage=storage)
 
+    sleep(30)
+
     # jubilant's wait helper has been avoided intentionally,
     # as it queries the full status of a model (including incompletely set up storage, etc.) thereby erroring out.
     # instead, we fetch the status every 10s and wait for a maximum of 1000s for the app to become active, and agents to settle.
