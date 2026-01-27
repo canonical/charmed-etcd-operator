@@ -145,6 +145,7 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
         are_units_removed = False
         for x in range(10):
             if 2 == len(get_app_status(juju_lxd_model, APP_NAME).units):
+                are_units_removed = True
                 break
             sleep(5)
         if not are_units_removed:

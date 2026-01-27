@@ -66,7 +66,7 @@ def test_upgrade_single_unit_cluster(charm: str, juju_lxd_model: Juju) -> None:
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
     juju_lxd_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, idle_period=30), delay=10, successes=1
+        lambda status: are_agents_idle(status, APP_NAME, idle_period=60), delay=10, successes=1
     )
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
@@ -154,7 +154,8 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
 
     logger.info("Scaling up will continue the refresh on the newly added unit")
     juju_lxd_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS + 1)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS + 1),
+        timeout=1200,
     )
 
     updated_endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)

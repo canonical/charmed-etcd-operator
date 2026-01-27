@@ -65,7 +65,8 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     )
 
     juju_lxd_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=2)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=2),
+        timeout=1200,
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
