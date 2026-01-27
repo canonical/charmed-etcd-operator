@@ -142,9 +142,13 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
     leader_unit = None
 
     with fast_forward(juju_lxd_model):
-        for x in range(5):
-            logger.info(f"Waiting for the units to be removed....{5 - x}")
+        are_units_removed = False
+        for x in range(10):
+            if 2 == len(get_app_status(juju_lxd_model, APP_NAME).units):
+                break
             sleep(5)
+        if not are_units_removed:
+            raise Exception("Timed out waiting for units to be removed")
 
         while leader_unit is None:
             for unit_name, unit_details in get_app_status(juju_lxd_model, APP_NAME).units.items():
