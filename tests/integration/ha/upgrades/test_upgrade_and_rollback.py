@@ -122,7 +122,9 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
         include_model=False,
     )
 
-    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
+    juju_lxd_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, idle_period=30), delay=10, successes=1
+    )
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         # will be marked "incompatible" if rollback is not to the same revision as initially deployed
