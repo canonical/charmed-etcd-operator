@@ -4,7 +4,6 @@
 
 import logging
 import time
-from time import sleep
 
 import pytest
 from jubilant import Juju
@@ -13,7 +12,6 @@ from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
-    get_app_status,
     get_cluster_endpoints,
     get_cluster_id,
     get_cluster_members,
@@ -24,7 +22,10 @@ from ..helpers import (
     put_key,
     set_password,
 )
-from ..helpers_deployment import apps_active_and_agents_idle
+from ..helpers_deployment import (
+    are_apps_active_and_agents_idle,
+    wait_until_apps_active_and_agents_idle,
+)
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -55,23 +56,12 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS, storage=storage)
 
-    sleep(30)
+    # sleep(30)
 
     # jubilant's wait helper has been avoided intentionally,
     # as it queries the full status of a model (including incompletely set up storage, etc.) thereby erroring out.
     # instead, we fetch the status every 10s and wait for a maximum of 1000s for the app to become active, and agents to settle.
-    deadline = time.monotonic() + 1000
-    while True:
-        current_app_status = get_app_status(juju_lxd_model, APP_NAME)
-        is_app_ready = "active" == current_app_status.app_status.current and all(
-            "idle" == current_app_status.units.get(unit).juju_status.current
-            for unit in current_app_status.units
-        )
-        if is_app_ready:
-            break
-        if time.monotonic() >= deadline:
-            raise Exception(f"Timed out after waiting 1000s for '{APP_NAME}' to become ready.")
-        sleep(10)
+    wait_until_apps_active_and_agents_idle(juju_lxd_model, APP_NAME)
 
     assert len(juju_lxd_model.status().get_units(APP_NAME)) == NUM_UNITS
 
@@ -96,7 +86,7 @@ def test_attach_storage_after_scale_down(juju_lxd_model: Juju) -> None:
     # remove the unit
     juju_lxd_model.remove_unit(unit)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, app, unit_count=init_units_count - 1, idle_period=60
         )
     )
@@ -107,7 +97,7 @@ def test_attach_storage_after_scale_down(juju_lxd_model: Juju) -> None:
 
     new_unit = list(juju_lxd_model.status().get_units(app))[-1]
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, app, unit_count=init_units_count, idle_period=60
         )
     )
@@ -164,7 +154,7 @@ def test_attach_storage_after_scale_to_zero(juju_lxd_model: Juju) -> None:
         juju_lxd_model.add_unit(app, attach_storage=storage_id)
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, app, unit_count=len(storage_ids), idle_period=120
         )
     )
@@ -215,7 +205,7 @@ def test_attach_storage_after_removing_application(charm: str, juju_lxd_model: J
         juju_lxd_model.remove_unit(unit)
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, app, unit_count=1, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(status, app, unit_count=1, idle_period=60)
     )
 
     # remove the remaining unit after saving the storage id
@@ -234,7 +224,9 @@ def test_attach_storage_after_removing_application(charm: str, juju_lxd_model: J
     set_password(juju_lxd_model, password)
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=1, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(
+            status, APP_NAME, unit_count=1, idle_period=60
+        )
     )
 
     # make sure the new application/etcd cluster is available
@@ -262,7 +254,7 @@ def test_attach_storage_after_removing_application(charm: str, juju_lxd_model: J
     # scale up
     juju_lxd_model.add_unit(APP_NAME, num_units=2)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, APP_NAME, unit_count=NUM_UNITS, idle_period=120
         )
     )

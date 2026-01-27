@@ -20,7 +20,7 @@ from ..helpers import (
     put_key,
     set_password,
 )
-from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ def test_restore_verification_failed(juju_lxd_model: Juju):
     invalid_password = "invalid_password"
     set_password(juju_lxd_model, invalid_password)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)

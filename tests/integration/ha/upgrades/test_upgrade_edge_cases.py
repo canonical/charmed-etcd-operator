@@ -46,8 +46,8 @@ from tests.integration.helpers import (
 )
 from tests.integration.helpers_deployment import (
     ExpectedStatus,
-    agents_idle,
-    apps_active_and_agents_idle,
+    are_agents_idle,
+    are_apps_active_and_agents_idle,
     does_status_match,
 )
 
@@ -64,7 +64,9 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2))
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=2)
+    )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -80,7 +82,9 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2, idle_period=60))
+    juju_lxd_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=60)
+    )
 
     last_unit_name, last_unit_status = list(juju_lxd_model.status().get_units(APP_NAME).items())[
         -1
@@ -91,7 +95,9 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
         juju_lxd_model.run(last_unit_name, "force-refresh-start", {"check-compatibility": False})
 
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2, idle_period=60))
+    juju_lxd_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=60)
+    )
 
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
 
@@ -102,7 +108,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # TODO remove once we have a start upgrade tests with a charm revision with v1
     # data interfaces v1 uses - instead of _ for relation data keys
     # this breaks disaster recovery during upgrades if the upgraded unit is not the leader
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=2))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, unit_count=2))
 
     # cluster should be recovered again
     assert "Cluster failure" not in last_unit_status.workload_status.message, (
@@ -125,7 +131,9 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     assert resume_refresh_response.return_code == 0, "action failed"
 
     # wait for upgrade to complete
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=2))
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=2)
+    )
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info("Check etcd versions and cluster membership")
@@ -154,7 +162,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     )
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
@@ -179,7 +187,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
     juju_lxd_model.wait(
-        lambda status: agents_idle(status, APP_NAME, unit_count=NUM_UNITS, idle_period=60)
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS, idle_period=60)
     )
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
@@ -245,7 +253,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
 
     # wait for upgrade to complete
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     endpoints_updated = endpoints.replace(old_unit_ip, new_unit_ip)
@@ -291,7 +299,7 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     tls_config = {"ca-common-name": "etcd", "certificate-validity": "3m"}
     juju_lxd_model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -333,7 +341,7 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_lxd_model: Juju) -> N
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=60))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")

@@ -34,8 +34,8 @@ from tests.integration.helpers import (
 )
 from tests.integration.helpers_deployment import (
     ExpectedStatus,
-    agents_idle,
-    apps_active_and_agents_idle,
+    are_agents_idle,
+    are_apps_active_and_agents_idle,
     does_status_match,
 )
 
@@ -53,7 +53,7 @@ def test_deploy(juju_lxd_model: Juju) -> None:
     )
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS),
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS),
         timeout=1000,
     )
 
@@ -84,7 +84,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
 
     # versions will always be marked "incompatible" if refresh to a local version
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
@@ -99,7 +99,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
         )
 
     # wait for the first refreshed unit to settle
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
 
     assert (
         "health check failed"
@@ -122,7 +122,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
         include_model=False,
     )
 
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=60))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         # will be marked "incompatible" if rollback is not to the same revision as initially deployed
@@ -140,7 +140,7 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
     # wait for rollback to complete
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     logger.info("Check etcd versions and cluster membership")
@@ -206,7 +206,7 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=60))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
@@ -235,7 +235,7 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
 
     # wait for upgrade to complete
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 

@@ -22,7 +22,7 @@ from ..helpers import (
     get_unit_endpoint,
     is_endpoint_up,
 )
-from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -56,7 +56,9 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 
     # Deploy the charm and wait for active/idle status
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
+    )
 
 
 # known-issue with self-hosted runners: `lxc config device set ... eth0 limits.priority=10`
@@ -199,7 +201,7 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_lxd_model: Juju) -> None
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates relation")
     juju_lxd_model.integrate(f"{app}:peer-certificates", TLS_NAME)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, app, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, app, TLS_NAME))
 
     init_units_count = len(juju_lxd_model.status().get_units(app))
     endpoints = get_cluster_endpoints(juju_lxd_model, app)
@@ -336,7 +338,7 @@ def test_ip_change_with_client_tls(juju_lxd_model: Juju) -> None:
     juju_lxd_model.integrate(f"{app}:client-certificates", TLS_NAME)
     init_units_count = len(juju_lxd_model.status().get_units(app))
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, app, unit_count=init_units_count)
+        lambda status: are_apps_active_and_agents_idle(status, app, unit_count=init_units_count)
     )
 
     unit_name = next(iter(juju_lxd_model.status().get_units(app)))
@@ -365,7 +367,7 @@ def test_ip_change_with_client_tls(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.wait(
         # extended waiting period because it takes time for Juju to update the public ip address
-        lambda status: apps_active_and_agents_idle(status, app, idle_period=120)
+        lambda status: are_apps_active_and_agents_idle(status, app, idle_period=120)
     )
 
     # if all cluster operations where successful, test can be considered passed

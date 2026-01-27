@@ -15,7 +15,7 @@ from ..helpers import (
     get_cluster_endpoints,
     get_secret_by_label,
 )
-from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -56,7 +56,9 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates relations")
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
+    )
 
     app_name = existing_app(juju_lxd_model) or APP_NAME
 
@@ -70,14 +72,18 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     # disable peer TLS and check continuous writes
     logger.info("Removing peer-certificates relations")
     juju_lxd_model.remove_relation(f"{app_name}:peer-certificates", f"{TLS_NAME}:certificates")
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
+    )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # enable peer TLS and check continuous writes
     logger.info("Integrating peer-certificates relations")
     juju_lxd_model.integrate(f"{app_name}:peer-certificates", TLS_NAME)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
+    )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()
@@ -89,7 +95,7 @@ def test_tuning_config_options(juju_lxd_model: Juju) -> None:
     """Tune the network latency parameters in etcd and ensure the cluster is available."""
     app_name = existing_app(juju_lxd_model) or APP_NAME
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, app_name, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, app_name, unit_count=NUM_UNITS)
     )
 
     # start writing data to the cluster
@@ -109,7 +115,7 @@ def test_tuning_config_options(juju_lxd_model: Juju) -> None:
 
     # wait for the rolling restart to apply the config changes
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
@@ -122,7 +128,7 @@ def test_invalid_tuning_config_options(juju_lxd_model: Juju) -> None:
     """Ensure the cluster keeps running with invalid tuning options."""
     app_name = existing_app(juju_lxd_model) or APP_NAME
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, app_name, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, app_name, unit_count=NUM_UNITS)
     )
 
     # start writing data to the cluster

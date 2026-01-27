@@ -12,8 +12,8 @@ from tests.integration.ha.upgrades.literals import NUM_UNITS, WORKLOAD_VERSION
 from tests.integration.helpers import APP_NAME, TLS_NAME, get_leader_unit_name
 from tests.integration.helpers_deployment import (
     ExpectedStatus,
-    agents_idle,
-    apps_active_and_agents_idle,
+    are_agents_idle,
+    are_apps_active_and_agents_idle,
     does_status_match,
 )
 
@@ -62,7 +62,7 @@ def test_deploy_stable_revision(juju_lxd_model: Juju, requirer_charm: str) -> No
     juju_lxd_model.deploy(TLS_NAME, channel="1/stable", app=REQUIRER_TLS_NAME, config=tls_config)
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     logger.info("Enable TLS")
@@ -70,7 +70,7 @@ def test_deploy_stable_revision(juju_lxd_model: Juju, requirer_charm: str) -> No
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
     juju_lxd_model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME
         )
     )
@@ -78,7 +78,7 @@ def test_deploy_stable_revision(juju_lxd_model: Juju, requirer_charm: str) -> No
     logger.info("Integrate client application")
     juju_lxd_model.integrate(APP_NAME, REQUIRER_NAME)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
     )
 
 
@@ -105,11 +105,7 @@ def test_upgrade_to_latest(charm: str, juju_lxd_model: Juju) -> None:
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=60))
-    logger.info(f"Status rn: {juju_lxd_model.status().apps.get(APP_NAME)}")
-    logger.info(
-        f"App status message rn: f{juju_lxd_model.status().apps.get(APP_NAME).app_status.message}"
-    )
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
@@ -135,5 +131,5 @@ def test_upgrade_to_latest(charm: str, juju_lxd_model: Juju) -> None:
 
     # wait for upgrade to complete
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )

@@ -31,7 +31,7 @@ from ..helpers import (
     get_secret_by_label,
     put_key,
 )
-from ..helpers_deployment import apps_active_and_agents_idle
+from ..helpers_deployment import are_apps_active_and_agents_idle
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME, idle_period=60)
     )
 
 
@@ -172,7 +172,7 @@ def test_set_private_key(juju_lxd_model: Juju) -> None:
 
     logger.info("Configuring the application with the new peer private key")
     juju_lxd_model.config(app=APP_NAME, values={TLS_PEER_PRIVATE_KEY_CONFIG: secret_id})
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
@@ -248,7 +248,7 @@ def test_set_private_key(juju_lxd_model: Juju) -> None:
 
     logger.info("Configuring the application with the new client private key")
     juju_lxd_model.config(app=APP_NAME, values={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret_id})
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     logger.info("Checking if the cluster is still accessible")
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)

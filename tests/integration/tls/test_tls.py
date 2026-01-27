@@ -26,7 +26,7 @@ from ..helpers import (
 )
 from ..helpers_deployment import (
     ExpectedStatus,
-    apps_active_and_agents_idle,
+    are_apps_active_and_agents_idle,
     does_status_match,
 )
 
@@ -57,7 +57,7 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME, idle_period=60)
     )
 
 
@@ -116,7 +116,7 @@ def test_disable_tls(juju_lxd_model: Juju) -> None:
     juju_lxd_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
     juju_lxd_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
@@ -169,7 +169,7 @@ def test_enable_tls(juju_lxd_model: Juju) -> None:
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
     download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
@@ -225,7 +225,7 @@ def test_enable_tls(juju_lxd_model: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
     """Configure extra sans for the TLS certificates."""
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     logger.info("Set config to invalid sans value")
     config_value = "-my.hostname"
@@ -255,7 +255,7 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
     juju_lxd_model.config(app=APP_NAME, values={"certificate-extra-sans": config_value})
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS),
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS),
         timeout=1200,
     )
 
@@ -274,7 +274,7 @@ def test_extra_sans_config_option(juju_lxd_model: Juju) -> None:
     juju_lxd_model.config(app=APP_NAME, reset="certificate-extra-sans")
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     download_client_certificate_from_unit(juju_lxd_model, APP_NAME)
@@ -302,7 +302,7 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     logger.info("Removing peer-certificates relation")
     juju_lxd_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
@@ -359,7 +359,7 @@ def test_disable_and_enable_peer_tls(juju_lxd_model: Juju) -> None:
     logger.info("Integrating peer-certificates relation")
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     cluster_members = get_cluster_members(
         endpoints, user=INTERNAL_USER, password=password, tls_enabled=True
@@ -429,7 +429,7 @@ def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
     logger.info("Removing client-certificates relation")
     juju_lxd_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
@@ -479,7 +479,7 @@ def test_disable_and_enable_client_tls(juju_lxd_model: Juju) -> None:
     logger.info("Integrating client-certificates relation")
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
@@ -545,7 +545,7 @@ def test_certificate_expiration(juju_lxd_model: Juju) -> None:
     juju_lxd_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
     juju_lxd_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"

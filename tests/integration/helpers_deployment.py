@@ -3,13 +3,17 @@
 # See LICENSE file for licensing details.
 
 import logging
+import time
 from datetime import datetime, timedelta
 
 import jubilant
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from dateutil.parser import parse
+from jubilant import Juju
 from jubilant.statustypes import StatusInfo
 from ops import StatusBase
+
+from tests.integration.helpers import get_app_status
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s", datefmt="%H:%M:%S"
@@ -36,7 +40,7 @@ class ExpectedStatus:
         self.idle_period = idle_period
 
 
-def apps_active_and_agents_idle(
+def are_apps_active_and_agents_idle(
     status: jubilant.Status,
     *apps: str,
     idle_period: int = 0,
@@ -61,7 +65,7 @@ def apps_active_and_agents_idle(
     )
 
 
-def agents_idle(
+def are_agents_idle(
     status: jubilant.Status,
     *apps: str,
     idle_period: int = 0,
@@ -206,3 +210,37 @@ def _does_message_match(model_status: StatusInfo, expected_status: StatusObject 
             return False
     else:
         return model_status.current == expected_status
+
+
+def wait_until_apps_active_and_agents_idle(
+    juju: Juju,
+    app_name: str,
+    unit_count: int | None = None,
+    interval: int = 10,
+    timeout: int = 1000,
+):
+    """Query the status of a particular app at regular intervals, check for app to be active, its agents idle and optionally for expected unit count, and time out after a set duration.
+
+    Args:
+        juju: An instance of Jubilant's Juju class on which to run Juju commands.
+        app_name: The name of the app whose status is to be queried and checked.
+        unit_count: Number of units to wait for. Optional.
+        interval: Duration, in seconds, to wait between subsequent queries. Optional; defaults to 10 seconds.
+        timeout: Duration, in seconds, within which to time out and raise an exception, if conditions unmet. Optional; defaults to 1000 seconds.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        current_app_status = get_app_status(juju, app_name)
+        is_app_ready = (
+            "active" == current_app_status.app_status.current
+            and all(
+                "idle" == current_app_status.units.get(unit).juju_status.current
+                for unit in current_app_status.units
+            )
+            and (unit_count is None or unit_count == len(current_app_status.units))
+        )
+        if is_app_ready:
+            return
+        if time.monotonic() >= deadline:
+            raise Exception(f"Timed out after waiting 1000s for '{app_name}' to become ready.")
+        time.sleep(interval)

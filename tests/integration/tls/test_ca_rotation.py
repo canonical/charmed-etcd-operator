@@ -23,7 +23,7 @@ from ..helpers import (
 )
 from ..helpers_deployment import (
     ExpectedStatus,
-    apps_active_and_agents_idle,
+    are_apps_active_and_agents_idle,
     does_status_match,
 )
 
@@ -56,7 +56,7 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME, idle_period=60)
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
@@ -131,7 +131,7 @@ def test_ca_rotation_by_config_change(juju_lxd_model: Juju) -> None:
     tls_config = {"ca-common-name": "new-etcd-ca"}
     juju_lxd_model.config(app=TLS_NAME, values=tls_config)
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     logger.info("Checking if the CA certificates are rotated")
     new_peer_ca = get_certificate_from_unit(

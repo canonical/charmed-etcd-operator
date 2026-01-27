@@ -20,7 +20,7 @@ from ..helpers import (
     get_unit_endpoint,
     is_endpoint_up,
 )
-from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -51,7 +51,9 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 
     # Deploy the charm and wait for active/idle status
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
+    )
 
 
 @pytest.mark.abort_on_fail

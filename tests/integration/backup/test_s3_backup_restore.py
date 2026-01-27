@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 import logging
-from time import sleep
 
 import pytest
 from jubilant import Juju
@@ -18,7 +17,7 @@ from ..helpers import (
     put_key,
     set_password,
 )
-from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +61,7 @@ def test_deploy_and_configure(
     logger.info("Configure admin credentials in etcd")
     set_password(juju_lxd_model, PASSWORD)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
 
@@ -74,13 +73,11 @@ def test_s3_integration(juju_lxd_model: Juju, s3_bucket) -> None:
         lambda status: does_status_match(
             status,
             expected_status={
-                APP_NAME: ExpectedStatus(app_status=["active"]),
-                S3_INTEGRATOR: ExpectedStatus(app_status=["active"]),
+                APP_NAME: ExpectedStatus(app_status=["active"], idle_period=30),
+                S3_INTEGRATOR: ExpectedStatus(app_status=["active"], idle_period=30),
             },
         )
     )
-
-    sleep(60)
 
     # bucket should be created when integrating both
     assert s3_bucket.meta.client.head_bucket(Bucket=s3_bucket.name)
@@ -140,7 +137,7 @@ def test_restore_backup_on_same_cluster(juju_lxd_model: Juju) -> None:
 
     # wait for the restore to be performed across all units and check the restored data
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
@@ -159,7 +156,7 @@ def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: Juju):
 
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, APP_NAME, unit_count=NUM_UNITS, idle_period=60
         )
     )
@@ -167,7 +164,7 @@ def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: Juju):
     logger.info("Configure admin credentials in etcd")
     set_password(juju_lxd_model, PASSWORD)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     logger.info(f"Integrate the newly deployed application with {S3_INTEGRATOR}")
@@ -191,7 +188,7 @@ def test_restore_backup_on_different_cluster(charm: str, juju_lxd_model: Juju):
 
     # wait for the restore to be performed across all units and check the restored data
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)

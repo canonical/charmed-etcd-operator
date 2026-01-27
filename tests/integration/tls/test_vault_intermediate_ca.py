@@ -25,7 +25,7 @@ from ..helpers import (
     get_secret_by_label,
     put_key,
 )
-from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def test_build_and_deploy_with_tls(charm: str, juju_lxd_model: Juju) -> None:
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
     # Deploy the TLS charms
     tls_config = {"ca-common-name": "etcd"}
@@ -166,7 +166,7 @@ def test_initialize_vault(juju_lxd_model: Juju) -> None:
 
     assert action.status == "completed", "Action should succeed"
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, VAULT_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, VAULT_NAME))
 
 
 @pytest.mark.abort_on_fail
@@ -176,7 +176,9 @@ def test_tls_enabled(juju_lxd_model: Juju) -> None:
     juju_lxd_model.integrate(f"{APP_NAME}:peer-certificates", VAULT_NAME)
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", VAULT_NAME)
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME, VAULT_NAME))
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, VAULT_NAME)
+    )
 
     # check if all units have been added to the cluster
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
@@ -231,7 +233,7 @@ def test_restrict_certificate_domain(juju_lxd_model: Juju) -> None:
     juju_lxd_model.config(
         app=VAULT_NAME, values={"pki_allowed_domains": vault_domain_config_value}
     )
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, VAULT_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, VAULT_NAME))
 
     logger.info("Configure certificate domain in etcd")
     etcd_domain_config_value = "domain3"
@@ -244,7 +246,7 @@ def test_restrict_certificate_domain(juju_lxd_model: Juju) -> None:
     )
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     download_client_certificate_from_unit(juju_lxd_model, APP_NAME)

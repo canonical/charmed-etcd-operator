@@ -18,7 +18,10 @@ from ..helpers import (
     get_leader_unit_name,
     get_secret_by_label,
 )
-from ..helpers_deployment import apps_active_and_agents_idle
+from ..helpers_deployment import (
+    are_apps_active_and_agents_idle,
+    wait_until_apps_active_and_agents_idle,
+)
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -35,7 +38,9 @@ NUM_UNITS = 5
 def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
     """Build and deploy the charm."""
     juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1400)
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1400
+    )
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
@@ -57,7 +62,9 @@ def test_membership_reconfiguration_after_unit_loss(juju_lxd_model: Juju) -> Non
     # wait for the next `update_status` for the cluster membership to be updated
     with fast_forward(juju_lxd_model, 15):
         juju_lxd_model.wait(
-            lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+            lambda status: are_apps_active_and_agents_idle(
+                status, APP_NAME, unit_count=NUM_UNITS - 1
+            )
         )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
@@ -86,7 +93,7 @@ def test_membership_reconfiguration_after_unit_loss(juju_lxd_model: Juju) -> Non
 def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
     """Users can run `rebuild-cluster` on a healthy cluster if they use the `force` parameter."""
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
     )
 
     leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
@@ -102,7 +109,7 @@ def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
 
     # wait for the rebuild to be performed
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
@@ -119,7 +126,7 @@ def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
 def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
     """When the majority of the cluster is lost, users can run `rebuild-cluster`."""
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
     )
 
     units = list(juju_lxd_model.status().get_units(APP_NAME))
@@ -150,9 +157,7 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
     assert rebuild_response.return_code == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    for x in range(10):
-        logger.info(f"Waiting for the rebuild....{10 - x}")
-        sleep(5)
+    wait_until_apps_active_and_agents_idle(juju_lxd_model, APP_NAME, unit_count=2)
 
     app_status = get_app_status(juju_lxd_model, APP_NAME)
 

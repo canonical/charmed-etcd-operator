@@ -31,8 +31,8 @@ from tests.integration.helpers import (
 )
 from tests.integration.helpers_deployment import (
     ExpectedStatus,
-    agents_idle,
-    apps_active_and_agents_idle,
+    are_agents_idle,
+    are_apps_active_and_agents_idle,
     does_status_match,
 )
 
@@ -49,7 +49,7 @@ def test_upgrade_single_unit_cluster(charm: str, juju_lxd_model: Juju) -> None:
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -65,7 +65,7 @@ def test_upgrade_single_unit_cluster(charm: str, juju_lxd_model: Juju) -> None:
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=60))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
@@ -78,7 +78,7 @@ def test_upgrade_single_unit_cluster(charm: str, juju_lxd_model: Juju) -> None:
         )
 
     # wait for upgrade to complete
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info("Check etcd version")
@@ -108,7 +108,7 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -131,7 +131,7 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=60))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
@@ -150,7 +150,7 @@ def test_scale_up_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
 
     logger.info("Scaling up will continue the refresh on the newly added unit")
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS + 1)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS + 1)
     )
 
     updated_endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
@@ -190,7 +190,7 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
     secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -213,7 +213,7 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: agents_idle(status, APP_NAME, idle_period=60))
+    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
     if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
@@ -269,7 +269,7 @@ def test_scale_down_during_upgrade(charm: str, juju_lxd_model: Juju) -> None:
 
     # wait for upgrade to complete
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
     )
 
     logger.info("Check etcd versions and cluster membership")

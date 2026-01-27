@@ -28,7 +28,7 @@ from ..helpers import (
     get_secret_by_label,
     get_user,
 )
-from ..helpers_deployment import ExpectedStatus, apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ def test_build_and_deploy(
     juju_lxd_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
     juju_lxd_model.integrate(REQUIRER_NAME, TLS_NAME)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, APP_NAME, REQUIRER_NAME, TLS_NAME, REQUIRER_TLS_NAME
         )
     )
@@ -129,7 +129,9 @@ def test_relate_client_charm(juju_lxd_model: Juju) -> None:
     """Test normal client charm relation."""
     juju_lxd_model.integrate(APP_NAME, REQUIRER_NAME)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, idle_period=10)
+        lambda status: are_apps_active_and_agents_idle(
+            status, APP_NAME, REQUIRER_NAME, idle_period=10
+        )
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME, tls_enabled=True)
@@ -217,7 +219,9 @@ def test_update_mtls_cert(juju_lxd_model: Juju) -> None:
 
     # wait for model to settle
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, idle_period=10)
+        lambda status: are_apps_active_and_agents_idle(
+            status, APP_NAME, REQUIRER_NAME, idle_period=10
+        )
     )
 
     # get client ca from every unit and check if it includes the new_ca
@@ -258,7 +262,7 @@ def test_etcd_updates_ca(juju_lxd_model: Juju) -> None:
 
     # wait for model to settle
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, TLS_NAME)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, TLS_NAME)
     )
     logger.debug("Getting new server ca")
     action = juju_lxd_model.run(requirer_unit, "get-credentials")
@@ -303,7 +307,7 @@ def test_remove_client_relation(juju_lxd_model: Juju) -> None:
 
     # wait for model to settle
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
     )
 
     # check that the user and role are removed
@@ -345,19 +349,23 @@ def test_different_tls_providers(juju_lxd_model: Juju) -> None:
     logger.info("Remove TLS relation for requirer.")
     juju_lxd_model.remove_relation(f"{REQUIRER_NAME}:certificates", f"{TLS_NAME}:certificates")
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, REQUIRER_NAME, idle_period=10)
+        lambda status: are_apps_active_and_agents_idle(status, REQUIRER_NAME, idle_period=10)
     )
 
     logger.info("Integrate requirer with different TLS provider.")
     juju_lxd_model.integrate(REQUIRER_NAME, REQUIRER_TLS_NAME)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, idle_period=10)
+        lambda status: are_apps_active_and_agents_idle(
+            status, APP_NAME, REQUIRER_NAME, idle_period=10
+        )
     )
 
     logger.info("Integrate requirer with etcd again.")
     juju_lxd_model.integrate(APP_NAME, REQUIRER_NAME)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, idle_period=10)
+        lambda status: are_apps_active_and_agents_idle(
+            status, APP_NAME, REQUIRER_NAME, idle_period=10
+        )
     )
     # Update common name on TLS provider for client application
     logger.info("Updating common name on TLS provider")
@@ -365,7 +373,7 @@ def test_different_tls_providers(juju_lxd_model: Juju) -> None:
 
     # wait for model to settle
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, TLS_NAME)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, TLS_NAME)
     )
 
     logger.info("Ensure updated mtls-certs are trusted on etcd")
@@ -386,7 +394,7 @@ def test_different_tls_providers(juju_lxd_model: Juju) -> None:
 
     # wait for model to settle
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
     )
 
 
@@ -400,7 +408,7 @@ def test_certificate_transfer(juju_lxd_model: Juju) -> None:
 
     # wait for model to settle
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, APP_NAME, REQUIRER_TLS_NAME)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_TLS_NAME)
     )
 
     # get ca from the REQUIRER_TLS_NAME

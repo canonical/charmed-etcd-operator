@@ -18,7 +18,7 @@ from ..helpers import (
     get_raft_leader,
     get_secret_by_label,
 )
-from ..helpers_deployment import apps_active_and_agents_idle
+from ..helpers_deployment import are_apps_active_and_agents_idle
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -39,7 +39,9 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 
     # Deploy the charm and wait for active/idle status
     juju_lxd_model.deploy(charm, num_units=1)
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, APP_NAME), timeout=1000)
+    juju_lxd_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
+    )
 
     assert len(juju_lxd_model.status().get_units(APP_NAME)) == 1
 
@@ -59,7 +61,7 @@ def test_scale_up(juju_lxd_model: Juju) -> None:
     # scale up
     juju_lxd_model.add_unit(app, num_units=2)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, app, unit_count=init_units_count + 2, idle_period=60
         )
     )
@@ -97,7 +99,7 @@ def test_scale_down(juju_lxd_model: Juju) -> None:
     unit_to_remove = list(juju_lxd_model.status().get_units(app))[-1]
     juju_lxd_model.remove_unit(unit_to_remove)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, app, unit_count=init_units_count - 1, idle_period=60
         )
     )
@@ -133,7 +135,7 @@ def test_remove_raft_leader(juju_lxd_model: Juju) -> None:
     juju_lxd_model.add_unit(app)
     init_units_count = 3
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, app, unit_count=init_units_count, idle_period=60
         )
     )
@@ -152,7 +154,7 @@ def test_remove_raft_leader(juju_lxd_model: Juju) -> None:
     juju_lxd_model.remove_unit(init_raft_leader.replace(app, f"{app}/"))
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(
+        lambda status: are_apps_active_and_agents_idle(
             status, app, unit_count=init_units_count - 1, idle_period=60
         )
     )
@@ -197,14 +199,14 @@ def test_remove_multiple_units(juju_lxd_model: Juju) -> None:
 
     juju_lxd_model.add_unit(app)
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, app, unit_count=3, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(status, app, unit_count=3, idle_period=60)
     )
 
     # remove all units except one
     for unit in list(juju_lxd_model.status().get_units(app))[1:]:
         juju_lxd_model.remove_unit(unit)
 
-    juju_lxd_model.wait(lambda status: apps_active_and_agents_idle(status, app, unit_count=1))
+    juju_lxd_model.wait(lambda status: are_apps_active_and_agents_idle(status, app, unit_count=1))
 
     num_units = len(juju_lxd_model.status().get_units(app))
     assert num_units == 1, f"Expected 1 unit, got {num_units}."
@@ -239,7 +241,7 @@ def test_scale_to_zero_and_back(juju_lxd_model: Juju) -> None:
     juju_lxd_model.add_unit(app, num_units=3)
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, app, unit_count=3, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(status, app, unit_count=3, idle_period=60)
     )
 
     endpoints = get_cluster_endpoints(juju_lxd_model, app)
@@ -272,7 +274,9 @@ def test_remove_juju_leader(juju_lxd_model: Juju) -> None:
     juju_lxd_model.remove_unit(juju_leader_unit)
 
     juju_lxd_model.wait(
-        lambda status: apps_active_and_agents_idle(status, app, unit_count=init_units_count - 1)
+        lambda status: are_apps_active_and_agents_idle(
+            status, app, unit_count=init_units_count - 1
+        )
     )
 
     num_units = len(juju_lxd_model.status().get_units(app))
