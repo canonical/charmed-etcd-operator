@@ -139,19 +139,19 @@ def does_status_match(
     """
     return all(
         (
-            expected_status.unit_status is None
+            not expected_status.unit_status
             or _does_unit_workload_status_match(model_status, app, expected_status.unit_status)
         )
         and (
-            expected_status.app_status is None
+            not expected_status.app_status
             or _does_app_status_match(model_status, app, expected_status.app_status)
         )
         and (
-            expected_status.unit_count is None
+            not expected_status.unit_count
             or _verify_unit_count(model_status, app, unit_count=expected_status.unit_count)
         )
         and (
-            expected_status.idle_period is None
+            not expected_status.idle_period
             or _check_apps_idle_period(model_status, app, idle_period=expected_status.idle_period)
         )
         for app, expected_status in expected_status.items()
@@ -237,7 +237,7 @@ def wait_until_apps_active_and_agents_idle(
                 "idle" == current_app_status.units.get(unit).juju_status.current
                 for unit in current_app_status.units
             )
-            and (unit_count is None or unit_count == len(current_app_status.units))
+            and ((not unit_count) or unit_count == len(current_app_status.units))
         )
         if is_app_ready:
             return

@@ -15,7 +15,6 @@ from ..helpers import (
     get_app_status,
     get_cluster_endpoints,
     get_cluster_members,
-    get_leader_unit_name,
     get_secret_by_label,
 )
 from ..helpers_deployment import (
@@ -35,14 +34,14 @@ NUM_UNITS = 5
 
 
 @pytest.mark.abort_on_fail
-def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
+def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     """Build and deploy the charm."""
-    juju_lxd_model.deploy(charm, num_units=NUM_UNITS)
-    juju_lxd_model.wait(
+    juju_vm_model.deploy(charm, num_units=NUM_UNITS)
+    juju_vm_model.wait(
         lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1400
     )
-    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -50,31 +49,38 @@ def test_build_and_deploy(charm: str, juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-def test_membership_reconfiguration_after_unit_loss(juju_lxd_model: Juju) -> None:
+def test_membership_reconfiguration_after_unit_loss(juju_vm_model: Juju) -> None:
     """Make sure a forcefully removed unit is removed as cluster member."""
-    units = list(juju_lxd_model.status().get_units(APP_NAME))
+    units = list(juju_vm_model.status().get_units(APP_NAME))
     unit_to_remove = units[-1]
     removed_member_name = unit_to_remove.replace("/", "")
     logger.info(f"Forcefully removing unit {unit_to_remove}")
 
-    juju_lxd_model.remove_unit(unit_to_remove, force=True)
+    destroy_unit_cmd = (
+        f"remove-unit {unit_to_remove} --model={juju_vm_model.model} --force --no-wait --no-prompt"
+    )
+    juju_vm_model.cli(*destroy_unit_cmd.split(), include_model=False)
+
+    # Note that from this point forward, jubilant's status() and wait() methods cannot be used on this model
+    # For further details and an explanation, see: https://github.com/canonical/jubilant/issues/249
+    # Consequently, whichever helpers make use of these jubilant methods will have to be avoided too.
+    # Thus, we define wait_until_apps_active_and_agents_idle, get_cluster_endpoints_ha, etc.
 
     # wait for the next `update_status` for the cluster membership to be updated
-    with fast_forward(juju_lxd_model, 15):
-        juju_lxd_model.wait(
-            lambda status: are_apps_active_and_agents_idle(
-                status, APP_NAME, unit_count=NUM_UNITS - 1
-            )
-        )
+    with fast_forward(juju_vm_model, 15):
+        wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
 
-    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints_ha(juju_vm_model, APP_NAME)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
-    for unit_name in juju_lxd_model.status().get_units(APP_NAME):
+
+    app_status = get_app_status(juju_vm_model, APP_NAME)
+
+    for unit_name in app_status.units:
         assert unit_name.replace("/", "") in member_names, (
             f"unit {unit_name} not in cluster members"
         )
@@ -90,32 +96,34 @@ def test_membership_reconfiguration_after_unit_loss(juju_lxd_model: Juju) -> Non
 
 
 @pytest.mark.abort_on_fail
-def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
+def test_rebuild_on_healthy_cluster(juju_vm_model: Juju) -> None:
     """Users can run `rebuild-cluster` on a healthy cluster if they use the `force` parameter."""
-    juju_lxd_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
-    )
+    wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
 
-    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
+    leader_unit = None
+    for unit_name, unit_details in get_app_status(juju_vm_model, APP_NAME).units.items():
+        if unit_details.leader:
+            leader_unit = unit_name
 
     logger.info("Executing rebuild-cluster on healthy cluster - this should fail")
     with pytest.raises(TaskError) as task_error:
-        juju_lxd_model.run(leader_unit, "rebuild-cluster")
+        juju_vm_model.run(leader_unit, "rebuild-cluster")
     assert "Use `force`" in str(task_error), "rebuild should fail without `force` option"
 
     logger.info("Try again with `force` option")
-    rebuild_force_response = juju_lxd_model.run(leader_unit, "rebuild-cluster", {"force": True})
+    rebuild_force_response = juju_vm_model.run(leader_unit, "rebuild-cluster", {"force": True})
     assert rebuild_force_response.return_code == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    juju_lxd_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
-    )
+    wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
 
-    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
+    endpoints = get_cluster_endpoints_ha(juju_vm_model, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
-    for unit_name in juju_lxd_model.status().get_units(APP_NAME):
+
+    app_status = get_app_status(juju_vm_model, APP_NAME)
+
+    for unit_name in app_status.units:
         assert unit_name.replace("/", "") in member_names, (
             f"unit {unit_name} not in cluster members"
         )
@@ -123,28 +131,26 @@ def test_rebuild_on_healthy_cluster(juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
+def test_recover_from_majority_failure(juju_vm_model: Juju) -> None:
     """When the majority of the cluster is lost, users can run `rebuild-cluster`."""
-    juju_lxd_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
-    )
+    wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
 
-    units = list(juju_lxd_model.status().get_units(APP_NAME))
+    units = list(get_app_status(juju_vm_model, APP_NAME).units)
     first_unit_to_remove = units[0]
     first_removed_member_name = first_unit_to_remove.replace("/", "")
     second_unit_to_remove = units[1]
     second_removed_member_name = second_unit_to_remove.replace("/", "")
     logger.info(f"Forcefully removing units {first_unit_to_remove} and {second_unit_to_remove}")
 
-    destroy_unit_cmd = f"remove-unit {first_unit_to_remove} {second_unit_to_remove} --model={juju_lxd_model.model} --force --no-wait --no-prompt"
-    juju_lxd_model.cli(*destroy_unit_cmd.split(), include_model=False)
+    destroy_unit_cmd = f"remove-unit {first_unit_to_remove} {second_unit_to_remove} --model={juju_vm_model.model} --force --no-wait --no-prompt"
+    juju_vm_model.cli(*destroy_unit_cmd.split(), include_model=False)
 
     leader_unit = None
 
-    with fast_forward(juju_lxd_model):
+    with fast_forward(juju_vm_model):
         are_units_removed = False
         for x in range(10):
-            if 2 == len(get_app_status(juju_lxd_model, APP_NAME).units):
+            if 2 == len(get_app_status(juju_vm_model, APP_NAME).units):
                 are_units_removed = True
                 break
             sleep(5)
@@ -152,24 +158,22 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
             raise Exception("Timed out waiting for units to be removed")
 
         while leader_unit is None:
-            for unit_name, unit_details in get_app_status(juju_lxd_model, APP_NAME).units.items():
+            for unit_name, unit_details in get_app_status(juju_vm_model, APP_NAME).units.items():
                 if unit_details.leader:
                     leader_unit = unit_name
 
     logger.info("Rebuilding cluster after majority failure")
-    rebuild_response = juju_lxd_model.run(leader_unit, "rebuild-cluster")
+    rebuild_response = juju_vm_model.run(leader_unit, "rebuild-cluster")
     assert rebuild_response.return_code == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
-    wait_until_apps_active_and_agents_idle(juju_lxd_model, APP_NAME, unit_count=2)
+    wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, unit_count=2)
 
-    app_status = get_app_status(juju_lxd_model, APP_NAME)
-
-    endpoints = ",".join(
-        [f"'http'://{unit.public_address}:{CLIENT_PORT}" for unit in app_status.units.values()]
-    )
+    endpoints = get_cluster_endpoints_ha(juju_vm_model, APP_NAME)
     cluster_members = get_cluster_members(endpoints)
     member_names = [member["name"] for member in cluster_members]
+
+    app_status = get_app_status(juju_vm_model, APP_NAME)
 
     for unit_name in app_status.units:
         assert unit_name.replace("/", "") in member_names, (
@@ -184,3 +188,11 @@ def test_recover_from_majority_failure(juju_lxd_model: Juju) -> None:
         f"{second_removed_member_name} still in cluster members"
     )
     logger.info(f"{second_removed_member_name} not in cluster members")
+
+
+def get_cluster_endpoints_ha(juju: Juju, app_name: str):
+    app_status = get_app_status(juju, app_name)
+
+    return ",".join(
+        [f"'http'://{unit.public_address}:{CLIENT_PORT}" for unit in app_status.units.values()]
+    )

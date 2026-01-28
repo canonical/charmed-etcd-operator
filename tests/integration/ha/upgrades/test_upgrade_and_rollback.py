@@ -43,26 +43,26 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
-def test_deploy(juju_lxd_model: Juju) -> None:
+def test_deploy(juju_vm_model: Juju) -> None:
     """Deploy the charm with the previously released workload version of etcd."""
-    juju_lxd_model.deploy(
+    juju_vm_model.deploy(
         APP_NAME,
         num_units=NUM_UNITS,
         channel=CHARM_CHANNEL,
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    juju_lxd_model.wait(
+    juju_vm_model.wait(
         lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS),
         timeout=1000,
     )
 
 
 @pytest.mark.abort_on_fail
-def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
+def test_fail_upgrade_and_rollback(charm: str, juju_vm_model: Juju) -> None:
     """Run a refresh, fail and roll back."""
-    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -70,28 +70,28 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
-        juju_lxd_model.status().get_units(APP_NAME),
+        juju_vm_model.status().get_units(APP_NAME),
         key=lambda unit_name: int(unit_name.split("/")[1]),
         reverse=True,
     )
 
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
-    juju_lxd_model.refresh(app=APP_NAME, path=charm)
+    juju_vm_model.refresh(app=APP_NAME, path=charm)
 
     logger.info(f"Pause etcd service on unit {refresh_order[-1]} to force upgrade to fail")
-    disable_etcd_service(juju_lxd_model, unit_name=refresh_order[-1])
+    disable_etcd_service(juju_vm_model, unit_name=refresh_order[-1])
 
     # versions will always be marked "incompatible" if refresh to a local version
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
+    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
 
-    if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
+    if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
         logger.info(f"Continue refresh on unit {refresh_order[0]}")
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        juju_lxd_model.run(
+        juju_vm_model.run(
             refresh_order[0],
             "force-refresh-start",
             params={"check-compatibility": False, "run-pre-refresh-checks": False},
@@ -99,56 +99,51 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
         )
 
     # wait for the first refreshed unit to settle
-    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
+    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS))
 
     assert (
         "health check failed"
-        in juju_lxd_model.status()
-        .get_units(APP_NAME)
-        .get(refresh_order[0])
-        .workload_status.message
+        in juju_vm_model.status().get_units(APP_NAME).get(refresh_order[0]).workload_status.message
     ), "Health check after upgrade should have failed"
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info(f"Upgrade failed - roll back to previous version v{WORKLOAD_VERSION['previous']}")
     logger.info(f"Continue etcd service on unit {refresh_order[-1]}")
-    enable_etcd_service(juju_lxd_model, unit_name=refresh_order[-1])
+    enable_etcd_service(juju_vm_model, unit_name=refresh_order[-1])
 
     # in `juju refresh`, --switch and --revision are mutually exclusive
     # we can only roll back to the latest released revision from a local charm
-    refresh_cmd = f"refresh {APP_NAME} --model={juju_lxd_model.model} --switch {APP_NAME} --channel {CHARM_CHANNEL}"
-    juju_lxd_model.cli(
+    refresh_cmd = f"refresh {APP_NAME} --model={juju_vm_model.model} --switch {APP_NAME} --channel {CHARM_CHANNEL}"
+    juju_vm_model.cli(
         *refresh_cmd.split(),
         include_model=False,
     )
 
-    juju_lxd_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, idle_period=30), delay=10, successes=1
-    )
+    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
-    if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
+    if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         # will be marked "incompatible" if rollback is not to the same revision as initially deployed
         logger.info("Rollback is blocked due to incompatibility")
 
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        juju_lxd_model.run(refresh_order[0], "force-refresh-start", {"check-compatibility": False})
-    elif "Refreshing" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
+        juju_vm_model.run(refresh_order[0], "force-refresh-start", {"check-compatibility": False})
+    elif "Refreshing" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         # rolling back from local to published is only possible to the latest revision
         # if this is not run in a PR, the local built version is the same as the latest published
         # to roll back to the initially deployed version, we need to issue another rollback command
         logger.info("Rolling back to previous revision")
-        juju_lxd_model.refresh(app=APP_NAME, revision=CHARM_REVISIONS_TO_DEPLOY[machine()])
+        juju_vm_model.refresh(app=APP_NAME, revision=CHARM_REVISIONS_TO_DEPLOY[machine()])
 
     # wait for rollback to complete
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
-    juju_lxd_model.wait(
+    juju_vm_model.wait(
         lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
-    for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
+    for unit_name in juju_vm_model.status().get_units(APP_NAME):
+        unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["previous"]
@@ -168,9 +163,9 @@ def test_fail_upgrade_and_rollback(charm: str, juju_lxd_model: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
+def test_upgrade_to_local(charm: str, juju_vm_model: Juju) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
-    juju_lxd_model.wait(
+    juju_vm_model.wait(
         lambda status: does_status_match(
             status,
             expected_status={
@@ -181,70 +176,70 @@ def test_upgrade_to_local(charm: str, juju_lxd_model: Juju) -> None:
         )
     )
 
-    endpoints = get_cluster_endpoints(juju_lxd_model, APP_NAME)
-    secret = get_secret_by_label(juju_lxd_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # pre-refresh-check
-    leader_unit = get_leader_unit_name(juju_lxd_model, APP_NAME)
+    leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
     logger.info("Running `pre-refresh-check` action")
-    pre_refresh_response = juju_lxd_model.run(leader_unit, "pre-refresh-check")
+    pre_refresh_response = juju_vm_model.run(leader_unit, "pre-refresh-check")
     assert pre_refresh_response.return_code == 0, "action failed"
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
-        juju_lxd_model.status().get_units(APP_NAME),
+        juju_vm_model.status().get_units(APP_NAME),
         key=lambda unit_name: int(unit_name.split("/")[1]),
         reverse=True,
     )
 
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
-    juju_lxd_model.refresh(app=APP_NAME, path=charm)
+    juju_vm_model.refresh(app=APP_NAME, path=charm)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_lxd_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
+    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
-    if "incompatible" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message:
+    if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
         logger.info(f"Continue refresh on unit {refresh_order[0]}")
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        force_refresh_response = juju_lxd_model.run(
+        force_refresh_response = juju_vm_model.run(
             refresh_order[0], "force-refresh-start", {"check-compatibility": False}
         )
         assert force_refresh_response.return_code == 0, "action failed"
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
-    juju_lxd_model.wait(
+    juju_vm_model.wait(
         lambda status: does_status_match(
             status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
         )
     )
-    assert "resume-refresh" in juju_lxd_model.status().apps.get(APP_NAME).app_status.message, (
+    assert "resume-refresh" in juju_vm_model.status().apps.get(APP_NAME).app_status.message, (
         "Refresh should wait for user to continue with `resume-refresh` action"
     )
 
     logger.info("Continue refresh on all other units with `resume-refresh` action")
-    resume_refresh_response = juju_lxd_model.run(refresh_order[1], "resume-refresh")
+    resume_refresh_response = juju_vm_model.run(refresh_order[1], "resume-refresh")
     assert resume_refresh_response.return_code == 0, "action failed"
 
     # wait for upgrade to complete
-    juju_lxd_model.wait(
+    juju_vm_model.wait(
         lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
-    for unit_name in juju_lxd_model.status().get_units(APP_NAME):
-        unit_endpoint = get_unit_endpoint(juju_lxd_model, unit_name=unit_name, app_name=APP_NAME)
+    for unit_name in juju_vm_model.status().get_units(APP_NAME):
+        unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]

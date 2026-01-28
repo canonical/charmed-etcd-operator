@@ -144,12 +144,14 @@ def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
 
 
 @pytest.fixture(scope="module")
-def juju_lxd_model(arch: str, lxd_cloud: str, lxd_controller: str, juju: Juju):
+def juju_vm_model(arch: str, lxd_cloud: str, lxd_controller: str, juju: Juju):
     # if concierge model ("testing") is found, such as on CI, continue with this. Else setup temp model.
     models = json.loads(juju.cli("models", "--format", "json", include_model=False))
     for model in models["models"]:
         if CONCIERGE_MODEL_NAME == model["short-name"]:
-            juju_lxd = jubilant.Juju(model=f"{lxd_controller}:testing", wait_timeout=1000)
+            juju_lxd = jubilant.Juju(
+                model=f"{lxd_controller}:{CONCIERGE_MODEL_NAME}", wait_timeout=1000
+            )
             juju_lxd.cli("set-model-constraints", f"arch={arch}")
             yield juju_lxd
             return
