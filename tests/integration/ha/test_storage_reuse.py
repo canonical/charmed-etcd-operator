@@ -145,9 +145,7 @@ def test_attach_storage_after_scale_to_zero(juju_vm_model: Juju) -> None:
         storage_ids.append(get_storage_id(juju_vm_model, unit, "data"))
         juju_vm_model.remove_unit(unit)
 
-    juju_vm_model.wait(
-        lambda status: len(juju_vm_model.status().get_units(app)) == 0, timeout=1000
-    )
+    juju_vm_model.wait(lambda status: len(juju_vm_model.status().get_units(app)) == 0)
 
     # scale up again re-attaching the storage
     for storage_id in storage_ids:

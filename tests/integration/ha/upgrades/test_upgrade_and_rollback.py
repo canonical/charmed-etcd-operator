@@ -53,8 +53,7 @@ def test_deploy(juju_vm_model: Juju) -> None:
     )
 
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS),
-        timeout=1000,
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
 

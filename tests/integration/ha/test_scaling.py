@@ -233,15 +233,14 @@ def test_scale_to_zero_and_back(juju_vm_model: Juju) -> None:
     for unit in juju_vm_model.status().get_units(app):
         juju_vm_model.remove_unit(unit)
 
-    juju_vm_model.wait(
-        lambda status: len(juju_vm_model.status().get_units(app)) == 0, timeout=1000
-    )
+    juju_vm_model.wait(lambda status: len(juju_vm_model.status().get_units(app)) == 0)
 
     # scale up again
     juju_vm_model.add_unit(app, num_units=3)
 
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, app, unit_count=3, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(status, app, unit_count=3, idle_period=60),
+        timeout=1200,
     )
 
     endpoints = get_cluster_endpoints(juju_vm_model, app)

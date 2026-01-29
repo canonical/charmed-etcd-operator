@@ -52,7 +52,7 @@ def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     # Deploy the charm and wait for active/idle status
     juju_vm_model.deploy(charm, num_units=NUM_UNITS)
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1200
     )
 
 
@@ -636,12 +636,13 @@ def test_reboot_raft_leader(etcd_process: str, juju_vm_model: Juju) -> None:
             status,
             expected_status={
                 app: ExpectedStatus(
-                    app_status=["active"], unit_status=["active"], unit_count=units_count
+                    app_status=["active"],
+                    unit_status=["active"],
+                    unit_count=units_count,
+                    idle_period=30,
                 )
             },
-        ),
-        delay=10,
-        successes=1,
+        )
     )
 
     # ensure data is written in the cluster

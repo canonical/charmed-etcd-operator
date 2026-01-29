@@ -84,9 +84,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
     juju_vm_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=30),
-        delay=10,
-        successes=1,
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=60)
     )
 
     last_unit_name, last_unit_status = list(juju_vm_model.status().get_units(APP_NAME).items())[-1]
@@ -97,9 +95,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
         juju_vm_model.run(last_unit_name, "force-refresh-start", {"check-compatibility": False})
 
     juju_vm_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=30),
-        delay=10,
-        successes=1,
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=60)
     )
 
     leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
@@ -190,9 +186,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
     juju_vm_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS, idle_period=30),
-        delay=10,
-        successes=1,
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=NUM_UNITS, idle_period=60)
     )
 
     if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
@@ -239,12 +233,13 @@ def test_ip_address_change_during_upgrade(charm: str, juju_vm_model: Juju) -> No
             status,
             expected_status={
                 APP_NAME: ExpectedStatus(
-                    app_status=["blocked"], unit_status=["active"], unit_count=NUM_UNITS
+                    app_status=["blocked"],
+                    unit_status=["active"],
+                    unit_count=NUM_UNITS,
+                    idle_period=30,
                 )
             },
-        ),
-        delay=10,
-        successes=1,
+        )
     )
 
     # ensure the unit is up again

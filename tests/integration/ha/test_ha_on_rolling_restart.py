@@ -56,9 +56,7 @@ def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates relations")
     juju_vm_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
-    juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
-    )
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
     app_name = existing_app(juju_vm_model) or APP_NAME
 
@@ -72,18 +70,14 @@ def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     # disable peer TLS and check continuous writes
     logger.info("Removing peer-certificates relations")
     juju_vm_model.remove_relation(f"{app_name}:peer-certificates", f"{TLS_NAME}:certificates")
-    juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
-    )
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     # enable peer TLS and check continuous writes
     logger.info("Integrating peer-certificates relations")
     juju_vm_model.integrate(f"{app_name}:peer-certificates", TLS_NAME)
-    juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
-    )
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
     stop_continuous_writes()

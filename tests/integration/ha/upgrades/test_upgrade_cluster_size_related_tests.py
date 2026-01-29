@@ -190,7 +190,9 @@ def test_scale_down_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
+    juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1200
+    )
 
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")

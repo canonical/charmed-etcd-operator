@@ -56,9 +56,7 @@ def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
 
     # Deploy the charm and wait for active/idle status
     juju_vm_model.deploy(charm, num_units=NUM_UNITS)
-    juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1000
-    )
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
 
 # known-issue with self-hosted runners: `lxc config device set ... eth0 limits.priority=10`
