@@ -6,7 +6,7 @@ import logging
 import time
 
 import pytest
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
 
@@ -20,7 +20,7 @@ from ..helpers import (
     get_unit_endpoint,
     is_endpoint_up,
 )
-from ..helpers_deployment import wait_until
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -43,36 +43,41 @@ TEST_VALUE = "42"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
+def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
-    if await existing_app(ops_test):
+    if existing_app(juju_vm_model):
         return
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+    juju_vm_model.deploy(charm, num_units=NUM_UNITS)
+    juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1200
+    )
 
 
 @pytest.mark.abort_on_fail
-async def test_kill_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
+def test_kill_db_process_on_raft_leader(etcd_process: str, juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal when the leader goes down."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can stop one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
-    init_units_count = len(ops_test.model.applications[app].units)
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -89,13 +94,13 @@ async def test_kill_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTe
     # axe away the etcd process of the cluster/raft leader
     send_process_control_signal(
         unit_name=leader_unit,
-        model_full_name=ops_test.model_full_name,
+        model_full_name=juju_vm_model.model,
         signal="SIGKILL",
         etcd_process=etcd_process,
     )
 
     # make sure the process is stopped
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=leader_unit, app_name=app)
     assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is stopped.")
 
@@ -139,24 +144,27 @@ async def test_kill_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTe
 
 
 @pytest.mark.abort_on_fail
-async def test_freeze_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
+def test_freeze_db_process_on_raft_leader(etcd_process: str, juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal when the leader stops."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can stop one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
-    init_units_count = len(ops_test.model.applications[app].units)
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -173,7 +181,7 @@ async def test_freeze_db_process_on_raft_leader(etcd_process: str, ops_test: Ops
     # freeze the etcd process of the cluster/raft leader
     send_process_control_signal(
         unit_name=leader_unit,
-        model_full_name=ops_test.model_full_name,
+        model_full_name=juju_vm_model.model,
         signal="SIGSTOP",
         etcd_process=etcd_process,
     )
@@ -182,7 +190,7 @@ async def test_freeze_db_process_on_raft_leader(etcd_process: str, ops_test: Ops
     time.sleep(10)
 
     # ensure the stopped unit is not reachable
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=leader_unit, app_name=app)
     assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"{leader_unit} is stopped.")
 
@@ -205,7 +213,7 @@ async def test_freeze_db_process_on_raft_leader(etcd_process: str, ops_test: Ops
     # continue the etcd process
     send_process_control_signal(
         unit_name=leader_unit,
-        model_full_name=ops_test.model_full_name,
+        model_full_name=juju_vm_model.model,
         signal="SIGCONT",
         etcd_process=etcd_process,
     )
@@ -229,24 +237,27 @@ async def test_freeze_db_process_on_raft_leader(etcd_process: str, ops_test: Ops
 
 
 @pytest.mark.abort_on_fail
-async def test_restart_db_process_on_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
+def test_restart_db_process_on_raft_leader(etcd_process: str, juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal when the leader goes down."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can kill one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
-    init_units_count = len(ops_test.model.applications[app].units)
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -263,13 +274,13 @@ async def test_restart_db_process_on_raft_leader(etcd_process: str, ops_test: Op
     # axe away the etcd process of the cluster/raft leader
     send_process_control_signal(
         unit_name=leader_unit,
-        model_full_name=ops_test.model_full_name,
+        model_full_name=juju_vm_model.model,
         signal="SIGTERM",
         etcd_process=etcd_process,
     )
 
     # make sure the process is stopped
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=leader_unit, app_name=app)
     assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
 
     # as the stopped member is unresponsive, only query the endpoints still available
@@ -312,24 +323,27 @@ async def test_restart_db_process_on_raft_leader(etcd_process: str, ops_test: Op
 
 
 @pytest.mark.abort_on_fail
-async def test_full_cluster_restart(etcd_process: str, ops_test: OpsTest) -> None:
+def test_full_cluster_restart(etcd_process: str, juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal after all members went down."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can kill one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
-    init_units_count = len(ops_test.model.applications[app].units)
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -337,21 +351,21 @@ async def test_full_cluster_restart(etcd_process: str, ops_test: OpsTest) -> Non
     time.sleep(10)
 
     # update the restart delay for all units
-    for unit in ops_test.model.applications[app].units:
-        await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_PATCHED)
+    for unit in juju_vm_model.status().get_units(app):
+        patch_restart_delay(juju_vm_model, unit_name=unit, delay=RESTART_DELAY_PATCHED)
 
     # axe away the etcd process on all units
-    for unit in ops_test.model.applications[app].units:
+    for unit in juju_vm_model.status().get_units(app):
         send_process_control_signal(
-            unit_name=unit.name,
-            model_full_name=ops_test.model_full_name,
+            unit_name=unit,
+            model_full_name=juju_vm_model.model,
             signal="SIGTERM",
             etcd_process=etcd_process,
         )
 
     # ensure the all cluster members are down
-    for unit in ops_test.model.applications[app].units:
-        unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=app)
+    for unit in juju_vm_model.status().get_units(app):
+        unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=unit, app_name=app)
         assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info("Cluster is not available after being stopped.")
 
@@ -373,29 +387,32 @@ async def test_full_cluster_restart(etcd_process: str, ops_test: OpsTest) -> Non
     )
 
     # reset the restart delay to the original value
-    for unit in ops_test.model.applications[app].units:
-        await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_DEFAULT)
+    for unit in juju_vm_model.status().get_units(app):
+        patch_restart_delay(juju_vm_model, unit_name=unit, delay=RESTART_DELAY_DEFAULT)
 
 
 @pytest.mark.abort_on_fail
-async def test_full_cluster_crash(etcd_process: str, ops_test: OpsTest) -> None:
+def test_full_cluster_crash(etcd_process: str, juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal after all members went down."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can kill one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
-    init_units_count = len(ops_test.model.applications[app].units)
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -403,21 +420,21 @@ async def test_full_cluster_crash(etcd_process: str, ops_test: OpsTest) -> None:
     time.sleep(10)
 
     # update the restart delay for all units
-    for unit in ops_test.model.applications[app].units:
-        await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_PATCHED)
+    for unit in juju_vm_model.status().get_units(app):
+        patch_restart_delay(juju_vm_model, unit_name=unit, delay=RESTART_DELAY_PATCHED)
 
     # axe away the etcd process on all units
-    for unit in ops_test.model.applications[app].units:
+    for unit in juju_vm_model.status().get_units(app):
         send_process_control_signal(
-            unit_name=unit.name,
-            model_full_name=ops_test.model_full_name,
+            unit_name=unit,
+            model_full_name=juju_vm_model.model,
             signal="SIGKILL",
             etcd_process=etcd_process,
         )
 
     # ensure the all cluster members are down
-    for unit in ops_test.model.applications[app].units:
-        unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=app)
+    for unit in juju_vm_model.status().get_units(app):
+        unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=unit, app_name=app)
         assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info("Cluster is not available after crash.")
 
@@ -439,31 +456,34 @@ async def test_full_cluster_crash(etcd_process: str, ops_test: OpsTest) -> None:
     )
 
     # reset the restart delay to the original value
-    for unit in ops_test.model.applications[app].units:
-        await patch_restart_delay(ops_test, unit_name=unit.name, delay=RESTART_DELAY_DEFAULT)
+    for unit in juju_vm_model.status().get_units(app):
+        patch_restart_delay(juju_vm_model, unit_name=unit, delay=RESTART_DELAY_DEFAULT)
 
 
 @pytest.mark.abort_on_fail
-async def test_restart_raft_leader_after_deleting_database_file(
-    etcd_process: str, ops_test: OpsTest
+def test_restart_raft_leader_after_deleting_database_file(
+    etcd_process: str, juju_vm_model: Juju
 ) -> None:
     """Make sure the cluster can self-heal when the leader's data is deleted."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can kill one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
-    init_units_count = len(ops_test.model.applications[app].units)
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -478,20 +498,20 @@ async def test_restart_raft_leader_after_deleting_database_file(
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
     # stop the etcd process of the cluster/raft leader
-    await patch_restart_delay(ops_test, unit_name=leader_unit, delay=RESTART_DELAY_PATCHED)
+    patch_restart_delay(juju_vm_model, unit_name=leader_unit, delay=RESTART_DELAY_PATCHED)
     send_process_control_signal(
         unit_name=leader_unit,
-        model_full_name=ops_test.model_full_name,
+        model_full_name=juju_vm_model.model,
         signal="SIGTERM",
         etcd_process=etcd_process,
     )
 
     # make sure the process is stopped
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=leader_unit, app_name=app)
     assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
 
     # forcefully remove database file on the unit
-    await remove_database_file(ops_test, unit_name=leader_unit)
+    remove_database_file(juju_vm_model, unit_name=leader_unit)
 
     # as the stopped member is unresponsive, only query the endpoints still available
     remaining_endpoints = get_remaining_endpoints(endpoints, unit_endpoint)
@@ -533,23 +553,26 @@ async def test_restart_raft_leader_after_deleting_database_file(
 
 
 @pytest.mark.abort_on_fail
-async def test_reboot_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
+def test_reboot_raft_leader(etcd_process: str, juju_vm_model: Juju) -> None:
     """Make sure a unit comes back cleanly after rebooting the VM."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can kill one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -564,11 +587,11 @@ async def test_reboot_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
     # forcefully reboot the unit
-    await reboot_unit(ops_test, unit_name=leader_unit)
+    reboot_unit(juju_vm_model, unit_name=leader_unit)
 
     # ensure a new leader was assigned after waiting for the `election timeout`
     time.sleep(3)
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=leader_unit, app_name=app)
     remaining_endpoints = get_remaining_endpoints(endpoints, unit_endpoint)
     new_raft_leader = get_raft_leader(
         endpoints=remaining_endpoints, user=INTERNAL_USER, password=password
@@ -604,16 +627,22 @@ async def test_reboot_raft_leader(etcd_process: str, ops_test: OpsTest) -> None:
     time.sleep(10)
 
     # now reboot all units
-    units_count = len(ops_test.model.applications[app].units)
-    for unit in ops_test.model.applications[app].units:
-        await reboot_unit(ops_test, unit_name=unit.name)
+    units_count = len(juju_vm_model.status().get_units(app))
+    for unit in juju_vm_model.status().get_units(app):
+        reboot_unit(juju_vm_model, unit_name=unit)
 
-    await wait_until(
-        ops_test,
-        apps=[app],
-        apps_statuses=["active"],
-        units_statuses=["active"],
-        wait_for_exact_units=units_count,
+    juju_vm_model.wait(
+        lambda status: does_status_match(
+            status,
+            expected_status={
+                app: ExpectedStatus(
+                    app_status=["active"],
+                    unit_status=["active"],
+                    unit_count=units_count,
+                    idle_period=30,
+                )
+            },
+        )
     )
 
     # ensure data is written in the cluster

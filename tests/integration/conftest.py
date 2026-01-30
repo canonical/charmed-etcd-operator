@@ -12,7 +12,7 @@ from jubilant import Juju
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 MICROK8S_CLOUD_NAME = "mk8s"
-
+CONCIERGE_MODEL_NAME = "testing"
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def lxd_controller(lxd_cloud: str, juju: Juju):
 
 
 @pytest.fixture(scope="module")
-async def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
+def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
     """Provision a microk8s cloud, if a k8s cloud isn't already present, and return the name. Do so only if running on amd64.
 
     This is because arm64 isn't supported by the cos-lite charms for which we are provisioning this k8s cloud.
@@ -144,7 +144,18 @@ async def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
 
 
 @pytest.fixture(scope="module")
-def juju_lxd_model(arch: str, lxd_cloud: str, lxd_controller: str):
+def juju_vm_model(arch: str, lxd_cloud: str, lxd_controller: str, juju: Juju):
+    # if concierge model ("testing") is found, such as on CI, continue with this. Else setup temp model.
+    models = json.loads(juju.cli("models", "--format", "json", include_model=False))
+    for model in models["models"]:
+        if CONCIERGE_MODEL_NAME == model["short-name"]:
+            juju_lxd = jubilant.Juju(
+                model=f"{lxd_controller}:{CONCIERGE_MODEL_NAME}", wait_timeout=1000
+            )
+            juju_lxd.cli("set-model-constraints", f"arch={arch}")
+            yield juju_lxd
+            return
+
     with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
         juju_lxd.wait_timeout = 1000
         juju_lxd.cli("set-model-constraints", f"arch={arch}")
