@@ -5,6 +5,6 @@ systems:
   - self-hosted-linux-amd64-noble-medium
   - self-hosted-linux-arm64-noble-medium
 execute: |
-  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results" -m v1
+  tox run -e integration -- "tests/integration/$TEST_MODULE"  --alluredir="$SPREAD_TASK/allure-results" -m v1
 artifacts:
   - allure-results

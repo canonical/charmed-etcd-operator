@@ -2,15 +2,15 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import base64
 import logging
 import os
 import re
 import subprocess
 from pathlib import Path
 
+import jubilant
 import pytest
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
 from statuses import TLSStatuses
@@ -18,7 +18,6 @@ from statuses import TLSStatuses
 from ..helpers import (
     APP_NAME,
     TLS_NAME,
-    add_secret,
     download_client_certificate_from_unit,
     get_cluster_endpoints,
     get_cluster_members,
@@ -26,7 +25,7 @@ from ..helpers import (
     get_secret_by_label,
     put_key,
 )
-from ..helpers_deployment import wait_until
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 
 logger = logging.getLogger(__name__)
 
@@ -47,19 +46,19 @@ def _install_dependencies() -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_with_tls(charm: str, ops_test: OpsTest) -> None:
+def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     """Set up the TLS provider charms and etcd."""
     _install_dependencies()
 
     # Deploy the charm and wait for active/idle status
     logger.info("Deploying the charm")
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    juju_vm_model.deploy(charm, num_units=NUM_UNITS)
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
     # Deploy the TLS charms
     tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
-    await ops_test.model.deploy(
+    juju_vm_model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
+    juju_vm_model.deploy(
         VAULT_NAME,
         channel="1.18/edge",
         config={
@@ -68,26 +67,27 @@ async def test_build_and_deploy_with_tls(charm: str, ops_test: OpsTest) -> None:
             "pki_allow_ip_sans": True,
         },
     )
-    await ops_test.model.integrate(f"{VAULT_NAME}:tls-certificates-pki", TLS_NAME)
-    await ops_test.model.wait_for_idle(apps=[VAULT_NAME], status="blocked", timeout=1000)
+    juju_vm_model.integrate(f"{VAULT_NAME}:tls-certificates-pki", TLS_NAME)
+    juju_vm_model.wait(lambda status: jubilant.all_blocked(status, VAULT_NAME))
 
 
 @pytest.mark.abort_on_fail
-async def test_initialize_vault(ops_test: OpsTest) -> None:
+def test_initialize_vault(juju_vm_model: Juju) -> None:
     """Initialize Vault and wait for it to be ready."""
-    vault_app = ops_test.model.applications[VAULT_NAME]
-    vault_unit = vault_app.units[0]
-    vault_ip = vault_unit.public_address
-    secrets = await ops_test.model.list_secrets(show_secrets=True)
+    vault_units = juju_vm_model.status().get_units(VAULT_NAME)
+    vault_ip = next(iter(vault_units.values())).public_address
+    secrets = juju_vm_model.secrets()
     logger.info("Initializing Vault")
 
     vault_ca = None
     for secret in secrets:
         if secret.label == "self-signed-vault-ca-certificate":
-            vault_ca = secret.value.data.get("certificate")
+            vault_ca = juju_vm_model.show_secret(identifier=secret.uri, reveal=True).content.get(
+                "certificate"
+            )
 
     assert vault_ca, "Vault CA certificate not found in secrets"
-    vault_ca = base64.b64decode(vault_ca).decode("utf-8")
+
     Path("./vault_ca.pem").write_text(vault_ca)
 
     vault_env = os.environ.copy()
@@ -144,8 +144,7 @@ async def test_initialize_vault(ops_test: OpsTest) -> None:
     match = re.search(token_regex, create_token_result.stdout)
     assert match, "Failed to extract token from Vault token create output"
     charm_vault_token = match.group(1)
-    secret_id = await add_secret(
-        ops_test,
+    secret_id = juju_vm_model.add_secret(
         "vault-token",
         {
             "token": charm_vault_token,
@@ -154,36 +153,39 @@ async def test_initialize_vault(ops_test: OpsTest) -> None:
 
     assert secret_id, "Failed to create vault-token secret"
 
-    await ops_test.model.grant_secret("vault-token", VAULT_NAME)
+    juju_vm_model.grant_secret("vault-token", VAULT_NAME)
 
-    action = await vault_unit.run_action(
-        "authorize-charm",
-        **{
-            "secret-id": secret_id,
+    vault_unit_name = next(iter(vault_units))
+    action = juju_vm_model.run(
+        unit=vault_unit_name,
+        action="authorize-charm",
+        params={
+            "secret-id": str(secret_id),
         },
     )
 
-    action = await action.wait()
     assert action.status == "completed", "Action should succeed"
 
-    await ops_test.model.wait_for_idle(apps=[VAULT_NAME], status="active", timeout=1000)
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, VAULT_NAME))
 
 
 @pytest.mark.abort_on_fail
-async def test_tls_enabled(ops_test: OpsTest) -> None:
+def test_tls_enabled(juju_vm_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     logger.info("Integrating peer-certificates and client-certificates relations")
-    await ops_test.model.integrate(f"{APP_NAME}:peer-certificates", VAULT_NAME)
-    await ops_test.model.integrate(f"{APP_NAME}:client-certificates", VAULT_NAME)
+    juju_vm_model.integrate(f"{APP_NAME}:peer-certificates", VAULT_NAME)
+    juju_vm_model.integrate(f"{APP_NAME}:client-certificates", VAULT_NAME)
 
-    await wait_until(ops_test, apps=[APP_NAME, VAULT_NAME])
+    juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, VAULT_NAME)
+    )
 
     # check if all units have been added to the cluster
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME, tls_enabled=True)
-    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME, tls_enabled=True)
+    download_client_certificate_from_unit(juju_vm_model, APP_NAME)
 
     # make sure data can be written to the cluster
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"failed to get secret for {PEER_RELATION}.{APP_NAME}.app"
     password = secret.get(f"{INTERNAL_USER}-password")
 
@@ -224,27 +226,28 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_restrict_certificate_domain(ops_test: OpsTest) -> None:
+def test_restrict_certificate_domain(juju_vm_model: Juju) -> None:
     """Restrict the allowed domains and request new certificates."""
     logger.info("Restrict allowed certificate domains in Vault")
     vault_domain_config_value = "domain1, domain2, domain3"
-    await ops_test.model.applications[VAULT_NAME].set_config(
-        {"pki_allowed_domains": vault_domain_config_value}
-    )
-    await wait_until(ops_test, apps=[VAULT_NAME])
+    juju_vm_model.config(app=VAULT_NAME, values={"pki_allowed_domains": vault_domain_config_value})
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, VAULT_NAME))
 
     logger.info("Configure certificate domain in etcd")
     etcd_domain_config_value = "domain3"
-    await ops_test.model.applications[APP_NAME].set_config(
-        {
+    juju_vm_model.config(
+        app=APP_NAME,
+        values={
             "client-certificate-domain": etcd_domain_config_value,
             "peer-certificate-domain": etcd_domain_config_value,
-        }
+        },
     )
 
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS)
+    juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+    )
 
-    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    download_client_certificate_from_unit(juju_vm_model, APP_NAME)
     client_cert_subject = subprocess.getoutput("openssl x509 -noout -subject -in client.pem ")
     assert etcd_domain_config_value in client_cert_subject, (
         f"expected domain name {etcd_domain_config_value} not found in certificate subject {client_cert_subject}"
@@ -253,25 +256,28 @@ async def test_restrict_certificate_domain(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_invalid_certificate_domain(ops_test: OpsTest) -> None:
+def test_invalid_certificate_domain(juju_vm_model: Juju) -> None:
     """Ensure no new certificates are requested if invalid domain is configured."""
     logger.info("Set config in etcd to invalid value")
     etcd_invalid_domain_config_value = "192.168.2.200"
 
-    await ops_test.model.applications[APP_NAME].set_config(
-        {"client-certificate-domain": etcd_invalid_domain_config_value}
+    juju_vm_model.config(
+        app=APP_NAME, values={"client-certificate-domain": etcd_invalid_domain_config_value}
     )
 
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME],
-        apps_full_statuses={
-            APP_NAME: [TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value],
-        },
-        wait_for_exact_units=NUM_UNITS,
+    juju_vm_model.wait(
+        lambda status: does_status_match(
+            status,
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=[TLSStatuses.CLIENT_DOMAIN_CONFIG_INVALID.value],
+                    unit_count=NUM_UNITS,
+                )
+            },
+        )
     )
 
-    await download_client_certificate_from_unit(ops_test, APP_NAME)
+    download_client_certificate_from_unit(juju_vm_model, APP_NAME)
     client_cert_subject = subprocess.getoutput("openssl x509 -noout -subject -in client.pem ")
     assert etcd_invalid_domain_config_value not in client_cert_subject, (
         f"domain name {etcd_invalid_domain_config_value} found in certificate subject {client_cert_subject}"

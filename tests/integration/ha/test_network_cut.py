@@ -5,8 +5,9 @@
 import logging
 import time
 
+import jubilant
 import pytest
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
 
@@ -21,7 +22,7 @@ from ..helpers import (
     get_unit_endpoint,
     is_endpoint_up,
 )
-from ..helpers_deployment import wait_until
+from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -47,15 +48,15 @@ TLS_NAME = "self-signed-certificates"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
+def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
-    if await existing_app(ops_test):
+    if existing_app(juju_vm_model):
         return
 
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(charm, num_units=NUM_UNITS)
-    await wait_until(ops_test, apps=[APP_NAME], timeout=1000)
+    juju_vm_model.deploy(charm, num_units=NUM_UNITS)
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
 
 # known-issue with self-hosted runners: `lxc config device set ... eth0 limits.priority=10`
@@ -63,24 +64,27 @@ async def test_build_and_deploy(charm: str, ops_test: OpsTest) -> None:
 # details see: https://warthogs.atlassian.net/browse/ISD-3026
 @pytest.mark.skip()
 @pytest.mark.abort_on_fail
-async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -> None:
+def test_network_cut_on_raft_leader_without_ip_change(juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can stop one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
-    init_units_count = len(ops_test.model.applications[app].units)
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -95,25 +99,25 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     leader_unit = initial_raft_leader.replace(app, f"{app}/")
 
     # cut network from the current cluster/raft leader
-    leader_hostname = await hostname_from_unit(ops_test, unit_name=leader_unit)
+    leader_hostname = hostname_from_unit(juju_vm_model, unit_name=leader_unit)
     cut_network_from_unit_without_ip_change(leader_hostname)
 
     # make sure the unit is not reachable from the other units
-    for unit in ops_test.model.applications[app].units:
-        if unit.name == leader_unit:
+    for unit in juju_vm_model.status().get_units(app):
+        if unit == leader_unit:
             continue
-        hostname = await hostname_from_unit(ops_test, unit.name)
+        hostname = hostname_from_unit(juju_vm_model, unit)
         assert not is_unit_reachable(hostname, leader_hostname), (
             f"{leader_hostname} is reachable from {hostname}"
         )
 
     # make sure the unit is not reachable from the controller
-    controller_hostname = await get_controller_hostname(ops_test)
+    controller_hostname = get_controller_hostname(juju_vm_model)
     assert not is_unit_reachable(controller_hostname, leader_hostname)
     logger.info(f"{leader_unit} is not reachable via network.")
 
     # verify the cluster member is not up anymore
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=leader_unit, app_name=app)
     assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"etcd endpoint on {leader_unit} is not available.")
 
@@ -138,12 +142,15 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
     restore_network_for_unit_without_ip_change(leader_hostname)
     logger.info(f"Network restored for {leader_unit}")
 
-    await wait_until(
-        ops_test,
-        apps=[app],
-        apps_statuses=["active"],
-        units_statuses=["active"],
-        wait_for_exact_units=init_units_count,
+    juju_vm_model.wait(
+        lambda status: does_status_match(
+            status,
+            expected_status={
+                app: ExpectedStatus(
+                    app_status=["active"], unit_status=["active"], unit_count=init_units_count
+                )
+            },
+        )
     )
 
     # ensure the member is up again
@@ -167,33 +174,36 @@ async def test_network_cut_on_raft_leader_without_ip_change(ops_test: OpsTest) -
 
 
 @pytest.mark.abort_on_fail
-async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> None:
+def test_network_cut_on_raft_leader_with_ip_change(juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # Deploy the TLS charm
     tls_config = {"ca-common-name": "etcd"}
-    await ops_test.model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
+    juju_vm_model.deploy(TLS_NAME, channel="1/edge", config=tls_config)
 
     # make sure we have at least two units so we can stop one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
     # enable TLS and check if the cluster is still accessible
     logger.info("Integrating peer-certificates relation")
-    await ops_test.model.integrate(f"{app}:peer-certificates", TLS_NAME)
-    await wait_until(ops_test, apps=[app, TLS_NAME])
+    juju_vm_model.integrate(f"{app}:peer-certificates", TLS_NAME)
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, app, TLS_NAME))
 
-    init_units_count = len(ops_test.model.applications[app].units)
-    endpoints = get_cluster_endpoints(ops_test, app)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{app}.app")
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    endpoints = get_cluster_endpoints(juju_vm_model, app)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{app}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -209,30 +219,30 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
 
     logger.info("Getting certificate from leader unit")
     initial_peer_certificate = get_certificate_from_unit(
-        ops_test.model_full_name, leader_unit, cert_type=TLSType.PEER
+        juju_vm_model, leader_unit, cert_type=TLSType.PEER
     )
 
     # cut network from the current cluster/raft leader
-    leader_hostname = await hostname_from_unit(ops_test, unit_name=leader_unit)
-    leader_ip = await ip_address_from_unit(ops_test, unit_name=leader_unit)
+    leader_hostname = hostname_from_unit(juju_vm_model, unit_name=leader_unit)
+    leader_ip = ip_address_from_unit(juju_vm_model, unit_name=leader_unit)
     cut_network_from_unit_with_ip_change(leader_hostname)
 
     # make sure the unit is not reachable from the other units
-    for unit in ops_test.model.applications[app].units:
-        if unit.name == leader_unit:
+    for unit in juju_vm_model.status().get_units(app):
+        if unit == leader_unit:
             continue
-        hostname = await hostname_from_unit(ops_test, unit.name)
+        hostname = hostname_from_unit(juju_vm_model, unit)
         assert not is_unit_reachable(hostname, leader_hostname), (
             f"{leader_hostname} is reachable from {hostname}"
         )
 
     # make sure the unit is not reachable from the controller
-    controller_hostname = await get_controller_hostname(ops_test)
+    controller_hostname = get_controller_hostname(juju_vm_model)
     assert not is_unit_reachable(controller_hostname, leader_hostname)
     logger.info(f"{leader_unit} is not reachable via network.")
 
     # verify the cluster member is not up anymore
-    unit_endpoint = get_unit_endpoint(ops_test, unit_name=leader_unit, app_name=app)
+    unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=leader_unit, app_name=app)
     assert not is_endpoint_up(unit_endpoint, user=INTERNAL_USER, password=password)
     logger.info(f"etcd endpoint on {leader_unit} is not available.")
 
@@ -257,18 +267,23 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
     restore_network_for_unit_with_ip_change(leader_hostname)
     logger.info(f"Network has been restored for {leader_unit}")
 
-    await wait_until(
-        ops_test,
-        apps=[app],
-        apps_statuses=["active"],
-        units_statuses=["active"],
-        wait_for_exact_units=init_units_count,
+    juju_vm_model.wait(
+        lambda status: does_status_match(
+            status,
+            expected_status={
+                app: ExpectedStatus(
+                    app_status=["active"], unit_status=["active"], unit_count=init_units_count
+                )
+            },
+        )
+        and jubilant.all_agents_idle(status, app)
     )
 
     # ensure the member is up again
-    new_unit_ip = await ip_address_from_unit(ops_test, unit_name=leader_unit)
+    new_unit_ip = ip_address_from_unit(juju_vm_model, unit_name=leader_unit)
     unit_endpoint_updated = unit_endpoint.replace(leader_ip, new_unit_ip)
     assert is_endpoint_up(unit_endpoint_updated, user=INTERNAL_USER, password=password)
+
     logger.info(f"{leader_unit} is available again with new ip {new_unit_ip}")
 
     endpoints_updated = endpoints.replace(leader_ip, new_unit_ip)
@@ -280,7 +295,7 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
 
     logger.info("Getting new certificate from leader unit")
     new_peer_certificate = get_certificate_from_unit(
-        ops_test.model_full_name, leader_unit, cert_type=TLSType.PEER
+        juju_vm_model, leader_unit, cert_type=TLSType.PEER
     )
     assert new_peer_certificate != initial_peer_certificate, "Peer certificate not updated."
     logger.info("Certificates are updated after ip change.")
@@ -298,44 +313,49 @@ async def test_network_cut_on_raft_leader_with_ip_change(ops_test: OpsTest) -> N
 
 
 @pytest.mark.abort_on_fail
-async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
+def test_ip_change_with_client_tls(juju_vm_model: Juju) -> None:
     """Ensure TLS communication with the cluster works after an ip change."""
-    app = (await existing_app(ops_test)) or APP_NAME
+    app = existing_app(juju_vm_model) or APP_NAME
 
     # make sure we have at least two units so we can stop one of them
-    if len(ops_test.model.applications[app].units) < 2:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await wait_until(
-            ops_test,
-            apps=[app],
-            apps_statuses=["active"],
-            units_statuses=["active"],
-            wait_for_exact_units=2,
+    if len(juju_vm_model.status().get_units(app)) < 2:
+        juju_vm_model.add_unit(app)
+        juju_vm_model.wait(
+            lambda status: does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=2
+                    )
+                },
+            )
         )
 
     # enable client TLS before ip change
     logger.info("Integrating client-certificates relation")
-    await ops_test.model.integrate(f"{app}:client-certificates", TLS_NAME)
-    init_units_count = len(ops_test.model.applications[app].units)
-    await wait_until(ops_test, apps=[app], wait_for_exact_units=init_units_count)
+    juju_vm_model.integrate(f"{app}:client-certificates", TLS_NAME)
+    init_units_count = len(juju_vm_model.status().get_units(app))
+    juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, app, unit_count=init_units_count)
+    )
 
-    unit_name = ops_test.model.applications[app].units[0].name
+    unit_name = next(iter(juju_vm_model.status().get_units(app)))
 
     # cut network
-    unit_hostname = await hostname_from_unit(ops_test, unit_name=unit_name)
+    unit_hostname = hostname_from_unit(juju_vm_model, unit_name=unit_name)
     cut_network_from_unit_with_ip_change(unit_hostname)
 
     # make sure the unit is not reachable from the other units
-    for unit in ops_test.model.applications[app].units:
-        if unit.name == unit_name:
+    for unit in juju_vm_model.status().get_units(app):
+        if unit == unit_name:
             continue
-        hostname = await hostname_from_unit(ops_test, unit.name)
+        hostname = hostname_from_unit(juju_vm_model, unit)
         assert not is_unit_reachable(hostname, unit_hostname), (
             f"{unit_hostname} is reachable from {hostname}"
         )
 
     # make sure the unit is not reachable from the controller
-    controller_hostname = await get_controller_hostname(ops_test)
+    controller_hostname = get_controller_hostname(juju_vm_model)
     assert not is_unit_reachable(controller_hostname, unit_hostname)
     logger.info(f"{unit_name} is not reachable via network.")
 
@@ -343,14 +363,9 @@ async def test_ip_change_with_client_tls(ops_test: OpsTest) -> None:
     restore_network_for_unit_with_ip_change(unit_hostname)
     logger.info(f"Network has been restored for {unit_name}")
 
-    await wait_until(
-        ops_test,
-        apps=[app],
-        apps_statuses=["active"],
-        units_statuses=["active"],
-        wait_for_exact_units=init_units_count,
+    juju_vm_model.wait(
         # extended waiting period because it takes time for Juju to update the public ip address
-        idle_period=120,
+        lambda status: are_apps_active_and_agents_idle(status, app, idle_period=120)
     )
 
     # if all cluster operations where successful, test can be considered passed

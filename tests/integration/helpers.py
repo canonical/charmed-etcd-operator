@@ -3,22 +3,22 @@
 # See LICENSE file for licensing details.
 
 import base64
+import contextlib
 import json
 import logging
 import subprocess
-import time
 from pathlib import Path
 from typing import Any, Dict
 
 import yaml
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
+from jubilant.statustypes import AppStatus
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from literals import (
     CLIENT_PORT,
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
-    PEER_RELATION,
     TLS_ROOT_DIR,
     TLSType,
 )
@@ -28,6 +28,12 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
 TLS_NAME = "self-signed-certificates"
+GRAFANA_AGENT_APP_NAME = "grafana-agent"
+COS_CHANNEL = "1/stable"
+LOKI_APP_NAME = "loki"
+PROMETHEUS_APP_NAME = "prometheus"
+GRAFANA_APP_NAME = "grafana"
+COS_RELATION_NAME = "cos-agent"
 
 
 class SecretNotFoundError(Exception):
@@ -135,28 +141,27 @@ def get_cluster_id(
     raise KeyError("cluster_id not found")
 
 
-def get_cluster_endpoints(
-    ops_test: OpsTest, app_name: str = APP_NAME, tls_enabled: bool = False
-) -> str:
+def get_cluster_endpoints(juju: Juju, app_name: str = APP_NAME, tls_enabled: bool = False) -> str:
     """Resolve the etcd endpoints for a given juju application."""
     return ",".join(
         [
             f"{'https' if tls_enabled else 'http'}://{unit.public_address}:{CLIENT_PORT}"
-            for unit in ops_test.model.applications[app_name].units
+            for unit in juju.status().get_units(app_name).values()
         ]
     )
 
 
 def get_unit_endpoint(
-    ops_test: OpsTest,
+    juju: Juju,
     unit_name: str,
     app_name: str = APP_NAME,
     tls_enabled: bool = False,
-) -> str:
+) -> str | None:
     """Resolve the etcd endpoint for a given unit name."""
-    for unit in ops_test.model.applications[app_name].units:
-        if unit.name == unit_name:
-            return f"{'https' if tls_enabled else 'http'}://{unit.public_address}:{CLIENT_PORT}"
+    for name, details in juju.status().get_units(app_name).items():
+        if unit_name == name:
+            return f"{'https' if tls_enabled else 'http'}://{details.public_address}:{CLIENT_PORT}"
+    return None
 
 
 def get_remaining_endpoints(all_endpoints: str, endpoints_to_subtract: str) -> str:
@@ -238,167 +243,118 @@ def get_raft_leader(
             return member["name"]
 
 
-async def get_application_relation_data(
-    ops_test: OpsTest, application_name: str, relation_name: str, key: str
+def get_unit_relation_data(
+    juju: Juju,
+    unit_name: str,
+    target_unit_name: str,
+    relation_name: str,
+    key: str,
 ) -> str | None:
-    """Get relation data for an application.
+    """Get relation data for a unit.
 
     Args:
-        ops_test: The ops test framework instance
-        application_name: The name of the application
+        juju: An instance of Jubilant's Juju class on which to run Juju commands
+        unit_name: The name of provider's unit
+        target_unit_name: The name of requirer's unit
         relation_name: name of the relation to get connection data from
         key: key of data to be retrieved
-        relation_id: id of the relation to get connection data from
 
     Returns:
-        the relation data that was requested, or None if no data in the relation
+        the data that was requested or None
+            if no data in the relation
 
     Raises:
         ValueError if it's not possible to get application unit data
-            or if there is no data for the particular relation endpoint.
+            or if there is no data for the particular relation endpoint
+            and/or alias.
     """
-    unit_name = await get_juju_leader_unit_name(ops_test, application_name)
-    raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    raw_data = juju.cli("show-unit", unit_name)
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
     # Filter the data based on the relation name.
     relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == relation_name]
-    if len(relation_data) == 0:
+    if not relation_data:
         raise ValueError(
             f"no relation data could be grabbed on relation with endpoint {relation_name}"
         )
-    return relation_data[0]["application-data"].get(key)
+    # Consider the case we are dealing with subordinate charms, e.g. grafana-agent
+    # The field "relation-units" is structured slightly different.
+    for idx in range(len(relation_data)):
+        if target_unit_name in relation_data[idx]["related-units"]:
+            break
+    else:
+        return None
+    return (
+        relation_data[idx]["related-units"].get(target_unit_name, {}).get("data", {}).get(key, {})
+    )
 
 
-async def wait_for_cluster_formation(ops_test: OpsTest, app_name: str = APP_NAME):
-    """Wait until all cluster members have been promoted to full-voting member."""
-    try:
-        if learner := await get_application_relation_data(
-            ops_test, app_name, PEER_RELATION, "learning_member"
-        ):
-            while True:
-                logger.info(f"Waiting for learning-member {learner}")
-                time.sleep(5)
-                # this will raise with `ValueError` if not found and thereby break the loop
-                learner = await get_application_relation_data(
-                    ops_test, app_name, PEER_RELATION, "learning_member"
-                )
-    except ValueError:
-        pass
-
-
-async def get_juju_leader_unit_name(ops_test: OpsTest, app_name: str = APP_NAME) -> str:
-    """Retrieve the leader unit name."""
-    for unit in ops_test.model.applications[app_name].units:
-        if await unit.is_leader_from_status():
-            return unit.name
-    raise Exception("No leader unit found")
-
-
-async def get_secret_by_label(ops_test: OpsTest, label: str) -> Dict[str, str]:
-    secrets_raw = await ops_test.juju("list-secrets")
-    secret_ids = [
-        secret_line.split()[0] for secret_line in secrets_raw[1].split("\n")[1:] if secret_line
-    ]
-
-    for secret_id in secret_ids:
-        secret_data_raw = await ops_test.juju(
-            "show-secret", "--format", "json", "--reveal", secret_id
-        )
-        secret_data = json.loads(secret_data_raw[1])
-
-        if label == secret_data[secret_id].get("label"):
-            return secret_data[secret_id]["content"]["Data"]
+def get_secret_by_label(juju: Juju, label: str) -> Dict[str, str]:
+    for secret in juju.secrets():
+        if label == secret.label:
+            revealed_secret = juju.show_secret(secret.uri, reveal=True)
+            return revealed_secret.content
 
     raise SecretNotFoundError(f"Secret with label {label} not found")
 
 
 def get_certificate_from_unit(
-    model: str, unit: str, cert_type: TLSType, is_ca: bool = False
+    juju: Juju, unit: str, cert_type: TLSType, is_ca: bool = False
 ) -> str | None:
     """Retrieve a certificate from a unit."""
-    command = f'juju ssh --model={model} {unit} "cat {TLS_ROOT_DIR}/{cert_type.value}{"_ca" if is_ca else ""}.pem"'
-    output = subprocess.getoutput(command)
+    command = f"cat {TLS_ROOT_DIR}/{cert_type.value}{'_ca' if is_ca else ''}.pem"
+    output = juju.ssh(target=unit, command=command)
     if output.startswith("-----BEGIN CERTIFICATE-----"):
         return output
 
     return None
 
 
-async def add_secret(ops_test: OpsTest, secret_name: str, content: dict[str, str]) -> str:
-    """Add a secret to the model.
-
-    Args:
-        ops_test (OpsTest): The current test harness.
-        secret_name (str): The name of the secret.
-        content (dict[str, str]): The content of the secret.
-
-    Returns:
-        str: The secret ID.
-    """
-    assert ops_test.model is not None, "Model is not set"
-    add_secret_cmd = ["add-secret", secret_name]
-    add_secret_cmd.extend([f"{key}={value}" for key, value in content.items()])
-    return_code, std_out, std_err = await ops_test.juju(*add_secret_cmd, check=True)
-
-    assert return_code == 0, f"Failed to add secret: {std_err}"
-    logger.info(f"Added secret {secret_name} to the model")
-    return std_out.strip()
-
-
-async def set_password(
-    ops_test: OpsTest,
+def set_password(
+    juju: Juju,
     password: str,
     username: str = INTERNAL_USER,
     application: str = APP_NAME,
 ) -> None:
-    """Set a user password via secret.
+    """Set a user password (or update it if existing) via secret.
 
     Args:
-        ops_test: ops_test instance.
-        username: the user to set the password.
+        juju: An instance of Jubilant's Juju class on which to run Juju commands
         password: password to use
+        username: the user to set the password
         application: the application the created secret will be granted to
     """
     secret_name = "system_users_secret"
 
-    try:
-        secret_id = await ops_test.model.add_secret(
-            name=secret_name, data_args=[f"{username}={password}"]
-        )
-    except Exception:
-        secrets = await ops_test.model.list_secrets({"name": secret_name})
-        secret_id = secrets[0].uri
-        await ops_test.model.update_secret(
-            name=secret_name, data_args=[f"{username}={password}"], new_name=secret_name
-        )
+    # if secret exists, update it, else add secret
+    existing = next((s for s in juju.secrets() if s.name == secret_name), None)
+    if existing:
+        juju.update_secret(identifier=existing.uri, content={username: password})
+        secret_id = existing.uri
+    else:
+        secret_id = juju.add_secret(name=secret_name, content={username: password})
 
-    await ops_test.model.grant_secret(secret_name=secret_name, application=application)
+    # grant the application access to this secret
+    juju.grant_secret(identifier=secret_id, app=application)
 
     # update the application config to include the secret
-    await ops_test.model.applications[application].set_config(
-        {INTERNAL_USER_PASSWORD_CONFIG: secret_id}
-    )
+    juju.config(app=application, values={INTERNAL_USER_PASSWORD_CONFIG: secret_id})
 
 
-async def download_client_certificate_from_unit(
-    ops_test: OpsTest, app_name: str = APP_NAME
-) -> None:
+def download_client_certificate_from_unit(juju: Juju, app_name: str = APP_NAME) -> None:
     """Copy the client certificate files from a unit to the host's filesystem."""
-    unit = ops_test.model.applications[app_name].units[0]
+    unit = next(iter(juju.status().get_units(app_name)))
+
     tls_path = TLS_ROOT_DIR
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
-        await unit.scp_from(f"{tls_path}/{file}", file)
+        juju.scp(f"{unit}:{tls_path}/{file}", file)
 
 
-def get_storage_id(ops_test: OpsTest, unit_name: str, storage_name: str) -> str:
+def get_storage_id(juju: Juju, unit_name: str, storage_name: str) -> str | None:
     """Retrieve the storage id associated with a unit."""
-    model_name = ops_test.model.info.name
-
-    storage_data = subprocess.check_output(f"juju storage --model={model_name}".split())
-    storage_data = storage_data.decode("utf-8")
+    storage_data = juju.cli("storage")
     for line in storage_data.splitlines():
         # skip the header and irrelevant lines
         if not line or "Storage" in line or "detached" in line:
@@ -406,6 +362,8 @@ def get_storage_id(ops_test: OpsTest, unit_name: str, storage_name: str) -> str:
 
         if line.split()[0] == unit_name and line.split()[1].startswith(storage_name):
             return line.split()[1]
+
+    raise RuntimeError(f"Storage {storage_name} not found for unit {unit_name}")
 
 
 def get_user(
@@ -491,3 +449,52 @@ def get_etcd_version(
         return status["Status"]["version"]
     except KeyError:
         raise
+
+
+def get_leader_unit_name(juju: Juju, app: str = APP_NAME) -> str:
+    """Retrieve the leader unit's name.
+
+    Raises:
+        RuntimeError: if no leader unit is found.
+    """
+    for name, unit in juju.status().get_units(app).items():
+        if unit.leader:
+            return name
+
+    raise RuntimeError(f"No leader unit found for app {app}")
+
+
+def get_leader_unit_ip(juju: Juju, app: str = APP_NAME) -> str:
+    """Retrieve the leader unit's public address.
+
+    Raises:
+        RuntimeError: if no leader unit is found.
+    """
+    for unit in juju.status().get_units(app).values():
+        if unit.leader:
+            return unit.public_address
+
+    raise RuntimeError(f"No leader unit found for app {app}")
+
+
+@contextlib.contextmanager
+def fast_forward(juju: Juju, interval: int = 10):
+    """Context manager that temporarily speeds up update-status hooks.
+
+    Args:
+        juju: An instance of Jubilant's Juju class on which to run Juju commands
+        interval: How frequently (in seconds) to fire the update-status hook. Default value is 10.
+    """
+    old = juju.model_config()["update-status-hook-interval"]
+    juju.model_config({"update-status-hook-interval": f"{interval}s"})
+    try:
+        yield
+    finally:
+        juju.model_config({"update-status-hook-interval": old})
+
+
+def get_app_status(juju: Juju, app_name: str) -> AppStatus:
+    status_cmd = f"status {app_name} --format=json"
+    return AppStatus._from_dict(
+        json.loads(juju.cli(*status_cmd.split()))["applications"][app_name]
+    )

@@ -6,7 +6,7 @@ import logging
 from platform import machine
 
 import pytest
-from pytest_operator.plugin import OpsTest
+from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
 from tests.integration.ha.helpers import (
@@ -29,26 +29,30 @@ from tests.integration.helpers import (
     get_secret_by_label,
     get_unit_endpoint,
 )
-from tests.integration.helpers_deployment import wait_until
+from tests.integration.helpers_deployment import (
+    ExpectedStatus,
+    are_agents_idle,
+    are_apps_active_and_agents_idle,
+    does_status_match,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
-async def test_upgrade_single_unit_cluster(charm: str, ops_test: OpsTest) -> None:
+def test_upgrade_single_unit_cluster(charm: str, juju_vm_model: Juju) -> None:
     """Deploy one unit of etcd and upgrade it - without HA."""
-    await ops_test.model.deploy(
+    juju_vm_model.deploy(
         APP_NAME,
         num_units=1,
         channel=CHARM_CHANNEL,
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    await wait_until(ops_test, apps=[APP_NAME])
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
-    etcd_application = ops_test.model.applications[APP_NAME]
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -56,27 +60,32 @@ async def test_upgrade_single_unit_cluster(charm: str, ops_test: OpsTest) -> Non
 
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
-    await etcd_application.refresh(path=charm)
+    juju_vm_model.refresh(app=APP_NAME, path=charm)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
-    if "incompatible" in etcd_application.status_message:
+    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
+
+    if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        await etcd_application.units[0].run_action(
-            "force-refresh-start", **{"check-compatibility": False}
+        juju_vm_model.run(
+            list(juju_vm_model.status().get_units(APP_NAME))[0],
+            "force-refresh-start",
+            {"check-compatibility": False},
         )
 
     # wait for upgrade to complete
-    await wait_until(ops_test, apps=[APP_NAME])
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     logger.info("Check etcd version")
     unit_endpoint = get_unit_endpoint(
-        ops_test, unit_name=etcd_application.units[0].name, app_name=APP_NAME
+        juju_vm_model,
+        unit_name=list(juju_vm_model.status().get_units(APP_NAME))[0],
+        app_name=APP_NAME,
     )
     assert (
         get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
@@ -85,24 +94,24 @@ async def test_upgrade_single_unit_cluster(charm: str, ops_test: OpsTest) -> Non
 
     # clean up and remove the application to allow for further upgrade tests
     stop_continuous_writes()
-    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
+    juju_vm_model.remove_application(APP_NAME)
+    juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
 
 
 @pytest.mark.abort_on_fail
-async def test_scale_up_during_upgrade(charm: str, ops_test: OpsTest) -> None:
+def test_scale_up_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     """Add a unit to an etcd cluster during an upgrade."""
-    await ops_test.model.deploy(
+    juju_vm_model.deploy(
         APP_NAME,
         num_units=NUM_UNITS,
         channel=CHARM_CHANNEL,
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    await wait_until(ops_test, apps=[APP_NAME])
+    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
 
-    etcd_application = ops_test.model.applications[APP_NAME]
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -110,56 +119,56 @@ async def test_scale_up_during_upgrade(charm: str, ops_test: OpsTest) -> None:
 
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
-    await etcd_application.refresh(path=charm)
+    juju_vm_model.refresh(app=APP_NAME, path=charm)
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
-        etcd_application.units,
-        key=lambda unit: int(unit.name.split("/")[1]),
+        juju_vm_model.status().get_units(APP_NAME),
+        key=lambda unit_name: int(unit_name.split("/")[1]),
         reverse=True,
     )
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
-    if "incompatible" in etcd_application.status_message:
+    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
+
+    if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
+        juju_vm_model.run(refresh_order[0], "force-refresh-start", {"check-compatibility": False})
 
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
-
-    logger.info("Scale up")
-    await ops_test.model.applications[APP_NAME].add_unit()
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME],
-        apps_statuses=["blocked"],
-        wait_for_exact_units=NUM_UNITS + 1,
-        idle_period=60,
+    juju_vm_model.wait(
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
     )
 
-    logger.info("Scaling up will continue the refresh on the newly added unit")
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS + 1)
+    logger.info("Scale up")
+    juju_vm_model.add_unit(APP_NAME)
 
-    updated_endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    logger.info("Scaling up will continue the refresh on the newly added unit")
+    juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS + 1)
+    )
+
+    updated_endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
     assert_continuous_writes_increasing(
         endpoints=updated_endpoints, user=INTERNAL_USER, password=password
     )
 
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
-    for unit in etcd_application.units:
-        unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
+    for unit_name in juju_vm_model.status().get_units(APP_NAME):
+        unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]
-        ), f"unit {unit.name} was not upgraded"
+        ), f"unit {unit_name} was not upgraded"
 
-        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
-            f"{unit.name} is not in {cluster_members}"
+        assert any(unit_name.replace("/", "") == member["name"] for member in cluster_members), (
+            f"{unit_name} is not in {cluster_members}"
         )
 
     # clean up and remove the application to allow for further upgrade tests
@@ -167,24 +176,26 @@ async def test_scale_up_during_upgrade(charm: str, ops_test: OpsTest) -> None:
     assert_continuous_writes_consistent(
         endpoints=updated_endpoints, user=INTERNAL_USER, password=password
     )
-    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
+    juju_vm_model.remove_application(APP_NAME)
+    juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
 
 
 @pytest.mark.abort_on_fail
-async def test_scale_down_during_upgrade(charm: str, ops_test: OpsTest) -> None:
+def test_scale_down_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     """Remove a unit from an etcd cluster during an upgrade."""
-    await ops_test.model.deploy(
+    juju_vm_model.deploy(
         APP_NAME,
         num_units=NUM_UNITS,
         channel=CHARM_CHANNEL,
         revision=CHARM_REVISIONS_TO_DEPLOY[machine()],
     )
 
-    await wait_until(ops_test, apps=[APP_NAME])
+    juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME), timeout=1200
+    )
 
-    etcd_application = ops_test.model.applications[APP_NAME]
-    endpoints = get_cluster_endpoints(ops_test, APP_NAME)
-    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # start writing data to the cluster
@@ -192,78 +203,90 @@ async def test_scale_down_during_upgrade(charm: str, ops_test: OpsTest) -> None:
 
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
-    await etcd_application.refresh(path=charm)
+    juju_vm_model.refresh(app=APP_NAME, path=charm)
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
-        etcd_application.units,
-        key=lambda unit: int(unit.name.split("/")[1]),
+        juju_vm_model.status().get_units(APP_NAME),
+        key=lambda unit_name: int(unit_name.split("/")[1]),
         reverse=True,
     )
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], idle_period=30)
-    if "incompatible" in etcd_application.status_message:
+    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
+
+    if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
-        await refresh_order[0].run_action("force-refresh-start", **{"check-compatibility": False})
+        juju_vm_model.run(refresh_order[0], "force-refresh-start", {"check-compatibility": False})
 
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
-
-    logger.info(f"Remove unit {refresh_order[0].name}")
-    removed_member_name = refresh_order[0].name.replace("/", "")
-    await ops_test.model.applications[APP_NAME].destroy_unit(refresh_order[0].name)
-
-    await wait_until(
-        ops_test,
-        apps=[APP_NAME],
-        apps_statuses=["blocked"],
-        wait_for_exact_units=NUM_UNITS - 1,
-        idle_period=60,
+    juju_vm_model.wait(
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
     )
 
-    updated_endpoints = get_cluster_endpoints(ops_test, APP_NAME)
+    logger.info(f"Remove unit {refresh_order[0]}")
+    removed_member_name = refresh_order[0].replace("/", "")
+    juju_vm_model.remove_unit(refresh_order[0])
+
+    juju_vm_model.wait(
+        lambda status: does_status_match(
+            status,
+            expected_status={
+                APP_NAME: ExpectedStatus(
+                    app_status=["blocked"], unit_count=NUM_UNITS - 1, idle_period=60
+                )
+            },
+        )
+    )
+
+    updated_endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
     assert_continuous_writes_increasing(
         endpoints=updated_endpoints, user=INTERNAL_USER, password=password
     )
 
-    if "incompatible" in etcd_application.status_message:
+    if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
         logger.info("Running `force-refresh-start` action with check-compatibility=false")
         # wait for the action to return before continuing, to avoid being too quick
-        force_refresh_action = await refresh_order[1].run_action(
-            "force-refresh-start", **{"check-compatibility": False}
+        force_refresh_response = juju_vm_model.run(
+            refresh_order[1], "force-refresh-start", {"check-compatibility": False}
         )
-        force_refresh_response = await force_refresh_action.wait()
-        assert force_refresh_response.results.get("return-code") == 0, "action failed"
+        assert force_refresh_response.return_code == 0, "action failed"
 
-    await wait_until(ops_test, apps=[APP_NAME], apps_statuses=["blocked"])
+    juju_vm_model.wait(
+        lambda status: does_status_match(
+            status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}
+        )
+    )
 
     logger.info("Complete refresh with `resume-refresh` action")
-    resume_refresh_action = await refresh_order[-1].run_action("resume-refresh")
-    resume_refresh_response = await resume_refresh_action.wait()
-    assert resume_refresh_response.results.get("return-code") == 0, "action failed"
+    resume_refresh_response = juju_vm_model.run(refresh_order[-1], "resume-refresh")
+    assert resume_refresh_response.return_code == 0, "action failed"
 
     # wait for upgrade to complete
-    await wait_until(ops_test, apps=[APP_NAME], wait_for_exact_units=NUM_UNITS - 1)
+    juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS - 1)
+    )
 
     logger.info("Check etcd versions and cluster membership")
     cluster_members = get_cluster_members(updated_endpoints, user=INTERNAL_USER, password=password)
     member_names = [member["name"] for member in cluster_members]
 
-    for unit in etcd_application.units:
-        unit_endpoint = get_unit_endpoint(ops_test, unit_name=unit.name, app_name=APP_NAME)
+    for unit_name in juju_vm_model.status().get_units(APP_NAME):
+        unit_endpoint = get_unit_endpoint(juju_vm_model, unit_name=unit_name, app_name=APP_NAME)
         assert (
             get_etcd_version(unit_endpoint, user=INTERNAL_USER, password=password)
             == WORKLOAD_VERSION["target"]
-        ), f"unit {unit.name} was not upgraded"
+        ), f"unit {unit_name} was not upgraded"
 
-        assert any(unit.name.replace("/", "") == member["name"] for member in cluster_members), (
-            f"{unit.name} is not in {cluster_members}"
+        assert any(unit_name.replace("/", "") == member["name"] for member in cluster_members), (
+            f"{unit_name} is not in {cluster_members}"
         )
 
     assert removed_member_name not in member_names, (
