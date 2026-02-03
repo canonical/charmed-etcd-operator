@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 NUM_UNITS = 5
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     """Build and deploy the charm."""
     juju_vm_model.deploy(charm, num_units=NUM_UNITS)
@@ -48,7 +47,6 @@ def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     start_continuous_writes(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_membership_reconfiguration_after_unit_loss(juju_vm_model: Juju) -> None:
     """Make sure a forcefully removed unit is removed as cluster member."""
     units = list(juju_vm_model.status().get_units(APP_NAME))
@@ -95,7 +93,6 @@ def test_membership_reconfiguration_after_unit_loss(juju_vm_model: Juju) -> None
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_rebuild_on_healthy_cluster(juju_vm_model: Juju) -> None:
     """Users can run `rebuild-cluster` on a healthy cluster if they use the `force` parameter."""
     wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
@@ -130,7 +127,6 @@ def test_rebuild_on_healthy_cluster(juju_vm_model: Juju) -> None:
         logger.info(f"{unit_name} in cluster members")
 
 
-@pytest.mark.abort_on_fail
 def test_recover_from_majority_failure(juju_vm_model: Juju) -> None:
     """When the majority of the cluster is lost, users can run `rebuild-cluster`."""
     wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)

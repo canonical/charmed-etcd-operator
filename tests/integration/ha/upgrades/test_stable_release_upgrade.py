@@ -62,8 +62,7 @@ def test_deploy_stable_revision(juju_vm_model: Juju, requirer_charm: str) -> Non
     juju_vm_model.deploy(TLS_NAME, channel="1/stable", app=REQUIRER_TLS_NAME, config=tls_config)
 
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS),
-        timeout=60,
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
     logger.info("Enable TLS")

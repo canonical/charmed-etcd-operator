@@ -4,7 +4,6 @@
 import logging
 import time
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
@@ -36,7 +35,6 @@ TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 90
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 
@@ -97,7 +95,6 @@ def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.abort_on_fail
 def test_ca_rotation_by_config_change(juju_vm_model: Juju) -> None:
     """Test the CA rotation.
 
@@ -227,7 +224,6 @@ def _prepare_units_for_ca_expiration_test(juju: Juju) -> None:
         )
 
 
-@pytest.mark.abort_on_fail
 def test_ca_rotation_by_expiration(juju_vm_model: Juju) -> None:
     """Test the CA rotation.
 

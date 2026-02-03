@@ -5,7 +5,6 @@
 import logging
 import time
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
@@ -41,7 +40,6 @@ TEST_KEY = "test_key"
 TEST_VALUE = "42"
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     """Deploy the charm with storage volume for data, allowing for skipping if already deployed."""
     # create storage to be used in this test
@@ -66,7 +64,6 @@ def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     assert len(juju_vm_model.status().get_units(APP_NAME)) == NUM_UNITS
 
 
-@pytest.mark.abort_on_fail
 def test_attach_storage_after_scale_down(juju_vm_model: Juju) -> None:
     """Make sure storage can be re-attached after removing a unit."""
     # this test should only be executed with the app we deployed
@@ -128,7 +125,6 @@ def test_attach_storage_after_scale_down(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_attach_storage_after_scale_to_zero(juju_vm_model: Juju) -> None:
     """Make sure storage can be re-attached after removing all units."""
     # this test should only be executed with the app we deployed
@@ -187,7 +183,6 @@ def test_attach_storage_after_scale_to_zero(juju_vm_model: Juju) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_attach_storage_after_removing_application(charm: str, juju_vm_model: Juju) -> None:
     """Make sure storage can be re-attached to a completely new etcd application."""
     # this test should only be executed with the app we deployed

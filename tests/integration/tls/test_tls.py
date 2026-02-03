@@ -6,7 +6,6 @@ import logging
 import subprocess
 from time import sleep
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
@@ -38,7 +37,6 @@ TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 250
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 
@@ -61,7 +59,6 @@ def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_tls_enabled(juju_vm_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
@@ -109,7 +106,6 @@ def test_tls_enabled(juju_vm_model: Juju) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.abort_on_fail
 def test_disable_tls(juju_vm_model: Juju) -> None:
     """Disable TLS on a running cluster and check if it is still accessible."""
     logger.info("Removing peer-certificates and client-certificates relations")
@@ -162,7 +158,6 @@ def test_disable_tls(juju_vm_model: Juju) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.abort_on_fail
 def test_enable_tls(juju_vm_model: Juju) -> None:
     """Enable TLS on a running cluster and check if it is still accessible."""
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -222,7 +217,6 @@ def test_enable_tls(juju_vm_model: Juju) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.abort_on_fail
 def test_extra_sans_config_option(juju_vm_model: Juju) -> None:
     """Configure extra sans for the TLS certificates."""
     juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
@@ -286,7 +280,6 @@ def test_extra_sans_config_option(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     """Disable then enable peer TLS on a running cluster and check if it is still accessible."""
     leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
@@ -411,7 +404,6 @@ def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.abort_on_fail
 def test_disable_and_enable_client_tls(juju_vm_model: Juju) -> None:
     """Disable then enable client TLS on a running cluster and check if it is still accessible."""
     leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
@@ -535,7 +527,6 @@ def test_disable_and_enable_client_tls(juju_vm_model: Juju) -> None:
     ), "Failed to read new key"
 
 
-@pytest.mark.abort_on_fail
 def test_certificate_expiration(juju_vm_model: Juju) -> None:
     """Test the TLS certificate expiration on a running cluster."""
     # disable TLS and check if the cluster is still accessible

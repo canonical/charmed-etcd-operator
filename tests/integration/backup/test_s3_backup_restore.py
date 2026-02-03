@@ -4,7 +4,6 @@
 
 import logging
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER
@@ -29,7 +28,6 @@ PASSWORD = "some-password"
 backup_id = ""
 
 
-@pytest.mark.abort_on_fail
 def test_deploy_and_configure(
     charm: str, juju_vm_model: Juju, storage_credentials, storage_config
 ) -> None:
@@ -65,7 +63,6 @@ def test_deploy_and_configure(
     )
 
 
-@pytest.mark.abort_on_fail
 def test_s3_integration(juju_vm_model: Juju, s3_bucket) -> None:
     """Integrate charm and s3-integrator."""
     juju_vm_model.integrate(APP_NAME, S3_INTEGRATOR)
@@ -83,7 +80,6 @@ def test_s3_integration(juju_vm_model: Juju, s3_bucket) -> None:
     assert s3_bucket.meta.client.head_bucket(Bucket=s3_bucket.name)
 
 
-@pytest.mark.abort_on_fail
 def test_create_backup(juju_vm_model: Juju) -> None:
     """Create a backup and upload to s3-storage."""
     global backup_id
@@ -125,7 +121,6 @@ def test_create_backup(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_restore_backup_on_same_cluster(juju_vm_model: Juju) -> None:
     """Restore a backup and check if data is recovered."""
     leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
@@ -146,7 +141,6 @@ def test_restore_backup_on_same_cluster(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_restore_backup_on_different_cluster(charm: str, juju_vm_model: Juju):
     """Restore a backup and check if data is recovered."""
     logger.info("Remove existing etcd cluster and deploy a new one.")

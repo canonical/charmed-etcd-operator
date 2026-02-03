@@ -5,7 +5,6 @@
 import logging
 import time
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
@@ -30,7 +29,6 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
@@ -46,7 +44,6 @@ def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     assert len(juju_vm_model.status().get_units(APP_NAME)) == 1
 
 
-@pytest.mark.abort_on_fail
 def test_scale_up(juju_vm_model: Juju) -> None:
     """Make sure new units are added to the etcd cluster without downtime."""
     app = existing_app(juju_vm_model) or APP_NAME
@@ -83,7 +80,6 @@ def test_scale_up(juju_vm_model: Juju) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_scale_down(juju_vm_model: Juju) -> None:
     """Make sure a unit is removed from the etcd cluster without downtime."""
     app = existing_app(juju_vm_model) or APP_NAME
@@ -121,7 +117,6 @@ def test_scale_down(juju_vm_model: Juju) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_remove_raft_leader(juju_vm_model: Juju) -> None:
     """Make sure the etcd cluster is still available when the Raft leader is removed."""
     app = existing_app(juju_vm_model) or APP_NAME
@@ -186,7 +181,6 @@ def test_remove_raft_leader(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_remove_multiple_units(juju_vm_model: Juju) -> None:
     """Make sure multiple units can be removed from the etcd cluster without downtime."""
     app = existing_app(juju_vm_model) or APP_NAME
@@ -222,7 +216,6 @@ def test_remove_multiple_units(juju_vm_model: Juju) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_scale_to_zero_and_back(juju_vm_model: Juju) -> None:
     """Make sure that removing all units and then adding them again works."""
     app = existing_app(juju_vm_model) or APP_NAME
@@ -256,7 +249,6 @@ def test_scale_to_zero_and_back(juju_vm_model: Juju) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_remove_juju_leader(juju_vm_model: Juju) -> None:
     """Make sure that removing the juju leader unit works."""
     app = existing_app(juju_vm_model) or APP_NAME
@@ -296,7 +288,6 @@ def test_remove_juju_leader(juju_vm_model: Juju) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_remove_application(juju_vm_model: Juju) -> None:
     """Make sure removing the application works."""
     app = existing_app(juju_vm_model) or APP_NAME

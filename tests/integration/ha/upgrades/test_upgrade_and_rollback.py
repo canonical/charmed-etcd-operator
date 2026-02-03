@@ -5,7 +5,6 @@
 import logging
 from platform import machine
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
@@ -42,7 +41,6 @@ from tests.integration.helpers_deployment import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.abort_on_fail
 def test_deploy(juju_vm_model: Juju) -> None:
     """Deploy the charm with the previously released workload version of etcd."""
     juju_vm_model.deploy(
@@ -57,7 +55,6 @@ def test_deploy(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_fail_upgrade_and_rollback(charm: str, juju_vm_model: Juju) -> None:
     """Run a refresh, fail and roll back."""
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
@@ -161,7 +158,6 @@ def test_fail_upgrade_and_rollback(charm: str, juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_upgrade_to_local(charm: str, juju_vm_model: Juju) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
     juju_vm_model.wait(

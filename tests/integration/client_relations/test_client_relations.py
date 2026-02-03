@@ -91,7 +91,6 @@ def get_requirer_mtls_certificates(juju: Juju) -> list[str] | None:
     return None
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.parametrize(
     "data_interfaces_version",
     [pytest.param("0", marks=pytest.mark.v0), pytest.param("1", marks=pytest.mark.v1)],
@@ -122,7 +121,6 @@ def test_build_and_deploy(
     )
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
 def test_relate_client_charm(juju_vm_model: Juju) -> None:
@@ -172,7 +170,6 @@ def test_relate_client_charm(juju_vm_model: Juju) -> None:
             assert mtls_cert in client_cas, f"mtls cert not in trusted CAs for {unit_name}"
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
 def test_write_read_with_requirer(juju_vm_model: Juju) -> None:
@@ -204,7 +201,6 @@ def test_write_read_with_requirer(juju_vm_model: Juju) -> None:
         )
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
 def test_update_mtls_cert(juju_vm_model: Juju) -> None:
@@ -241,7 +237,6 @@ def test_update_mtls_cert(juju_vm_model: Juju) -> None:
             )
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
 def test_etcd_updates_ca(juju_vm_model: Juju) -> None:
@@ -284,7 +279,6 @@ def test_etcd_updates_ca(juju_vm_model: Juju) -> None:
             assert mtls_cert in client_cas, f"new mtls cert not in trusted CAs for {unit_name}"
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
 def test_remove_client_relation(juju_vm_model: Juju) -> None:
@@ -341,7 +335,6 @@ def test_remove_client_relation(juju_vm_model: Juju) -> None:
             )
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
 def test_different_tls_providers(juju_vm_model: Juju) -> None:
@@ -398,7 +391,6 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
 def test_certificate_transfer(juju_vm_model: Juju) -> None:
@@ -426,7 +418,6 @@ def test_certificate_transfer(juju_vm_model: Juju) -> None:
         assert ca_cert in client_cas, f"CA chain not in trusted CAs for {unit_name}"
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.v0
 @pytest.mark.v1
 def test_requirer_sends_ca(juju_vm_model: Juju) -> None:
