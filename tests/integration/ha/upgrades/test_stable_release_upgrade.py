@@ -33,7 +33,6 @@ def requirer_charm(arch: str) -> str:
     return f"./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-{arch}.charm"
 
 
-@pytest.mark.abort_on_fail
 def test_deploy_stable_revision(juju_vm_model: Juju, requirer_charm: str) -> None:
     """Deploy the charm with the first stable release, in a production-like setup."""
     logger.info("Create storage pool for persistent storage")
@@ -63,7 +62,8 @@ def test_deploy_stable_revision(juju_vm_model: Juju, requirer_charm: str) -> Non
     juju_vm_model.deploy(TLS_NAME, channel="1/stable", app=REQUIRER_TLS_NAME, config=tls_config)
 
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS),
+        timeout=60,
     )
 
     logger.info("Enable TLS")
@@ -83,7 +83,6 @@ def test_deploy_stable_revision(juju_vm_model: Juju, requirer_charm: str) -> Non
     )
 
 
-@pytest.mark.abort_on_fail
 def test_upgrade_to_latest(charm: str, juju_vm_model: Juju) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
     # pre-refresh-check
