@@ -42,7 +42,6 @@ TEST_VALUE = "42"
 TLSLIBID = "afd8c2bccf834997afce12c2706d2ede"
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 
@@ -64,7 +63,6 @@ def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_tls_enabled(juju_vm_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     # check if all units have been added to the cluster
@@ -112,7 +110,6 @@ def test_tls_enabled(juju_vm_model: Juju) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.abort_on_fail
 def test_set_private_key(juju_vm_model: Juju) -> None:
     """Set a new private key and check if the cluster is still accessible."""
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")

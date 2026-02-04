@@ -4,7 +4,6 @@
 
 import logging
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION, TuningOptions
@@ -30,7 +29,6 @@ TLS_NAME = "self-signed-certificates"
 NUM_UNITS = 3
 
 
-@pytest.mark.abort_on_fail
 def test_deploy_with_peer_tls(charm: str, juju_vm_model: Juju) -> None:
     """Deploy a cluster with three units and peer-certificates."""
     # Deploy the TLS charm
@@ -45,7 +43,6 @@ def test_deploy_with_peer_tls(charm: str, juju_vm_model: Juju) -> None:
     juju_vm_model.deploy(charm, num_units=NUM_UNITS)
 
 
-@pytest.mark.abort_on_fail
 def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     """Disable and enable peer TLS on a running cluster.
 
@@ -84,7 +81,6 @@ def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_tuning_config_options(juju_vm_model: Juju) -> None:
     """Tune the network latency parameters in etcd and ensure the cluster is available."""
     app_name = existing_app(juju_vm_model) or APP_NAME
@@ -117,7 +113,6 @@ def test_tuning_config_options(juju_vm_model: Juju) -> None:
     assert_continuous_writes_consistent(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
 
-@pytest.mark.abort_on_fail
 def test_invalid_tuning_config_options(juju_vm_model: Juju) -> None:
     """Ensure the cluster keeps running with invalid tuning options."""
     app_name = existing_app(juju_vm_model) or APP_NAME

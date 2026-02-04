@@ -5,7 +5,6 @@ import json
 import logging
 
 import jubilant
-import pytest
 import requests
 from jubilant import Juju
 
@@ -41,7 +40,6 @@ TEST_VALUE = "42"
 ADMIN = "admin"
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 
@@ -72,7 +70,6 @@ def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     assert get_key(endpoints, user=INTERNAL_USER, password=password, key=TEST_KEY) == TEST_VALUE
 
 
-@pytest.mark.abort_on_fail
 def test_authentication(juju_vm_model: Juju) -> None:
     """Assert authentication is enabled by default."""
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
@@ -82,7 +79,6 @@ def test_authentication(juju_vm_model: Juju) -> None:
     assert put_key(endpoints, key=TEST_KEY, value=TEST_VALUE) != "OK"
 
 
-@pytest.mark.abort_on_fail
 def test_update_admin_password(juju_vm_model: Juju) -> None:
     """Assert the admin password is updated when adding a user secret to the config."""
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
@@ -111,7 +107,6 @@ def test_update_admin_password(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_user_secret_permissions(juju_vm_model: Juju) -> None:
     """If a user secret is not granted, ensure we can process updated permissions."""
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME)
@@ -152,7 +147,6 @@ def test_user_secret_permissions(juju_vm_model: Juju) -> None:
     logger.info("Password update successful after secret was granted")
 
 
-@pytest.mark.abort_on_fail
 def test_etcd_metrics_endpoint(juju_vm_model: Juju):
     # direct metrics scrape
     leader_unit_ip = get_leader_unit_ip(juju_vm_model, app=APP_NAME)
@@ -163,7 +157,6 @@ def test_etcd_metrics_endpoint(juju_vm_model: Juju):
     assert len(text.splitlines()) > 50
 
 
-@pytest.mark.abort_on_fail
 def test_etcd_integration_with_grafana_agent(juju_vm_model: Juju):
     # deploy grafana-agent and integrate
     juju_vm_model.deploy(GRAFANA_AGENT_APP_NAME, channel=COS_CHANNEL)
@@ -187,7 +180,6 @@ def test_etcd_integration_with_grafana_agent(juju_vm_model: Juju):
     assert scrape_job["static_configs"][0]["targets"][0].endswith(f":{METRICS_PORT}")
 
 
-@pytest.mark.abort_on_fail
 def test_etcd_metrics_on_cos(juju_vm_model: Juju, juju_k8s_model: Juju, lxd_controller: str):
     # further, verify integration with cos-lite bundle.
     # Some charms in this bundle are only supported by amd64, so this test will be run only on this arch

@@ -9,7 +9,6 @@ import subprocess
 from pathlib import Path
 
 import jubilant
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
@@ -45,7 +44,6 @@ def _install_dependencies() -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     """Set up the TLS provider charms and etcd."""
     _install_dependencies()
@@ -71,7 +69,6 @@ def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     juju_vm_model.wait(lambda status: jubilant.all_blocked(status, VAULT_NAME))
 
 
-@pytest.mark.abort_on_fail
 def test_initialize_vault(juju_vm_model: Juju) -> None:
     """Initialize Vault and wait for it to be ready."""
     vault_units = juju_vm_model.status().get_units(VAULT_NAME)
@@ -169,7 +166,6 @@ def test_initialize_vault(juju_vm_model: Juju) -> None:
     juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, VAULT_NAME))
 
 
-@pytest.mark.abort_on_fail
 def test_tls_enabled(juju_vm_model: Juju) -> None:
     """Check if the TLS has been enabled on app startup."""
     logger.info("Integrating peer-certificates and client-certificates relations")
@@ -225,7 +221,6 @@ def test_tls_enabled(juju_vm_model: Juju) -> None:
     ), "Failed to read key"
 
 
-@pytest.mark.abort_on_fail
 def test_restrict_certificate_domain(juju_vm_model: Juju) -> None:
     """Restrict the allowed domains and request new certificates."""
     logger.info("Restrict allowed certificate domains in Vault")
@@ -255,7 +250,6 @@ def test_restrict_certificate_domain(juju_vm_model: Juju) -> None:
     logger.info("Certificates in etcd updated with new domain")
 
 
-@pytest.mark.abort_on_fail
 def test_invalid_certificate_domain(juju_vm_model: Juju) -> None:
     """Ensure no new certificates are requested if invalid domain is configured."""
     logger.info("Set config in etcd to invalid value")

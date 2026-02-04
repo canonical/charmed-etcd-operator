@@ -47,7 +47,6 @@ NUM_UNITS = 3
 TLS_NAME = "self-signed-certificates"
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
     """Build and deploy the charm, allowing for skipping if already deployed."""
     # it is possible for users to provide their own cluster for HA testing.
@@ -63,7 +62,6 @@ def test_build_and_deploy(charm: str, juju_vm_model: Juju) -> None:
 # command fails because of wrong kernel version
 # details see: https://warthogs.atlassian.net/browse/ISD-3026
 @pytest.mark.skip()
-@pytest.mark.abort_on_fail
 def test_network_cut_on_raft_leader_without_ip_change(juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
     app = existing_app(juju_vm_model) or APP_NAME
@@ -173,7 +171,6 @@ def test_network_cut_on_raft_leader_without_ip_change(juju_vm_model: Juju) -> No
     )
 
 
-@pytest.mark.abort_on_fail
 def test_network_cut_on_raft_leader_with_ip_change(juju_vm_model: Juju) -> None:
     """Make sure the cluster can self-heal and the unit reconfigures after network disconnect."""
     app = existing_app(juju_vm_model) or APP_NAME
@@ -312,7 +309,6 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_vm_model: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_ip_change_with_client_tls(juju_vm_model: Juju) -> None:
     """Ensure TLS communication with the cluster works after an ip change."""
     app = existing_app(juju_vm_model) or APP_NAME

@@ -33,7 +33,6 @@ def requirer_charm(arch: str) -> str:
     return f"./tests/integration/client_relations/requirer-charm/requirer-charm_ubuntu@24.04-{arch}.charm"
 
 
-@pytest.mark.abort_on_fail
 def test_deploy_stable_revision(juju_vm_model: Juju, requirer_charm: str) -> None:
     """Deploy the charm with the first stable release, in a production-like setup."""
     logger.info("Create storage pool for persistent storage")
@@ -83,7 +82,6 @@ def test_deploy_stable_revision(juju_vm_model: Juju, requirer_charm: str) -> Non
     )
 
 
-@pytest.mark.abort_on_fail
 def test_upgrade_to_latest(charm: str, juju_vm_model: Juju) -> None:
     """Refresh the charm and upgrade etcd, ensuring high availability while upgrading."""
     # pre-refresh-check

@@ -5,7 +5,6 @@
 import logging
 from platform import machine
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION
@@ -39,7 +38,6 @@ from tests.integration.helpers_deployment import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.abort_on_fail
 def test_upgrade_single_unit_cluster(charm: str, juju_vm_model: Juju) -> None:
     """Deploy one unit of etcd and upgrade it - without HA."""
     juju_vm_model.deploy(
@@ -98,7 +96,6 @@ def test_upgrade_single_unit_cluster(charm: str, juju_vm_model: Juju) -> None:
     juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
 
 
-@pytest.mark.abort_on_fail
 def test_scale_up_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     """Add a unit to an etcd cluster during an upgrade."""
     juju_vm_model.deploy(
@@ -180,7 +177,6 @@ def test_scale_up_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
 
 
-@pytest.mark.abort_on_fail
 def test_scale_down_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     """Remove a unit from an etcd cluster during an upgrade."""
     juju_vm_model.deploy(

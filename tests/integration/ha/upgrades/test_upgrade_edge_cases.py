@@ -6,7 +6,6 @@ import logging
 from platform import machine
 from time import sleep
 
-import pytest
 from jubilant import Juju
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
@@ -54,7 +53,6 @@ from tests.integration.helpers_deployment import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.abort_on_fail
 def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     """Recover a failed cluster of two units during an upgrade."""
     juju_vm_model.deploy(
@@ -150,7 +148,6 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
 
 
-@pytest.mark.abort_on_fail
 def test_ip_address_change_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     """Process an updated ip address during an upgrade."""
     juju_vm_model.deploy(
@@ -284,7 +281,6 @@ def test_ip_address_change_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
 
 
-@pytest.mark.abort_on_fail
 def test_tls_cert_rotation_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     """Process new TLS certificates during an upgrade."""
     juju_vm_model.deploy(
