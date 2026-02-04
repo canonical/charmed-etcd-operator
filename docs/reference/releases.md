@@ -17,9 +17,9 @@ Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.c
 | Charm        | etcd       | Snap     |
 | revision     | Version    | revision |
 +==============+============+==========+
-| 143 (amd64)  | 3.6.7      | 27       |
+| 149 (amd64)  | 3.6.7      | 27       |
 +--------------+            +----------+
-| 144 (arm64)  |            | 28       |
+| 150 (arm64)  |            | 28       |
 +--------------+------------+----------+
 ```            
 
