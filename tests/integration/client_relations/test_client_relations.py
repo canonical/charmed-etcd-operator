@@ -37,6 +37,7 @@ TEST_KEY = "/test_key"
 TEST_VALUE = "42"
 REQUIRER_NAME = "requirer-charm"
 REQUIRER_TLS_NAME = "requirer-tls-provider"
+USER_WITH_FULL_KEYSPACE_ACCESS = "client1.requirer-charm"
 
 
 @pytest.fixture
@@ -175,30 +176,41 @@ def test_relate_client_charm(juju_vm_model: Juju) -> None:
 def test_write_read_with_requirer(juju_vm_model: Juju) -> None:
     """Test write and read to the key prefix with the requirer charm."""
     requirer_unit = next(iter(juju_vm_model.status().get_units(REQUIRER_NAME)))
-
-    # write to the key prefix
-    with pytest.raises(TaskError) as task_error:
-        juju_vm_model.run(requirer_unit, "put", params={"key": TEST_KEY, "value": TEST_VALUE})
-    assert "permission denied" in str(task_error), (
-        "Action should fail because user does not have permission to write to the key prefix"
-    )
-
-    # write to authorized key prefix
-    # every user will write the key to their own prefix
-    key = "test/foo"
-    action = juju_vm_model.run(requirer_unit, "put", params={"key": key, "value": TEST_VALUE})
-    assert action.status == "completed", "Action should succeed"
-
-    # read from the key prefix
-    action = juju_vm_model.run(requirer_unit, "get", params={"key": key})
-    assert action.status == "completed", "Action should succeed"
     common_names = get_requirer_common_names(juju_vm_model)
-    results = json.loads(action.results["results"])
+
     for common_name in common_names:
-        assert (
-            common_name in results
-            and results[common_name] == f"/{common_name}/{key}\n{TEST_VALUE}"
+        # write to the key prefix
+        if USER_WITH_FULL_KEYSPACE_ACCESS == common_name:
+            action = juju_vm_model.run(
+                requirer_unit,
+                "put",
+                params={"key": TEST_KEY, "value": TEST_VALUE, "user": common_name},
+            )
+            assert action.status == "completed", "Action should succeed"
+        else:
+            with pytest.raises(TaskError) as task_error:
+                juju_vm_model.run(
+                    requirer_unit,
+                    "put",
+                    params={"key": TEST_KEY, "value": TEST_VALUE, "user": common_name},
+                )
+            assert "permission denied" in str(task_error), (
+                "Action should fail because user does not have permission to write to the key prefix"
+            )
+
+        # write to authorized key prefix
+        # every user will write the key to their own prefix
+        key = "test/foo"
+        action = juju_vm_model.run(
+            requirer_unit, "put", params={"key": key, "value": TEST_VALUE, "user": common_name}
         )
+        assert action.status == "completed", "Action should succeed"
+
+        # read from the key prefix
+        action = juju_vm_model.run(requirer_unit, "get", params={"key": key, "user": common_name})
+        assert action.status == "completed", "Action should succeed"
+        result = json.loads(action.results["result"])
+        assert result == f"{key}\n{TEST_VALUE}"
 
 
 @pytest.mark.v0

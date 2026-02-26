@@ -161,8 +161,9 @@ class RequirerCharm(ops.CharmBase):
             return
         orig_key = str(event.params.get("key", ""))
         value = str(event.params.get("value", ""))
-        if not orig_key or not value:
-            event.fail("Both key and value parameters are required.")
+        user = str(event.params.get("user", ""))
+        if not orig_key or not value or not user:
+            event.fail("Key, value and user parameters are required.")
             event.set_results({"ok": False})
             return
 
@@ -178,37 +179,27 @@ class RequirerCharm(ops.CharmBase):
             event.fail("No certificates available")
             return
 
-        results = {}
         for cert in certs:
+            if cert.certificate.common_name != user:
+                pass
             Path(SNAP_DIR).mkdir(exist_ok=True)
             Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
             Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
-            key = (
-                orig_key
-                if orig_key.startswith("/")
-                else f"/{cert.certificate.common_name}/{orig_key}"
-            )
-            if result := _put(uris, key, value):
-                results[cert.certificate.common_name] = result
+            if result := _put(uris, orig_key, value):
+                event.set_results(
+                    {
+                        "ok": True,
+                        "result": json.dumps(result),
+                    }
+                )
             else:
-                results[cert.certificate.common_name] = "Failed"
-
-        for common_name, result in results.items():
-            if result == "Failed":
                 event.set_results(
                     {
                         "ok": False,
-                        "results": json.dumps(results),
+                        "result": json.dumps(result),
                     }
                 )
-                event.fail(f"etcdctl put failed for certificate with common name: {common_name}")
-                return
-        event.set_results(
-            {
-                "ok": True,
-                "results": json.dumps(results),
-            }
-        )
+                event.fail(f"etcdctl put failed for certificate with common name: {user}")
 
     def _on_get_action(self, event: ops.ActionEvent) -> None:
         """Handle get action."""
@@ -223,8 +214,9 @@ class RequirerCharm(ops.CharmBase):
             return
 
         orig_key = str(event.params.get("key", ""))
-        if not orig_key:
-            event.fail("Key parameter is required.")
+        user = str(event.params.get("user", ""))
+        if not orig_key or not user:
+            event.fail("Key and user parameters are required.")
             event.set_results({"ok": False})
             return
 
@@ -234,37 +226,27 @@ class RequirerCharm(ops.CharmBase):
             event.set_results({"ok": False})
             return
 
-        results = {}
         for cert in certs:
+            if cert.certificate.common_name != user:
+                pass
             Path(SNAP_DIR).mkdir(exist_ok=True)
             Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
             Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
-            key = (
-                orig_key
-                if orig_key.startswith("/")
-                else f"/{cert.certificate.common_name}/{orig_key}"
-            )
-            if result := _get(uris, key):
-                results[cert.certificate.common_name] = result
+            if result := _get(uris, orig_key):
+                event.set_results(
+                    {
+                        "ok": True,
+                        "result": json.dumps(result),
+                    }
+                )
             else:
-                results[cert.certificate.common_name] = "Failed"
-
-        for common_name, result in results.items():
-            if result == "Failed":
                 event.set_results(
                     {
                         "ok": False,
-                        "results": json.dumps(results),
+                        "result": json.dumps(result),
                     }
                 )
-                event.fail(f"etcdctl get failed for certificate with common name: {common_name}")
-                return
-        event.set_results(
-            {
-                "ok": True,
-                "results": json.dumps(results),
-            }
-        )
+                event.fail(f"etcdctl get failed for certificate with common name: {user}")
 
     def _on_get_credentials_action(self, event: ops.ActionEvent) -> None:
         """Return the credentials an action response."""

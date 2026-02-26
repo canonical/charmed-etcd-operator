@@ -48,12 +48,18 @@ actions:
       value:
         description: The value to put in etcd
         type: string
+      user:
+        description: The common name to use
+        type: string
 
   get:
     description: Get a key value pair from etcd
     params:
       key:
         description: The key to get from etcd
+        type: string
+      user:
+        description: The common name to use
         type: string
 
   get-credentials:

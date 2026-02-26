@@ -186,7 +186,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 mtls_cert = request.mtls_cert
                 prefix = request.resource
                 # for client relation created hook
-                if not mtls_cert or not prefix:
+                if (not mtls_cert) or (prefix is None):
                     status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
                     continue
                 if not is_leaf_certificate_valid(mtls_cert):
