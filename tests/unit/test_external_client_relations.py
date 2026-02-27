@@ -29,7 +29,7 @@ from literals import (
     TLSCARotationState,
     TLSType,
 )
-from statuses import ExternalClientsStatuses
+from statuses import CharmStatuses, ExternalClientsStatuses
 
 from .helpers import status_is
 from .tls_helpers import generate_certificate_request_extensions
@@ -330,7 +330,7 @@ def test_add_ecr_new_user_no_tls_leader(cluster_no_tls_context, mtls_cert):
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
 
 
-def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context, mtls_cert):
+def test_add_ecr_new_user_missing_resource_from_requirer(cluster_no_tls_context, mtls_cert):
     """Test adding an external client relation to the charm with missing data from requirer."""
     ctx, relations = cluster_no_tls_context
 
@@ -343,6 +343,37 @@ def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context, 
         remote_app_data={
             "version": "v1",
             "requests": f'[{{"request-id": "0cbbc9781f189ea5", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
+        },
+    )
+
+    state_in = testing.State(
+        relations=relations + [ecr_relation],
+        leader=True,
+        secrets=[secret],
+    )
+
+    with (
+        ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
+    ):
+        charm: EtcdOperatorCharm = manager.charm
+        state_out = manager.run()
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE, is_app=True)
+        assert ecr_relation.id not in charm.state.cluster.model.managed_users
+
+
+def test_add_ecr_new_user_incomplete_data_from_requirer(cluster_no_tls_context, mtls_cert):
+    """Test adding an external client relation to the charm with missing data from requirer."""
+    ctx, relations = cluster_no_tls_context
+
+    secret = Secret(
+        {"mtls-cert": mtls_cert},
+    )
+    ecr_relation = testing.Relation(
+        id=5,
+        endpoint=EXTERNAL_CLIENTS_RELATION,
+        remote_app_data={
+            "version": "v1",
+            "requests": '[{"request-id": "0cbbc9781f189ea5", "salt": "mWpK32IQW4bsu65t"}]',
         },
     )
 
