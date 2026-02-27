@@ -157,7 +157,12 @@ def test_relate_client_charm(juju_vm_model: Juju) -> None:
         assert permissions, f"failed to get permissions for {common_name}"
         for permission in permissions:
             assert permission["permType"] == 2, "permission is not read and write"
-            assert permission["key"] == f"/{common_name}/", "permission is not for the key prefix"
+            if USER_WITH_FULL_KEYSPACE_ACCESS == common_name:
+                assert permission["key"] == "\x00", "full keyspace access has not been granted"
+            else:
+                assert permission["key"] == f"/{common_name}/", (
+                    "permission is not for the key prefix"
+                )
 
     # get client ca from every unit and check if it includes the mtls cert
     mtls_certs = get_requirer_mtls_certificates(juju_vm_model)
