@@ -29,7 +29,7 @@ from literals import (
     TLSCARotationState,
     TLSType,
 )
-from statuses import CharmStatuses, ExternalClientsStatuses
+from statuses import ExternalClientsStatuses
 
 from .helpers import status_is
 from .tls_helpers import generate_certificate_request_extensions
@@ -204,6 +204,63 @@ def test_add_ecr_new_user_leader(cluster_tls_context, mtls_cert):
         restart_member.assert_called_once()
 
 
+def test_add_ecr_new_user_missing_resource_from_requirer(cluster_tls_context, mtls_cert):
+    """Test adding an external client relation to the charm."""
+    ctx, relations = cluster_tls_context
+    secret = Secret({"mtls-cert": mtls_cert}, owner="app")
+    ecr_relation = testing.Relation(
+        id=5,
+        endpoint=EXTERNAL_CLIENTS_RELATION,
+        remote_app_data={
+            "version": "v1",
+            "requests": f'[{{"request-id": "0cbbc9781f189ea5", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
+        },
+    )
+
+    state_in = testing.State(
+        relations=relations + [ecr_relation],
+        leader=True,
+        secrets=[secret],
+    )
+
+    with (
+        ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
+        patch("common.client.EtcdClient.get_user", return_value=None),
+        patch("common.client.EtcdClient._run_etcdctl", return_value="success"),
+        patch(
+            "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
+            return_value=([server_cert], MagicMock()),
+        ),
+        patch("managers.cluster.ClusterManager.get_version", return_value="3.6"),
+        patch("workload.EtcdWorkload.write_file"),
+        patch("managers.tls.TLSManager.is_new_ca", return_value=True),
+        patch("managers.cluster.ClusterManager.restart_member") as restart_member,
+    ):
+        charm: EtcdOperatorCharm = manager.charm
+        state_out = manager.run()
+        ecr_relation = state_out.get_relation(ecr_relation.id)
+        response = json.loads(ecr_relation.local_app_data["requests"])[0]
+        managed_user_key = charm.external_clients_manager._construct_managed_user_key(
+            ecr_relation.id, response["request-id"]
+        )
+        assert managed_user_key in charm.state.cluster.model.managed_users
+        assert charm.state.cluster.model.managed_users[managed_user_key] == CLIENT_COMMON_NAME
+        assert (
+            _get_secret_from_state(state_out, response["secret-tls"]).tracked_content.get("tls-ca")
+            == "test_ca_server"
+        )
+        assert set(response["endpoints"].split(",")) == set(
+            "ip1:2379,ip2:2379,ip0:2379".split(",")
+        )
+        assert (
+            _get_secret_from_state(state_out, response["secret-user"]).tracked_content.get(
+                "username"
+            )
+            == CLIENT_COMMON_NAME
+        )
+        restart_member.assert_called_once()
+
+
 def test_add_ecr_user_creation_failed(cluster_tls_context, mtls_cert):
     """Test adding an external client relation to the charm."""
     ctx, relations = cluster_tls_context
@@ -327,37 +384,6 @@ def test_add_ecr_new_user_no_tls_leader(cluster_no_tls_context, mtls_cert):
         state_out = manager.run()
         defered_event_names = [event.name for event in state_out.deferred]
         assert "bulk_resources_requested" in defered_event_names
-        assert ecr_relation.id not in charm.state.cluster.model.managed_users
-
-
-def test_add_ecr_new_user_missing_resource_from_requirer(cluster_tls_context, mtls_cert):
-    """Test adding an external client relation to the charm with missing data from requirer."""
-    ctx, relations = cluster_tls_context
-
-    secret = Secret(
-        {"mtls-cert": mtls_cert},
-    )
-    ecr_relation = testing.Relation(
-        id=5,
-        endpoint=EXTERNAL_CLIENTS_RELATION,
-        remote_app_data={
-            "version": "v1",
-            "requests": f'[{{"request-id": "0cbbc9781f189ea5", "salt": "mWpK32IQW4bsu65t","secret-mtls": "{secret.id}"}}]',
-        },
-    )
-
-    state_in = testing.State(
-        relations=relations + [ecr_relation],
-        leader=True,
-        secrets=[secret],
-    )
-
-    with (
-        ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
-    ):
-        charm: EtcdOperatorCharm = manager.charm
-        state_out = manager.run()
-        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value, is_app=True)
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
 
 
