@@ -330,9 +330,9 @@ def test_add_ecr_new_user_no_tls_leader(cluster_no_tls_context, mtls_cert):
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
 
 
-def test_add_ecr_new_user_missing_resource_from_requirer(cluster_no_tls_context, mtls_cert):
+def test_add_ecr_new_user_missing_resource_from_requirer(cluster_tls_context, mtls_cert):
     """Test adding an external client relation to the charm with missing data from requirer."""
-    ctx, relations = cluster_no_tls_context
+    ctx, relations = cluster_tls_context
 
     secret = Secret(
         {"mtls-cert": mtls_cert},
@@ -357,7 +357,7 @@ def test_add_ecr_new_user_missing_resource_from_requirer(cluster_no_tls_context,
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
-        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE, is_app=True)
+        assert status_is(state_out, CharmStatuses.ACTIVE_IDLE.value, is_app=True)
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
 
 
