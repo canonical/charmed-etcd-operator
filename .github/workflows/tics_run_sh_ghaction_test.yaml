@@ -5,7 +5,7 @@ name: TICS run self-hosted test (github-action)
 
 on:
   schedule:
-    - cron: '0 2 * * 6' # Every Saturday 2:00 AM UTC
+    - cron: "0 2 * * 6" # Every Saturday 2:00 AM UTC
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -35,7 +35,7 @@ jobs:
           python3 -m venv .venv
           . .venv/bin/activate
           poetry install --all-groups
-          pipx install pylint flake8
+          pip install flake8 poetry pylint pytest tox
           echo "PATH=$PATH" >> "$GITHUB_PATH"
 
       - name: Run tox tests to create coverage.xml
