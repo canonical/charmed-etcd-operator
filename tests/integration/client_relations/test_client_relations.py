@@ -200,7 +200,7 @@ def test_write_read_with_requirer(juju_vm_model: Juju) -> None:
 
         # write to authorized key prefix
         # every user will write the key to their own prefix
-        key = "test/foo"
+        key = f"/{common_name}/test/foo"
         action = juju_vm_model.run(
             requirer_unit, "put", params={"key": key, "value": TEST_VALUE, "user": common_name}
         )
