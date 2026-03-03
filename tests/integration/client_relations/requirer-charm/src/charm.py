@@ -181,7 +181,7 @@ class RequirerCharm(ops.CharmBase):
 
         for cert in certs:
             if cert.certificate.common_name != user:
-                pass
+                continue
             Path(SNAP_DIR).mkdir(exist_ok=True)
             Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
             Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
@@ -228,7 +228,7 @@ class RequirerCharm(ops.CharmBase):
 
         for cert in certs:
             if cert.certificate.common_name != user:
-                pass
+                continue
             Path(SNAP_DIR).mkdir(exist_ok=True)
             Path(f"{SNAP_DIR}/client.pem").write_text(cert.certificate.raw)
             Path(f"{SNAP_DIR}/client.key").write_text(private_key.raw)
