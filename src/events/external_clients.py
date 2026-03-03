@@ -136,7 +136,7 @@ class ExternalClientsEvents(Object):
 
     def _on_mtls_cert_updated(self, event: MtlsCertUpdatedEvent[RequirerCommonModel]) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
-        if not event.request.mtls_cert or not event.request.resource:
+        if not event.request.mtls_cert:
             logger.error("CA chain, keys prefix, or common name not provided")
             return
 

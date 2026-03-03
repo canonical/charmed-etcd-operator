@@ -148,7 +148,11 @@ class EtcdRequiresV1(EtcdRequires):
         for certificate in certs:
             cur_request = request_common_names.get(
                 certificate.common_name,
-                RequirerCommonModel(resource=f"/{certificate.common_name}/"),
+                RequirerCommonModel(
+                    resource=f"/{certificate.common_name}/"
+                    if certificate.common_name == "client2.requirer-charm"
+                    else ""
+                ),
             )
 
             cur_request.mtls_cert = certificate.raw
