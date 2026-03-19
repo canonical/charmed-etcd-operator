@@ -157,7 +157,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 logger.warning("Skipping relation %s with no responses.", relation.id)
                 continue
             for request in self.state.etcd_provides_event_handler.requests(relation):
-                if not request.resource or not request.mtls_cert:
+                if not request.mtls_cert:
                     logger.warning("Skipping relation %s with invalid payloads.", relation.id)
                     continue
                 current_response = next(
