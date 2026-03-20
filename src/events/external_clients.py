@@ -85,7 +85,7 @@ class ExternalClientsEvents(Object):
         responses = []
         for request in event.requests:
             if not request.mtls_cert:
-                logger.error("mTLS certificate or resource not provided")
+                logger.error("mTLS certificate not provided")
                 invalid_requests.append(request)
                 continue
 
@@ -137,7 +137,7 @@ class ExternalClientsEvents(Object):
     def _on_mtls_cert_updated(self, event: MtlsCertUpdatedEvent[RequirerCommonModel]) -> None:  # noqa: C901
         """Handle the ca chain updated event."""
         if not event.request.mtls_cert:
-            logger.error("CA chain, keys prefix, or common name not provided")
+            logger.error("CA chain not provided")
             return
 
         if self._exists_preventing_reason():
