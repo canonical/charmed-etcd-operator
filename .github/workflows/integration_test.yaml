@@ -80,7 +80,7 @@ jobs:
         # Default test results in case the integration tests time out or runner set up fails
         # (So that Allure report will show "unknown"/"failed" test result, instead of omitting the test)
         if: ${{ inputs.allure_report && github.event_name == 'schedule' && github.run_attempt == '1' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: allure-default-results-integration-test
           path: allure-default-results/
@@ -140,7 +140,7 @@ jobs:
         # Allure can only process one result per pytest test ID. If parameterization is done via
         # spread instead of pytest, there will be overlapping pytest test IDs.
         if: ${{ (success() || (failure() && steps.spread.outcome == 'failure')) && startsWith(matrix.job.spread_job, 'github-ci:') && contains(matrix.job.spread_job, 'amd64') && github.event_name == 'schedule' && github.run_attempt == '1' && inputs.allure_report }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: allure-results-integration-test-${{ matrix.job.name_in_artifact }}
           path: artifacts/${{ matrix.job.spread_job }}/allure-results/
@@ -172,7 +172,7 @@ jobs:
       - name: Upload logs
         timeout-minutes: 5
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logs-integration-test-${{ matrix.job.name_in_artifact }}
           path: ~/logs/
