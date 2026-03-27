@@ -27,7 +27,8 @@ Next, you need to implement the `etcd_client` interface in your charm's code. Th
 To install the `data_interfaces` library, navigate to your charm's root directory and run the following command:
 
 ```{terminal}
-:input: charmcraft fetch-lib charms.data_platform_libs.v0.data_interfaces
+:copy:
+charmcraft fetch-lib charms.data_platform_libs.v0.data_interfaces
 ```
 
 This command will download the `data_interfaces` library and make it available for use in your charm.
@@ -94,13 +95,15 @@ The `EtcdRequires` class also emit:
 To establish a relation between your charm and etcd, use the `juju integrate` command:
 
 ```{terminal}
-:input: juju integrate charmed-etcd <your-charm>
+:copy:
+juju integrate charmed-etcd <your-charm>
 ```
 
 To remove the relation, you can use the `juju remove-relation` command:
 
 ```{terminal}
-:input: juju remove-relation <your-charm> charmed-etcd
+:copy:
+juju remove-relation <your-charm> charmed-etcd
 ```
 
 If at any point in the charm code you need to access any field you can do the following:
@@ -126,26 +129,32 @@ The `data-integrator` charm can be used to integrate an application outside of J
 First, deploy the `data-integrator` charm:
 
 ```{terminal}
-:input: juju deploy data-integrator
+:copy:
+juju deploy data-integrator
 ```
 
 Next, configure the `data-integrator` charm with the `prefix-name` and `mtls-cert` options. The `prefix-name` option specifies the prefix for the keys that will be used in etcd, and the `mtls-cert` option specifies the client certificate for mutual TLS authentication.
 
 ```{terminal}
-:input: juju config data-integrator prefix-name=/my-charm/ mtls-cert="-----BEGIN CERTIFICATE-----...--------END CERTIFICATE-----"
+:copy:
+:scroll:
+juju config data-integrator prefix-name=/my-charm/ mtls-cert="-----BEGIN CERTIFICATE-----...--------END CERTIFICATE-----"
 ```
 
 Then, create a relation between the `data-integrator` charm and the etcd charm:
 
 ```{terminal}
-:input: juju integrate data-integrator charmed-etcd
+:copy:
+juju integrate data-integrator charmed-etcd
 ```
 
 To fetch the authentication information, you can use the `get-credentials` action provided by the `data-integrator` charm:
 
 ```{terminal}
-:input: juju run data-integrator/leader get-credentials
+:copy:
 :scroll:
+juju run data-integrator/leader get-credentials
+
 Running operation 1 with 1 task
   - task 2 on unit-data-integrator-0
 
@@ -166,9 +175,10 @@ ok: "True"
 To remove the relation, you can use the `juju remove-relation` command:
 
 ```{terminal}
-:input: juju remove-relation data-integrator charmed-etcd
+:copy:
+juju remove-relation data-integrator charmed-etcd
 ```
 
 ```{caution}
-It's important to be aware that charmed etcd does not provide automatic `mtls_cert` rotation or expiration. Consequently, managing this certificate's life cycle must be handled by the user.
- ```
+Charmed etcd does not provide automatic `mtls_cert` rotation or expiration. This certificate's life cycle **must be handled by the user**.
+```
