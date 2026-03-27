@@ -3,14 +3,13 @@ name: Automatic doc checks
 
 on:
   push:
-    branches: [ 3.6/edge ]
+    branches: [ main ]
   pull_request:
     paths:
       - 'docs/**'   # Only run on changes to the docs directory
 
   workflow_dispatch:
     # Manual trigger
-
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
