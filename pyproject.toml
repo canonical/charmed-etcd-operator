@@ -29,7 +29,7 @@ ops = ">=2.0.0"
 # data_platform_libs/v0/upgrade.py
 poetry-core = "*"
 # tls_certificates_interface/v4/tls_certificates.py
-cryptography = "==46.0.5"
+cryptography = "==46.0.6"
 pydantic = ">= 1.0"
 cosl = ">= 0.0.50"
 
