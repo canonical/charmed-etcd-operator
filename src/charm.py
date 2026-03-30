@@ -10,6 +10,7 @@ from subprocess import CalledProcessError
 import charm_refresh
 import ops
 import ops.log
+from charmlibs import pathops
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from data_platform_helpers.advanced_statuses.handler import StatusHandler
@@ -48,12 +49,13 @@ class EtcdOperatorCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         # Show logger name (module name) in logs
+        self.root: pathops.PathProtocol = pathops.LocalPath('/')
         root_logger = logging.getLogger()
         for handler in root_logger.handlers:
             if isinstance(handler, ops.log.JujuLogHandler):
                 handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
 
-        self.workload = EtcdWorkload()
+        self.workload = EtcdWorkload(self.root)
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
         # --- MANAGERS ---
@@ -61,7 +63,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.config_manager = ConfigManager(
             state=self.state, workload=self.workload, config=self.config
         )
-        self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
+        self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE, self.root)
         self.backup_manager = BackupManager(state=self.state, workload=self.workload)
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE

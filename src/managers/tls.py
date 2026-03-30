@@ -9,9 +9,9 @@ import binascii
 import logging
 import re
 from ipaddress import ip_address
-from pathlib import Path
 from typing import Dict, Iterable
 
+from charmlibs import pathops
 from charmlibs.interfaces.tls_certificates import (
     PrivateKey,
     ProviderCertificate,
@@ -44,10 +44,11 @@ class TLSManager(ManagerStatusProtocol):
     name: str = "tls"
     state: ClusterState
 
-    def __init__(self, state: ClusterState, workload: WorkloadBase, substrate: SUBSTRATES):
+    def __init__(self, state: ClusterState, workload: WorkloadBase, substrate: SUBSTRATES, root: pathops.PathProtocol):
         self.state = state
         self.workload = workload
         self.substrate = substrate
+        self.root = root
 
     def set_tls_state(self, state: TLSState, tls_type: TLSType) -> None:
         """Set the TLS state.
@@ -124,9 +125,9 @@ class TLSManager(ManagerStatusProtocol):
             tls_type (TLSType): The TLS type. Defaults to TLSType.PEER.
         """
         if tls_type == TLSType.CLIENT:
-            ca_certs_path = Path(self.workload.paths.tls.client_ca)
+            ca_certs_path = self.root / self.workload.paths.tls.client_ca
         else:
-            ca_certs_path = Path(self.workload.paths.tls.peer_ca)
+            ca_certs_path = self.root / self.workload.paths.tls.peer_ca
 
         if not ca_certs_path.exists():
             return set()
