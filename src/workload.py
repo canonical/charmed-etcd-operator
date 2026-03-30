@@ -14,7 +14,7 @@ from typing import Any, Dict, List
 
 import tomllib
 import yaml
-from charmlibs import snap, pathops
+from charmlibs import pathops, snap
 from charmlibs.systemd import service_disable, service_enable
 from tenacity import Retrying, retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 from typing_extensions import override

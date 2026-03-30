@@ -49,7 +49,7 @@ class EtcdOperatorCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         # Show logger name (module name) in logs
-        self.root: pathops.PathProtocol = pathops.LocalPath('/')
+        self.root: pathops.PathProtocol = pathops.LocalPath("/")
         root_logger = logging.getLogger()
         for handler in root_logger.handlers:
             if isinstance(handler, ops.log.JujuLogHandler):

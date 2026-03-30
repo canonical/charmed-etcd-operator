@@ -44,7 +44,13 @@ class TLSManager(ManagerStatusProtocol):
     name: str = "tls"
     state: ClusterState
 
-    def __init__(self, state: ClusterState, workload: WorkloadBase, substrate: SUBSTRATES, root: pathops.PathProtocol):
+    def __init__(
+        self,
+        state: ClusterState,
+        workload: WorkloadBase,
+        substrate: SUBSTRATES,
+        root: pathops.PathProtocol,
+    ):
         self.state = state
         self.workload = workload
         self.substrate = substrate
