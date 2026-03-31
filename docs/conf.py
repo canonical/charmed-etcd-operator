@@ -1,5 +1,4 @@
 import datetime
-import ast
 import os
 import yaml
 
@@ -22,6 +21,8 @@ import yaml
 #######################
 
 # Project name
+#
+# TODO: Update with the official name of your project or product
 
 project = "Charmed etcd"
 author = "Canonical Ltd."
@@ -30,9 +31,10 @@ author = "Canonical Ltd."
 # Sidebar documentation title; best kept reasonably short
 #
 # TODO: To include a version number, add it here (hardcoded or automated).
+#
 # TODO: To disable the title, set to an empty string.
 
-html_title = project + " documentation"
+html_title = project + " 3.6 documentation"
 
 
 # Copyright string; shown at the bottom of the page
@@ -68,21 +70,25 @@ copyright = "%s CC-BY-SA, %s" % (datetime.date.today().year, author)
 # NOTE: The Open Graph Protocol (OGP) enhances page display in a social graph
 #       and is used by social media platforms; see https://ogp.me/
 
-# ogp_site_url = "https://canonical-starter-pack.readthedocs-hosted.com/"
+ogp_site_url = "https://canonical-charmed-etcd.readthedocs-hosted.com/"
 
 
 # Preview name of the documentation website
+#
 # TODO: To use a different name for the project in previews, update as needed.
 
 ogp_site_name = project
 
+
 # Preview image URL
+#
 # TODO: To customise the preview image, update as needed.
 
 ogp_image = "https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg"
 
 
 # Product favicon; shown in bookmarks, browser tabs, etc.
+
 # TODO: To customise the favicon, uncomment and update as needed.
 
 # html_favicon = '.sphinx/_static/favicon.png'
@@ -93,48 +99,66 @@ ogp_image = "https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg
 
 html_context = {
     # Product page URL; can be different from product docs URL
-    # TODO: Change to etcd product page when it goes live
-
+    #
+    # TODO: Change to your product website URL,
+    #       dropping the 'https://' prefix, e.g. 'ubuntu.com/lxd'.
+    #
+    # TODO: If there's no such website,
+    #       remove the {{ product_page }} link from the page header template
+    #       (usually .sphinx/_templates/header.html; also, see README.rst).
     "product_page": "canonical.com/data",
-
     # Product tag image; the orange part of your logo, shown in the page header
     #
     # TODO: To add a tag image, uncomment and update as needed.
     # 'product_tag': '_static/tag.png',
-
     # Your Discourse instance URL
+    #
+    # TODO: Change to your Discourse instance URL or leave empty.
+    #
     # NOTE: If set, adding ':discourse: 123' to an .rst file
     #       will add a link to Discourse topic 123 at the bottom of the page.
     "discourse": "https://discourse.charmhub.io",
-    
     # Your Mattermost channel URL
-    "mattermost":"",
-
+    #
+    # TODO: Change to your Mattermost channel URL or leave empty.
+    # "mattermost": ",
     # Your Matrix channel URL
+    #
+    # TODO: Change to your Matrix channel URL or leave empty.
     "matrix": "https://matrix.to/#/#charmhub-data-platform:ubuntu.com",
-    
     # Your documentation GitHub repository URL
+    #
+    # TODO: Change to your documentation GitHub repository URL or leave empty.
+    #
     # NOTE: If set, links for viewing the documentation source files
     #       and creating GitHub issues are added at the bottom of each page.
     "github_url": "https://github.com/canonical/charmed-etcd-operator",
-    
     # Docs branch in the repo; used in links for viewing the source files
-    # TODO: Update when this changes to stable
+    #
+    # TODO: To customise the branch, uncomment and update as needed.
     'repo_default_branch': '3.6/edge',
-
     # Docs location in the repo; used in links for viewing the source files
+    #
+
+
+    # TODO: To customise the directory, uncomment and update as needed.
     "repo_folder": "/docs/",
-
-    # Enable or disable the Previous / Next buttons at the bottom of pages
+    # TODO: To enable or disable the Previous / Next buttons at the bottom of pages
     # Valid options: none, prev, next, both
-    "sequential_nav": "none",
-
-    # Enable listing contributors on individual pages, set to True
+    # "sequential_nav": "both",
+    # TODO: To enable listing contributors on individual pages, set to True
     "display_contributors": True,
 
-    # Required for feedback button
+    # Required for feedback button    
     'github_issues': 'enabled',
 }
+
+html_extra_path = []
+
+# Allow opt-in build of the OpenAPI "Hello" example so docs stay clean by default.
+if os.getenv("OPENAPI", ""):
+    tags.add("openapi")
+    html_extra_path.append("how-to/assets/openapi.yaml")
 
 # TODO: To enable the edit button on pages, uncomment and change the link to a
 # public repository on GitHub or Launchpad. Any of the following link domains
@@ -154,26 +178,55 @@ html_theme_options = {
 
 # slug = ''
 
-# Template and asset locations
+#######################
+# Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
+#######################
+
+# Use RTD canonical URL to ensure duplicate pages have a specific canonical URL
+
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
+
+# sphinx-sitemap uses html_baseurl to generate the full URL for each page:
+
+sitemap_url_scheme = '{link}'
+
+# Include `lastmod` dates in the sitemap:
+
+sitemap_show_lastmod = True
+
+# Exclude generated pages from the sitemap:
+
+sitemap_excludes = [
+    '404/',
+    'genindex/',
+    'search/',
+]
+
+# TODO: Add more pages to sitemap_excludes if needed. Wildcards are supported.
+#       For example, to exclude module pages generated by autodoc, add '_modules/*'.
+
+################################
+# Template and asset locations #
+################################
 
 # html_static_path = ["_static"]
-# templates_path = ["_templates"]
+templates_path = ["_templates"]
 
 
 #############
 # Redirects #
 #############
 
-# To set up redirects: https://documatt.gitlab.io/sphinx-reredirects/usage.html
-# For example: 'explanation/old-name.html': '../how-to/prettify.html',
+# Add redirects to the 'redirects.txt' file
+# https://sphinxext-rediraffe.readthedocs.io/en/latest/
 
 # To set up redirects in the Read the Docs project dashboard:
 # https://docs.readthedocs.io/en/stable/guides/redirects.html
 
-# NOTE: If undefined, set to None, or empty,
-#       the sphinx_reredirects extension will be disabled.
+rediraffe_redirects = "redirects.txt"
 
-redirects = {}
+# Strips '/index.html' from destination URLs when building with 'dirhtml'
+# rediraffe_dir_only = True
 
 
 ###########################
@@ -186,8 +239,11 @@ redirects = {}
 
 linkcheck_ignore = [
     "http://127.0.0.1:8000",
-    "https://github.com/canonical/ACME/*",
-    "https://matrix.to/*"
+    "https://github.com",
+    r"https://matrix\.to/.*",
+    "https://example.com",
+    # SourceForge domains often block linkcheck
+    r"https://.*\.sourceforge\.(net|io)/.*",
     ]
 
 
@@ -199,7 +255,7 @@ linkcheck_anchors_ignore_for_url = [
     ]
 
 # give linkcheck multiple tries on failure
-# linkcheck_timeout = 30
+linkcheck_timeout = 90
 linkcheck_retries = 3
 
 ########################
@@ -220,41 +276,48 @@ myst_heading_anchors = 3
 # https://www.sphinx-doc.org/en/master/usage/extensions/index.html
 
 # NOTE: The canonical_sphinx extension is required for the starter pack.
-#       It automatically enables the following extensions:
-#       - custom-rst-roles
-#       - myst_parser
-#       - notfound.extension
-#       - related-links
-#       - sphinx_copybutton
-#       - sphinx_design
-#       - sphinx_reredirects
-#       - sphinx_tabs.tabs
-#       - sphinxcontrib.jquery
-#       - sphinxext.opengraph
-#       - terminal-output
-#       - youtube-links
 
 extensions = [
     "canonical_sphinx",
+    "notfound.extension",
+    "sphinx_design",
+    "sphinx_rerediraffe",
+    "sphinx_reredirects",
+    "sphinx_tabs.tabs",
+    "sphinxcontrib.jquery",
+    "sphinxext.opengraph",
+    "sphinx_config_options",
+    "sphinx_contributor_listing",
+    "sphinx_filtered_toctree",
+    "sphinx_related_links",
+    "sphinx_roles",
+    "sphinx_terminal",
+    "sphinx_ubuntu_images",
+    "sphinx_youtube_links",
     "sphinxcontrib.cairosvgconverter",
     "sphinx_last_updated_by_git",
     "sphinx.ext.intersphinx",
+    "sphinx_sitemap",
 ]
 
 # Excludes files or directories from processing
 
 exclude_patterns = [
-    "doc-cheat-sheet*",
+    ".venv*",
 ]
 
 # Adds custom CSS files, located under 'html_static_path'
 
-# html_css_files = []
+html_css_files = [
+    "https://assets.ubuntu.com/v1/d86746ef-cookie_banner.css",
+]
 
 
 # Adds custom JavaScript files, located under 'html_static_path'
 
-# html_js_files = []
+html_js_files = [
+    "https://assets.ubuntu.com/v1/287a5e8f-bundle.js",
+]
 
 
 # Specifies a reST snippet to be appended to each .rst file
@@ -302,7 +365,7 @@ rst_prolog = """
 # Workaround for https://github.com/canonical/canonical-sphinx/issues/34
 
 if "discourse_prefix" not in html_context and "discourse" in html_context:
-    html_context["discourse_prefix"] = html_context["discourse"] + "/t/"
+    html_context["discourse_prefix"] = f"{html_context['discourse']}/t/"
 
 # Workaround for substitutions.yaml
 
@@ -311,7 +374,7 @@ if os.path.exists('./reuse/substitutions.yaml'):
         myst_substitutions = yaml.safe_load(fd.read())
 
 # Add configuration for intersphinx mapping
-
-intersphinx_mapping = {
-    'starter-pack': ('https://canonical-example-product-documentation.readthedocs-hosted.com/en/latest', None)
-}
+# Map only the Sphinx documentation sets that you need to link to from your docs set.
+# intersphinx_mapping = {
+#     'sphinxcontrib-mermaid': ('https://sphinxcontrib-mermaid-demo.readthedocs.io/en/latest', None)
+# }
