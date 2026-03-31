@@ -55,7 +55,7 @@ class EtcdOperatorCharm(ops.CharmBase):
             if isinstance(handler, ops.log.JujuLogHandler):
                 handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
 
-        self.workload = EtcdWorkload(self.root)
+        self.workload = EtcdWorkload()
         self.state = ClusterState(self, substrate=SUBSTRATE)
 
         # --- MANAGERS ---
@@ -63,7 +63,7 @@ class EtcdOperatorCharm(ops.CharmBase):
         self.config_manager = ConfigManager(
             state=self.state, workload=self.workload, config=self.config
         )
-        self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE, self.root)
+        self.tls_manager = TLSManager(self.state, self.workload, SUBSTRATE)
         self.backup_manager = BackupManager(state=self.state, workload=self.workload)
         self.external_clients_manager = ExternalClientsManager(
             self.state, self.workload, SUBSTRATE

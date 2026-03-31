@@ -49,12 +49,11 @@ class TLSManager(ManagerStatusProtocol):
         state: ClusterState,
         workload: WorkloadBase,
         substrate: SUBSTRATES,
-        root: pathops.PathProtocol,
     ):
         self.state = state
         self.workload = workload
         self.substrate = substrate
-        self.root = root
+        self.root = pathops.LocalPath("/")
 
     def set_tls_state(self, state: TLSState, tls_type: TLSType) -> None:
         """Set the TLS state.

@@ -31,8 +31,8 @@ WORKING_DIR = Path(__file__).absolute().parent
 class EtcdWorkload(WorkloadBase):
     """Implementation of WorkloadBase for running on VMs."""
 
-    def __init__(self, root_path: pathops.PathProtocol):
-        self.root_path = root_path
+    def __init__(self):
+        self.root = pathops.LocalPath("/")
         for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
             with attempt:
                 self.etcd = snap.SnapCache()[SNAP_NAME]
@@ -102,13 +102,13 @@ class EtcdWorkload(WorkloadBase):
 
     @override
     def write_file(self, content: str, file: str) -> None:
-        path = self.root_path / file
+        path = self.root / file
         path.parent.mkdir(exist_ok=True, parents=True)
         path.write_text(content)
 
     @override
     def load_yaml_file(self, file: str) -> Dict[str, Any]:
-        file = self.root_path / file
+        file = self.root / file
         if not file.exists():
             return {}
 
@@ -116,7 +116,7 @@ class EtcdWorkload(WorkloadBase):
 
     @override
     def load_toml_file(self, file: str) -> Dict[str, Any]:
-        file = self.root_path / file
+        file = self.root / file
         if not file.exists():
             return {}
 
@@ -132,19 +132,18 @@ class EtcdWorkload(WorkloadBase):
 
     @override
     def copy_file(self, src_file: str, dst_file: str) -> None:
-        src = self.root_path / src_file
-        dst = self.root_path / dst_file
-        dst.parent.mkdir(exist_ok=True, parents=True)
+        src = self.root / src_file
+        dst = self.root / dst_file
         dst.write_bytes(src.read_bytes())
 
     @override
     def remove_file(self, file) -> None:
-        path = self.root_path / file
+        path = self.root / file
         path.unlink(missing_ok=True)
 
     @override
     def remove_directory(self, directory: str) -> None:
-        path = self.root_path / directory
+        path = self.root / directory
         if not path.exists():
             return
         self._remove_tree(path)
@@ -160,7 +159,7 @@ class EtcdWorkload(WorkloadBase):
 
     @override
     def exists(self, path: str) -> bool:
-        path = self.root_path / path
+        path = self.root / path
 
         if path.exists():
             if path.is_dir():
@@ -234,7 +233,7 @@ class EtcdWorkload(WorkloadBase):
         Returns:
             int: The size of the data storage in Bytes.
         """
-        return shutil.disk_usage(str(self.root_path / SNAP_DATA_PATH)).total
+        return shutil.disk_usage(str(self.root / SNAP_DATA_PATH)).total
 
     @override
     def get_db_file_size(self) -> int:
@@ -243,7 +242,7 @@ class EtcdWorkload(WorkloadBase):
         Returns:
             int: Size of the etcd database file in bytes.
         """
-        db_file_path = self.root_path / DATABASE_DIR / "snap" / "db"
+        db_file_path = self.root / DATABASE_DIR / "snap" / "db"
         if not db_file_path.exists() or not db_file_path.is_file():
             return 0
 
@@ -258,7 +257,7 @@ class EtcdWorkload(WorkloadBase):
         """
         # LXD sets up a Unix socket at /dev/lxd/sock inside the container
         # https://documentation.ubuntu.com/lxd/latest/dev-lxd/#implementation-details
-        path = self.root_path / "/dev/lxd/sock"
+        path = self.root / "/dev/lxd/sock"
         return path.exists()
 
     @override
@@ -268,5 +267,5 @@ class EtcdWorkload(WorkloadBase):
         Returns:
             bool: True if data storage is attached, False otherwise.
         """
-        path = self.root_path / SNAP_DATA_PATH
+        path = self.root / SNAP_DATA_PATH
         return path.exists()
