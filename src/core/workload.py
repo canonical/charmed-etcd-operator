@@ -10,10 +10,14 @@ import socket
 import string
 import subprocess
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from literals import CONFIG_FILE, TLS_ROOT_DIR
+import tomllib
+import yaml
+from charmlibs import pathops
+
+from literals import BACKUP_FILE_NAME, CONFIG_FILE, DATABASE_DIR, TLS_ROOT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -22,56 +26,82 @@ logger = logging.getLogger(__name__)
 class TLSPaths:
     """Paths for TLS."""
 
-    root_dir: str = TLS_ROOT_DIR
+    def __init__(self, root_dir: pathops.LocalPath | pathops.ContainerPath):
+        self.tls_root = root_dir / TLS_ROOT_DIR
 
     @property
-    def peer_ca(self) -> str:
+    def peer_ca(self):
         """Path to the peer CA."""
-        return f"{self.root_dir}/peer_ca.pem"
+        return self.tls_root / "peer_ca.pem"
 
     @property
-    def peer_cert(self) -> str:
+    def peer_cert(self):
         """Path to the peer cert."""
-        return f"{self.root_dir}/peer.pem"
+        return self.tls_root / "peer.pem"
 
     @property
-    def peer_key(self) -> str:
+    def peer_key(self):
         """Path to the peer key."""
-        return f"{self.root_dir}/peer.key"
+        return self.tls_root / "peer.key"
 
     @property
-    def client_ca(self) -> str:
+    def client_ca(self):
         """Path to the client CA."""
-        return f"{self.root_dir}/client_ca.pem"
+        return self.tls_root / "client_ca.pem"
 
     @property
-    def client_cert(self) -> str:
+    def client_cert(self):
         """Path to the server cert."""
-        return f"{self.root_dir}/client.pem"
+        return self.tls_root / "client.pem"
 
     @property
-    def client_key(self) -> str:
+    def client_key(self):
         """Path to the server key."""
-        return f"{self.root_dir}/client.key"
+        return self.tls_root / "client.key"
 
     @property
-    def backup_ca(self) -> str:
+    def backup_ca(self):
         """Path to the CA for backup/restore object storage."""
-        return f"{self.root_dir}/backup_ca.pem"
+        return self.tls_root / "backup_ca.pem"
 
 
 @dataclass
 class EtcdPaths:
     """Paths for etcd."""
 
-    config_file: str = CONFIG_FILE
-    tls: TLSPaths = field(default_factory=TLSPaths)
+    def __init__(self, root_dir: pathops.LocalPath | pathops.ContainerPath):
+        self.root_dir = root_dir
+
+    @property
+    def config_file(self):
+        """Path to the etcd config file."""
+        return self.root_dir / CONFIG_FILE
+
+    @property
+    def tls(self) -> TLSPaths:
+        """TLS paths."""
+        return TLSPaths(root_dir=self.root_dir)
+
+    @property
+    def data_dir(self):
+        """Path to the etcd database dir."""
+        return self.root_dir / DATABASE_DIR
+
+    @property
+    def backup_file(self):
+        """Path to the etcd snapshot file."""
+        return self.root_dir / BACKUP_FILE_NAME
 
 
 class WorkloadBase(ABC):
     """Base interface for common workload operations."""
 
-    paths: EtcdPaths = EtcdPaths()
+    root_dir: pathops.LocalPath | pathops.ContainerPath
+
+    @property
+    def paths(self) -> EtcdPaths:
+        """Object to access workload paths."""
+        return EtcdPaths(root_dir=self.root_dir)
 
     @abstractmethod
     def start(self) -> None:
@@ -96,40 +126,6 @@ class WorkloadBase(ABC):
         """
 
     @abstractmethod
-    def write_file(self, content: str, file: str) -> None:
-        """Write content to a file.
-
-        Args:
-            content (str): Content to write to the file.
-            file (str): Path to the file.
-        """
-        pass
-
-    @abstractmethod
-    def load_yaml_file(self, file: str) -> Dict[str, Any]:
-        """Read yaml content from a file.
-
-        Args:
-            file (str): Path to the file.
-
-        Returns:
-            The content of a YAML file as a dict.
-        """
-        pass
-
-    @abstractmethod
-    def load_toml_file(self, file: str) -> Dict[str, Any]:
-        """Read toml content from a file.
-
-        Args:
-            file (str): Path to the file.
-
-        Returns:
-            The content of a TOML file as a dict.
-        """
-        pass
-
-    @abstractmethod
     def stop(self) -> None:
         """Stop the workload service."""
         pass
@@ -146,41 +142,6 @@ class WorkloadBase(ABC):
     @abstractmethod
     def restart(self) -> None:
         """Restart the workload service."""
-        pass
-
-    @abstractmethod
-    def copy_file(self, src_file: str, dst_file: str) -> None:
-        """Copy a source-file to a destination-file."""
-        pass
-
-    @abstractmethod
-    def remove_file(self, file: str) -> None:
-        """Remove a file.
-
-        Args:
-            file (str): Path to the file.
-        """
-        pass
-
-    @abstractmethod
-    def remove_directory(self, directory: str) -> None:
-        """Remove a directory.
-
-        Args:
-            directory (str): Path to the directory.
-        """
-        pass
-
-    @abstractmethod
-    def exists(self, path: str) -> bool:
-        """Check if a file or directory exists.
-
-        Args:
-            path (str): Path to the file or directory.
-
-        Returns:
-            bool: True if the file or directory exists, False otherwise.
-        """
         pass
 
     @abstractmethod
@@ -206,6 +167,51 @@ class WorkloadBase(ABC):
     @abstractmethod
     def enable_database(self) -> None:
         """Enable the service and start the workload."""
+        pass
+
+    @abstractmethod
+    def memory_size(self) -> int:
+        """Get the total memory size of the system in Bytes.
+
+        Returns:
+            int: The total memory size in Bytes.
+        """
+        pass
+
+    @abstractmethod
+    def data_storage_size(self) -> int:
+        """Get the size of the data storage in Bytes.
+
+        Returns:
+            int: The size of the data storage in Bytes.
+        """
+        pass
+
+    @abstractmethod
+    def get_db_file_size(self) -> int:
+        """Get the size of the etcd database file in bytes.
+
+        Returns:
+            int: Size of the etcd database file in bytes.
+        """
+        pass
+
+    @abstractmethod
+    def is_lxd_cloud(self) -> bool:
+        """Check if the workload is running in an LXD cloud environment.
+
+        Returns:
+            bool: True if running in LXD cloud, False otherwise.
+        """
+        pass
+
+    @abstractmethod
+    def data_storage_attached(self) -> bool:
+        """Check if the data storage is attached.
+
+        Returns:
+            bool: True if data storage is attached, False otherwise.
+        """
         pass
 
     def get_public_ip(self) -> str | None:
@@ -262,47 +268,98 @@ class WorkloadBase(ABC):
 
         return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
 
-    @abstractmethod
-    def memory_size(self) -> int:
-        """Get the total memory size of the system in Bytes.
+    def write_file(self, content: str, path: pathops.PathProtocol) -> None:
+        """Write the given content to the specified file path, creating parent directories if needed.
+
+        Args:
+            content (str): The content to write to the file.
+            path (pathops.PathProtocol): The file path where the content will be written.
+        """
+        path.parent.mkdir(exist_ok=True, parents=True)
+        path.write_text(content)
+
+    def load_yaml_file(self, path: pathops.PathProtocol) -> Dict[str, Any]:
+        """Load a YAML file from the given path.
+
+        Args:
+            path (pathops.PathProtocol): The file path to load.
 
         Returns:
-            int: The total memory size in Bytes.
+            Dict[str, Any]: Parsed YAML content as a dictionary, or an empty dict if the file does not exist.
         """
-        pass
+        if not path.exists():
+            return {}
 
-    @abstractmethod
-    def data_storage_size(self) -> int:
-        """Get the size of the data storage in Bytes.
+        return yaml.safe_load(path.read_text()) or {}
+
+    def load_toml_file(self, path: pathops.PathProtocol) -> Dict[str, Any]:
+        """Load a TOML file from the given path.
+
+        Args:
+            path (pathops.PathProtocol): The file path to load.
 
         Returns:
-            int: The size of the data storage in Bytes.
+            Dict[str, Any]: Parsed TOML content as a dictionary, or an empty dict if the file does not exist.
         """
-        pass
+        if not path.exists():
+            return {}
 
-    @abstractmethod
-    def get_db_file_size(self) -> int:
-        """Get the size of the etcd database file in Bytes.
+        return tomllib.loads(path.read_text()) or {}
+
+    def copy_file(self, src_file: pathops.PathProtocol, dst_file: pathops.PathProtocol) -> None:
+        """Copy the contents of the source file to the destination file.
+
+        Args:
+            src_file (pathops.PathProtocol): The source file path.
+            dst_file (pathops.PathProtocol): The destination file path.
+        """
+        dst_file.write_bytes(src_file.read_bytes())
+
+    def remove_file(self, path: pathops.PathProtocol) -> None:
+        """Remove the specified file if it exists.
+
+        Args:
+            path (pathops.PathProtocol): The file path to remove.
+        """
+        path.unlink(missing_ok=True)
+
+    def remove_directory(self, directory: pathops.PathProtocol) -> None:
+        """Remove a directory and all its contents.
+
+        Args:
+            directory (pathops.PathProtocol): The directory path to remove.
+        """
+        if not directory.exists():
+            return
+        self._remove_tree(directory)
+        directory.rmdir()
+
+    def _remove_tree(self, path: pathops.PathProtocol) -> None:
+        """Recursively remove all files and subdirectories in the given directory.
+
+        Args:
+            path (pathops.PathProtocol): The directory path to clean.
+        """
+        for child in path.iterdir():
+            if child.is_dir():
+                self._remove_tree(child)
+                child.rmdir()
+            else:
+                child.unlink()
+
+    def exists(self, path: pathops.PathProtocol) -> bool:
+        """Check if the given path exists and is not an empty directory.
+
+        Args:
+            path (pathops.PathProtocol): The path to check.
 
         Returns:
-            int: The size of the etcd database file in Bytes.
+            bool: True if the path exists and is not an empty directory, False otherwise.
         """
-        pass
+        if path.exists():
+            if path.is_dir():
+                # consider it false if the directory is empty
+                return len(list(path.glob("*"))) > 0
+            return True
 
-    @abstractmethod
-    def is_lxd_cloud(self) -> bool:
-        """Check if the workload is running in an LXD cloud environment.
-
-        Returns:
-            bool: True if running in LXD cloud, False otherwise.
-        """
-        pass
-
-    @abstractmethod
-    def data_storage_attached(self) -> bool:
-        """Check if the data storage is attached.
-
-        Returns:
-            bool: True if data storage is attached, False otherwise.
-        """
-        pass
+        return False

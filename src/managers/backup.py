@@ -152,7 +152,10 @@ class BackupManager(ManagerStatusProtocol):
         else:
             # offline backup from `member/snap/db` file
             logger.info("Cluster is not running, creating offline backup")
-            self.workload.copy_file(src_file=f"{DATABASE_DIR}/snap/db", dst_file=BACKUP_FILE_NAME)
+            self.workload.copy_file(
+                src_file=self.workload.root_dir / f"{DATABASE_DIR}/snap/db",
+                dst_file=self.workload.root_dir / BACKUP_FILE_NAME,
+            )
 
         if s3_parameters := self.state.cluster.s3_credentials:
             # backup file will be uploaded to S3 storage
@@ -168,7 +171,7 @@ class BackupManager(ManagerStatusProtocol):
             except ClientError as e:
                 self.state.cluster.update({"backup_id": ""})
                 # if we can't upload, we still need to clean up the backup file to free the disk space
-                self.workload.remove_file(BACKUP_FILE_NAME)
+                self.workload.remove_file(self.workload.paths.backup_file)
                 logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
                 raise EtcdBackupError(e)
         else:
@@ -190,14 +193,14 @@ class BackupManager(ManagerStatusProtocol):
             except RetryError as e:
                 self.state.cluster.update({"backup_id": ""})
                 # if we can't upload, we still need to clean up the backup file to free the disk space
-                self.workload.remove_file(BACKUP_FILE_NAME)
+                self.workload.remove_file(self.workload.paths.backup_file)
                 logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
                 raise EtcdBackupError(e)
 
         logger.info(f"Backup uploaded to {upload_target}")
 
         self.state.cluster.update({"backup_id": ""})
-        self.workload.remove_file(BACKUP_FILE_NAME)
+        self.workload.remove_file(self.workload.paths.backup_file)
         logger.debug(f"Removed temporary snapshot file {BACKUP_FILE_NAME}")
 
         return backup_id
@@ -290,7 +293,7 @@ class BackupManager(ManagerStatusProtocol):
 
         # existing data directory has to be purged, otherwise restore will fail
         try:
-            self.workload.remove_directory(DATABASE_DIR)
+            self.workload.remove_directory(self.workload.paths.data_dir)
             logger.info(f"Removed previous database files from {DATABASE_DIR} before restoring.")
         except FileNotFoundError:
             logger.info(f"No database file found in {DATABASE_DIR} - nothing to remove")
@@ -323,7 +326,7 @@ class BackupManager(ManagerStatusProtocol):
         """Remove backup files and state from unit."""
         logger.info("Removing backup file after restore completed.")
 
-        self.workload.remove_file(BACKUP_FILE_NAME)
+        self.workload.remove_file(self.workload.paths.backup_file)
         self.set_restore_step("")
 
     @staticmethod
