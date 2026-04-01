@@ -6,7 +6,6 @@
 
 import json
 import logging
-import os
 import subprocess
 from typing import Tuple
 
@@ -20,7 +19,8 @@ from common.exceptions import (
     HealthCheckFailedError,
 )
 from core.models import Member
-from literals import BACKUP_FILE_NAME, INTERNAL_USER, SNAP_NAME, TLS_ROOT_DIR
+from core.workload import EtcdPaths
+from literals import INTERNAL_USER, SNAP_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,12 @@ class EtcdClient:
         username: str,
         password: str,
         client_url: str,
-        tls_path: str | None = None,
+        workload_paths: EtcdPaths,
     ):
         self.client_url = client_url
         self.user = username
         self.password = password
-        self.tls_path = tls_path
+        self.workload_paths = workload_paths
 
     def get_endpoint_status(self) -> dict:
         """Run the `endpoint status` command and return the result as dict."""
@@ -312,7 +312,7 @@ class EtcdClient:
         if result := self._run_etcdctl(
             command="snapshot",
             subcommand="save",
-            snapshot_path=BACKUP_FILE_NAME,
+            snapshot_path=self.workload_paths.backup_file.as_posix(),
             endpoints=self.client_url,
             auth_username=self.user,
             auth_password=self.password,
@@ -424,10 +424,10 @@ class EtcdClient:
                 args.append("--interactive=False")
             # we append the TLS params whenever we find a client certificate
             # todo: this is not substrate-agnostic
-            if os.path.exists(f"{TLS_ROOT_DIR}/client.pem"):
-                args.append(f"--cert={TLS_ROOT_DIR}/client.pem")
-                args.append(f"--key={TLS_ROOT_DIR}/client.key")
-                args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
+            if self.workload_paths.tls.client_cert.exists():
+                args.append(f"--cert={self.workload_paths.tls.client_cert.as_posix()}")
+                args.append(f"--key={self.workload_paths.tls.client_key.as_posix()}")
+                args.append(f"--cacert={self.workload_paths.tls.client_ca.as_posix()}")
             if cluster_arg:
                 args.append("--cluster")
             if prefix:
