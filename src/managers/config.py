@@ -106,10 +106,10 @@ class ConfigManager(ManagerStatusProtocol):
             )
             # set the client-transport-security
             config_properties["client-transport-security"] = {
-                "cert-file": self.workload.paths.tls.client_cert,
-                "key-file": self.workload.paths.tls.client_key,
+                "cert-file": self.workload.paths.tls.client_cert.as_posix(),
+                "key-file": self.workload.paths.tls.client_key.as_posix(),
                 "client-cert-auth": True,
-                "trusted-ca-file": self.workload.paths.tls.client_ca,
+                "trusted-ca-file": self.workload.paths.tls.client_ca.as_posix(),
             }
         if self.state.unit_server.tls_peer_state in [TLSState.TO_TLS, TLSState.TLS]:
             # replace http with https in listen-peer-urls, initial-cluster and initial-advertise-peer-urls
@@ -130,10 +130,10 @@ class ConfigManager(ManagerStatusProtocol):
 
             # set the peer-transport-security
             config_properties["peer-transport-security"] = {
-                "cert-file": self.workload.paths.tls.peer_cert,
-                "key-file": self.workload.paths.tls.peer_key,
+                "cert-file": self.workload.paths.tls.peer_cert.as_posix(),
+                "key-file": self.workload.paths.tls.peer_key.as_posix(),
                 "client-cert-auth": True,
-                "trusted-ca-file": self.workload.paths.tls.peer_ca,
+                "trusted-ca-file": self.workload.paths.tls.peer_ca.as_posix(),
             }
 
         if self.state.unit_server.tls_client_state == TLSState.TO_NO_TLS:

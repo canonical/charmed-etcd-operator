@@ -351,7 +351,7 @@ class BackupManager(ManagerStatusProtocol):
 
         raw_ca = "\n".join(cert for cert in tls_ca_chain)
         self.workload.write_file(raw_ca, self.workload.paths.tls.backup_ca)
-        logger.debug(f"TLS CA chain stored in {self.workload.paths.tls.backup_ca}")
+        logger.debug(f"TLS CA chain stored in {self.workload.paths.tls.backup_ca.as_posix()}")
 
     @staticmethod
     def next_restore_step(current_step: RestoreStep) -> RestoreStep:
