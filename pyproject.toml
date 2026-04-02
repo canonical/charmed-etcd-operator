@@ -19,6 +19,7 @@ charm-refresh = "^3.1.0.0"
 charmlibs-interfaces-tls-certificates = ">=1.0"
 charmlibs-snap = "^1.0.1"
 charmlibs-systemd = "^1.0.0"
+object-storage-charmlib = "^1.0.0"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"

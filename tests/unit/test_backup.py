@@ -78,6 +78,7 @@ def test_azure_relation():
         endpoint=AZURE_RELATION_NAME,
         remote_app_name="azure",
         remote_app_data={
+            "version": "1",
             "connection-protocol": "abfss",
             "secret-key": "mysecret",
             "container": "mycontainer",
@@ -100,6 +101,7 @@ def test_azure_relation():
         endpoint=AZURE_RELATION_NAME,
         remote_app_name="azure",
         remote_app_data={
+            "version": "1",
             "connection-protocol": "abfss",
             "secret-key": "mysecret",
             "container": "mycontainer",

@@ -8,15 +8,15 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from charms.data_platform_libs.v0.azure_storage import (
-    AzureStorageRequires,
-    StorageConnectionInfoChangedEvent,
-    StorageConnectionInfoGoneEvent,
-)
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
     CredentialsGoneEvent,
     S3Requirer,
+)
+from object_storage import (
+    AzureStorageRequirer,
+    StorageConnectionInfoChangedEvent,
+    StorageConnectionInfoGoneEvent,
 )
 from ops import Object
 from ops.charm import ActionEvent, RelationChangedEvent
@@ -49,7 +49,7 @@ class BackupEvents(Object):
         super().__init__(charm, key="backup")
         self.charm = charm
         self.s3_requirer = S3Requirer(self.charm, S3_RELATION_NAME)
-        self.azure_requirer = AzureStorageRequires(self.charm, AZURE_RELATION_NAME)
+        self.azure_requirer = AzureStorageRequirer(self.charm, AZURE_RELATION_NAME)
 
         self.framework.observe(
             self.s3_requirer.on.credentials_changed, self._on_s3_credentials_changed
@@ -140,7 +140,7 @@ class BackupEvents(Object):
 
     def _on_azure_credentials_changed(self, event: StorageConnectionInfoChangedEvent) -> None:
         """Handle an update of the azure credentials from azure-storage-integrator."""
-        if not (azure_parameters := self.azure_requirer.get_azure_storage_connection_info()):
+        if not (azure_parameters := self.azure_requirer.get_storage_connection_info()):
             logger.debug(f"No relation {AZURE_RELATION_NAME}")
             return
 
