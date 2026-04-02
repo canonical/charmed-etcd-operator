@@ -175,8 +175,8 @@ You can access etcd with a command line client like `etcdctl` or via REST API.
 To confirm that the API is reachable, we can use `curl` to make a request to one of the nodes. If it returns a JSON string with the etcd server version, it is healthy.
 
 ```{terminal}
-:input: curl -L http://10.235.251.189:2379/version
-
+:copy:
+curl -L http://10.235.251.189:2379/version
 
 {"etcdserver":"3.6.5","etcdcluster":"3.6.0","storage":"3.6.0"}
 ```

@@ -19,7 +19,9 @@ If multiple important (`Blocked`, `Maintenance` or `Waiting`) statuses are repor
 For example, the following `juju status` output shows an aggregated status for the charmed-etcd application:
 
 ```{terminal}
-:input: juju status
+:copy:
+juju status
+
 Model  Controller  Cloud/Region         Version  SLA          Timestamp
 test   lxd         localhost/localhost  3.6.8    unsupported  12:45:09Z
 
@@ -54,7 +56,9 @@ This action is particularly useful for debugging and understanding the charm's c
 Running the `status-detail` action produces output similar to the following:
 
 ```{terminal}
-:input: juju run charmed-etcd/1 status-detail
+:copy:
+juju run charmed-etcd/1 status-detail
+
 Running operation 1 with 1 task
   - task 2 on unit-charmed-etcd-1
 
