@@ -12,7 +12,6 @@ from platform import machine
 from socket import socket
 from typing import List
 
-import tomllib
 from charmlibs import pathops, snap
 from charmlibs.systemd import service_disable, service_enable
 from tenacity import Retrying, retry, retry_if_exception_type, stop_after_attempt, wait_fixed
@@ -63,7 +62,7 @@ class EtcdWorkload(WorkloadBase):
         """
         if not revision:
             versions_path = (WORKING_DIR / ".." / VERSIONS_FILE).resolve()
-            versions = tomllib.loads(versions_path.read_text())
+            versions = self.load_toml_file(pathops.LocalPath(versions_path))
             revision = versions["snap"]["revisions"][machine()]
 
         try:
@@ -171,7 +170,7 @@ class EtcdWorkload(WorkloadBase):
         Returns:
             int: The size of the data storage in Bytes.
         """
-        return shutil.disk_usage(str(self.root_dir / SNAP_DATA_PATH)).total
+        return shutil.disk_usage((self.root_dir / SNAP_DATA_PATH).as_posix()).total
 
     @override
     def get_db_file_size(self) -> int:

@@ -26,41 +26,41 @@ logger = logging.getLogger(__name__)
 class TLSPaths:
     """Paths for TLS."""
 
-    def __init__(self, root_dir: pathops.LocalPath | pathops.ContainerPath):
+    def __init__(self, root_dir: pathops.PathProtocol):
         self.tls_root = root_dir / TLS_ROOT_DIR
 
     @property
-    def peer_ca(self):
+    def peer_ca(self) -> pathops.PathProtocol:
         """Path to the peer CA."""
         return self.tls_root / "peer_ca.pem"
 
     @property
-    def peer_cert(self):
+    def peer_cert(self) -> pathops.PathProtocol:
         """Path to the peer cert."""
         return self.tls_root / "peer.pem"
 
     @property
-    def peer_key(self):
+    def peer_key(self) -> pathops.PathProtocol:
         """Path to the peer key."""
         return self.tls_root / "peer.key"
 
     @property
-    def client_ca(self):
+    def client_ca(self) -> pathops.PathProtocol:
         """Path to the client CA."""
         return self.tls_root / "client_ca.pem"
 
     @property
-    def client_cert(self):
+    def client_cert(self) -> pathops.PathProtocol:
         """Path to the server cert."""
         return self.tls_root / "client.pem"
 
     @property
-    def client_key(self):
+    def client_key(self) -> pathops.PathProtocol:
         """Path to the server key."""
         return self.tls_root / "client.key"
 
     @property
-    def backup_ca(self):
+    def backup_ca(self) -> pathops.PathProtocol:
         """Path to the CA for backup/restore object storage."""
         return self.tls_root / "backup_ca.pem"
 
@@ -69,11 +69,11 @@ class TLSPaths:
 class EtcdPaths:
     """Paths for etcd."""
 
-    def __init__(self, root_dir: pathops.LocalPath | pathops.ContainerPath):
+    def __init__(self, root_dir: pathops.PathProtocol):
         self.root_dir = root_dir
 
     @property
-    def config_file(self):
+    def config_file(self) -> pathops.PathProtocol:
         """Path to the etcd config file."""
         return self.root_dir / CONFIG_FILE
 
@@ -83,12 +83,12 @@ class EtcdPaths:
         return TLSPaths(root_dir=self.root_dir)
 
     @property
-    def data_dir(self):
+    def data_dir(self) -> pathops.PathProtocol:
         """Path to the etcd database dir."""
         return self.root_dir / DATABASE_DIR
 
     @property
-    def backup_file(self):
+    def backup_file(self) -> pathops.PathProtocol:
         """Path to the etcd snapshot file."""
         return self.root_dir / BACKUP_FILE_NAME
 
@@ -96,7 +96,7 @@ class EtcdPaths:
 class WorkloadBase(ABC):
     """Base interface for common workload operations."""
 
-    root_dir: pathops.LocalPath | pathops.ContainerPath
+    root_dir: pathops.PathProtocol
 
     @property
     def paths(self) -> EtcdPaths:
