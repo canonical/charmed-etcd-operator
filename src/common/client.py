@@ -578,7 +578,7 @@ class EtcdClient:
             rolename (str): The role name to grant permission to.
             key_prefix (str): The key prefix to grant permission for.
         """
-        if "" == key_prefix:
+        if key_prefix == "":
             logger.debug("Granting user access to full keyspace...")
 
         if result := self._run_etcdctl(
@@ -589,7 +589,7 @@ class EtcdClient:
             auth_password=self.password,
             user=rolename,
             prefix=key_prefix,
-            from_key=key_prefix if ("" == key_prefix) else None,
+            from_key=key_prefix if (key_prefix == "") else None,
         ):
             logger.debug(result)
         else:
