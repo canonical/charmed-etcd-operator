@@ -361,7 +361,6 @@ class EtcdClient:
         use_input: str | None = None,
         cluster_arg: bool = False,
         prefix: str | None = None,
-        from_key: str | None = None,
         role: str | None = None,
     ) -> str | None:
         """Execute `etcdctl` command via subprocess to perform online cluster admin tasks.
@@ -387,7 +386,6 @@ class EtcdClient:
                         non-interactive password change)
             cluster_arg: set to `True` if the command requires the `--cluster` argument
             prefix: prefix to be used for the `role grant-permission` command
-            from_key: all keys greater this one (in terms of bytes) will be granted access to in the `role grant-permission` command
             role: role name to be used for the `user grant-role` command
 
         Returns:
@@ -432,17 +430,12 @@ class EtcdClient:
                 args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
             if cluster_arg:
                 args.append("--cluster")
-            if prefix:
+            if prefix is not None:
                 args.append("--prefix=true")
                 args.append("readwrite")
                 args.append(prefix)
             if role:
                 args.append(role)
-
-            if from_key is not None:
-                args.append("--from-key=true")
-                args.append("readwrite")
-                args.append(from_key)
 
             result = subprocess.run(
                 args,
@@ -589,7 +582,6 @@ class EtcdClient:
             auth_password=self.password,
             user=rolename,
             prefix=key_prefix,
-            from_key=key_prefix if (key_prefix == "") else None,
         ):
             logger.debug(result)
         else:
