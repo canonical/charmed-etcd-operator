@@ -148,7 +148,11 @@ class EtcdRequiresV1(EtcdRequires):
         for certificate in certs:
             cur_request = request_common_names.get(
                 certificate.common_name,
-                RequirerCommonModel(resource=f"/{certificate.common_name}/"),
+                RequirerCommonModel(
+                    resource=f"/{certificate.common_name}/"
+                    if certificate.common_name == "client2.requirer-charm"
+                    else ""
+                ),
             )
 
             cur_request.mtls_cert = certificate.raw
@@ -216,10 +220,15 @@ class EtcdRequiresV1(EtcdRequires):
         """Return the client requests for the etcd requirer interface."""
         return [
             RequirerCommonModel(
-                resource=f"/{common_name}/",
-                mtls_cert=self.charm.get_certificate_of_common_name(common_name) or "",
-            )
-            for common_name in self.charm.common_names
+                resource="",  # access to full keyspace
+                mtls_cert=self.charm.get_certificate_of_common_name(self.charm.common_names[0])
+                or "",
+            ),
+            RequirerCommonModel(
+                resource=f"/{self.charm.common_names[1]}/",
+                mtls_cert=self.charm.get_certificate_of_common_name(self.charm.common_names[1])
+                or "",
+            ),
         ]
 
 

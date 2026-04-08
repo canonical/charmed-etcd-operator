@@ -430,7 +430,7 @@ class EtcdClient:
                 args.append(f"--cacert={TLS_ROOT_DIR}/client_ca.pem")
             if cluster_arg:
                 args.append("--cluster")
-            if prefix:
+            if prefix is not None:
                 args.append("--prefix=true")
                 args.append("readwrite")
                 args.append(prefix)
@@ -571,6 +571,9 @@ class EtcdClient:
             rolename (str): The role name to grant permission to.
             key_prefix (str): The key prefix to grant permission for.
         """
+        if key_prefix == "":
+            logger.debug("Granting user access to full keyspace...")
+
         if result := self._run_etcdctl(
             command="role",
             subcommand="grant-permission",
