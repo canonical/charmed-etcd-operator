@@ -15,7 +15,7 @@ from typing import Any, Dict, List
 
 import tomllib
 import yaml
-from charmlibs import pathops
+from charmlibs.pathops import PathProtocol
 
 from literals import BACKUP_FILE_NAME, CONFIG_FILE, DATABASE_DIR, TLS_ROOT_DIR
 
@@ -26,41 +26,41 @@ logger = logging.getLogger(__name__)
 class TLSPaths:
     """Paths for TLS."""
 
-    def __init__(self, root_dir: pathops.PathProtocol):
+    def __init__(self, root_dir: PathProtocol):
         self.tls_root = root_dir / TLS_ROOT_DIR
 
     @property
-    def peer_ca(self) -> pathops.PathProtocol:
+    def peer_ca(self) -> PathProtocol:
         """Path to the peer CA."""
         return self.tls_root / "peer_ca.pem"
 
     @property
-    def peer_cert(self) -> pathops.PathProtocol:
+    def peer_cert(self) -> PathProtocol:
         """Path to the peer cert."""
         return self.tls_root / "peer.pem"
 
     @property
-    def peer_key(self) -> pathops.PathProtocol:
+    def peer_key(self) -> PathProtocol:
         """Path to the peer key."""
         return self.tls_root / "peer.key"
 
     @property
-    def client_ca(self) -> pathops.PathProtocol:
+    def client_ca(self) -> PathProtocol:
         """Path to the client CA."""
         return self.tls_root / "client_ca.pem"
 
     @property
-    def client_cert(self) -> pathops.PathProtocol:
+    def client_cert(self) -> PathProtocol:
         """Path to the server cert."""
         return self.tls_root / "client.pem"
 
     @property
-    def client_key(self) -> pathops.PathProtocol:
+    def client_key(self) -> PathProtocol:
         """Path to the server key."""
         return self.tls_root / "client.key"
 
     @property
-    def backup_ca(self) -> pathops.PathProtocol:
+    def backup_ca(self) -> PathProtocol:
         """Path to the CA for backup/restore object storage."""
         return self.tls_root / "backup_ca.pem"
 
@@ -69,11 +69,11 @@ class TLSPaths:
 class EtcdPaths:
     """Paths for etcd."""
 
-    def __init__(self, root_dir: pathops.PathProtocol):
+    def __init__(self, root_dir: PathProtocol):
         self.root_dir = root_dir
 
     @property
-    def config_file(self) -> pathops.PathProtocol:
+    def config_file(self) -> PathProtocol:
         """Path to the etcd config file."""
         return self.root_dir / CONFIG_FILE
 
@@ -83,12 +83,12 @@ class EtcdPaths:
         return TLSPaths(root_dir=self.root_dir)
 
     @property
-    def data_dir(self) -> pathops.PathProtocol:
+    def data_dir(self) -> PathProtocol:
         """Path to the etcd database dir."""
         return self.root_dir / DATABASE_DIR
 
     @property
-    def backup_file(self) -> pathops.PathProtocol:
+    def backup_file(self) -> PathProtocol:
         """Path to the etcd snapshot file."""
         return self.root_dir / BACKUP_FILE_NAME
 
@@ -96,7 +96,7 @@ class EtcdPaths:
 class WorkloadBase(ABC):
     """Base interface for common workload operations."""
 
-    root_dir: pathops.PathProtocol
+    root_dir: PathProtocol
 
     @property
     def paths(self) -> EtcdPaths:
@@ -268,21 +268,21 @@ class WorkloadBase(ABC):
 
         return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
 
-    def write_file(self, content: str, path: pathops.PathProtocol) -> None:
+    def write_file(self, content: str, path: PathProtocol) -> None:
         """Write the given content to the specified file path, creating parent directories if needed.
 
         Args:
             content (str): The content to write to the file.
-            path (pathops.PathProtocol): The file path where the content will be written.
+            path (PathProtocol): The file path where the content will be written.
         """
         path.parent.mkdir(exist_ok=True, parents=True)
         path.write_text(content)
 
-    def load_yaml_file(self, path: pathops.PathProtocol) -> Dict[str, Any]:
+    def load_yaml_file(self, path: PathProtocol) -> Dict[str, Any]:
         """Load a YAML file from the given path.
 
         Args:
-            path (pathops.PathProtocol): The file path to load.
+            path (PathProtocol): The file path to load.
 
         Returns:
             Dict[str, Any]: Parsed YAML content as a dictionary, or an empty dict if the file does not exist.
@@ -292,11 +292,11 @@ class WorkloadBase(ABC):
 
         return yaml.safe_load(path.read_text()) or {}
 
-    def load_toml_file(self, path: pathops.PathProtocol) -> Dict[str, Any]:
+    def load_toml_file(self, path: PathProtocol) -> Dict[str, Any]:
         """Load a TOML file from the given path.
 
         Args:
-            path (pathops.PathProtocol): The file path to load.
+            path (PathProtocol): The file path to load.
 
         Returns:
             Dict[str, Any]: Parsed TOML content as a dictionary, or an empty dict if the file does not exist.
@@ -306,39 +306,39 @@ class WorkloadBase(ABC):
 
         return tomllib.loads(path.read_text()) or {}
 
-    def copy_file(self, src_file: pathops.PathProtocol, dst_file: pathops.PathProtocol) -> None:
+    def copy_file(self, src_file: PathProtocol, dst_file: PathProtocol) -> None:
         """Copy the contents of the source file to the destination file.
 
         Args:
-            src_file (pathops.PathProtocol): The source file path.
-            dst_file (pathops.PathProtocol): The destination file path.
+            src_file (PathProtocol): The source file path.
+            dst_file (PathProtocol): The destination file path.
         """
         dst_file.write_bytes(src_file.read_bytes())
 
-    def remove_file(self, path: pathops.PathProtocol) -> None:
+    def remove_file(self, path: PathProtocol) -> None:
         """Remove the specified file if it exists.
 
         Args:
-            path (pathops.PathProtocol): The file path to remove.
+            path (PathProtocol): The file path to remove.
         """
         path.unlink(missing_ok=True)
 
-    def remove_directory(self, directory: pathops.PathProtocol) -> None:
+    def remove_directory(self, directory: PathProtocol) -> None:
         """Remove a directory and all its contents.
 
         Args:
-            directory (pathops.PathProtocol): The directory path to remove.
+            directory (PathProtocol): The directory path to remove.
         """
         if not directory.exists():
             return
         self._remove_tree(directory)
         directory.rmdir()
 
-    def _remove_tree(self, path: pathops.PathProtocol) -> None:
+    def _remove_tree(self, path: PathProtocol) -> None:
         """Recursively remove all files and subdirectories in the given directory.
 
         Args:
-            path (pathops.PathProtocol): The directory path to clean.
+            path (PathProtocol): The directory path to clean.
         """
         for child in path.iterdir():
             if child.is_dir():
@@ -347,11 +347,11 @@ class WorkloadBase(ABC):
             else:
                 child.unlink()
 
-    def exists(self, path: pathops.PathProtocol) -> bool:
+    def exists(self, path: PathProtocol) -> bool:
         """Check if the given path exists and is not an empty directory.
 
         Args:
-            path (pathops.PathProtocol): The path to check.
+            path (PathProtocol): The path to check.
 
         Returns:
             bool: True if the path exists and is not an empty directory, False otherwise.

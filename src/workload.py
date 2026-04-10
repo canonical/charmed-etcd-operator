@@ -12,7 +12,8 @@ from platform import machine
 from socket import socket
 from typing import List
 
-from charmlibs import pathops, snap
+from charmlibs import snap
+from charmlibs.pathops import LocalPath
 from charmlibs.systemd import service_disable, service_enable
 from tenacity import Retrying, retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 from typing_extensions import override
@@ -30,7 +31,7 @@ class EtcdWorkload(WorkloadBase):
     """Implementation of WorkloadBase for running on VMs."""
 
     def __init__(self):
-        self.root_dir = pathops.LocalPath("/")
+        self.root_dir = LocalPath("/")
         for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
             with attempt:
                 self.etcd = snap.SnapCache()[SNAP_NAME]
@@ -62,7 +63,7 @@ class EtcdWorkload(WorkloadBase):
         """
         if not revision:
             versions_path = (WORKING_DIR / ".." / VERSIONS_FILE).resolve()
-            versions = self.load_toml_file(pathops.LocalPath(versions_path))
+            versions = self.load_toml_file(LocalPath(versions_path))
             revision = versions["snap"]["revisions"][machine()]
 
         try:
