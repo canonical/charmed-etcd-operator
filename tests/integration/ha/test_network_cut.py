@@ -265,15 +265,17 @@ def test_network_cut_on_raft_leader_with_ip_change(juju_vm_model: Juju) -> None:
     logger.info(f"Network has been restored for {leader_unit}")
 
     juju_vm_model.wait(
-        lambda status: does_status_match(
-            status,
-            expected_status={
-                app: ExpectedStatus(
-                    app_status=["active"], unit_status=["active"], unit_count=init_units_count
-                )
-            },
+        lambda status: (
+            does_status_match(
+                status,
+                expected_status={
+                    app: ExpectedStatus(
+                        app_status=["active"], unit_status=["active"], unit_count=init_units_count
+                    )
+                },
+            )
+            and jubilant.all_agents_idle(status, app)
         )
-        and jubilant.all_agents_idle(status, app)
     )
 
     # ensure the member is up again
