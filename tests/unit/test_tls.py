@@ -318,8 +318,8 @@ def test_certificates_broken():
             patch("managers.cluster.ClusterManager.broadcast_peer_url"),
             patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
             patch("managers.config.ConfigManager.set_config_properties"),
-            patch("pathlib.Path.exists", return_value=True),
-            patch("pathlib.Path.unlink"),
+            patch("charmlibs.pathops.PathProtocol.exists", return_value=True),
+            patch("charmlibs.pathops.PathProtocol.unlink"),
             patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT.copy()),
             patch("common.client.EtcdClient.move_leader"),
             patch(
@@ -377,9 +377,12 @@ def test_certificate_available_new_cluster(certificate_available_context):
     with patch("managers.cluster.ClusterManager.restart_member", return_value=True):
         with (
             manager,
-            patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
+            patch(
+                "charmlibs.pathops.PathProtocol.read_text",
+                return_value=provider_ca_certificate.raw,
+            ),
             patch("workload.EtcdWorkload.write_file"),
-            patch("pathlib.Path.exists", return_value=True),
+            patch("charmlibs.pathops.PathProtocol.exists", return_value=True),
             patch("workload.EtcdWorkload.alive", return_value=True),
             patch("managers.cluster.ClusterManager.clean_users"),
         ):
@@ -438,9 +441,12 @@ def test_certificate_available_enabling_tls(certificate_available_context):
     with patch("managers.cluster.ClusterManager.restart_member", return_value=True):
         with (
             manager,
-            patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
+            patch(
+                "charmlibs.pathops.PathProtocol.read_text",
+                return_value=provider_ca_certificate.raw,
+            ),
             patch("workload.EtcdWorkload.write_file"),
-            patch("pathlib.Path.exists", return_value=True),
+            patch("charmlibs.pathops.PathProtocol.exists", return_value=True),
             patch("workload.EtcdWorkload.alive", return_value=True),
             patch("workload.EtcdWorkload.restart"),
             patch(
@@ -455,7 +461,7 @@ def test_certificate_available_enabling_tls(certificate_available_context):
             charm.tls_manager.set_tls_state(TLSState.TO_TLS, tls_type=TLSType.PEER)
 
             with (
-                patch("pathlib.Path.exists", return_value=False),
+                patch("charmlibs.pathops.PathProtocol.exists", return_value=False),
                 patch("managers.cluster.ClusterManager.broadcast_peer_url"),
                 patch("managers.config.ConfigManager._get_cluster_endpoints", return_value=""),
                 patch(
@@ -536,8 +542,11 @@ def test_enabling_tls_one_restart(certificate_available_context):
     ):
         with (
             manager,
-            patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
-            patch("pathlib.Path.exists", return_value=True),
+            patch(
+                "charmlibs.pathops.PathProtocol.read_text",
+                return_value=provider_ca_certificate.raw,
+            ),
+            patch("charmlibs.pathops.PathProtocol.exists", return_value=True),
             patch("workload.EtcdWorkload.alive", return_value=True),
         ):
             state_out = manager.run()
@@ -546,7 +555,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
 
             # Peer cert added case but no restart
             with (
-                patch("pathlib.Path.exists", return_value=False),
+                patch("charmlibs.pathops.PathProtocol.exists", return_value=False),
                 patch("common.client.EtcdClient.broadcast_peer_url"),
                 patch(
                     "common.client.EtcdClient._run_etcdctl",
@@ -631,7 +640,7 @@ def test_enabling_tls_one_restart(certificate_available_context):
         # Peer cert added case but no restart
         with (
             ctx(ctx.on.update_status(), state_out) as manager,
-            patch("pathlib.Path.exists", return_value=False),
+            patch("charmlibs.pathops.PathProtocol.exists", return_value=False),
             patch("common.client.EtcdClient.broadcast_peer_url"),
             patch(
                 "common.client.EtcdClient.member_list",
@@ -736,9 +745,12 @@ def test_certificate_expiration(certificate_available_context):
     with patch("managers.cluster.ClusterManager.restart_member", return_value=True):
         with (
             manager,
-            patch("pathlib.Path.read_text", return_value=provider_ca_certificate.raw),
+            patch(
+                "charmlibs.pathops.PathProtocol.read_text",
+                return_value=provider_ca_certificate.raw,
+            ),
             patch("workload.EtcdWorkload.write_file"),
-            patch("pathlib.Path.exists", return_value=True),
+            patch("charmlibs.pathops.PathProtocol.exists", return_value=True),
             patch("workload.EtcdWorkload.alive", return_value=True),
             patch("managers.tls.TLSManager.is_new_ca", return_value=False),
             patch("managers.cluster.ClusterManager.clean_users"),
@@ -749,7 +761,7 @@ def test_certificate_expiration(certificate_available_context):
 
             # Peer cert added case but no restart
             with (
-                patch("pathlib.Path.exists", return_value=False),
+                patch("charmlibs.pathops.PathProtocol.exists", return_value=False),
                 patch("common.client.EtcdClient.broadcast_peer_url"),
                 patch(
                     "common.client.EtcdClient.member_list",

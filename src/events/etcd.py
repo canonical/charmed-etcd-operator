@@ -118,7 +118,7 @@ class EtcdEvents(Object):
             return
 
         # check if data exists before doing any operation
-        storage_reuse = self.charm.workload.exists(DATABASE_DIR)
+        storage_reuse = self.charm.workload.exists(self.charm.workload.paths.data_dir)
 
         tls_transition_states = [TLSState.TO_TLS, TLSState.TO_NO_TLS]
         if (
@@ -192,7 +192,7 @@ class EtcdEvents(Object):
                     logger.warning(f"Existing database file detected in {DATABASE_DIR}.")
                     # storage cannot be reused on non-leader members
                     try:
-                        self.charm.workload.remove_directory(DATABASE_DIR)
+                        self.charm.workload.remove_directory(self.charm.workload.paths.data_dir)
                         logger.warning(
                             f"Removed database file from {DATABASE_DIR} to join existing cluster."
                         )
@@ -729,7 +729,7 @@ class EtcdEvents(Object):
             self.charm.workload.disable_database()
             logger.warning(f"Removing database file from {DATABASE_DIR} for cluster rebuild.")
             try:
-                self.charm.workload.remove_directory(DATABASE_DIR)
+                self.charm.workload.remove_directory(self.charm.workload.paths.data_dir)
             except FileNotFoundError:
                 logger.info(f"No database file found in {DATABASE_DIR} - nothing to remove")
             self.charm.state.unit_server.update({"state": ""})
