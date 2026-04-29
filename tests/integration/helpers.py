@@ -105,8 +105,11 @@ def get_cluster_members(
             --key client.key"
 
     try:
-        result = subprocess.getoutput(etcd_command).split("\n")[0]
-        return json.loads(result)["members"]
+        result = subprocess.getoutput(etcd_command)
+        logger.info(f"Member result: {result}")
+        result_line = result.split("\n")[0]
+        logger.info(f"Member resultline: {result_line}")
+        return json.loads(result_line)["members"]
     except KeyError:
         raise
 
