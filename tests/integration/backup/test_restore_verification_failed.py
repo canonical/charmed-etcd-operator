@@ -161,7 +161,7 @@ def test_restore_verification_failed(juju_vm_model: Juju):
     ), "Test data was restored even though restore should have failed"
 
     # ensure cluster is fully formed
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=invalid_password)
     assert len(cluster_members) == NUM_UNITS, (
         f"Expected {NUM_UNITS} cluster members, got {len(cluster_members)}."
     )
