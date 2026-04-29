@@ -233,6 +233,10 @@ def get_raft_leader(
 
     # query member name for leader id
     etcd_command = f"etcdctl member list --endpoints={endpoints} -w=json"
+    if user:
+        etcd_command = f"{etcd_command} --user={user}"
+    if password:
+        etcd_command = f"{etcd_command} --password={password}"
     if tls_enabled:
         etcd_command = f"{etcd_command} \
                 --cacert client_ca.pem \

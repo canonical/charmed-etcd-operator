@@ -73,7 +73,7 @@ def test_membership_reconfiguration_after_unit_loss(juju_vm_model: Juju) -> None
     password = secret.get(f"{INTERNAL_USER}-password")
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     member_names = [member["name"] for member in cluster_members]
 
     app_status = get_app_status(juju_vm_model, APP_NAME)
