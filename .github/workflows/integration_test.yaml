@@ -54,11 +54,13 @@ jobs:
               _, runner, task = job.split(":")
               # Example: "test_charm.py"
               task = task.removeprefix("tests/spread/")
-              # For IS-hosted runners
+              # Map spread system labels to gh-hosted runner labels.
               if "arm64" in runner:
                   architecture = "arm64"
+                  github_runner = "ubuntu-24.04-arm"
               else:
                   architecture = "amd64"
+                  github_runner = "ubuntu-24.04"
               # Example: "test_charm.py:juju36 | amd64"
               name = f"{task} | {architecture}"
               # ":" character not valid in GitHub Actions artifact
@@ -67,7 +69,7 @@ jobs:
                   "spread_job": job,
                   "name": name,
                   "name_in_artifact": name_in_artifact,
-                  "runner": runner,
+                  "runner": github_runner,
               })
           output = f"jobs={json.dumps(jobs)}"
           print(output)
