@@ -73,7 +73,7 @@ def test_membership_reconfiguration_after_unit_loss(juju_vm_model: Juju) -> None
     password = secret.get(f"{INTERNAL_USER}-password")
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
-    cluster_members = get_cluster_members(endpoints)
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     member_names = [member["name"] for member in cluster_members]
 
     app_status = get_app_status(juju_vm_model, APP_NAME)
@@ -115,7 +115,9 @@ def test_rebuild_on_healthy_cluster(juju_vm_model: Juju) -> None:
     wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
 
     endpoints = get_cluster_endpoints_ha(juju_vm_model, APP_NAME)
-    cluster_members = get_cluster_members(endpoints)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     member_names = [member["name"] for member in cluster_members]
 
     app_status = get_app_status(juju_vm_model, APP_NAME)
@@ -166,7 +168,9 @@ def test_recover_from_majority_failure(juju_vm_model: Juju) -> None:
     wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, unit_count=2)
 
     endpoints = get_cluster_endpoints_ha(juju_vm_model, APP_NAME)
-    cluster_members = get_cluster_members(endpoints)
+    secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+    password = secret.get(f"{INTERNAL_USER}-password")
+    cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     member_names = [member["name"] for member in cluster_members]
 
     app_status = get_app_status(juju_vm_model, APP_NAME)
