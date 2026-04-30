@@ -2,8 +2,8 @@ summary: test_tls.py
 environment:
   TEST_MODULE: tls/test_tls.py
 systems:
-  - self-hosted-linux-amd64-noble-medium
-  - self-hosted-linux-arm64-noble-medium
+  - ubuntu-24.04
+  - ubuntu-24.04-arm
 execute: |
   tox run -e integration -- "tests/integration/$TEST_MODULE"  --alluredir="$SPREAD_TASK/allure-results"
 artifacts:
