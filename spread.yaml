@@ -96,10 +96,8 @@ backends:
       GCP_SECRET_KEY: "$(HOST: echo $GCP_SECRET_KEY)"
       GCP_SERVICE_ACCOUNT: "$(HOST: echo $GCP_SERVICE_ACCOUNT)"
     systems:
-      - ubuntu-24.04:
-          username: runner
-      - ubuntu-24.04-arm:
-          username: runner
+      - ubuntu-24.04
+      - ubuntu-24.04-arm
 
 suites:
   tests/spread/:
