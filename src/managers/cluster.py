@@ -56,6 +56,7 @@ class ClusterManager(ManagerStatusProtocol):
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=self.state.unit_server.client_url,
+                workload_paths=self.workload.paths,
             )
             endpoint_status = client.get_endpoint_status()
             leader_id = endpoint_status["Status"]["leader"]
@@ -76,6 +77,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=f"http://{self.state.unit_server.model.private_ip}:{METRICS_PORT}/metrics",
+            workload_paths=self.workload.paths,
         )
 
         if client.get_metric(metric_name="etcd_server_has_leader") == "0":
@@ -96,6 +98,7 @@ class ClusterManager(ManagerStatusProtocol):
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=self.state.unit_server.client_url,
+                workload_paths=self.workload.paths,
             )
             client.add_user(username=self.admin_user)
             client.enable_auth()
@@ -114,6 +117,7 @@ class ClusterManager(ManagerStatusProtocol):
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=self.state.unit_server.client_url,
+                workload_paths=self.workload.paths,
             )
             client.update_password(username=username, new_password=password)
         except EtcdUserManagementError:
@@ -131,6 +135,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
 
         member_list = client.member_list()
@@ -160,6 +165,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
         try:
             client.broadcast_peer_url(self.member.id, peer_urls)
@@ -184,6 +190,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
         return client.is_healthy(cluster=cluster)
 
@@ -219,6 +226,7 @@ class ClusterManager(ManagerStatusProtocol):
                     username=self.admin_user,
                     password=self.admin_password,
                     client_url=self.state.unit_server.client_url,
+                    workload_paths=self.workload.paths,
                 )
                 cluster_members, member_id = client.add_member_as_learner(
                     server.member_name, peer_url
@@ -258,6 +266,7 @@ class ClusterManager(ManagerStatusProtocol):
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=",".join(e for e in self.cluster_endpoints),
+                workload_paths=self.workload.paths,
             )
             client.promote_member(member_id=member_id)
         except EtcdClusterManagementError:
@@ -279,6 +288,7 @@ class ClusterManager(ManagerStatusProtocol):
                 username=self.admin_user,
                 password=self.admin_password,
                 client_url=",".join(e for e in self.cluster_endpoints),
+                workload_paths=self.workload.paths,
             )
             client.remove_member(self.member.id)
         except (EtcdClusterManagementError, RaftLeaderNotFoundError):
@@ -297,6 +307,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
 
         member_list = client.member_list()
@@ -316,6 +327,7 @@ class ClusterManager(ManagerStatusProtocol):
                     username=self.admin_user,
                     password=self.admin_password,
                     client_url=",".join(e for e in self.cluster_endpoints),
+                    workload_paths=self.workload.paths,
                 )
                 client.move_leader(new_leader_id)
                 # wait for leadership to be moved before continuing operation
@@ -336,6 +348,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
 
         cluster_members = client.member_list()
@@ -357,6 +370,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
 
         try:
@@ -421,6 +435,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
         return client.get_user(username=username)
 
@@ -434,6 +449,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
         return client.get_version()
 
@@ -447,6 +463,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
 
         client.remove_role(username)
@@ -464,6 +481,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
         client.add_user(username)
         client.add_role(username)
@@ -481,6 +499,7 @@ class ClusterManager(ManagerStatusProtocol):
             username=self.admin_user,
             password=self.admin_password,
             client_url=self.state.unit_server.client_url,
+            workload_paths=self.workload.paths,
         )
         return client.list_users()
 

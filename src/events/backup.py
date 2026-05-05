@@ -29,7 +29,6 @@ from common.exceptions import (
 )
 from literals import (
     AZURE_RELATION_NAME,
-    DATABASE_DIR,
     PEER_RELATION,
     S3_RELATION_NAME,
     RestoreStep,
@@ -421,7 +420,7 @@ class BackupEvents(Object):
             logger.error("Failed to verify - cancel the restore procedure")
             self.charm.state.cluster.update({"restore_verification_failed": "True"})
             self.charm.backup_manager.stop_database()
-            self.charm.workload.remove_directory(DATABASE_DIR)
+            self.charm.workload.remove_directory(self.charm.workload.paths.data_dir)
             self.charm.backup_manager.set_restore_step(RestoreStep.VERIFY.value)
             return
         # if the verification was successful, stop etcd again and continue the workflow

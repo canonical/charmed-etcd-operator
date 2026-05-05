@@ -16,8 +16,6 @@ from ops.model import ConfigData
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import (
-    CONFIG_FILE,
-    DATABASE_DIR,
     MAX_QUOTA_BACKEND_BYTES,
     METRICS_PORT,
     MIN_QUOTA_BACKEND_BYTES,
@@ -74,7 +72,7 @@ class ConfigManager(ManagerStatusProtocol):
             # regular situation: cluster is initialized and cluster configuration should be applied
             config_properties["initial-cluster-state"] = self.state.cluster.model.cluster_state
             config_properties["initial-cluster"] = self.state.cluster.model.cluster_members
-        elif self.workload.exists(DATABASE_DIR):
+        elif self.workload.exists(self.workload.paths.data_dir):
             # if no cluster state is available, but we find a database file
             # we force a new one-cluster-member with existing data
             # this is the case for storage reuse and `rebuild_cluster` workflows
@@ -108,10 +106,10 @@ class ConfigManager(ManagerStatusProtocol):
             )
             # set the client-transport-security
             config_properties["client-transport-security"] = {
-                "cert-file": self.workload.paths.tls.client_cert,
-                "key-file": self.workload.paths.tls.client_key,
+                "cert-file": self.workload.paths.tls.client_cert.as_posix(),
+                "key-file": self.workload.paths.tls.client_key.as_posix(),
                 "client-cert-auth": True,
-                "trusted-ca-file": self.workload.paths.tls.client_ca,
+                "trusted-ca-file": self.workload.paths.tls.client_ca.as_posix(),
             }
         if self.state.unit_server.tls_peer_state in [TLSState.TO_TLS, TLSState.TLS]:
             # replace http with https in listen-peer-urls, initial-cluster and initial-advertise-peer-urls
@@ -132,10 +130,10 @@ class ConfigManager(ManagerStatusProtocol):
 
             # set the peer-transport-security
             config_properties["peer-transport-security"] = {
-                "cert-file": self.workload.paths.tls.peer_cert,
-                "key-file": self.workload.paths.tls.peer_key,
+                "cert-file": self.workload.paths.tls.peer_cert.as_posix(),
+                "key-file": self.workload.paths.tls.peer_key.as_posix(),
                 "client-cert-auth": True,
-                "trusted-ca-file": self.workload.paths.tls.peer_ca,
+                "trusted-ca-file": self.workload.paths.tls.peer_ca.as_posix(),
             }
 
         if self.state.unit_server.tls_client_state == TLSState.TO_NO_TLS:
@@ -166,7 +164,7 @@ class ConfigManager(ManagerStatusProtocol):
         logger.debug("Writing configuration")
         self.workload.write_file(
             content=self.config_properties,
-            file=self.config_file,
+            path=self.config_file,
         )
 
     def are_tuning_parameters_valid(self) -> bool:
@@ -227,7 +225,7 @@ class ConfigManager(ManagerStatusProtocol):
     def requires_restart(self) -> bool:
         """Check current configuration and determine if restart is required."""
         try:
-            current_config_values = self.workload.load_yaml_file(CONFIG_FILE)
+            current_config_values = self.workload.load_yaml_file(self.workload.paths.config_file)
         except yaml.YAMLError as e:
             logger.error(f"Error loading current config: {e}")
             return False

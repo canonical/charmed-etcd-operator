@@ -157,7 +157,7 @@ class ExternalClientsManager(ManagerStatusProtocol):
                 logger.warning("Skipping relation %s with no responses.", relation.id)
                 continue
             for request in self.state.etcd_provides_event_handler.requests(relation):
-                if not request.resource or not request.mtls_cert:
+                if not request.mtls_cert:
                     logger.warning("Skipping relation %s with invalid payloads.", relation.id)
                     continue
                 current_response = next(
@@ -184,9 +184,8 @@ class ExternalClientsManager(ManagerStatusProtocol):
         for relation in self.state.etcd_provides_interface.relations:
             for request in self.state.etcd_provides_event_handler.requests(relation):
                 mtls_cert = request.mtls_cert
-                prefix = request.resource
                 # for client relation created hook
-                if not mtls_cert or not prefix:
+                if not mtls_cert:
                     status_list.append(ExternalClientsStatuses.EC_MISSING_CREDENTIALS.value)
                     continue
                 if not is_leaf_certificate_valid(mtls_cert):

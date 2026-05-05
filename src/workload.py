@@ -7,16 +7,13 @@
 import logging
 import shutil
 import subprocess
-from os.path import exists
 from pathlib import Path
 from platform import machine
-from shutil import copyfile, rmtree
 from socket import socket
-from typing import Any, Dict, List
+from typing import List
 
-import tomllib
-import yaml
 from charmlibs import snap
+from charmlibs.pathops import LocalPath
 from charmlibs.systemd import service_disable, service_enable
 from tenacity import Retrying, retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 from typing_extensions import override
@@ -34,6 +31,7 @@ class EtcdWorkload(WorkloadBase):
     """Implementation of WorkloadBase for running on VMs."""
 
     def __init__(self):
+        self.root_dir = LocalPath("/")
         for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5)):
             with attempt:
                 self.etcd = snap.SnapCache()[SNAP_NAME]
@@ -64,7 +62,8 @@ class EtcdWorkload(WorkloadBase):
             True if successfully installed, False if errors occur and `retry_and_raise` is False.
         """
         if not revision:
-            versions = self.load_toml_file(f"{WORKING_DIR}/../{VERSIONS_FILE}")
+            versions_path = (WORKING_DIR / ".." / VERSIONS_FILE).resolve()
+            versions = self.load_toml_file(LocalPath(versions_path))
             revision = versions["snap"]["revisions"][machine()]
 
         try:
@@ -101,59 +100,12 @@ class EtcdWorkload(WorkloadBase):
             s.close()
 
     @override
-    def write_file(self, content: str, file: str) -> None:
-        path = Path(file)
-        path.parent.mkdir(exist_ok=True, parents=True)
-        path.write_text(content)
-
-    @override
-    def load_yaml_file(self, file: str) -> Dict[str, Any]:
-        if not exists(file):
-            return {}
-
-        with open(file, "r") as f:
-            return yaml.safe_load(f)
-
-    @override
-    def load_toml_file(self, file: str) -> Dict[str, Any]:
-        if not exists(file):
-            return {}
-
-        with open(file, "rb") as f:
-            return tomllib.load(f)
-
-    @override
     def stop(self) -> None:
         self.etcd.stop(services=[SNAP_SERVICE])
 
     @override
     def restart(self) -> None:
         self.etcd.restart(services=[SNAP_SERVICE])
-
-    @override
-    def copy_file(self, src_file: str, dst_file: str) -> None:
-        copyfile(src_file, dst_file)
-
-    @override
-    def remove_file(self, file) -> None:
-        path = Path(file)
-        path.unlink(missing_ok=True)
-
-    @override
-    def remove_directory(self, directory: str) -> None:
-        rmtree(directory)
-
-    @override
-    def exists(self, path: str) -> bool:
-        path_object = Path(path)
-
-        if path_object.exists():
-            if path_object.is_dir():
-                # consider it false if the directory is empty
-                return len(list(path_object.glob("*"))) > 0
-            return True
-
-        return False
 
     @override
     def exec(self, command: List[str]) -> str:
@@ -219,7 +171,7 @@ class EtcdWorkload(WorkloadBase):
         Returns:
             int: The size of the data storage in Bytes.
         """
-        return shutil.disk_usage(SNAP_DATA_PATH).total
+        return shutil.disk_usage((self.root_dir / SNAP_DATA_PATH).as_posix()).total
 
     @override
     def get_db_file_size(self) -> int:
@@ -228,10 +180,11 @@ class EtcdWorkload(WorkloadBase):
         Returns:
             int: Size of the etcd database file in bytes.
         """
-        db_file_path = Path(DATABASE_DIR) / "snap" / "db"
-        if db_file_path.exists() and db_file_path.is_file():
-            return db_file_path.stat().st_size
-        return 0
+        db_file_path = self.root_dir / DATABASE_DIR / "snap" / "db"
+        if not db_file_path.exists() or not db_file_path.is_file():
+            return 0
+
+        return len(db_file_path.read_bytes())
 
     @override
     def is_lxd_cloud(self) -> bool:
@@ -242,7 +195,8 @@ class EtcdWorkload(WorkloadBase):
         """
         # LXD sets up a Unix socket at /dev/lxd/sock inside the container
         # https://documentation.ubuntu.com/lxd/latest/dev-lxd/#implementation-details
-        return Path("/dev/lxd/sock").exists()
+        path = self.root_dir / "/dev/lxd/sock"
+        return path.exists()
 
     @override
     def data_storage_attached(self) -> bool:
@@ -251,4 +205,5 @@ class EtcdWorkload(WorkloadBase):
         Returns:
             bool: True if data storage is attached, False otherwise.
         """
-        return Path(SNAP_DATA_PATH).exists()
+        path = self.root_dir / SNAP_DATA_PATH
+        return path.exists()
