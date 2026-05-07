@@ -1,6 +1,6 @@
 # How to scale horizontally
 
-Adding and removing nodes from an etcd deployment is done by scaling [Juju units](https://juju.is/docs/juju/unit). 
+Adding and removing nodes from an etcd deployment is done by scaling [Juju units](https://documentation.ubuntu.com/juju/3.6/reference/unit/). 
  
 ## Add a node
 You can add additional nodes to your deployed etcd application with the following command:

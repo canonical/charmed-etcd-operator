@@ -64,17 +64,14 @@ def test_membership_reconfiguration_after_unit_loss(juju_vm_model: Juju) -> None
     # Consequently, whichever helpers make use of these jubilant methods will have to be avoided too.
     # Thus, we define wait_until_apps_active_and_agents_idle, get_cluster_endpoints_ha, etc.
 
+    # wait for the next `update_status` for the cluster membership to be updated
+    with fast_forward(juju_vm_model, 15):
+        wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
+
     endpoints = get_cluster_endpoints_ha(juju_vm_model, APP_NAME)
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     password = secret.get(f"{INTERNAL_USER}-password")
-
-    # wait for the next `update_status` for the cluster membership to be updated
-    with fast_forward(juju_vm_model, 15):
-        assert_continuous_writes_increasing(
-            endpoints=endpoints, user=INTERNAL_USER, password=password
-        )
-
-    wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
+    assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     cluster_members = get_cluster_members(endpoints, user=INTERNAL_USER, password=password)
     member_names = [member["name"] for member in cluster_members]
