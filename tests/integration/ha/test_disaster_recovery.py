@@ -70,7 +70,9 @@ def test_membership_reconfiguration_after_unit_loss(juju_vm_model: Juju) -> None
 
     # wait for the next `update_status` for the cluster membership to be updated
     with fast_forward(juju_vm_model, 15):
-        assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
+        assert_continuous_writes_increasing(
+            endpoints=endpoints, user=INTERNAL_USER, password=password
+        )
 
     wait_until_apps_active_and_agents_idle(juju_vm_model, APP_NAME, NUM_UNITS - 1)
 
