@@ -20,7 +20,7 @@ Charmed etcd is equipped with several features to securely store and scale compl
 
 The charmed etcd operator is an open-source project that welcomes community contributions, suggestions, fixes and constructive feedback.
 
-- [Read our Code of Conduct](https://ubuntu.com/community/code-of-conduct)
+- [Read our Code of Conduct](https://ubuntu.com/community/docs/ethos/code-of-conduct)
 - [Contribute](https://github.com/canonical/charmed-etcd-operator/blob/03687ed992f30c8fea8f8576e0079894ae4b0f16/CONTRIBUTING.md) and report [issues](https://github.com/canonical/charmed-etcd-operator/issues)
 - Explore [Canonical Data & AI solutions](https://canonical.com/data)
 - [Contact us on Matrix](https://matrix.to/#/#charmhub-data-platform:ubuntu.com)
