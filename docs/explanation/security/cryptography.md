@@ -20,7 +20,7 @@ Both the etcd charm and snap are published and released programmatically using r
 All repositories in GitHub are set up with branch protection rules, requiring:
 
 * new commits to be merged to main branches via pull request with at least 2 approvals from repository maintainers
-* developers to sign the [Canonical Contributor License Agreement (CLA)](https://ubuntu.com/legal/contributors)
+* developers to sign the [Canonical Contributor License Agreement (CLA)](https://canonical.com/legal/contributors)
 
 ## Encryption
 
