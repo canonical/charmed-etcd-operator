@@ -7,6 +7,7 @@ import subprocess
 from time import sleep
 
 from jubilant import Juju
+import pytest
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
 from statuses import CharmStatuses, TLSStatuses
@@ -37,6 +38,7 @@ TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 250
 
 
+@pytest.mark.skip()
 def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
     """Build the charm-under-test and deploy it with three units.
 

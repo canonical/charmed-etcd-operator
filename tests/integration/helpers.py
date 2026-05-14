@@ -34,6 +34,7 @@ LOKI_APP_NAME = "loki"
 PROMETHEUS_APP_NAME = "prometheus"
 GRAFANA_APP_NAME = "grafana"
 COS_RELATION_NAME = "cos-agent"
+SSH_KEY_FILE = "id_rsa_jubilant"
 
 
 class SecretNotFoundError(Exception):
@@ -308,7 +309,7 @@ def get_certificate_from_unit(
 ) -> str | None:
     """Retrieve a certificate from a unit."""
     command = f"cat {TLS_ROOT_DIR}/{cert_type.value}{'_ca' if is_ca else ''}.pem"
-    output = juju.ssh(target=unit, command=command)
+    output = juju.ssh(target=unit, command=command, ssh_options=['-i', SSH_KEY_FILE])
     if output.startswith("-----BEGIN CERTIFICATE-----"):
         return output
 
@@ -353,7 +354,7 @@ def download_client_certificate_from_unit(juju: Juju, app_name: str = APP_NAME) 
     tls_path = TLS_ROOT_DIR
 
     for file in ["client.pem", "client.key", "client_ca.pem"]:
-        juju.scp(f"{unit}:{tls_path}/{file}", file)
+        juju.scp(f"{unit}:{tls_path}/{file}", file, scp_options=['-i', SSH_KEY_FILE])
 
 
 def get_storage_id(juju: Juju, unit_name: str, storage_name: str) -> str | None:

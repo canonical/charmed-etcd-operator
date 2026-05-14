@@ -145,6 +145,14 @@ def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
 
 @pytest.fixture(scope="module")
 def juju_vm_model(arch: str, lxd_cloud: str, lxd_controller: str, juju: Juju):
+    ssh_key_file = "id_rsa_jubilant"
+    subprocess.run(
+        ["ssh-keygen", "-t", "rsa", "-b", "4096", "-f", ssh_key_file, "-q", "-N", ""],
+        check=True,
+    )
+    with open(f"{ssh_key_file}.pub") as key_file:
+        ssh_key = key_file.read()
+
     # if concierge model ("testing") is found, such as on CI, continue with this. Else setup temp model.
     models = json.loads(juju.cli("models", "--format", "json", include_model=False))
     for model in models["models"]:
@@ -153,12 +161,14 @@ def juju_vm_model(arch: str, lxd_cloud: str, lxd_controller: str, juju: Juju):
                 model=f"{lxd_controller}:{CONCIERGE_MODEL_NAME}", wait_timeout=1000
             )
             juju_lxd.cli("set-model-constraints", f"arch={arch}")
+            juju_lxd.add_ssh_key(ssh_key)
             yield juju_lxd
             return
 
     with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
         juju_lxd.wait_timeout = 1000
         juju_lxd.cli("set-model-constraints", f"arch={arch}")
+        juju_lxd.add_ssh_key(ssh_key)
         yield juju_lxd
 
 
