@@ -119,7 +119,7 @@ path: /root/spread_project
 kill-timeout: 3h
 environment:
   PATH: $PATH:$(pipx environment --value PIPX_BIN_DIR)
-  CONCIERGE_JUJU_CHANNEL: 4/stable
+  CONCIERGE_JUJU_CHANNEL: 4.1/beta
 prepare: |
   snap refresh --hold
   chown -R root:root "$SPREAD_PATH"
