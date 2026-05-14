@@ -1,7 +1,7 @@
 # https://canonical-charm-refresh.readthedocs-hosted.com/latest/refresh-versions-toml/
 
 charm_major = 1
-workload = "3.6.7"
+workload = "3.6.11"
 
 [snap]
 name = "charmed-etcd"
