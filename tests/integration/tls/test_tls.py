@@ -7,7 +7,6 @@ import subprocess
 from time import sleep
 
 from jubilant import Juju
-import pytest
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
 from statuses import CharmStatuses, TLSStatuses

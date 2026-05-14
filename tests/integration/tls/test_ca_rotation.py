@@ -222,7 +222,7 @@ def _prepare_units_for_ca_expiration_test(juju: Juju) -> None:
         juju.ssh(
             command=f"sudo sed -i 's|{search_expression}|{replace_expression}|' {file}",
             target=unit_name,
-            ssh_options=['-i', SSH_KEY_FILE],
+            ssh_options=["-i", SSH_KEY_FILE],
         )
 
 
