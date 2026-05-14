@@ -33,6 +33,7 @@ NUM_UNITS = 3
 TEST_KEY = "test_key"
 TEST_VALUE = "42"
 CERTIFICATE_EXPIRY_TIME = 90
+SSH_KEY_FILE = "id_rsa_jubilant"
 
 
 def test_build_and_deploy_with_tls(charm: str, juju_vm_model: Juju) -> None:
@@ -221,6 +222,7 @@ def _prepare_units_for_ca_expiration_test(juju: Juju) -> None:
         juju.ssh(
             command=f"sudo sed -i 's|{search_expression}|{replace_expression}|' {file}",
             target=unit_name,
+            ssh_options=["-i", SSH_KEY_FILE],
         )
 
 
