@@ -209,6 +209,7 @@ def test_upgrade_to_local(charm: str, juju_vm_model: Juju) -> None:
             refresh_order[0], "force-refresh-start", {"check-compatibility": False}
         )
         assert force_refresh_response.return_code == 0, "action failed"
+        juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=30))
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
