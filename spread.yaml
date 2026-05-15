@@ -116,6 +116,7 @@ kill-timeout: 3h
 environment:
   PATH: $PATH:$(pipx environment --value PIPX_BIN_DIR)
   CONCIERGE_JUJU_CHANNEL: 3.6/stable
+  pythonLocation: '$(HOST: echo $pythonLocation)'
 prepare: |
   snap refresh --hold
   chown -R root:root "$SPREAD_PATH"
@@ -126,6 +127,7 @@ prepare: |
   concierge prepare --trace
 
   pipx install tox poetry
+  poetry env use $pythonLocation/bin/python
 prepare-each: |
   cd "$SPREAD_PATH"
   # `concierge prepare` needs to be run for each spread job in case Juju version changed
@@ -134,5 +136,7 @@ prepare-each: |
   # Unable to set constraint on all models because of Juju bug:
   # https://bugs.launchpad.net/juju/+bug/2065050
   juju set-model-constraints arch="$(dpkg --print-architecture)"
+  
+  poetry env use $pythonLocation/bin/python
 
 # Only restore on lxd backend—no need to restore on CI
