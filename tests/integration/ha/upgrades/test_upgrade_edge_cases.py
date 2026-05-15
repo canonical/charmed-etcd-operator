@@ -93,7 +93,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
         juju_vm_model.run(last_unit_name, "force-refresh-start", {"check-compatibility": False})
 
     juju_vm_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=60)
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=30)
     )
 
     leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
@@ -106,7 +106,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # data interfaces v1 uses - instead of _ for relation data keys
     # this breaks disaster recovery during upgrades if the upgraded unit is not the leader
     juju_vm_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=30)
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=60)
     )
 
     # cluster should be recovered again
