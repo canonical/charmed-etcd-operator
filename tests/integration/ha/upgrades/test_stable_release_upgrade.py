@@ -114,8 +114,8 @@ def test_upgrade_to_latest(charm: str, juju_vm_model: Juju) -> None:
             refresh_order[0], "force-refresh-start", {"check-compatibility": False}
         )
         assert force_refresh_response.return_code == 0, "action failed"
-        juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
 
+    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
     juju_vm_model.wait(
         lambda status: does_status_match(
             status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}

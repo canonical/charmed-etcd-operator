@@ -77,7 +77,9 @@ def test_upgrade_single_unit_cluster(charm: str, juju_vm_model: Juju) -> None:
 
     # wait for upgrade to complete
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, idle_period=60)
+        lambda status: are_apps_active_and_agents_idle(
+            status, APP_NAME, idle_period=60, unit_count=1
+        )
     )
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
