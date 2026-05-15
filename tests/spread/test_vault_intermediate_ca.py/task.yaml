@@ -2,7 +2,7 @@ summary: test_vault_intermediate_ca.py
 environment:
   TEST_MODULE: tls/test_vault_intermediate_ca.py
 systems:
-  - ubuntu-24.04
+  - ubuntu-22.04
   # no vault arm 1.18
   # - ubuntu-24.04-arm
 execute: |
