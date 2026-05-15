@@ -82,7 +82,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
     juju_vm_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=30)
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=60)
     )
 
     last_unit_name, last_unit_status = list(juju_vm_model.status().get_units(APP_NAME).items())[-1]
@@ -106,7 +106,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # data interfaces v1 uses - instead of _ for relation data keys
     # this breaks disaster recovery during upgrades if the upgraded unit is not the leader
     juju_vm_model.wait(
-        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=60)
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=30)
     )
 
     # cluster should be recovered again

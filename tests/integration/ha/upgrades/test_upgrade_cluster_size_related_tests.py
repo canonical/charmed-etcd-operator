@@ -63,7 +63,9 @@ def test_upgrade_single_unit_cluster(charm: str, juju_vm_model: Juju) -> None:
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=30))
+    juju_vm_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, idle_period=60, unit_count=1)
+    )
 
     if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
