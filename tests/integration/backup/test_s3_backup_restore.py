@@ -164,6 +164,11 @@ def test_restore_backup_on_different_cluster(charm: str, juju_vm_model: Juju):
     logger.info(f"Integrate the newly deployed application with {S3_INTEGRATOR}")
     juju_vm_model.integrate(APP_NAME, S3_INTEGRATOR)
     juju_vm_model.wait(
+        lambda status: are_apps_active_and_agents_idle(
+            status, APP_NAME, unit_count=NUM_UNITS, idle_period=30
+        )
+    )
+    juju_vm_model.wait(
         lambda status: does_status_match(
             status,
             expected_status={
