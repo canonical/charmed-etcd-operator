@@ -102,7 +102,7 @@ def test_upgrade_to_latest(charm: str, juju_vm_model: Juju) -> None:
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(path=charm, app=APP_NAME)
     logger.info("Wait for the refresh to initiate")
-    sleep(60)
+    sleep(90)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
