@@ -78,7 +78,7 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
     logger.info("Wait for the refresh to initiate")
-    sleep(20)
+    sleep(60)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
@@ -176,7 +176,7 @@ def test_ip_address_change_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
     logger.info("Wait for the refresh to initiate")
-    sleep(20)
+    sleep(60)
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
@@ -326,7 +326,7 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
     logger.info("Wait for the refresh to initiate")
-    sleep(20)
+    sleep(60)
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
