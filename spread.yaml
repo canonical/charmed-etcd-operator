@@ -84,9 +84,6 @@ backends:
       
       sudo passwd --delete runner
       
-      # workaround for 22.04 runners
-      sudo systemctl reload ssh || sudo systemctl restart ssh
-
       ADDRESS localhost
     # HACK: spread does not pass environment variables set on runner
     # Manually pass specific environment variables
@@ -101,9 +98,9 @@ backends:
       GCP_SECRET_KEY: "$(HOST: echo $GCP_SECRET_KEY)"
       GCP_SERVICE_ACCOUNT: "$(HOST: echo $GCP_SERVICE_ACCOUNT)"
     systems:
-      - ubuntu-22.04:
+      - ubuntu-24.04:
           username: runner
-      - ubuntu-22.04-arm:
+      - ubuntu-24.04-arm:
           username: runner
 
 suites:
@@ -116,7 +113,6 @@ kill-timeout: 3h
 environment:
   PATH: $PATH:$(pipx environment --value PIPX_BIN_DIR)
   CONCIERGE_JUJU_CHANNEL: 3.6/stable
-  pythonLocation: '$(HOST: echo $pythonLocation)'
 prepare: |
   snap refresh --hold
   chown -R root:root "$SPREAD_PATH"
@@ -127,7 +123,6 @@ prepare: |
   concierge prepare --trace
 
   pipx install tox poetry
-  poetry env use $pythonLocation/bin/python
 prepare-each: |
   cd "$SPREAD_PATH"
   # `concierge prepare` needs to be run for each spread job in case Juju version changed
@@ -137,6 +132,4 @@ prepare-each: |
   # https://bugs.launchpad.net/juju/+bug/2065050
   juju set-model-constraints arch="$(dpkg --print-architecture)"
   
-  poetry env use $pythonLocation/bin/python
-
 # Only restore on lxd backend—no need to restore on CI

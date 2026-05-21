@@ -2,8 +2,8 @@ summary: test_s3_backup_restore.py
 environment:
   TEST_MODULE: backup/test_s3_backup_restore.py
 systems:
-  - ubuntu-22.04
-  - ubuntu-22.04-arm
+  - ubuntu-24.04
+  - ubuntu-24.04-arm
 execute: |
   tox run -e integration -- "tests/integration/$TEST_MODULE"  --alluredir="$SPREAD_TASK/allure-results"
 artifacts:
