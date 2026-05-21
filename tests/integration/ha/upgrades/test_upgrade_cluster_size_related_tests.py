@@ -4,7 +4,6 @@
 
 import logging
 from platform import machine
-from time import sleep
 
 from jubilant import Juju
 
@@ -60,8 +59,6 @@ def test_upgrade_single_unit_cluster(charm: str, juju_vm_model: Juju) -> None:
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
-    logger.info("Wait for the refresh to initiate")
-    sleep(90)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
@@ -126,8 +123,6 @@ def test_scale_up_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
-    logger.info("Wait for the refresh to initiate")
-    sleep(90)
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
@@ -211,8 +206,6 @@ def test_scale_down_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
-    logger.info("Wait for the refresh to initiate")
-    sleep(90)
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
