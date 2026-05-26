@@ -4,6 +4,7 @@
 
 import logging
 from platform import machine
+from time import sleep
 
 from jubilant import Juju
 
@@ -77,6 +78,8 @@ def test_fail_upgrade_and_rollback(charm: str, juju_vm_model: Juju) -> None:
 
     logger.info(f"Pause etcd service on unit {refresh_order[-1]} to force upgrade to fail")
     disable_etcd_service(juju_vm_model, unit_name=refresh_order[-1])
+    logger.info("Wait for the refresh to initiate")
+    sleep(90)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
@@ -194,11 +197,15 @@ def test_upgrade_to_local(charm: str, juju_vm_model: Juju) -> None:
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
+    logger.info("Wait for the refresh to initiate")
+    sleep(90)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
+    juju_vm_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, idle_period=60, unit_count=NUM_UNITS)
+    )
 
     if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
@@ -210,6 +217,9 @@ def test_upgrade_to_local(charm: str, juju_vm_model: Juju) -> None:
         )
         assert force_refresh_response.return_code == 0, "action failed"
 
+    juju_vm_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, idle_period=30, unit_count=NUM_UNITS)
+    )
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
     juju_vm_model.wait(

@@ -77,6 +77,8 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
+    logger.info("Wait for the refresh to initiate")
+    sleep(90)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
@@ -105,7 +107,9 @@ def test_disaster_recovery_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # TODO remove once we have a start upgrade tests with a charm revision with v1
     # data interfaces v1 uses - instead of _ for relation data keys
     # this breaks disaster recovery during upgrades if the upgraded unit is not the leader
-    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, unit_count=2))
+    juju_vm_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, unit_count=2, idle_period=30)
+    )
 
     # cluster should be recovered again
     assert "Cluster failure" not in last_unit_status.workload_status.message, (
@@ -171,6 +175,8 @@ def test_ip_address_change_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
+    logger.info("Wait for the refresh to initiate")
+    sleep(90)
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(
@@ -319,6 +325,8 @@ def test_tls_cert_rotation_during_upgrade(charm: str, juju_vm_model: Juju) -> No
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(app=APP_NAME, path=charm)
+    logger.info("Wait for the refresh to initiate")
+    sleep(90)
 
     # Refresh always happens from highest to lowest unit number
     refresh_order = sorted(

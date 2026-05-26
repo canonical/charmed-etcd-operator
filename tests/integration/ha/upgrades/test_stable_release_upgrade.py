@@ -4,6 +4,7 @@
 
 import logging
 from platform import machine
+from time import sleep
 
 import pytest
 from jubilant import Juju
@@ -100,11 +101,15 @@ def test_upgrade_to_latest(charm: str, juju_vm_model: Juju) -> None:
     # initiate the upgrade
     logger.info(f"Refresh etcd to v{WORKLOAD_VERSION['target']}")
     juju_vm_model.refresh(path=charm, app=APP_NAME)
+    logger.info("Wait for the refresh to initiate")
+    sleep(90)
 
     # versions will always be marked "incompatible" if refresh to a local version
     # this will not be the case when the PR is released
     # see: https://github.com/canonical/charm-refresh/blob/main/charm_refresh/_main.py#L182-L185
-    juju_vm_model.wait(lambda status: are_agents_idle(status, APP_NAME, idle_period=60))
+    juju_vm_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, idle_period=60, unit_count=NUM_UNITS)
+    )
     if "incompatible" in juju_vm_model.status().apps.get(APP_NAME).app_status.message:
         logger.info("Upgrade is blocked due to incompatibility")
 
@@ -115,6 +120,9 @@ def test_upgrade_to_latest(charm: str, juju_vm_model: Juju) -> None:
         )
         assert force_refresh_response.return_code == 0, "action failed"
 
+    juju_vm_model.wait(
+        lambda status: are_agents_idle(status, APP_NAME, idle_period=30, unit_count=NUM_UNITS)
+    )
     juju_vm_model.wait(
         lambda status: does_status_match(
             status, expected_status={APP_NAME: ExpectedStatus(app_status=["blocked"])}

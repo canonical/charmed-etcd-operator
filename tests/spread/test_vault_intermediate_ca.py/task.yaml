@@ -2,9 +2,9 @@ summary: test_vault_intermediate_ca.py
 environment:
   TEST_MODULE: tls/test_vault_intermediate_ca.py
 systems:
-  - self-hosted-linux-amd64-noble-medium
+  - ubuntu-24.04
   # no vault arm 1.18
-  # - self-hosted-linux-arm64-noble-medium
+  # - ubuntu-24.04-arm
 execute: |
   tox run -e integration -- "tests/integration/$TEST_MODULE"  --alluredir="$SPREAD_TASK/allure-results"
 artifacts:
