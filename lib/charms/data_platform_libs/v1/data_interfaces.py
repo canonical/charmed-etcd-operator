@@ -264,6 +264,7 @@ from typing import (
     overload,
 )
 
+from cryptography.fernet import Fernet, InvalidToken
 from ops import (
     CharmBase,
     EventBase,
@@ -333,6 +334,9 @@ RESOURCE_ALIASES = [
 
 SECRET_PREFIX = "secret-"
 
+CROSS_MODEL_RELATION_CONSUMER_SECRETS = [
+    "mtls-cert",
+]
 
 ##############################################################################
 # Exceptions
@@ -445,6 +449,7 @@ def store_new_data(
     component: Unit | Application,
     new_data: dict[str, str],
     short_uuid: str | None = None,
+    encryption_key: str | None = None,
 ):
     """Stores the new data in the databag for diff computation.
 
@@ -453,7 +458,19 @@ def store_new_data(
         component: The component databag to write data to
         new_data: a dictionary containing the data to write
         short_uuid: Only present in V1, the request-id of that data to write.
+        encryption_key: Key for encrypting sensitive data before storing
     """
+    # ensure all sensitive information is encrypted before storing to relation data
+    for key, value in new_data.items():
+        if key in CROSS_MODEL_RELATION_CONSUMER_SECRETS:
+            if encryption_key:
+                f = Fernet(encryption_key)
+                encrypted_value = f.encrypt(value.encode()).decode()
+                new_data[key] = encrypted_value
+            else:
+                # ensure sensitive information is not leaked unencrypted in relation data
+                new_data[key] = None
+
     # First, the case for V0
     if not short_uuid:
         relation.data[component].update({"data": json.dumps(new_data)})
@@ -801,9 +818,22 @@ class BaseCommonModel(BaseModel):
             return self
         repository: AbstractRepository = info.context.get("repository")
         short_uuid = self.short_uuid
+        hybrid_fields = [s.replace("-", "_") for s in CROSS_MODEL_RELATION_CONSUMER_SECRETS]
+
         for field, field_info in self.__pydantic_fields__.items():
-            if field_info.annotation in OptionalSecrets and len(field_info.metadata) == 1:
-                secret_group = field_info.metadata[0]
+            if (
+                field_info.annotation in OptionalSecrets and len(field_info.metadata) == 1
+                or field in hybrid_fields
+            ):
+                if field in hybrid_fields:
+                    if repository.is_cross_model_relation:
+                        # secrets cannot be shared from requirer side in cross-model-relations
+                        # therefore ignore this field as it is stored in relation data
+                        continue
+                    secret_group = field.split("_")[0]
+                else:
+                    secret_group = field_info.metadata[0]
+
                 if not secret_group:
                     raise SecretsUnavailableError(field)
 
@@ -848,9 +878,22 @@ class BaseCommonModel(BaseModel):
         if info.context.get("version") == "v0":
             short_uuid = None
 
+        hybrid_fields = [s.replace("-", "_") for s in CROSS_MODEL_RELATION_CONSUMER_SECRETS]
+
         for field, field_info in self.__pydantic_fields__.items():
-            if field_info.annotation in OptionalSecrets and len(field_info.metadata) == 1:
-                secret_group = field_info.metadata[0]
+            if (
+                field_info.annotation in OptionalSecrets and len(field_info.metadata) == 1
+                or field in hybrid_fields
+            ):
+                if field in hybrid_fields:
+                    if repository.is_cross_model_relation:
+                        # secrets cannot be shared from requirer side in cross-model-relations
+                        # therefore ignore this field as it is stored in relation data
+                        continue
+                    secret_group = field.split("_")[0]
+                else:
+                    secret_group = field_info.metadata[0]
+
                 if not secret_group:
                     raise SecretsUnavailableError(field)
                 aliased_field = field_info.serialization_alias or field
@@ -984,7 +1027,7 @@ class RequirerCommonModel(CommonModel):
     entity_type: Literal["USER", "GROUP"] | None = Field(default=None)
     entity_permissions: list[EntityPermissionModel] | None = Field(default=None)
     secret_mtls: SecretString | None = Field(default=None)
-    mtls_cert: MtlsSecretStr = Field(default=None)
+    mtls_cert: MtlsSecretStr | str = Field(default=None)
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -1036,6 +1079,7 @@ class RequirerDataContractV0(RequirerCommonModel):
     """Backward compatibility."""
 
     version: Literal["v0"] = Field(default="v0")
+    encryption_secret: str | None = Field(default=None)
 
     original_field: str = Field(exclude=True, default="")
 
@@ -1064,6 +1108,7 @@ class RequirerDataContractV1(BaseModel, Generic[TRequirerCommonModel]):
 
     version: Literal["v1"] = Field(default="v1")
     requests: list[TRequirerCommonModel] = Field(default_factory=list)
+    encryption_secret: str | None = Field(default=None)
 
 
 def discriminate_on_version(payload: Any) -> str:
@@ -1091,6 +1136,7 @@ class DataContractV1(BaseModel, Generic[TResourceProviderModel]):
 
     version: Literal["v1"] = Field(default="v1")
     requests: list[TResourceProviderModel] = Field(default_factory=list)
+    encryption_secret: str | None = Field(default=None)
 
 
 DataContract = TypeAdapter(DataContractV1[ResourceProviderModel])
@@ -1216,6 +1262,12 @@ class AbstractRepository(ABC):
     @abstractmethod
     def secret_field(self, secret_group: SecretGroup, field: str | None = None) -> str:
         """Builds a secret field."""
+        ...
+
+    @abstractmethod
+    def is_cross_model_relation(self) -> bool:
+        """Determines whether the relation is a cross-model relation or not."""
+        ...
 
 
 class OpsRepository(AbstractRepository):
@@ -1511,6 +1563,14 @@ class OpsRepository(AbstractRepository):
     def delete_secret(self, label: str) -> None:
         self.secrets.remove(label)
 
+    @override
+    @property
+    def is_cross_model_relation(self) -> bool:
+        if self.model.uuid != self.relation.remote_model.uuid:
+            return True
+
+        return False
+
 
 class OpsRelationRepository(OpsRepository):
     """Implementation of the Abstract Repository for non peer relations."""
@@ -1775,6 +1835,27 @@ def build_model(repository: AbstractRepository, model: type[TCommon] | TypeAdapt
 
     data.pop("data", None)
 
+    if (
+        repository.is_cross_model_relation
+        and data.get("encryption-secret")
+        and data.get("requests")
+    ):
+        secret = repository.get_secret(
+            secret_group=SecretGroup("encryption"), secret_uri=data["encryption-secret"]
+        )
+        encryption_key = secret.get_content().get("encryption-key", "")
+
+        # decrypt encrypted sensitive information
+        for request in data["requests"]:
+            try:
+                f = Fernet(encryption_key)
+                for field in CROSS_MODEL_RELATION_CONSUMER_SECRETS:
+                    if encrypted_value := request.get(field):
+                        decrypted_value = f.decrypt(encrypted_value.encode()).decode()
+                        request[field] = decrypted_value
+            except (AttributeError, InvalidToken, TypeError, ValueError):
+                logger.warning("Could not decrypt sensitive field in cross-model relation")
+
     # Beware this means all fields should have a default value here.
     if isinstance(model, TypeAdapter):
         return model.validate_python(data, context={"repository": repository})
@@ -1790,10 +1871,39 @@ def write_model(
     dumped = model.model_dump(
         mode="json", context={"repository": repository} | context, exclude_none=False
     )
+
+    # get encryption key from secret
+    encryption_key = None
+    if encryption_secret := repository.get_data().get("encryption-secret"):
+        secret = repository.get_secret(
+            secret_group=SecretGroup("encryption"), secret_uri=encryption_secret
+        )
+        encryption_key = secret.get_content().get("encryption-key")
+
+    # iterate over all requests and keys to ensure no sensitive data is exposed
     for field, value in dumped.items():
         if value is None:
             repository.delete_field(field)
             continue
+
+        if field == "requests":
+            for request in value:
+                for key in CROSS_MODEL_RELATION_CONSUMER_SECRETS:
+                    if (
+                        (unencrypted_value := request.get(key))
+                        and repository.is_cross_model_relation
+                        and encryption_key
+                    ):
+                        # encrypt sensitive information in cross-model relations
+                        try:
+                            f = Fernet(encryption_key)
+                            request[key] = f.encrypt(unencrypted_value.encode()).decode()
+                        except (AttributeError, InvalidToken, TypeError, ValueError):
+                            logger.warning("Could not encrypt sensitive field in cross-model relation")
+                            request[key] = None
+                    else:
+                        # ensure sensitive information is not leaked unencrypted in relation data
+                        request[key] = None
         dumped_value = value if isinstance(value, str) else json.dumps(value)
         repository.write_field(field, dumped_value)
 
@@ -2196,8 +2306,22 @@ class EventHandlers(Object):
         _diff = diff(old_data, new_data)
 
         if store:
+            # get encryption key to safely store data
+            encryption_key = None
+            if encryption_secret := repository.get_data().get("encryption-secret"):
+                secret = repository.get_secret(
+                    secret_group=SecretGroup("encryption"), secret_uri=encryption_secret
+                )
+                encryption_key = secret.get_content().get("encryption-key")
+
             # Update the databag with the new data for later diff computations
-            store_new_data(relation, self.component, new_data, short_uuid=request.request_id)
+            store_new_data(
+                relation,
+                self.component,
+                new_data,
+                short_uuid=request.request_id,
+                encryption_key=encryption_key,
+            )
 
         return _diff
 
@@ -2283,11 +2407,23 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
                 raise ValueError(f"Cannot change {key} after relation has already been created")
 
     def _dispatch_events(self, event: RelationEvent, _diff: Diff, request: RequirerCommonModel):
-        if self.mtls_enabled and "secret-mtls" in _diff.added:
+        if self.mtls_enabled and ("secret-mtls" in _diff.added or "mtls-cert" in _diff.added):
             getattr(self.on, "mtls_cert_updated").emit(
                 event.relation, app=event.app, unit=event.unit, request=request, old_mtls_cert=None
             )
             return
+
+        if self.mtls_enabled and "mtls-cert" in _diff.changed:
+            old_data = get_encoded_dict(event.relation, self.component, "data")
+            getattr(self.on, "mtls_cert_updated").emit(
+                event.relation,
+                app=event.app,
+                unit=event.unit,
+                request=request,
+                old_mtls_cert=old_data.get("mtls-cert", None),
+            )
+            return
+
         # Emit a resource requested event if the setup key (resource name)
         # was added to the relation databag, but the entity-type key was not.
         if resource_added(_diff) and "entity-type" not in _diff.added:
@@ -2356,6 +2492,14 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
             event.relation, app=event.app, unit=event.unit, requests=request_model.requests
         )
 
+        # get encryption key to safely store data
+        encryption_key = None
+        if encryption_secret := repository.get_data().get("encryption-secret"):
+            secret = repository.get_secret(
+                secret_group=SecretGroup("encryption"), secret_uri=encryption_secret
+            )
+            encryption_key = secret.get_content().get("encryption-key")
+
         # Store all the diffs if they were not already stored.
         for request in request_model.requests:
             new_data = request.model_dump(
@@ -2365,7 +2509,38 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
                 exclude_none=True,
                 exclude_defaults=True,
             )
-            store_new_data(event.relation, self.component, new_data, request.request_id)
+            store_new_data(
+                event.relation,
+                self.component,
+                new_data,
+                request.request_id,
+                encryption_key,
+            )
+
+    def _on_relation_created_event(self, event: RelationCreatedEvent) -> None:
+        """Event emitted when the database relation is created."""
+        super()._on_relation_created_event(event)
+
+        repository = OpsRelationRepository(self.model, event.relation, self.charm.app)
+
+        if not self.charm.unit.is_leader():
+            return
+
+        if not repository.is_cross_model_relation:
+            return
+
+        if repository.get_field("encryption-secret"):
+            return
+
+        # generate relation-specific encryption key
+        # this key will be used to safely store sensitive information from consumer side in relation data
+        # in cross-model relations, this is required because consumer-side secrets are not supported
+        encryption_key = Fernet.generate_key()
+        encryption_secret = repository.add_secret(
+            field="encryption-key", value=encryption_key.decode(), secret_group="encryption"
+        )
+
+        repository.write_field("encryption-secret", encryption_secret.meta.id)
 
     @override
     def _on_secret_changed_event(self, event: SecretChangedEvent) -> None:
@@ -2889,6 +3064,16 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
 
         if not response_model.requests:
             logger.info("Still waiting for data.")
+            if encryption_secret := repository.get_field("encryption-secret"):
+                for request in self._requests:
+                    request.request_id = gen_hash(request.resource, request.salt)
+                # update relation data with encryption secret
+                local_repository = OpsRelationRepository(self.model, event.relation, self.charm.app)
+                local_repository.write_field("encryption-secret", encryption_secret)
+                full_request = RequirerDataContractV1[self._request_model](
+                    version="v1", requests=self._requests
+                )
+                write_model(local_repository, full_request)
             return
 
         data = repository.get_field("data")
