@@ -433,6 +433,7 @@ from typing import (
     overload,
 )
 
+from cryptography.fernet import Fernet, InvalidToken
 from ops import JujuVersion, Model, Secret, SecretInfo, SecretNotFoundError
 from ops.charm import (
     CharmBase,
@@ -488,6 +489,10 @@ MODEL_ERRORS = {
     "no_label_and_uri": "ERROR either URI or label should be used for getting an owned secret but not both",
     "owner_no_refresh": "ERROR secret owner cannot use --refresh",
 }
+
+CROSS_MODEL_RELATION_CONSUMER_SECRETS = [
+    "mtls-cert",
+]
 
 
 ##############################################################################
@@ -1630,9 +1635,28 @@ class Data(ABC):
         if component not in relation.data or relation.data[component] is None:
             return
 
-        if relation:
-            relation.data[component].update(data)
+        if not relation or not data:
+            return
 
+        # ensure no sensitive information is stored in relation data
+        encryption_key = None
+        if encryption_secret := relation.data[relation.app].get("encryption-secret"):
+            # get the encryption secret created on provider side
+            secret = self._model.get_secret(id=encryption_secret)
+            encryption_key = secret.get_content().get("encryption-key")
+
+        if encryption_key and self._model.uuid != relation.remote_model.uuid:
+            for key, value in data.items():
+                try:
+                    f = Fernet(encryption_key)
+                    if key in CROSS_MODEL_RELATION_CONSUMER_SECRETS:
+                        encrypted_value = f.encrypt(value.encode()).decode()
+                        data[key] = encrypted_value
+                except (AttributeError, InvalidToken, TypeError, ValueError):
+                    logger.warning("Could not encrypt sensitive field in cross-model relation")
+                    data[key] = None
+
+        relation.data[component].update(data)
     def _delete_relation_data_without_secrets(
         self, component: Union[Application, Unit], relation: Relation, fields: List[str]
     ) -> None:
@@ -2102,13 +2126,22 @@ class RequirerData(Data):
         self._local_secret_fields = [
             field
             for field in self.SECRET_LABEL_MAP.keys()
-            if field not in self._remote_secret_fields
+            if field not in self._remote_secret_fields and not (field == "mtls-cert" and self.is_cross_model_relation)
         ]
         if additional_secret_fields:
             self._remote_secret_fields += additional_secret_fields
         self.data_component = self.local_unit
 
     # Internal functions
+    @property
+    def is_cross_model_relation(self) -> bool:
+        if len(self.relations) == 0:
+            return False
+
+        if self._model.uuid != self.relations[0].remote_model.uuid:
+            return True
+
+        return False
 
     def _is_resource_created_for_relation(self, relation: Relation) -> bool:
         if not relation.app:
@@ -5621,6 +5654,22 @@ class EtcdRequirerEventHandlers(RequirerEventHandlers):
 
         # Check which data has changed to emit customs events.
         diff = self._diff(event)
+
+        # send request again if encryption secret was added from provider side
+        if "encryption-secret" in diff.added:
+            payload = {
+                "prefix": self.relation_data.prefix,
+                "encryption-secret": event.relation.data[event.relation.app].get("encryption-secret"),
+            }
+            if self.relation_data.mtls_cert:
+                payload["mtls-cert"] = self.relation_data.mtls_cert
+
+            self.relation_data.update_relation_data(
+                event.relation.id,
+                payload,
+            )
+            return
+
         # Register all new secrets with their labels
         if any(newval for newval in diff.added if self.relation_data._is_secret_field(newval)):
             self.relation_data._register_secrets_to_relation(event.relation, diff.added)

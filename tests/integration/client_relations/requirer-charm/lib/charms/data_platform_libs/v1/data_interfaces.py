@@ -464,9 +464,13 @@ def store_new_data(
     for key, value in new_data.items():
         if key in CROSS_MODEL_RELATION_CONSUMER_SECRETS:
             if encryption_key:
-                f = Fernet(encryption_key)
-                encrypted_value = f.encrypt(value.encode()).decode()
-                new_data[key] = encrypted_value
+                try:
+                    f = Fernet(encryption_key)
+                    encrypted_value = f.encrypt(value.encode()).decode()
+                    new_data[key] = encrypted_value
+                except (AttributeError, InvalidToken, TypeError, ValueError):
+                    logger.warning("Could not encrypt sensitive field in cross-model relation")
+                    new_data[key] = None
             else:
                 # ensure sensitive information is not leaked unencrypted in relation data
                 new_data[key] = None
@@ -1566,6 +1570,9 @@ class OpsRepository(AbstractRepository):
     @override
     @property
     def is_cross_model_relation(self) -> bool:
+        if not self.relation:
+            return False
+
         if self.model.uuid != self.relation.remote_model.uuid:
             return True
 
@@ -3064,11 +3071,14 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
 
         if not response_model.requests:
             logger.info("Still waiting for data.")
-            if encryption_secret := repository.get_field("encryption-secret"):
+            local_repository = OpsRelationRepository(self.model, event.relation, self.charm.app)
+            if (
+                (encryption_secret := repository.get_field("encryption-secret"))
+                and not local_repository.get_field("encryption-secret")
+            ):
                 for request in self._requests:
                     request.request_id = gen_hash(request.resource, request.salt)
                 # update relation data with encryption secret
-                local_repository = OpsRelationRepository(self.model, event.relation, self.charm.app)
                 local_repository.write_field("encryption-secret", encryption_secret)
                 full_request = RequirerDataContractV1[self._request_model](
                     version="v1", requests=self._requests

@@ -464,9 +464,13 @@ def store_new_data(
     for key, value in new_data.items():
         if key in CROSS_MODEL_RELATION_CONSUMER_SECRETS:
             if encryption_key:
-                f = Fernet(encryption_key)
-                encrypted_value = f.encrypt(value.encode()).decode()
-                new_data[key] = encrypted_value
+                try:
+                    f = Fernet(encryption_key)
+                    encrypted_value = f.encrypt(value.encode()).decode()
+                    new_data[key] = encrypted_value
+                except (AttributeError, InvalidToken, TypeError, ValueError):
+                    logger.warning("Could not encrypt sensitive field in cross-model relation")
+                    new_data[key] = None
             else:
                 # ensure sensitive information is not leaked unencrypted in relation data
                 new_data[key] = None
@@ -1566,6 +1570,9 @@ class OpsRepository(AbstractRepository):
     @override
     @property
     def is_cross_model_relation(self) -> bool:
+        if not self.relation:
+            return False
+
         if self.model.uuid != self.relation.remote_model.uuid:
             return True
 
@@ -1838,7 +1845,6 @@ def build_model(repository: AbstractRepository, model: type[TCommon] | TypeAdapt
     if (
         repository.is_cross_model_relation
         and data.get("encryption-secret")
-        and data.get("requests")
     ):
         secret = repository.get_secret(
             secret_group=SecretGroup("encryption"), secret_uri=data["encryption-secret"]
@@ -1846,13 +1852,25 @@ def build_model(repository: AbstractRepository, model: type[TCommon] | TypeAdapt
         encryption_key = secret.get_content().get("encryption-key", "")
 
         # decrypt encrypted sensitive information
-        for request in data["requests"]:
+        if data.get("requests"):
+            # v1
+            for request in data["requests"]:
+                try:
+                    f = Fernet(encryption_key)
+                    for field in CROSS_MODEL_RELATION_CONSUMER_SECRETS:
+                        if encrypted_value := request.get(field):
+                            decrypted_value = f.decrypt(encrypted_value.encode()).decode()
+                            request[field] = decrypted_value
+                except (AttributeError, InvalidToken, TypeError, ValueError):
+                    logger.warning("Could not decrypt sensitive field in cross-model relation")
+        else:
+            # v0 backward compatibility
             try:
                 f = Fernet(encryption_key)
                 for field in CROSS_MODEL_RELATION_CONSUMER_SECRETS:
-                    if encrypted_value := request.get(field):
+                    if encrypted_value := data.get(field):
                         decrypted_value = f.decrypt(encrypted_value.encode()).decode()
-                        request[field] = decrypted_value
+                        data[field] = decrypted_value
             except (AttributeError, InvalidToken, TypeError, ValueError):
                 logger.warning("Could not decrypt sensitive field in cross-model relation")
 
@@ -3064,11 +3082,14 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
 
         if not response_model.requests:
             logger.info("Still waiting for data.")
-            if encryption_secret := repository.get_field("encryption-secret"):
+            local_repository = OpsRelationRepository(self.model, event.relation, self.charm.app)
+            if (
+                (encryption_secret := repository.get_field("encryption-secret"))
+                and not local_repository.get_field("encryption-secret")
+            ):
                 for request in self._requests:
                     request.request_id = gen_hash(request.resource, request.salt)
                 # update relation data with encryption secret
-                local_repository = OpsRelationRepository(self.model, event.relation, self.charm.app)
                 local_repository.write_field("encryption-secret", encryption_secret)
                 full_request = RequirerDataContractV1[self._request_model](
                     version="v1", requests=self._requests
