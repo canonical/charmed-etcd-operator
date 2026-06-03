@@ -296,11 +296,15 @@ def test_add_ecr_user_creation_failed(cluster_tls_context, mtls_cert):
             "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
+        patch(
+            "events.external_clients.ExternalClientsEvents._update_client_truststore"
+        ) as update_truststore,
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
         ecr_relation = state_out.get_relation(ecr_relation.id)
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
+        update_truststore.assert_called_once()
         assert state_out.app_status == as_status(
             ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value
         )
@@ -445,12 +449,14 @@ def test_add_ecr_existing_user_in_leader(cluster_tls_context, mtls_cert):
     with (
         ctx(ctx.on.relation_changed(ecr_relation), state_in) as manager,
         patch("common.client.EtcdClient.get_user", return_value={"name": CLIENT_COMMON_NAME}),
-        patch("managers.tls.TLSManager.update_cas") as update_cas,
+        patch(
+            "events.external_clients.ExternalClientsEvents._update_client_truststore"
+        ) as update_truststore,
     ):
         charm: EtcdOperatorCharm = manager.charm
         manager.run()
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
-        update_cas.assert_not_called()
+        update_truststore.assert_called_once()
 
 
 def test_ecr_update_common_name_leader(cluster_tls_context, mtls_cert, mtls_cert_diff_common_name):
@@ -1276,9 +1282,13 @@ def test_add_ecr_invalid_cert(cluster_tls_context, ca_cert):
             "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
+        patch(
+            "events.external_clients.ExternalClientsEvents._update_client_truststore"
+        ) as update_truststore,
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
+        update_truststore.assert_called_once()
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
         assert state_out.app_status == as_status(
             ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value
@@ -1313,9 +1323,13 @@ def test_add_ecr_invalid_cert_no_basic_constraints(
             "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificates",
             return_value=([server_cert], MagicMock()),
         ),
+        patch(
+            "events.external_clients.ExternalClientsEvents._update_client_truststore"
+        ) as update_truststore,
     ):
         charm: EtcdOperatorCharm = manager.charm
         state_out = manager.run()
+        update_truststore.assert_called_once()
         assert ecr_relation.id not in charm.state.cluster.model.managed_users
         assert state_out.app_status == as_status(
             ExternalClientsStatuses.EC_INVALID_CERTIFICATE.value

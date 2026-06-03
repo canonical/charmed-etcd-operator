@@ -12,3 +12,4 @@ websocket-client==1.9.0
 zipp==3.23.0
 charmlibs-interfaces-tls-certificates>=1.0
 charmlibs-snap>=1.0
+dpcharmlibs-interfaces @ git+https://github.com/reneradoi/data-platform-charmlibs.git@encryption-for-cross-model-consumer-secrets#subdirectory=interfaces
