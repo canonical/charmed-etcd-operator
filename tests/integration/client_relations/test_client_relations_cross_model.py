@@ -144,7 +144,6 @@ def test_relate_client_charm(juju_vm_model: Juju, requirer_model: Juju) -> None:
         lambda status: are_apps_active_and_agents_idle(status, APP_NAME, idle_period=30)
     )
 
-
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME, tls_enabled=True)
     download_client_certificate_from_unit(juju_vm_model, APP_NAME)
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
