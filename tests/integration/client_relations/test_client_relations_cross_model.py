@@ -45,9 +45,10 @@ def requirer_charm(arch: str) -> str:
 
 
 @pytest.fixture(scope="module")
-def requirer_model(juju: Juju, lxd_cloud: str, lxd_controller: str):
+def requirer_model(juju: Juju, lxd_cloud: str, lxd_controller: str, arch: str):
     with temp_model(cloud=lxd_cloud, controller=lxd_controller) as req_model:
         req_model.wait_timeout = 1000
+        req_model.cli("set-model-constraints", f"arch={arch}")
         yield req_model
 
 
