@@ -14,7 +14,8 @@ from charms.data_platform_libs.v0.data_interfaces import (
     EtcdReadyEvent,
 )
 from charms.data_platform_libs.v0.data_interfaces import EtcdRequires as EtcdRequiresV0Base
-from charms.data_platform_libs.v1.data_interfaces import (
+from constants import SNAP_DIR
+from dpcharmlibs.interfaces import (
     DataContractV1,
     RequirerCommonModel,
     RequirerDataContractV1,
@@ -24,7 +25,6 @@ from charms.data_platform_libs.v1.data_interfaces import (
     ResourceRequirerEventHandler,
     build_model,
 )
-from constants import SNAP_DIR
 
 if TYPE_CHECKING:
     from charm import RequirerCharm

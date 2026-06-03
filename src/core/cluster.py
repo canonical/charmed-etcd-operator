@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, Dict, Set
 from charmlibs.interfaces.tls_certificates import (
     ProviderCertificate,
 )
-from charms.data_platform_libs.v1.data_interfaces import (
+from data_platform_helpers.advanced_statuses.protocol import StatusesState, StatusesStateProtocol
+from dpcharmlibs.interfaces import (
     OpsOtherPeerUnitRepositoryInterface,
     OpsPeerRepositoryInterface,
     OpsPeerUnitRepositoryInterface,
@@ -18,7 +19,6 @@ from charms.data_platform_libs.v1.data_interfaces import (
     RequirerCommonModel,
     ResourceProviderEventHandler,
 )
-from data_platform_helpers.advanced_statuses.protocol import StatusesState, StatusesStateProtocol
 from ops import ModelError, Object, Relation, SecretNotFoundError, Unit
 
 from core.models import EtcdCluster, EtcdServer, PeerAppModel, PeerUnitModel

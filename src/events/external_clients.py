@@ -12,7 +12,7 @@ from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificatesRemovedEvent,
     CertificateTransferRequires,
 )
-from charms.data_platform_libs.v1.data_interfaces import (
+from dpcharmlibs.interfaces import (
     BulkResourcesRequestedEvent,
     MtlsCertUpdatedEvent,
     RequirerCommonModel,
