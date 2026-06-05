@@ -131,7 +131,7 @@ def test_build_and_deploy(
     requirer_model.wait(lambda status: are_apps_active_and_agents_idle(status, REQUIRER_NAME))
 
 
-# @pytest.mark.v0
+@pytest.mark.v0
 @pytest.mark.v1
 def test_relate_client_charm(juju_vm_model: Juju, requirer_model: Juju) -> None:
     """Test normal client charm relation."""
@@ -188,7 +188,7 @@ def test_relate_client_charm(juju_vm_model: Juju, requirer_model: Juju) -> None:
             assert mtls_cert in client_cas, f"mtls cert not in trusted CAs for {unit_name}"
 
 
-# @pytest.mark.v0
+@pytest.mark.v0
 @pytest.mark.v1
 def test_write_read_with_requirer(juju_vm_model: Juju, requirer_model: Juju) -> None:
     """Test write and read to the key prefix with the requirer charm."""
@@ -230,7 +230,7 @@ def test_write_read_with_requirer(juju_vm_model: Juju, requirer_model: Juju) -> 
         assert result == f"{key}\n{TEST_VALUE}"
 
 
-# @pytest.mark.v0
+@pytest.mark.v0
 @pytest.mark.v1
 def test_update_mtls_cert(juju_vm_model: Juju, requirer_model: Juju) -> None:
     """Test updating the common name used by the requirer app."""
