@@ -760,7 +760,7 @@ pydantic = ">=2.11,<3"
 type = "git"
 url = "https://github.com/reneradoi/data-platform-charmlibs.git"
 reference = "encryption-for-cross-model-consumer-secrets"
-resolved_reference = "95a8644cc82457da56d03f9b8b13e6425d1f6f2f"
+resolved_reference = "b04a9e876e9f5834e9449957da6cf7849b4ae77a"
 subdirectory = "interfaces"
 
 [[package]]

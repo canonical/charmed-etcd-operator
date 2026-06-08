@@ -192,11 +192,6 @@ class ExternalClientsEvents(Object):
                         logger.debug("User is already being added for this relation")
                     else:
                         logger.error("User already exists")
-                    # in cross-model relations, the mtls-cert is not stored in a secret
-                    # other units will not receive a secret-changed/mtls-cert-updated event
-                    # trigger peer-relation change instead to ensure all units update their truststore
-                    self.charm.state.cluster.update({"client_user_epoch": time.time()})
-                    self._update_client_truststore()
                     return
 
                 if relation_managed_user is None:
@@ -223,6 +218,10 @@ class ExternalClientsEvents(Object):
             return
 
         self._update_client_truststore()
+        # in cross-model relations, the mtls-cert is not stored in a secret
+        # other units will not receive a secret-changed/mtls-cert-updated event
+        # trigger peer-relation change instead to ensure all units update their truststore
+        self.charm.state.cluster.update({"client_user_epoch": time.time()})
 
         self.charm.state.statuses.delete(
             ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value,
