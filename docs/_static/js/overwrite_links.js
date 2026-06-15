@@ -1,5 +1,5 @@
 // Replace oldDomain with newDomain
-const oldDomain = 'canonical-charmed-etcd.readthedocs-hosted.com';
+const oldDomain = 'canonical-charmed-etcd-new.readthedocs-hosted.com';
 const newDomain = 'canonical.com/data/etcd/docs';
 
 function escapeRegExp(value) {
