@@ -20,8 +20,7 @@ charmlibs-interfaces-tls-certificates = ">=1.0"
 charmlibs-snap = "^1.0.1"
 charmlibs-systemd = "^1.0.0"
 charmlibs-pathops = "^1.2.1"
-# dpcharmlibs-interfaces = ">=1.1.0"
-dpcharmlibs-interfaces = { git = "https://github.com/reneradoi/data-platform-charmlibs.git", branch = "encryption-for-cross-model-consumer-secrets", subdirectory = "interfaces" }
+dpcharmlibs-interfaces = ">=1.1.0"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"

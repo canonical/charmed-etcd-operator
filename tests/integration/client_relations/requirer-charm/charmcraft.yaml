@@ -8,7 +8,6 @@ parts:
   charm:
     plugin: charm
     build-packages:
-      - git # todo: remove again
       - libffi-dev # Needed to build Python dependencies with Rust from source
       - libssl-dev # Needed to build Python dependencies with Rust from source
       - pkg-config # Needed to build Python dependencies with Rust from source
