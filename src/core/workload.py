@@ -216,13 +216,13 @@ class WorkloadBase(ABC):
 
     def get_public_ip(self) -> str | None:
         """Get the Public IP address of the current unit."""
-        cmd = "unit-get public-address"
+        cmd = ["unit-get", "public-address"]
         try:
             output = subprocess.run(
                 cmd,
                 check=True,
                 text=True,
-                shell=True,
+                shell=False,
                 capture_output=True,
                 timeout=10,
             )
@@ -237,13 +237,13 @@ class WorkloadBase(ABC):
 
     def get_private_ip(self) -> str:
         """Get the Private IP address of the current unit."""
-        cmd = "unit-get private-address"
+        cmd = ["unit-get", "private-address"]
         try:
             output = subprocess.run(
                 cmd,
                 check=True,
                 text=True,
-                shell=True,
+                shell=False,
                 capture_output=True,
                 timeout=10,
             )
