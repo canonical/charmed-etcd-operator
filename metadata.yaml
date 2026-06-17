@@ -50,7 +50,7 @@ requires:
     limit: 1
     optional: true
   azure-credentials:
-    interface: azure
+    interface: azure_storage
     limit: 1
     optional: true
 
