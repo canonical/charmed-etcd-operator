@@ -25,6 +25,7 @@ from common.certificates import is_leaf_certificate_valid, leaf_certificate
 from core.cluster import ClusterState
 from core.workload import WorkloadBase
 from literals import (
+    SNAP_USER_NAME,
     SUBSTRATES,
     TLS_CLIENT_PRIVATE_KEY_CONFIG,
     TLS_PEER_PRIVATE_KEY_CONFIG,
@@ -87,7 +88,13 @@ class TLSManager(ManagerStatusProtocol):
             private_key_path = self.workload.paths.tls.peer_key
 
         self.add_trusted_ca(ca_cert.raw, cert_type)
-        self.workload.write_file(private_key.raw, private_key_path)
+        self.workload.write_file(
+            content=private_key.raw,
+            path=private_key_path,
+            mode=0o600,
+            user=SNAP_USER_NAME,
+            group=SNAP_USER_NAME,
+        )
         self.workload.write_file(certificate.certificate.raw, certificate_path)
         self.set_cert_state(cert_type, is_ready=True)
 

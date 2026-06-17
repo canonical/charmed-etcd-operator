@@ -17,6 +17,7 @@ SNAP_LOG_PATH = "/var/snap/charmed-etcd/common/var/log/etcd"
 SNAP_ARCHIVE_PATH = "/var/snap/charmed-etcd/common/archive"
 SNAP_CONFIG_PATH = "/var/snap/charmed-etcd/current"
 SNAP_USER = 584788
+SNAP_USER_NAME = "snap_daemon"
 SNAP_GROUP = "root"
 CONFIG_FILE = "/var/snap/charmed-etcd/current/etcd.conf.yml"
 TLS_ROOT_DIR = "/var/snap/charmed-etcd/current/tls"

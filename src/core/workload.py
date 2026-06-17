@@ -268,15 +268,25 @@ class WorkloadBase(ABC):
 
         return {"hostname": hostname, "private_ip": private_ip, "public_ip": public_ip}
 
-    def write_file(self, content: str, path: PathProtocol) -> None:
+    def write_file(
+        self,
+        content: str,
+        path: PathProtocol,
+        mode: int | None = None,
+        user: str | None = None,
+        group: str | None = None,
+    ) -> None:
         """Write the given content to the specified file path, creating parent directories if needed.
 
         Args:
             content (str): The content to write to the file.
             path (PathProtocol): The file path where the content will be written.
+            mode (int, optional): The file mode (permissions). Defaults to None.
+            user (str, optional): The user name. Defaults to None.
+            group (str, optional): The group name. Defaults to None.
         """
         path.parent.mkdir(exist_ok=True, parents=True)
-        path.write_text(content)
+        path.write_text(content, mode=mode, user=user, group=group)
 
     def load_yaml_file(self, path: PathProtocol) -> Dict[str, Any]:
         """Load a YAML file from the given path.
