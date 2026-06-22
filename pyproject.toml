@@ -20,6 +20,7 @@ charmlibs-interfaces-tls-certificates = ">=1.0"
 charmlibs-snap = "^1.0.1"
 charmlibs-systemd = "^1.0.0"
 charmlibs-pathops = "^1.2.1"
+dpcharmlibs-interfaces = ">=1.1.0"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
@@ -30,7 +31,7 @@ ops = ">=2.0.0"
 # data_platform_libs/v0/upgrade.py
 poetry-core = "*"
 # tls_certificates_interface/v4/tls_certificates.py
-cryptography = "==46.0.7"
+cryptography = ">=48.0.0"
 pydantic = ">= 1.0"
 cosl = ">= 0.0.50"
 

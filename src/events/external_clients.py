@@ -5,6 +5,7 @@
 """External clients related event handlers."""
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from charms.certificate_transfer_interface.v1.certificate_transfer import (
@@ -12,7 +13,7 @@ from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificatesRemovedEvent,
     CertificateTransferRequires,
 )
-from charms.data_platform_libs.v1.data_interfaces import (
+from dpcharmlibs.interfaces import (
     BulkResourcesRequestedEvent,
     MtlsCertUpdatedEvent,
     RequirerCommonModel,
@@ -86,7 +87,7 @@ class ExternalClientsEvents(Object):
         for request in event.requests:
             if not request.mtls_cert:
                 logger.error("mTLS certificate not provided")
-                invalid_requests.append(request)
+                invalid_requests.append(request.request_id)
                 continue
 
             common_name = self.charm.external_clients_manager.get_common_name_from_chain(
@@ -96,7 +97,7 @@ class ExternalClientsEvents(Object):
             # validate leaf certificate
             if not is_leaf_certificate_valid(request.mtls_cert):
                 logger.error("Invalid end-entity certificate for user %s", common_name)
-                invalid_requests.append(request)
+                invalid_requests.append(request.request_id)
                 continue
 
             relation_managed_user = self.charm.external_clients_manager.get_relation_managed_user(
@@ -105,11 +106,15 @@ class ExternalClientsEvents(Object):
 
             if relation_managed_user and relation_managed_user == common_name:
                 logger.warning("User already created for this request in the relation")
+                # in cross-model relations, the mtls-cert is not stored in a secret
+                # other units will not receive a secret-changed/mtls-cert-updated event
+                # trigger peer-relation change instead to ensure all units update their truststore
+                self.charm.state.cluster.update({"client_user_epoch": time.time()})
                 continue
 
             if self.charm.cluster_manager.get_user(common_name) is not None:
                 logger.error("User already exists in database for another request")
-                invalid_requests.append(request)
+                invalid_requests.append(request.request_id)
                 continue
 
             if relation_managed_user:
@@ -129,7 +134,8 @@ class ExternalClientsEvents(Object):
             )
         if responses:
             self.etcd_provides.set_responses(event.relation.id, responses)
-            self._update_client_truststore()
+
+        self._update_client_truststore()
 
         if invalid_requests:
             logger.error("Invalid requests found: %s", invalid_requests)
@@ -212,6 +218,10 @@ class ExternalClientsEvents(Object):
             return
 
         self._update_client_truststore()
+        # in cross-model relations, the mtls-cert is not stored in a secret
+        # other units will not receive a secret-changed/mtls-cert-updated event
+        # trigger peer-relation change instead to ensure all units update their truststore
+        self.charm.state.cluster.update({"client_user_epoch": time.time()})
 
         self.charm.state.statuses.delete(
             ExternalClientsStatuses.EC_USER_MANAGEMENT_ERROR.value,
