@@ -17,6 +17,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed
 
 from literals import (
     CLIENT_PORT,
+    CLIENT_TLS_RELATION_NAME,
     INTERNAL_USER,
     INTERNAL_USER_PASSWORD_CONFIG,
     TLS_ROOT_DIR,
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
 TLS_NAME = "self-signed-certificates"
+TLSLIBID = "afd8c2bccf834997afce12c2706d2ede"
 GRAFANA_AGENT_APP_NAME = "grafana-agent"
 COS_CHANNEL = "1/stable"
 LOKI_APP_NAME = "loki"
@@ -352,8 +354,15 @@ def download_client_certificate_from_unit(juju: Juju, app_name: str = APP_NAME) 
 
     tls_path = TLS_ROOT_DIR
 
-    for file in ["client.pem", "client.key", "client_ca.pem"]:
+    for file in ["client.pem", "client_ca.pem"]:
         juju.scp(f"{unit}:{tls_path}/{file}", file)
+
+    private_key = get_secret_by_label(
+        juju, label=f"{TLSLIBID}-private-key-{unit.split('/')[1]}-{CLIENT_TLS_RELATION_NAME}"
+    )["private-key"]
+
+    with open("client.key", "w") as f:
+        f.write(private_key)
 
 
 def get_storage_id(juju: Juju, unit_name: str, storage_name: str) -> str | None:

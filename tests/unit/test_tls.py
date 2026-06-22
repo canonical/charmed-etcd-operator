@@ -1727,7 +1727,6 @@ def test_set_extra_sans_config_option():
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("workload.EtcdWorkload.exec", return_value=current_sans_value),
         patch("workload.EtcdWorkload.get_host_mapping", return_value={"hostname": "myhostname"}),
-        patch("workload.EtcdWorkload.get_private_ip", return_value="127.0.1.1"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
         # no RefreshTLSCertificatesEvent must be emitted
@@ -1825,7 +1824,6 @@ def test_set_domain_config_option():
         patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
         patch("workload.EtcdWorkload.exec", return_value=current_sans_value),
         patch("workload.EtcdWorkload.get_host_mapping", return_value={"hostname": "myhostname"}),
-        patch("workload.EtcdWorkload.get_private_ip", return_value="127.0.1.1"),
         patch("subprocess.run"),
     ):
         state_out = ctx.run(ctx.on.config_changed(), state_in)
