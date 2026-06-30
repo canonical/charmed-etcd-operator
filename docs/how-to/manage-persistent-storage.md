@@ -22,7 +22,7 @@ The following document will explain how to reuse storage volumes in charmed etcd
 
 ## Prerequisites
 The storage volumes that can be attached to charmed etcd depend on the storage providers available in the cloud where
-charmed etcd gets deployed. Please refer to the documentation about [Juju storage](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/storage)
+charmed etcd gets deployed. Please refer to the documentation about [Juju storage](https://canonical.com/juju/docs/juju-cli/3.6/reference/storage/)
 for more information on possible providers.
 
 ## Create a storage pool
@@ -52,7 +52,7 @@ rootfs        rootfs
 tmpfs         tmpfs
 ```     
 
-Details about how to manage storage pools with Juju can be found [in this guide](https://canonical-juju.readthedocs-hosted.com/en/latest/user/howto/manage-storage-pools/#manage-storage-pools).
+Details about how to manage storage pools with Juju can be found [in this guide](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-storage-pools/).
 
 ## Deploy with persistent storage
 The decision about using the persistent storage feature of charmed etcd has to be made at deploy time. In order to create
