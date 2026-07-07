@@ -396,7 +396,7 @@ class EtcdEvents(Object):
             cluster_members = self.charm.state.cluster.model.cluster_members.split(",")
             # re-assemble the string without the departing unit
             updated_cluster_members = ",".join(
-                m for m in cluster_members if event.unit.name.replace("/", "") not in m
+                m for m in cluster_members if m.split("=")[0] != event.unit.name.replace("/", "")
             )
             self.charm.state.cluster.update({"cluster_members": updated_cluster_members})
 

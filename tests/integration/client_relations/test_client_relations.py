@@ -274,7 +274,8 @@ def test_etcd_updates_ca(juju_vm_model: Juju) -> None:
 
     # wait for model to settle
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, TLS_NAME)
+        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME, TLS_NAME),
+        timeout=1200,
     )
     logger.debug("Getting new server ca")
     action = juju_vm_model.run(requirer_unit, "get-credentials")

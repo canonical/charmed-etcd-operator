@@ -140,6 +140,16 @@ def mock_is_cluster_failed(mocker):
     )
 
 
+@pytest.fixture(autouse=True)  # autouse=True makes this fixture run for all tests in the module
+def mock_get_private_ip(mocker):
+    mocker.patch("workload.EtcdWorkload.get_private_ip", return_value="127.0.1.1")
+
+
+@pytest.fixture(autouse=True)  # autouse=True makes this fixture run for all tests in the module
+def mock_get_public_ip(mocker):
+    mocker.patch("workload.EtcdWorkload.get_public_ip", return_value="192.168.1.100")
+
+
 @pytest.fixture(autouse=True)
 def mock_refresh():
     """Fixture for refresh logic and events."""

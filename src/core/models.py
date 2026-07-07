@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, final
 
 from charmlibs.interfaces.tls_certificates import PrivateKey
-from charms.data_platform_libs.v1.data_interfaces import (
+from dpcharmlibs.interfaces import (
     ExtraSecretStr,
     OpsOtherPeerUnitRepositoryInterface,
     OpsPeerRepositoryInterface,

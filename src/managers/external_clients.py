@@ -8,12 +8,12 @@ import logging
 from pathlib import Path
 
 from charmlibs.interfaces.tls_certificates import Certificate, TLSCertificatesError
-from charms.data_platform_libs.v1.data_interfaces import (
-    ResourceProviderModel,
-)
 from data_platform_helpers.advanced_statuses.models import StatusObject
 from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
 from data_platform_helpers.advanced_statuses.types import Scope
+from dpcharmlibs.interfaces import (
+    ResourceProviderModel,
+)
 
 from common.certificates import is_leaf_certificate_valid
 from core.cluster import ClusterState
