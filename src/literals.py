@@ -117,3 +117,5 @@ class TuningOptions(StrEnum):
     ELECTION_TIMEOUT_CONFIG = "election-timeout"
     HEARTBEAT_INTERVAL_CONFIG = "heartbeat-interval"
     QUOTA_BACKEND_BYTES_CONFIG = "quota-backend-bytes"
+    AUTO_COMPACTION_MODE = "auto-compaction-mode"
+    AUTO_COMPACTION_RETENTION = "auto-compaction-retention"

@@ -173,6 +173,19 @@ class ConfigManager(ManagerStatusProtocol):
         Returns:
             bool: True if tuning config values are valid, False if invalid.
         """
+        if not self._are_timeout_parameters_valid():
+            return False
+
+        if not self._is_backend_quota_valid():
+            return False
+
+        if not self._are_compaction_parameters_valid():
+            return False
+
+        return True
+
+    def _are_timeout_parameters_valid(self) -> bool:
+        """Validate configuration for heartbeat-interval and election timeout."""
         if heartbeat_interval := self.config.get(TuningOptions.HEARTBEAT_INTERVAL_CONFIG.value):
             if heartbeat_interval < 10 or heartbeat_interval > 5000:
                 logger.error(
@@ -190,6 +203,10 @@ class ConfigManager(ManagerStatusProtocol):
                 )
                 return False
 
+        return True
+
+    def _is_backend_quota_valid(self) -> bool:
+        """Validate configuration for backend quota."""
         # avoid recalculating quota_backend_bytes multiple times
         quota_backend_bytes = self.quota_backend_bytes
         if quota_backend_bytes is None:
@@ -198,6 +215,7 @@ class ConfigManager(ManagerStatusProtocol):
                 self.config.get(TuningOptions.QUOTA_BACKEND_BYTES_CONFIG.value),
             )
             return False
+
         if quota_backend_bytes < MIN_QUOTA_BACKEND_BYTES:
             logger.error(
                 "Quota backend bytes too low: %s. Minimum is %s.",
@@ -219,6 +237,35 @@ class ConfigManager(ManagerStatusProtocol):
                 "The deployment's quota-backend-bytes value is %s - consider applying constraints and/or setting the right lxd storage driver",
                 quota_backend_bytes,
             )
+
+        return True
+
+    def _are_compaction_parameters_valid(self) -> bool:
+        """Validate configuration for auto-compaction."""
+        compaction_mode = self.config.get(TuningOptions.AUTO_COMPACTION_MODE.value)
+        compaction_retention = self.config.get(TuningOptions.AUTO_COMPACTION_RETENTION.value)
+        if compaction_mode not in ["periodic", "revision"]:
+            logger.error("Auto-compaction-mode is invalid, must be 'periodic' or 'revision'")
+            return False
+
+        if compaction_mode == "periodic" and not compaction_retention.endswith(("h", "m")):
+            logger.error(
+                "Auto-compaction-retention invalid, must be 'h' for hours or 'm' for minutes"
+            )
+            return False
+
+        if compaction_retention == "0" or compaction_retention.strip("h").strip("m") == "0":
+            logger.error("Auto-compaction-retention is invalid, must not be 0")
+            return False
+
+        if compaction_mode == "revision":
+            try:
+                int(compaction_retention)
+            except ValueError:
+                logger.error(
+                    "Auto-compaction-retention invalid, must be a number in revision-mode"
+                )
+                return False
 
         return True
 
