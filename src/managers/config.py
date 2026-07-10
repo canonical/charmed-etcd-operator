@@ -251,7 +251,6 @@ class ConfigManager(ManagerStatusProtocol):
             return False
 
         # accept numerical values or numerical values ending with "h" or "m"
-        # ensure exactly one match
         pattern = re.compile(r"^\d+[hm]?$")
         if not pattern.findall(compaction_retention):
             logger.error(
