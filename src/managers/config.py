@@ -5,6 +5,7 @@
 """Manager for handling configuration building + writing."""
 
 import logging
+import re
 from pathlib import Path
 
 import yaml
@@ -242,10 +243,20 @@ class ConfigManager(ManagerStatusProtocol):
 
     def _are_compaction_parameters_valid(self) -> bool:
         """Validate configuration for auto-compaction."""
-        compaction_mode = self.config.get(TuningOptions.AUTO_COMPACTION_MODE.value)
-        compaction_retention = self.config.get(TuningOptions.AUTO_COMPACTION_RETENTION.value)
+        compaction_mode = str(self.config.get(TuningOptions.AUTO_COMPACTION_MODE.value))
+        compaction_retention = str(self.config.get(TuningOptions.AUTO_COMPACTION_RETENTION.value))
+
         if compaction_mode not in ["periodic", "revision"]:
             logger.error("Auto-compaction-mode is invalid, must be 'periodic' or 'revision'")
+            return False
+
+        # accept numerical values or numerical values ending with "h" or "m"
+        # ensure exactly one match
+        pattern = re.compile(r"^\d+[hm]?$")
+        if not pattern.findall(compaction_retention):
+            logger.error(
+                "Auto-compaction-retention invalid, must be numerical value or 'h' for hours or 'm' for minutes"
+            )
             return False
 
         if compaction_mode == "periodic" and not compaction_retention.endswith(("h", "m")):
@@ -254,18 +265,13 @@ class ConfigManager(ManagerStatusProtocol):
             )
             return False
 
+        if compaction_mode == "revision" and compaction_retention.endswith(("h", "m")):
+            logger.error("Auto-compaction-retention invalid, must be numerical in revision mode")
+            return False
+
         if compaction_retention == "0" or compaction_retention.strip("h").strip("m") == "0":
             logger.error("Auto-compaction-retention is invalid, must not be 0")
             return False
-
-        if compaction_mode == "revision":
-            try:
-                int(compaction_retention)
-            except ValueError:
-                logger.error(
-                    "Auto-compaction-retention invalid, must be a number in revision-mode"
-                )
-                return False
 
         return True
 

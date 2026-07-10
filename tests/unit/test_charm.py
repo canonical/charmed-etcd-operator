@@ -871,6 +871,38 @@ def test_config_options_compaction_invalid():
                 ConfigStatuses.TUNING_CONFIG_INVALID.value,
             )
 
+    # do not allow spaces between time and unit
+    state_in = testing.State(
+        secrets=[secret],
+        config={
+            INTERNAL_USER_PASSWORD_CONFIG: secret.id,
+            TuningOptions.AUTO_COMPACTION_MODE.value: "periodic",
+            TuningOptions.AUTO_COMPACTION_RETENTION.value: "2 h",
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    with ctx(ctx.on.config_changed(), state_in) as manager:
+        charm: EtcdOperatorCharm = manager.charm
+        with (
+            patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+            patch("subprocess.run"),
+            patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+            patch("common.client.EtcdClient.broadcast_peer_url"),
+            patch("workload.EtcdWorkload.write_file"),
+            patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+        ):
+            state_out = manager.run()
+
+            tuning_config = yaml.safe_load(charm.config_manager.config_properties)
+            assert tuning_config["auto-compaction-mode"] == "periodic"
+            assert tuning_config["auto-compaction-retention"] == "1"
+            assert status_is(
+                state_out,
+                ConfigStatuses.TUNING_CONFIG_INVALID.value,
+            )
+
     # do not allow disabling in periodic mode
     state_in = testing.State(
         secrets=[secret],
@@ -910,6 +942,38 @@ def test_config_options_compaction_invalid():
             INTERNAL_USER_PASSWORD_CONFIG: secret.id,
             TuningOptions.AUTO_COMPACTION_MODE.value: "revision",
             TuningOptions.AUTO_COMPACTION_RETENTION.value: "1h",
+        },
+        relations={relation},
+        leader=True,
+    )
+
+    with ctx(ctx.on.config_changed(), state_in) as manager:
+        charm: EtcdOperatorCharm = manager.charm
+        with (
+            patch("workload.EtcdWorkload.load_yaml_file", return_value=current_config_file),
+            patch("subprocess.run"),
+            patch("common.client.EtcdClient.member_list", return_value=MEMBER_LIST_DICT),
+            patch("common.client.EtcdClient.broadcast_peer_url"),
+            patch("workload.EtcdWorkload.write_file"),
+            patch("managers.cluster.ClusterManager.restart_member", return_value=True),
+        ):
+            state_out = manager.run()
+
+            tuning_config = yaml.safe_load(charm.config_manager.config_properties)
+            assert tuning_config["auto-compaction-mode"] == "periodic"
+            assert tuning_config["auto-compaction-retention"] == "1"
+            assert status_is(
+                state_out,
+                ConfigStatuses.TUNING_CONFIG_INVALID.value,
+            )
+
+    # invalid compaction retention because multiple values
+    state_in = testing.State(
+        secrets=[secret],
+        config={
+            INTERNAL_USER_PASSWORD_CONFIG: secret.id,
+            TuningOptions.AUTO_COMPACTION_MODE.value: "periodic",
+            TuningOptions.AUTO_COMPACTION_RETENTION.value: "1m1h",
         },
         relations={relation},
         leader=True,
