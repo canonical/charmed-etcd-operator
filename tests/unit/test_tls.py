@@ -831,6 +831,8 @@ def test_set_tls_private_key():
         "election-timeout": 1000,
         "heartbeat-interval": 100,
         "quota-backend-bytes": 8589934592,
+        "auto-compaction-mode": "periodic",
+        "auto-compaction-retention": "1h",
     }
 
     with (
@@ -1015,6 +1017,8 @@ def test_set_tls_private_key():
         "election-timeout": 1000,
         "heartbeat-interval": 100,
         "quota-backend-bytes": 8589934592,
+        "auto-compaction-mode": "periodic",
+        "auto-compaction-retention": "1h",
     }
 
     with (
@@ -1123,6 +1127,8 @@ def test_set_tls_private_key():
         "election-timeout": 1000,
         "heartbeat-interval": 100,
         "quota-backend-bytes": 8589934592,
+        "auto-compaction-mode": "periodic",
+        "auto-compaction-retention": "1h",
     }
 
     with (
@@ -1586,6 +1592,8 @@ def test_set_extra_sans_config_option():
         "election-timeout": 1000,
         "heartbeat-interval": 100,
         "quota-backend-bytes": 8589934592,
+        "auto-compaction-mode": "periodic",
+        "auto-compaction-retention": "1h",
     }
 
     # happy path
@@ -1753,6 +1761,8 @@ def test_set_domain_config_option():
         "election-timeout": 1000,
         "heartbeat-interval": 100,
         "quota-backend-bytes": 8589934592,
+        "auto-compaction-mode": "periodic",
+        "auto-compaction-retention": "1h",
     }
 
     # happy path

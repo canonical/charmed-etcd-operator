@@ -74,4 +74,19 @@ options:
       The community-recommended maximum is 8 GiB. 
       A minimum of 100MiB is enforced. 
       WARNING: The LXD 'dir' storage driver exposes the host's total disk space to containers, which 
-      can cause inaccurate quota calculations. 
+      can cause inaccurate quota calculations.
+
+  auto-compaction-mode:
+    type: string
+    default: "periodic"
+    description: |
+      The compaction mode to apply on the etcd keyspace. The possible values are "periodic" or "revision"; 
+      "periodic" for duration based retention, "revision" for revision number based retention.
+
+  auto-compaction-retention:
+    type: string
+    default: "1h"
+    description: |
+      Specifies how much history to keep when compacting the keyspace. Supported time units are "h"
+      for hours or "m" for minutes in case of periodic compaction. If the compaction mode is set to
+      "revision", this option defines how many revisions to keep.
