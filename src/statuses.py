@@ -93,7 +93,7 @@ class ConfigStatuses(Enum):
 
     TUNING_CONFIG_INVALID = StatusObject(
         status="blocked",
-        message="Invalid value for tuning config option, see debug-log for details",
+        message="Invalid value(s) set on the tuning config option(s), see debug-log for details",
     )
 
 
