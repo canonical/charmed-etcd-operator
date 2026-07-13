@@ -166,3 +166,9 @@ def mock_refresh():
         patch("charm.MachinesEtcdRefresh", Mock(return_value=None)),
     ):
         yield
+
+
+@pytest.fixture(autouse=True)
+def mock_snap_cache(mocker):
+    """Fixture to mock calls to the snap store in unit tests."""
+    mocker.patch("charmlibs.snap._snap.SnapCache")

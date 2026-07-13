@@ -105,6 +105,27 @@ A minimum of 100MiB is enforced.
 
 For more information, please refer to the [official etcd docs](https://etcd.io/docs/v3.6/op-guide/maintenance/#space-quota).
 
+## Auto-compaction
+
+Charmed etcd makes use of auto-compaction to periodically compact the keyspace of the database
+and avoid performance degradation and eventual storage space exhaustion. It applies default settings
+for all deployments to compact the keyspace periodically and keep one hour of history.
+
+To adjust these settings for specific use-cases, set the following configuration options:
+- `auto-compaction-mode`
+- `auto-compaction-retention`
+
+With the `auto-compaction-mode` configuration, the compaction mode is defined. Possible values are 
+"periodic" or "revision"; "periodic" for duration based retention, "revision" for revision number based retention.
+
+The retention policy for the history compaction is configured with `auto-compaction-retention`. 
+This setting specifies how much history to keep when compacting the keyspace. Supported time units
+are "h" for hours or "m" for minutes in case of periodic compaction. If the compaction mode is set 
+to "revision", this option defines how many revisions to keep.
+
+As a safeguard to avoid storage exhaustion, a configuration value of `0` for `auto-compaction-retention`
+will not be accepted.
+
 ## Certificate SANs configuration
 
 ```{attention}
