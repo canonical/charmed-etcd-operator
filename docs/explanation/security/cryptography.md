@@ -45,7 +45,7 @@ In Charmed etcd, authentication layers can be enabled for:
 
 Authentication of the admin user to etcd is based on the `bcrypt` go module. See the [etcd official documentation](https://etcd.io/docs/v3.6/learning/design-auth-v3/) for more details.
 
-Credentials are exchanged via [Juju secrets](https://canonical-juju.readthedocs-hosted.com/en/latest/user/howto/manage-secrets/).
+Credentials are exchanged via [Juju secrets](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-secrets/).
 
 ### etcd cluster authentication
 
