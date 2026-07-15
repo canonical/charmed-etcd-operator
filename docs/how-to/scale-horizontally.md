@@ -1,18 +1,18 @@
 # How to scale horizontally
 
 Adding and removing nodes from an etcd deployment is done by scaling [Juju units](https://documentation.ubuntu.com/juju/3.6/reference/unit/). 
- 
+
 ## Add a node
 You can add additional nodes to your deployed etcd application with the following command:
 
 `juju add-unit charmed-etcd -n 1`
 
-Where `-n 1` specifies the number of units to add. 
+Where `-n 1` specifies the number of units to add.
 
 In this case, we are adding one unit to the etcd application. You can add more units by changing the number after -n.
 
-You can now watch the new units join the cluster with: `juju status --watch 1s`. 
-It usually takes a few minutes for the new nodes to be added to the cluster formation. 
+You can now watch the new units join the cluster with: `juju status --watch 1s`.
+It usually takes a few minutes for the new nodes to be added to the cluster formation.
 You’ll know that all nodes are ready when `juju status --watch 1s` reports:
 
 ```shell
@@ -20,13 +20,13 @@ Model  Controller      Cloud/Region         Version  SLA          Timestamp
 etcd   dev-controller  localhost/localhost  3.6.0    unsupported  09:53:59Z
 
 App           Version  Status  Scale  Charm         Channel   Rev  Exposed  Message
-charmed-etcd           active      4  charmed-etcd  3.5/edge   18  no       
+charmed-etcd           active      4  charmed-etcd  3.5/edge   18  no
 
 Unit             Workload  Agent  Machine  Public address  Ports  Message
-charmed-etcd/0   active    idle   0        10.105.253.90          
-charmed-etcd/1*  active    idle   1        10.105.253.210         
-charmed-etcd/2   active    idle   2        10.105.253.47          
-charmed-etcd/3   active    idle   3        10.105.253.27          
+charmed-etcd/0   active    idle   0        10.105.253.90
+charmed-etcd/1*  active    idle   1        10.105.253.210
+charmed-etcd/2   active    idle   2        10.105.253.47
+charmed-etcd/3   active    idle   3        10.105.253.27
 
 Machine  State    Address         Inst id        Base          AZ  Message
 0        started  10.105.253.90   juju-fed980-0  ubuntu@22.04      Running
@@ -71,7 +71,7 @@ not be able to process requests anymore.
 
 Removing a unit from the Juju application scales down your etcd cluster by one 
 node. Before we scale down the nodes we no longer need, list all the units with 
-juju status. Here you will see four units/nodes: 
+`juju status`. Here you will see four units/nodes: 
 - `charmed-etcd/0`
 - `charmed-etcd/1`
 - `charmed-etcd/2`

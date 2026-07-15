@@ -6,7 +6,7 @@ Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.c
 
 ## etcd 3.6
 
-**Base:** Noble (Ubuntu 24.04)
+**Base:** Ubuntu 24.04 LTS (Noble Numbat)
 
 **Supported architectures:** `amd64` and `arm64`.
 

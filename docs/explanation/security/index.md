@@ -49,14 +49,14 @@ In the following, we provide guidance on how to harden your deployment using:
 
 1. Operating system
 2. Security upgrades
-3. Encryption 
+3. Encryption
 4. Authentication
 5. Authorisation
 6. Monitoring and auditing
 
 ### Operating system
 
-Charmed etcd runs on top of Ubuntu 24.04. Deploy a [Landscape Client Charm](https://charmhub.io/landscape-client?) to connect the underlying VM to a Landscape User Account to manage security upgrades and integrate [Ubuntu Pro](https://ubuntu.com/pro) subscriptions. 
+Charmed etcd runs on top of Ubuntu 24.04 LTS (Noble Numbat). Deploy a [Landscape Client Charm](https://charmhub.io/landscape-client?) to connect the underlying VM to a Landscape User Account to manage security upgrades and integrate [Ubuntu Pro](https://ubuntu.com/pro) subscriptions.
 
 ### Security upgrades
 
@@ -78,8 +78,8 @@ For more information on encryption, see the [Cryptography](cryptography) explana
 
 ### Authentication
 
-etcd saves and checks a configured password and a given password using Go’s [`bcrypt`](https://pkg.go.dev/golang.org/x/crypto/bcrypt) package. 
-For client authentication, Charmed etcd relies on TLS client certificate authentication. 
+etcd saves and checks a configured password and a given password using Go’s [`bcrypt`](https://pkg.go.dev/golang.org/x/crypto/bcrypt) package.
+For client authentication, Charmed etcd relies on TLS client certificate authentication.
 
 ### Authorisation
 
