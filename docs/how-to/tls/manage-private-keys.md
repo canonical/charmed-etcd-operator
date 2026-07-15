@@ -1,10 +1,10 @@
 # How to manage private keys
 
-You can manage private keys used by the charm to generate the certificate signing requests (CSR) by storing the private key in a [juju secret](https://canonical.com/juju/docs/juju-cli/3.6/reference/secret/) and then referencing the secret in the [charm configuration](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-applications/#configure-an-application).
+You can manage private keys used by the charm to generate the certificate signing requests (CSR) by storing the private key in a [Juju secret](https://canonical.com/juju/docs/juju-cli/3.6/reference/secret/) and then referencing the secret in the [charm configuration](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-applications/#configure-an-application).
 
 ## Store the private key in a Juju secret
 
-To store the private key in a juju secret, run the following command:
+To store the private key in a Juju secret, run the following command:
 
 ```{terminal}
 :copy:
