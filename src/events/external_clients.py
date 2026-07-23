@@ -218,6 +218,10 @@ class ExternalClientsEvents(Object):
             return
 
         self._update_client_truststore()
+
+        if not self.charm.unit.is_leader():
+            return
+
         # in cross-model relations, the mtls-cert is not stored in a secret
         # other units will not receive a secret-changed/mtls-cert-updated event
         # trigger peer-relation change instead to ensure all units update their truststore
