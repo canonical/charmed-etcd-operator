@@ -820,6 +820,8 @@ def test_set_tls_private_key():
     client_tls_relation = testing.Relation(id=3, endpoint=CLIENT_TLS_RELATION_NAME)
 
     private_key = generate_private_key().raw
+    initial_peer_private_key = generate_private_key().raw
+    initial_client_private_key = generate_private_key().raw
     peer_secret_label = f"{TLSLIBID}-private-key-0-{PEER_TLS_RELATION_NAME}"
     client_secret_label = f"{TLSLIBID}-private-key-0-{CLIENT_TLS_RELATION_NAME}"
 
@@ -863,12 +865,12 @@ def test_set_tls_private_key():
             secrets={
                 secret,
                 Secret(
-                    {"private-key": "initial_peer_private_key"},
+                    {"private-key": initial_peer_private_key},
                     label=peer_secret_label,
                     owner="unit",
                 ),
                 Secret(
-                    {"private-key": "initial_client_private_key"},
+                    {"private-key": initial_client_private_key},
                     label=client_secret_label,
                     owner="unit",
                 ),
@@ -884,7 +886,7 @@ def test_set_tls_private_key():
             state_out.get_secret(label=peer_secret_label)
         assert (
             state_out.get_secret(label=client_secret_label).latest_content["private-key"]
-            == "initial_client_private_key"
+            == initial_client_private_key
         ), "Client private key should not have been set"
 
         # Update peer private key
@@ -898,12 +900,12 @@ def test_set_tls_private_key():
             secrets={
                 secret,
                 Secret(
-                    {"private-key": "initial_peer_private_key"},
+                    {"private-key": initial_peer_private_key},
                     label=peer_secret_label,
                     owner="unit",
                 ),
                 Secret(
-                    {"private-key": "initial_client_private_key"},
+                    {"private-key": initial_client_private_key},
                     label=client_secret_label,
                     owner="unit",
                 ),
@@ -926,12 +928,12 @@ def test_set_tls_private_key():
             secrets={
                 secret,
                 Secret(
-                    {"private-key": "initial_peer_private_key"},
+                    {"private-key": initial_peer_private_key},
                     label=peer_secret_label,
                     owner="unit",
                 ),
                 Secret(
-                    {"private-key": "initial_client_private_key"},
+                    {"private-key": initial_client_private_key},
                     label=client_secret_label,
                     owner="unit",
                 ),
@@ -955,12 +957,12 @@ def test_set_tls_private_key():
             secrets={
                 secret,
                 Secret(
-                    {"private-key": "initial_peer_private_key"},
+                    {"private-key": initial_peer_private_key},
                     label=peer_secret_label,
                     owner="unit",
                 ),
                 Secret(
-                    {"private-key": "initial_client_private_key"},
+                    {"private-key": initial_client_private_key},
                     label=client_secret_label,
                     owner="unit",
                 ),
@@ -985,12 +987,12 @@ def test_set_tls_private_key():
             secrets={
                 secret,
                 Secret(
-                    {"private-key": "initial_peer_private_key"},
+                    {"private-key": initial_peer_private_key},
                     label=peer_secret_label,
                     owner="unit",
                 ),
                 Secret(
-                    {"private-key": "initial_client_private_key"},
+                    {"private-key": initial_client_private_key},
                     label=client_secret_label,
                     owner="unit",
                 ),
@@ -1045,12 +1047,12 @@ def test_set_tls_private_key():
             secrets={
                 secret,
                 Secret(
-                    {"private-key": "initial_client_private_key"},
+                    {"private-key": initial_client_private_key},
                     label=client_secret_label,
                     owner="unit",
                 ),
                 Secret(
-                    {"private-key": "initial_peer_private_key"},
+                    {"private-key": initial_peer_private_key},
                     label=peer_secret_label,
                     owner="unit",
                 ),
@@ -1066,7 +1068,7 @@ def test_set_tls_private_key():
             state_out.get_secret(label=client_secret_label)
         assert (
             state_out.get_secret(label=peer_secret_label).latest_content["private-key"]
-            == "initial_peer_private_key"
+            == initial_peer_private_key
         ), "Peer private key should not have been set"
 
         # Update client private key
@@ -1087,12 +1089,12 @@ def test_set_tls_private_key():
             secrets={
                 secret,
                 Secret(
-                    {"private-key": "initial_client_private_key"},
+                    {"private-key": initial_client_private_key},
                     label=client_secret_label,
                     owner="unit",
                 ),
                 Secret(
-                    {"private-key": "initial_peer_private_key"},
+                    {"private-key": initial_peer_private_key},
                     label=peer_secret_label,
                     owner="unit",
                 ),

@@ -535,7 +535,9 @@ def test_restore_action_s3():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    admin_secret = testing.Secret(
+        tracked_content=secret_content, remote_grants={peer_relation.id: [APP_NAME]}
+    )
     peer_relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
     )
@@ -557,7 +559,9 @@ def test_restore_action_s3():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    admin_secret = testing.Secret(
+        tracked_content=secret_content, remote_grants={peer_relation.id: [APP_NAME]}
+    )
     peer_relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
     )
@@ -584,7 +588,9 @@ def test_restore_action_s3():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    admin_secret = testing.Secret(
+        tracked_content=secret_content, remote_grants={peer_relation.id: [APP_NAME]}
+    )
     peer_relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
     )
@@ -611,7 +617,9 @@ def test_restore_action_s3():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    admin_secret = testing.Secret(
+        tracked_content=secret_content, remote_grants={peer_relation.id: [APP_NAME]}
+    )
     peer_relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
@@ -671,7 +679,9 @@ def test_restore_action_azure():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    admin_secret = testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    admin_secret = testing.Secret(
+        tracked_content=secret_content, remote_grants={peer_relation.id: [APP_NAME]}
+    )
     peer_relation = testing.PeerRelation(
         id=1, endpoint=PEER_RELATION, local_unit_data={"state": "started"}
     )
@@ -762,7 +772,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.stop"),
         patch("workload.EtcdWorkload.disable_service"),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
@@ -791,7 +801,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.stop"),
         patch("workload.EtcdWorkload.disable_service"),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
@@ -820,7 +830,7 @@ def test_restore_workflow_synchronization():
         },
     )
     state_in = testing.State(relations={relation, status_relation}, leader=False)
-    state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+    state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
     assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
     assert (
@@ -855,7 +865,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.stop"),
         patch("workload.EtcdWorkload.disable_service"),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         assert status_is(state_out, BackupStatuses.RESTORE_IN_PROGRESS.value)
         assert (
@@ -901,7 +911,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.stop"),
         patch("workload.EtcdWorkload.disable_service"),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         assert status_is(state_out, BackupStatuses.RESTORE_VERIFICATION_FAILED.value)
         assert (
@@ -938,7 +948,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.remove_directory"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="")),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         assert (
             state_out.get_relation(1).local_unit_data.get("restore-step")
@@ -967,7 +977,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.remove_directory"),
         patch("subprocess.run", return_value=CompletedProcess(returncode=0, args=[], stdout="")),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         assert (
             state_out.get_relation(1).local_unit_data.get("restore-step")
@@ -1004,7 +1014,7 @@ def test_restore_workflow_synchronization():
     with (
         patch("managers.backup.BackupManager.restore_backup") as restore_backup,
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         restore_backup.assert_not_called()
         assert (
@@ -1035,7 +1045,7 @@ def test_restore_workflow_synchronization():
     with (
         patch("managers.backup.BackupManager.restore_backup") as restore_backup,
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         restore_backup.assert_not_called()
         assert (
@@ -1076,7 +1086,7 @@ def test_restore_workflow_synchronization():
             "subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="snapshot restore")
         ),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
         assert not (
             state_out.get_relation(1).local_app_data.get("cluster-state")
             == EtcdClusterState.NEW.value
@@ -1106,7 +1116,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.start"),
         patch("workload.EtcdWorkload.enable_service"),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         write_config.assert_called_once()
         assert (
@@ -1138,7 +1148,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.enable_service"),
         patch("subprocess.run", side_effect=CalledProcessError(returncode=1, cmd="user add")),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         write_config.assert_called_once()
         assert (
@@ -1172,7 +1182,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
         patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         remove_backup.assert_called_once()
         assert (
@@ -1202,7 +1212,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
         patch("managers.cluster.ClusterManager.is_healthy", return_value=False),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         assert status_is(state_out, BackupStatuses.RESTORE_UNHEALTHY.value)
 
@@ -1228,7 +1238,7 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
         patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         remove_backup.assert_called_once()
         assert (
@@ -1267,6 +1277,6 @@ def test_restore_workflow_synchronization():
         patch("workload.EtcdWorkload.remove_file") as remove_backup,
         patch("managers.cluster.ClusterManager.is_healthy", return_value=False),
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=relation), state_in)
+        state_out = ctx.run(ctx.on.relation_changed(relation=relation, remote_unit=1), state_in)
 
         assert status_is(state_out, BackupStatuses.RESTORE_UNHEALTHY.value)
