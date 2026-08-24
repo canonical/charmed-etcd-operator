@@ -160,7 +160,7 @@ jobs:
           juju add-model test
           model_uuid="$(juju show-model test | awk -F': ' '/model-uuid/ {print $2}')"
           terraform init
-          terraform apply -var "model-uuid=$model_uuid" -var 'units=3' -auto-approve
+          terraform apply -var "model_uuid=$model_uuid" -var 'units=3' -auto-approve
       - name: Model Status
         run: |
           # wait for etcd to be ready
