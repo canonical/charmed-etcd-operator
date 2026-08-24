@@ -5,7 +5,7 @@ variable "etcd" {
   description = "etcd app definition"
   type = object({
     app_name          = optional(string, "etcd")
-    model             = string
+    model_uuid        = string
     base              = optional(string, "ubuntu@24.04")
     config            = optional(map(string), {})
     channel           = optional(string, "3.6/stable")
