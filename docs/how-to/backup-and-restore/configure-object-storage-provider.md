@@ -1,7 +1,7 @@
 # How to configure an object storage provider
 A backup for charmed etcd can be stored on any S3- or Azure-compatible storage. This includes:
 - AWS S3
-- Ceph with RadosGateway (see: [MicroCeph documentation](https://canonical-microceph.readthedocs-hosted.com/latest/snap/tutorial/get-started/#))
+- Ceph with RadosGateway (see: [MicroCeph documentation](https://canonical-microceph.readthedocs-hosted.com/en/stable/snap/tutorial/get-started/#))
 - Google Cloud Storage
 - Azure Blob Storage
 
