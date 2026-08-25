@@ -13,7 +13,7 @@ resource "juju_application" "etcd" {
     base     = var.base
   }
   config             = var.config
-  model              = var.model
+  model_uuid         = var.model_uuid
   name               = var.app_name
   units              = var.units
   constraints        = var.constraints
@@ -35,7 +35,7 @@ resource "juju_application" "etcd" {
 resource "juju_application" "self-signed-certificates" {
   for_each = var.tls ? { "deployed" = true } : {}
 
-  model = var.model
+  model_uuid = var.model_uuid
 
   charm {
     name     = "self-signed-certificates"
@@ -59,7 +59,7 @@ resource "juju_integration" "tls-etcd-peer" {
   # This integration is only created if TLS is enabled
   for_each = var.tls ? { "deployed" = true } : {}
 
-  model = var.model
+  model_uuid = var.model_uuid
 
   application {
     name     = "self-signed-certificates"
@@ -81,7 +81,7 @@ resource "juju_integration" "tls-etcd-client" {
   # This integration is only created if TLS is enabled
   for_each = var.tls ? { "deployed" = true } : {}
 
-  model = var.model
+  model_uuid = var.model_uuid
 
   application {
     name     = juju_application.self-signed-certificates["deployed"].name
