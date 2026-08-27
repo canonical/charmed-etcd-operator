@@ -52,7 +52,7 @@ def test_pre_refresh_checks(app_data, unit_data, pre_check_result) -> None:
 
     state_in = testing.State(relations={peer_relation})
 
-    with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
+    with ctx(ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in) as manager:
         charm: EtcdOperatorCharm = manager.charm
 
         # Mock the refresh constructor to avoid version checks
@@ -72,7 +72,9 @@ def test_pre_refresh_checks_unhealthy_cluster() -> None:
     state_in = testing.State(relations={peer_relation})
 
     with patch("managers.cluster.ClusterManager.is_healthy", return_value=False):
-        with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
+        with ctx(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        ) as manager:
             charm: EtcdOperatorCharm = manager.charm
 
             # Mock the refresh constructor to avoid version checks
@@ -100,7 +102,9 @@ def test_snap_refresh_successful() -> None:
         patch("workload.EtcdWorkload.write_file"),
         patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
-        with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
+        with ctx(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        ) as manager:
             mock_refresh = MagicMock()
             mock_refresh.next_unit_allowed_to_refresh = False
             charm: EtcdOperatorCharm = manager.charm
@@ -131,7 +135,9 @@ def test_snap_refresh_failed() -> None:
         patch("workload.EtcdWorkload.write_file"),
         patch("managers.cluster.ClusterManager.is_healthy", return_value=False),
     ):
-        with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
+        with ctx(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        ) as manager:
             mock_refresh = MagicMock()
             mock_refresh.next_unit_allowed_to_refresh = False
             charm: EtcdOperatorCharm = manager.charm
@@ -158,7 +164,9 @@ def test_post_snap_refresh_healthy_cluster() -> None:
         patch("workload.EtcdWorkload.restart"),
         patch("managers.cluster.ClusterManager.is_healthy", return_value=True),
     ):
-        with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
+        with ctx(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        ) as manager:
             mock_refresh = MagicMock()
             mock_refresh.next_unit_allowed_to_refresh = False
 
@@ -179,7 +187,9 @@ def test_post_snap_refresh_unhealthy_cluster() -> None:
         patch("workload.EtcdWorkload.restart"),
         patch("managers.cluster.ClusterManager.is_healthy", return_value=False),
     ):
-        with ctx(ctx.on.relation_changed(relation=peer_relation), state_in) as manager:
+        with ctx(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        ) as manager:
             mock_refresh = MagicMock()
             mock_refresh.next_unit_allowed_to_refresh = False
 

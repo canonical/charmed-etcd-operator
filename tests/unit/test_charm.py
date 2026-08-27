@@ -600,7 +600,7 @@ def test_get_leader():
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
     state_in = testing.State(relations={relation})
     with patch("managers.cluster.EtcdClient.get_endpoint_status", return_value=test_data):
-        with ctx(ctx.on.relation_joined(relation=relation), state_in) as context:
+        with ctx(ctx.on.relation_joined(relation=relation, remote_unit=1), state_in) as context:
             assert context.charm.cluster_manager.leader == hex(member_id)[2:]
 
 
@@ -608,8 +608,10 @@ def test_config_changed():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
+    secret = ops.testing.Secret(
+        tracked_content=secret_content, remote_grants={relation.id: [APP_NAME]}
+    )
 
     ctx = testing.Context(EtcdOperatorCharm)
     state_in = testing.State(
@@ -796,7 +798,7 @@ def test_config_options_compaction_invalid():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants={1: [APP_NAME]})
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
 
     ctx = testing.Context(EtcdOperatorCharm)
@@ -1036,7 +1038,7 @@ def test_config_options_compaction_valid():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants={1: [APP_NAME]})
     relation = testing.PeerRelation(id=1, endpoint=PEER_RELATION)
 
     ctx = testing.Context(EtcdOperatorCharm)
@@ -1149,7 +1151,7 @@ def test_secret_changed():
     secret_key = "root"
     secret_value = "123"
     secret_content = {secret_key: secret_value}
-    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants={1: [APP_NAME]})
     relation = testing.PeerRelation(
         id=1,
         endpoint=PEER_RELATION,
@@ -1186,7 +1188,7 @@ def test_secret_changed():
     # no update should happen if the user-name is invalid, charm status has to be blocked
     secret_key = "invalid-user-name"
     secret_content = {secret_key: secret_value}
-    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants=APP_NAME)
+    secret = ops.testing.Secret(tracked_content=secret_content, remote_grants={1: [APP_NAME]})
     state_in = testing.State(
         secrets=[secret],
         config={INTERNAL_USER_PASSWORD_CONFIG: secret.id},
@@ -1523,7 +1525,9 @@ def test_rebuild_cluster_workflow_synchronisation():
         patch("workload.EtcdWorkload.disable_service") as disable_etcd,
         patch("workload.EtcdWorkload.remove_directory") as remove_data,
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
+        state_out = ctx.run(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        )
 
         stop_etcd.assert_called_once()
         disable_etcd.assert_called_once()
@@ -1545,7 +1549,9 @@ def test_rebuild_cluster_workflow_synchronisation():
         patch("workload.EtcdWorkload.start") as start_etcd,
         patch("workload.EtcdWorkload.enable_service") as enable_etcd,
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
+        state_out = ctx.run(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        )
 
         # 1st call: set `force-new-cluster` to `True`, 2nd: reset `force-new-cluster` to `False`
         assert write_config.call_count == 2
@@ -1573,7 +1579,9 @@ def test_rebuild_cluster_workflow_synchronisation():
         patch("workload.EtcdWorkload.start") as start_etcd,
         patch("workload.EtcdWorkload.enable_service") as enable_etcd,
     ):
-        state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
+        state_out = ctx.run(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        )
 
         write_config.assert_called_once()
         start_etcd.assert_called_once()
@@ -1600,7 +1608,9 @@ def test_rebuild_cluster_workflow_synchronisation():
     state_in = testing.State(relations={peer_relation}, leader=True)
 
     with patch("managers.cluster.ClusterManager.is_healthy") as health_check:
-        state_out = ctx.run(ctx.on.relation_changed(relation=peer_relation), state_in)
+        state_out = ctx.run(
+            ctx.on.relation_changed(relation=peer_relation, remote_unit=1), state_in
+        )
 
         health_check.assert_called_once()
         assert not state_out.get_relation(1).local_app_data.get("rebuild-cluster") == "True"
