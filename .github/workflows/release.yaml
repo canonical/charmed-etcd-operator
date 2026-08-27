@@ -56,7 +56,7 @@ jobs:
     with:
       track: ${{ needs.tag.outputs.track }}
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
-      charmcraft-snap-revisions: '{"amd64": "8022", "arm64": "8030"}'
+      charmcraft-snap-revision: "8022"
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:
