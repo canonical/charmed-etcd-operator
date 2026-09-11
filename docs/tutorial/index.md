@@ -37,7 +37,7 @@ Install Multipass with snap:
 sudo snap install multipass
 ```
 
-Launch a virtual machine named `etcd` using Ubuntu 24.04 and the [`cloud-init-charm-dev.yaml`](https://raw.githubusercontent.com/canonical/multipass/refs/heads/main/data/cloud-init-yaml/cloud-init-charm-dev.yaml) configuration:
+Launch a virtual machine named `etcd` using Ubuntu 24.04 LTS (Noble Numbat) and the [`cloud-init-charm-dev.yaml`](https://raw.githubusercontent.com/canonical/multipass/refs/heads/main/data/cloud-init-yaml/cloud-init-charm-dev.yaml) configuration:
 
 ```shell
 multipass launch 24.04 \
@@ -67,7 +67,7 @@ Bootstrap a Juju controller on the local LXD cloud:
 juju bootstrap localhost dev-controller
 ```
 
-A controller can host multiple models. Create a model named `tutorial` for this walkthrough:
+A controller can host multiple models. Create a model named `tutorial` for this tutorial:
 
 ```shell
 juju add-model tutorial
@@ -89,7 +89,7 @@ Model "admin/tutorial" is empty.
 ```
 
 (deploy-etcd)=
-## Deploy Charmed etcd
+## Deploy etcd
 
 Deploy a single unit of Charmed etcd:
 
