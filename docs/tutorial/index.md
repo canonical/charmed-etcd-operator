@@ -43,7 +43,7 @@ Launch a virtual machine named `etcd` using Ubuntu 24.04 LTS (Noble Numbat) and 
 multipass launch 24.04 \
   --name etcd \
   --cpus 4 \
-  --memory 8G \
+  --memory 4G \
   --disk 50G \
   --timeout 1800 \
   --cloud-init https://raw.githubusercontent.com/canonical/multipass/refs/heads/main/data/cloud-init-yaml/cloud-init-charm-dev.yaml
@@ -89,6 +89,7 @@ Model "admin/tutorial" is empty.
 ```
 
 (deploy-etcd)=
+
 ## Deploy etcd
 
 Deploy a single unit of Charmed etcd:
@@ -134,12 +135,13 @@ Machine  State    Address         Inst id        Base          AZ    Message
 Press `Ctrl+C` to exit the watch view.
 
 (access-etcd)=
+
 ## Access etcd
 
 Charmed etcd enables authentication by default. It generates an administrative internal user named `root` and stores its password in a Juju secret.
 
 ```{caution}
-Do not use the `root` administrative user directly for external client applications in production. In production environments, integrate applications using client relations or manage dedicated credentials.
+Do not use the `root` administrative user directly for external client applications in production. In production environments, integrate applications using [client relations](../how-to/client-relations.md) or manage dedicated credentials.
 ```
 
 ### Retrieve credentials
@@ -347,14 +349,14 @@ Self-signed certificates are intended for testing and development. Use an offici
 Deploy the `self-signed-certificates` charm:
 
 ```shell
-juju deploy self-signed-certificates --channel 1/edge --config ca-common-name="Tutorial CA"
+juju deploy self-signed-certificates --channel 1/stable --config ca-common-name="Tutorial CA"
 ```
 
 ````{note}
 If you deploy on an ARM64 architecture, specify the architecture constraint:
 
 ```shell
-juju deploy self-signed-certificates --channel 1/edge --config ca-common-name="Tutorial CA" --constraints arch=arm64
+juju deploy self-signed-certificates --channel 1/stable --config ca-common-name="Tutorial CA" --constraints arch=arm64
 ```
 ````
 
@@ -370,7 +372,7 @@ tutorial  dev-controller  localhost/localhost  3.6.28   unsupported  14:37:23+04
 
 App                       Version  Status  Scale  Charm                     Channel     Rev  Exposed  Message
 charmed-etcd              3.6.13   active      2  charmed-etcd              3.6/stable  182  no
-self-signed-certificates           active      1  self-signed-certificates  1/edge      681  no
+self-signed-certificates           active      1  self-signed-certificates  1/stable    588  no
 
 Unit                         Workload  Agent  Machine  Public address  Ports     Message
 charmed-etcd/0*              active    idle   0        10.109.130.153  2379/tcp
