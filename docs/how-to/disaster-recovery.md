@@ -1,3 +1,4 @@
+(disaster-recovery)=
 # How to perform disaster recovery
 
 An etcd cluster automatically recovers from temporary failures of cluster members. If cluster members are lost permanently,

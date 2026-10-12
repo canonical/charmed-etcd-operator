@@ -1,18 +1,65 @@
+(how-to)=
 # How-to guides
+
+Key settings and common tasks for deploying and operating Charmed etcd.
+
+## Deployment and configuration
+
+Essential operations to configure a new charmed etcd deployment:
 
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
 
 Scale horizontally <scale-horizontally>
-Manage passwords <manage-passwords>
-Manage persistent storage <manage-persistent-storage>
-Enable monitoring <enable-monitoring>
-Integrate with an application <client-relations>
-TLS encryption <tls/index>
-Back up and restore <backup-and-restore/index>
 Tune etcd settings <tune-settings>
-Disaster recovery <disaster-recovery>
+```
+
+Migrate an existing etcd cluster to a charmed cluster:
+
+```{toctree}
 Migrate to charmed etcd <migrate-to-charmed-etcd>
+
+```
+
+Upgrade the charm:
+
+```{toctree}
 Refresh (upgrade) <refresh>
 ```
+
+## Security and network
+
+Learn how to manage user credentials through integrations and Juju secrets:
+
+```{toctree}
+Integrate with an application <client-relations>
+Manage passwords <manage-passwords>
+```
+
+Configure a secure transport layer for peer-to-peer and client-server communication by integrating with a TLS operator:
+
+```{toctree}
+:titlesonly:
+:maxdepth: 2
+
+TLS encryption <tls/index>
+```
+
+## Backups and storage
+
+```{toctree}
+Back up and restore <backup-and-restore/index>
+Manage persistent storage <manage-persistent-storage>
+```
+
+## Troubleshooting
+
+```{toctree}
+Enable monitoring <enable-monitoring>
+Disaster recovery <disaster-recovery>
+```
+
+
+
+

@@ -1,6 +1,6 @@
 # How to disable TLS
 
-To follow this guide, you need to have a running `charmed-etcd` cluster with TLS enabled. See [How to enable TLS](#enable-tls) for more information.
+To follow this guide, you need to have a running `charmed-etcd` cluster with TLS enabled. See {ref}`enable-tls` for more information.
 
 In general, to disable encryption with TLS, remove the relation between `charmed-etcd` and the TLS provider on the endpoint specific to the peer-to-peer or client-to-server communication.
 
