@@ -18,13 +18,16 @@ Tune etcd settings <tune-settings>
 Migrate an existing etcd cluster to a charmed cluster:
 
 ```{toctree}
-Migrate to charmed etcd <migrate-to-charmed-etcd>
+:titlesonly:
 
+Migrate to charmed etcd <migrate-to-charmed-etcd>
 ```
 
 Upgrade the charm:
 
 ```{toctree}
+:titlesonly:
+
 Refresh (upgrade) <refresh>
 ```
 
@@ -33,6 +36,8 @@ Refresh (upgrade) <refresh>
 Learn how to manage user credentials through integrations and Juju secrets:
 
 ```{toctree}
+:titlesonly:
+
 Integrate with an application <client-relations>
 Manage passwords <manage-passwords>
 ```
@@ -41,7 +46,6 @@ Configure a secure transport layer for peer-to-peer and client-server communicat
 
 ```{toctree}
 :titlesonly:
-:maxdepth: 2
 
 TLS encryption <tls/index>
 ```
@@ -49,6 +53,8 @@ TLS encryption <tls/index>
 ## Backups and storage
 
 ```{toctree}
+:titlesonly:
+
 Back up and restore <backup-and-restore/index>
 Manage persistent storage <manage-persistent-storage>
 ```

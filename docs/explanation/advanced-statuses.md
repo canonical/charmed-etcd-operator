@@ -1,3 +1,4 @@
+(advanced-statuses)=
 # Advanced Statuses
 
 Charmed etcd utilises Advanced Statuses to provide detailed, component-specific status information. This interface supports more complex and multiple statuses.
