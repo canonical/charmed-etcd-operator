@@ -1,3 +1,4 @@
+(configure-object-storage-provider)=
 # How to configure an object storage provider
 A backup for charmed etcd can be stored on any S3- or Azure-compatible storage. This includes:
 - AWS S3

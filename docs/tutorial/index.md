@@ -1,3 +1,4 @@
+(tutorial)=
 # Tutorial
 
 This hands-on tutorial guides you through deploying, configuring, and operating Charmed etcd using Juju.

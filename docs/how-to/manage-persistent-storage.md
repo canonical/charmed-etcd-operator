@@ -1,3 +1,4 @@
+(manage-persistent-storage)=
 # How to manage persistent storage
 
 Like many other databases, etcd stores its state on disk. In a default deployment (as described in [](../tutorial/index.md#deploy-etcd)),
