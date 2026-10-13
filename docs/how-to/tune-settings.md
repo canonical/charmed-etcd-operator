@@ -1,3 +1,4 @@
+(tune-settings)=
 # How to tune etcd settings
 
 Charmed etcd includes default configuration settings that work well in most deployment settings. In some cases though,

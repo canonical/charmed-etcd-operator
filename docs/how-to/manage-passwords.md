@@ -1,3 +1,4 @@
+(manage-passwords)=
 # How to manage passwords
 
 In the [Access etcd](#access-etcd) section of the tutorial, we didn't need to include a password in the HTTP request. However, in order to read or write data in etcd, we need to authenticate ourselves.
