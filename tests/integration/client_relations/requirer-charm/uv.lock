@@ -112,11 +112,14 @@ wheels = [
 
 [[package]]
 name = "charmlibs-snap"
-version = "2.0.0"
+version = "1.0.1.post0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d0/f1/b1af81b093f4b94f957a2d2efb20b78975f615a6384d44917c633f77ce82/charmlibs_snap-2.0.0.tar.gz", hash = "sha256:82bc863919614436bf4e8e38cedaa4d809c3d4e1eedab10b2eeb97006116cd29", size = 125387, upload-time = "2026-09-02T21:32:27.485Z" }
+dependencies = [
+    { name = "opentelemetry-api" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/85/33/5043f1dd01e485e1c855516e41694fae48f48e94dd52e6081e5b61eee649/charmlibs_snap-1.0.1.post0.tar.gz", hash = "sha256:1e8da752ee405aa981665da8c4772016236baf80d2d902b02ec8c1c640fb2844", size = 29393, upload-time = "2026-06-16T05:39:54.911Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/d9/65d7e73532c50f2533b8f1a735894b5d260202f60d5ab05e367b93382e13/charmlibs_snap-2.0.0-py3-none-any.whl", hash = "sha256:6e479163ede22f9ab4b66adead2d4ce4cdc6eb77f36f88c50c4d3d3b075da040", size = 38470, upload-time = "2026-09-02T21:32:26.129Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/71/fa658e05748a2ffd1185aeec43aefb286c33c2767e28919f0445b464244a/charmlibs_snap-1.0.1.post0-py3-none-any.whl", hash = "sha256:655041096952c63e92c8d25a6183149f0594d4888be4be62a9635cb96897aa01", size = 15416, upload-time = "2026-06-16T05:39:53.629Z" },
 ]
 
 [[package]]
@@ -415,7 +418,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "charmlibs-interfaces-tls-certificates", specifier = ">=1.0" },
-    { name = "charmlibs-snap", specifier = ">=1.0" },
+    { name = "charmlibs-snap", specifier = ">=1.0,<2" },
     { name = "cryptography", specifier = ">=48.0.0" },
     { name = "dpcharmlibs-interfaces", specifier = ">=1.1.0" },
     { name = "ops", specifier = ">=3.3.1" },
