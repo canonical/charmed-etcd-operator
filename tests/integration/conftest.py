@@ -1,5 +1,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
+import contextlib
 import json
 import logging
 import pathlib
@@ -145,16 +146,14 @@ def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
 def juju_vm_model(arch: str, lxd_cloud: str, lxd_controller: str, juju: Juju):
     # if concierge model ("testing") is found, such as on CI, continue with this. Else setup temp model.
     models = json.loads(juju.cli("models", "--format", "json", include_model=False))
-    for model in models["models"]:
-        if CONCIERGE_MODEL_NAME == model["short-name"]:
-            juju_lxd = jubilant.Juju(
-                model=f"{lxd_controller}:{CONCIERGE_MODEL_NAME}", wait_timeout=1000
-            )
-            juju_lxd.cli("set-model-constraints", f"arch={arch}")
-            yield juju_lxd
-            return
-
-    with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
+    if CONCIERGE_MODEL_NAME in {m["short-name"] for m in models["models"]}:
+        # nullcontext: reuse the concierge model and keep it after the tests
+        model = contextlib.nullcontext(
+            jubilant.Juju(model=f"{lxd_controller}:{CONCIERGE_MODEL_NAME}")
+        )
+    else:
+        model = jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller)
+    with model as juju_lxd:
         juju_lxd.wait_timeout = 1000
         juju_lxd.cli("set-model-constraints", f"arch={arch}")
         # Juju 4 no longer adds the client key to new models, and juju ssh/scp need it
