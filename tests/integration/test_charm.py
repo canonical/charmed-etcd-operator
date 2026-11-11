@@ -225,9 +225,12 @@ def test_etcd_metrics_on_cos(juju_vm_model: Juju, juju_k8s_model: Juju, lxd_cont
     )
 
     # integrate the COS charms with grafana-agent on the machine
-    juju_vm_model.integrate(GRAFANA_AGENT_APP_NAME, GRAFANA_APP_NAME)
-    juju_vm_model.integrate(GRAFANA_AGENT_APP_NAME, LOKI_APP_NAME)
-    juju_vm_model.integrate(GRAFANA_AGENT_APP_NAME, PROMETHEUS_APP_NAME)
+    # Juju 4 also offers juju-info on consumed apps, so name the endpoints to avoid ambiguity
+    juju_vm_model.integrate(
+        f"{GRAFANA_AGENT_APP_NAME}:grafana-dashboards-provider", GRAFANA_APP_NAME
+    )
+    juju_vm_model.integrate(f"{GRAFANA_AGENT_APP_NAME}:logging-consumer", LOKI_APP_NAME)
+    juju_vm_model.integrate(f"{GRAFANA_AGENT_APP_NAME}:send-remote-write", PROMETHEUS_APP_NAME)
     juju_vm_model.wait(
         lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
         timeout=1200,
