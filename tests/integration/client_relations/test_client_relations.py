@@ -29,7 +29,12 @@ from ..helpers import (
     get_secret_by_label,
     get_user,
 )
-from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import (
+    ExpectedStatus,
+    are_apps_active_and_agents_idle,
+    does_status_match,
+    is_relation_gone,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -320,7 +325,10 @@ def test_remove_client_relation(juju_vm_model: Juju) -> None:
 
     # wait for model to settle
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        lambda status: (
+            is_relation_gone(status, REQUIRER_NAME, EXTERNAL_CLIENTS_RELATION)
+            and are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        )
     )
 
     # check that the user and role are removed
@@ -361,7 +369,10 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
     logger.info("Remove TLS relation for requirer.")
     juju_vm_model.remove_relation(f"{REQUIRER_NAME}:certificates", f"{TLS_NAME}:certificates")
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, REQUIRER_NAME, idle_period=10)
+        lambda status: (
+            is_relation_gone(status, REQUIRER_NAME, "certificates")
+            and are_apps_active_and_agents_idle(status, REQUIRER_NAME, idle_period=10)
+        )
     )
 
     logger.info("Integrate requirer with different TLS provider.")
@@ -411,7 +422,10 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
 
     # wait for model to settle
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        lambda status: (
+            is_relation_gone(status, REQUIRER_NAME, EXTERNAL_CLIENTS_RELATION)
+            and are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        )
     )
 
 

@@ -14,7 +14,12 @@ from ..helpers import (
     get_cluster_endpoints,
     get_secret_by_label,
 )
-from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import (
+    ExpectedStatus,
+    are_apps_active_and_agents_idle,
+    does_status_match,
+    is_relation_gone,
+)
 from .helpers import (
     assert_continuous_writes_consistent,
     assert_continuous_writes_increasing,
@@ -67,7 +72,12 @@ def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     # disable peer TLS and check continuous writes
     logger.info("Removing peer-certificates relations")
     juju_vm_model.remove_relation(f"{app_name}:peer-certificates", f"{TLS_NAME}:certificates")
-    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME))
+    juju_vm_model.wait(
+        lambda status: (
+            is_relation_gone(status, app_name, "peer-certificates")
+            and are_apps_active_and_agents_idle(status, APP_NAME)
+        )
+    )
 
     assert_continuous_writes_increasing(endpoints=endpoints, user=INTERNAL_USER, password=password)
 
