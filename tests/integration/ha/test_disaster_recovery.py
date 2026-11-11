@@ -6,6 +6,7 @@ from time import sleep
 
 import pytest
 from jubilant import Juju, TaskError
+from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
 
 from literals import CLIENT_PORT, INTERNAL_USER, PEER_RELATION
 
@@ -161,7 +162,17 @@ def test_recover_from_majority_failure(juju_vm_model: Juju) -> None:
                     leader_unit = unit_name
 
     logger.info("Rebuilding cluster after majority failure")
-    rebuild_response = juju_vm_model.run(leader_unit, "rebuild-cluster")
+    # Juju 4 drops the units from status before their machines stop, so the cluster can still have a leader
+    for attempt in Retrying(
+        stop=stop_after_delay(300),
+        wait=wait_fixed(10),
+        retry=retry_if_exception(
+            lambda e: isinstance(e, TaskError) and "Cluster has not failed" in e.task.message
+        ),
+        reraise=True,
+    ):
+        with attempt:
+            rebuild_response = juju_vm_model.run(leader_unit, "rebuild-cluster")
     assert rebuild_response.return_code == 0, "rebuild failed"
 
     # wait for the rebuild to be performed
