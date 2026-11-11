@@ -13,6 +13,9 @@ on:
           Whether to generate Allure report
         type: boolean
         default: true
+      juju-channel:
+        description: Juju snap channel. Empty uses the spread.yaml default
+        type: string
 
 jobs:
   collect-integration-tests:
@@ -126,6 +129,7 @@ jobs:
         # https://github.com/canonical/charmcraft/issues/2130 fixed
         run: ~/go/bin/spread -vv -artifacts=artifacts '${{ matrix.job.spread_job }}'
         env:
+          CONCIERGE_JUJU_CHANNEL: ${{ inputs.juju-channel }}
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
