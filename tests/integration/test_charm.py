@@ -160,7 +160,7 @@ def test_etcd_metrics_endpoint(juju_vm_model: Juju):
 def test_etcd_integration_with_grafana_agent(juju_vm_model: Juju):
     # deploy grafana-agent and integrate
     juju_vm_model.deploy(GRAFANA_AGENT_APP_NAME, channel=COS_CHANNEL)
-    juju_vm_model.integrate(APP_NAME, GRAFANA_AGENT_APP_NAME)
+    juju_vm_model.integrate(f"{APP_NAME}:{COS_RELATION_NAME}", GRAFANA_AGENT_APP_NAME)
     juju_vm_model.wait(
         lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
         timeout=1200,

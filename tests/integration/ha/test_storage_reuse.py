@@ -207,7 +207,8 @@ def test_attach_storage_after_removing_application(charm: str, juju_vm_model: Ju
 
     # remove the entire application
     juju_vm_model.remove_application(app)
-    juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
+    # Juju 4 keeps the app for a moment after its last unit goes, so wait for the app itself
+    juju_vm_model.wait(lambda status: APP_NAME not in status.apps)
 
     # deploy new cluster, attaching the storage from the previous last unit to the new first unit
     juju_vm_model.deploy(charm, attach_storage=storage_id)

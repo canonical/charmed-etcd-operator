@@ -10,6 +10,7 @@ from pathlib import Path
 
 import jubilant
 from jubilant import Juju
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from literals import INTERNAL_USER, PEER_RELATION
 from statuses import TLSStatuses
@@ -242,11 +243,16 @@ def test_restrict_certificate_domain(juju_vm_model: Juju) -> None:
         lambda status: are_apps_active_and_agents_idle(status, APP_NAME, unit_count=NUM_UNITS)
     )
 
-    download_client_certificate_from_unit(juju_vm_model, APP_NAME)
-    client_cert_subject = subprocess.getoutput("openssl x509 -noout -subject -in client.pem ")
-    assert etcd_domain_config_value in client_cert_subject, (
-        f"expected domain name {etcd_domain_config_value} not found in certificate subject {client_cert_subject}"
-    )
+    # the wait can pass on status from before config-changed, and Vault issues the cert later
+    for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            download_client_certificate_from_unit(juju_vm_model, APP_NAME)
+            client_cert_subject = subprocess.getoutput(
+                "openssl x509 -noout -subject -in client.pem "
+            )
+            assert etcd_domain_config_value in client_cert_subject, (
+                f"expected domain name {etcd_domain_config_value} not found in certificate subject {client_cert_subject}"
+            )
     logger.info("Certificates in etcd updated with new domain")
 
 
