@@ -139,6 +139,12 @@ def test_relate_client_charm(juju_vm_model: Juju) -> None:
         )
     )
 
+    # Juju 4 can report agents as idle before the relation hooks run, so wait for the credentials
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            common_names = get_requirer_common_names(juju_vm_model)
+
+    assert common_names, "failed to get common names from requirer"
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME, tls_enabled=True)
     download_client_certificate_from_unit(juju_vm_model, APP_NAME)
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
@@ -146,7 +152,6 @@ def test_relate_client_charm(juju_vm_model: Juju) -> None:
     password = secret.get(f"{INTERNAL_USER}-password")
 
     # check if user and role are created for the common name and that the role is assigned to the user
-    common_names = get_requirer_common_names(juju_vm_model)
     logger.info(f"Requirer has common names: {common_names}")
     for common_name in common_names:
         user_roles = get_user(

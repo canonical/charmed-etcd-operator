@@ -5,6 +5,7 @@
 import logging
 
 from jubilant import Juju
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from literals import INTERNAL_USER
 
@@ -179,6 +180,14 @@ def test_restore_backup_on_different_cluster(charm: str, juju_vm_model: Juju):
     )
 
     leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
+
+    # Juju 4 can report agents as idle before the s3 relation hooks run, so wait for the credentials
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(10), reraise=True):
+        with attempt:
+            list_backups_response = juju_vm_model.run(leader_unit, "list-backups")
+            assert backup_id in list_backups_response.results.get("backups", ""), (
+                f"backup {backup_id} not found in list-backups"
+            )
 
     # download the backup from storage and restore it
     logger.info(f"Restoring backup {backup_id}")
