@@ -125,7 +125,9 @@ def send_process_control_signal(
     juju_cmd = f"JUJU_MODEL={model_full_name} juju ssh {unit_name} sudo -i 'pkill --signal {signal} -f {etcd_process}'"
 
     try:
-        # juju ssh can take 4 s on Juju 4 (12 s under load), and SIGSTOP hangs until this timeout
+        # juju ssh takes up to 10 s on Juju 4.0/4.1 after an idle spell, and SIGSTOP hangs until
+        # this timeout (watcher backoff, fixed on main by juju/juju#23264).
+        # TODO: lower it once juju/juju#23827 backports the fix to 4.0/4.1.
         subprocess.check_output(
             juju_cmd, stderr=subprocess.PIPE, shell=True, universal_newlines=True, timeout=30
         )

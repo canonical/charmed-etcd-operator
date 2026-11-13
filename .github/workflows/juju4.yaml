@@ -39,5 +39,5 @@ jobs:
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       allure_report: false
-      juju-channel: 4.0/stable
+      juju-channel: 4.1/edge
     secrets: inherit
