@@ -449,6 +449,7 @@ def test_certificate_transfer(juju_vm_model: Juju) -> None:
 
     # get client ca from every unit and check if it includes the ca_cert
     # the wait can pass on status from before the relation hooks run
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(5), reraise=True):
         with attempt:
             for unit_name in juju_vm_model.status().get_units(APP_NAME):

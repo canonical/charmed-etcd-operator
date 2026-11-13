@@ -173,6 +173,7 @@ def test_enable_tls(juju_vm_model: Juju) -> None:
     juju_vm_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
     # Juju 4 can report agents as idle before the relation hooks run, so wait for the certificate
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
         with attempt:
             download_client_certificate_from_unit(juju_vm_model, APP_NAME)

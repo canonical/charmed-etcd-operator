@@ -130,6 +130,7 @@ def test_ca_rotation_by_config_change(juju_vm_model: Juju) -> None:
     juju_vm_model.config(app=TLS_NAME, values=tls_config)
 
     # Juju 4 can report agents as idle before config-changed runs, so wait for the new CA
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
         with attempt:
             assert (
