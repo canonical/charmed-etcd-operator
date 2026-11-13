@@ -162,8 +162,13 @@ def test_etcd_integration_with_grafana_agent(juju_vm_model: Juju):
     juju_vm_model.deploy(GRAFANA_AGENT_APP_NAME, channel=COS_CHANNEL)
     # TODO: go back to bare app names when juju/juju#23744 is fixed
     juju_vm_model.integrate(f"{APP_NAME}:{COS_RELATION_NAME}", GRAFANA_AGENT_APP_NAME)
+    # grafana-agent is a subordinate with no units until the relation is set up, and
+    # all_agents_idle is true for an app with no units, so also wait for its leader unit
     juju_vm_model.wait(
-        lambda status: jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME),
+        lambda status: (
+            any(unit.leader for unit in status.get_units(GRAFANA_AGENT_APP_NAME).values())
+            and jubilant.all_agents_idle(status, GRAFANA_AGENT_APP_NAME, APP_NAME)
+        ),
         timeout=1200,
     )
 

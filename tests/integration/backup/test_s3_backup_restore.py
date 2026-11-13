@@ -5,14 +5,16 @@
 import logging
 
 from jubilant import Juju
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from literals import INTERNAL_USER
+from literals import INTERNAL_USER, PEER_RELATION
 
 from ..helpers import (
     APP_NAME,
     get_cluster_endpoints,
     get_key,
     get_leader_unit_name,
+    get_secret_by_label,
     put_key,
     set_password,
 )
@@ -179,6 +181,13 @@ def test_restore_backup_on_different_cluster(charm: str, juju_vm_model: Juju):
     )
 
     leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
+
+    # Juju 4 can report agents as idle before the s3 relation hooks run, so wait until
+    # the leader has stored the credentials that the restore action checks
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(10), reraise=True):
+        with attempt:
+            secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
+            assert secret.get("s3-credentials"), "s3 credentials not stored yet"
 
     # download the backup from storage and restore it
     logger.info(f"Restoring backup {backup_id}")
