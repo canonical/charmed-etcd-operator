@@ -96,7 +96,7 @@ jobs:
     needs:
       - collect-integration-tests
     runs-on: ${{ matrix.job.runner }}
-    timeout-minutes: 217 # Sum of steps `timeout-minutes` + 5
+    timeout-minutes: 262 # Sum of steps `timeout-minutes` + 5
     steps:
       - name: Disk usage
         timeout-minutes: 1
@@ -104,6 +104,16 @@ jobs:
       - name: Checkout
         timeout-minutes: 3
         uses: actions/checkout@v6
+      # Trial: flake0 records host metrics and Juju, workload, kernel and snapd
+      # logs for the whole job. Points at canonical/flake0's
+      # dpe-10085-opencode-classify branch (canonical/flake0#15).
+      # continue-on-error: telemetry must never fail an integration job.
+      - name: Start telemetry
+        timeout-minutes: 5
+        continue-on-error: true
+        uses: canonical/flake0/.github/actions/collect@dpe-10085-opencode-classify
+        with:
+          phase: start
       - name: Set up environment
         timeout-minutes: 5
         run: sudo snap install charmcraft --classic
@@ -124,7 +134,10 @@ jobs:
         # TODO: replace with `charmcraft test` when
         # https://github.com/canonical/charmcraft/issues/2105 and
         # https://github.com/canonical/charmcraft/issues/2130 fixed
-        run: ~/go/bin/spread -vv -artifacts=artifacts '${{ matrix.job.spread_job }}'
+        # The tee saves the output for the flake0 bundle. `shell: bash` adds
+        # pipefail, so the step keeps spread's exit code.
+        shell: bash
+        run: ~/go/bin/spread -vv -artifacts=artifacts '${{ matrix.job.spread_job }}' 2>&1 | tee "$RUNNER_TEMP/spread.log"
         env:
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
@@ -180,6 +193,45 @@ jobs:
         timeout-minutes: 1
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
         run: df --human-readable
+      # Trial: bundle and upload the flake0 telemetry, render its dashboard,
+      # then, when spread fails, an opencode agent reads the bundle and the
+      # source through OpenRouter and classifies the failure. Each failed job
+      # updates one PR comment. Classify skips without OPENROUTER_API_KEY and
+      # never fails the job.
+      - name: Stop telemetry
+        id: collect
+        timeout-minutes: 5
+        if: always()
+        uses: canonical/flake0/.github/actions/collect@dpe-10085-opencode-classify
+        with:
+          phase: stop
+          test-log: ${{ runner.temp }}/spread.log
+          artifact-name: flake0-collect-${{ matrix.job.name_in_artifact }}-${{ github.run_attempt }}
+      - name: Render telemetry dashboard
+        timeout-minutes: 5
+        if: always()
+        uses: canonical/flake0/.github/actions/plot@dpe-10085-opencode-classify
+        with:
+          bundle-path: ${{ steps.collect.outputs.bundle-path }}
+          artifact-name: flake0-plot-${{ matrix.job.name_in_artifact }}-${{ github.run_attempt }}
+      - name: Classify failure
+        id: classify
+        timeout-minutes: 25
+        if: ${{ failure() && steps.spread.outcome == 'failure' }}
+        uses: canonical/flake0/.github/actions/classify@dpe-10085-opencode-classify
+        with:
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          bundle-path: ${{ steps.collect.outputs.bundle-path }}
+          job-name: ${{ matrix.job.name }}
+      - name: Update flake0 PR comment
+        timeout-minutes: 5
+        if: ${{ failure() && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
+        uses: canonical/flake0/.github/actions/summarize@dpe-10085-opencode-classify
+        with:
+          leg-id: ${{ matrix.job.name_in_artifact }}
+          job-name: ${{ matrix.job.name }}
+          verdict-path: ${{ steps.classify.outputs.verdict-path }}
+          job-id: ${{ job.check_run_id }}
 
   allure-report:
     # TODO future improvement: use concurrency group for job
