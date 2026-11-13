@@ -160,6 +160,7 @@ def test_etcd_metrics_endpoint(juju_vm_model: Juju):
 def test_etcd_integration_with_grafana_agent(juju_vm_model: Juju):
     # deploy grafana-agent and integrate
     juju_vm_model.deploy(GRAFANA_AGENT_APP_NAME, channel=COS_CHANNEL)
+    # TODO: go back to bare app names when juju/juju#23744 is fixed
     juju_vm_model.integrate(f"{APP_NAME}:{COS_RELATION_NAME}", GRAFANA_AGENT_APP_NAME)
     # grafana-agent is a subordinate with no units until the relation is set up, and
     # all_agents_idle is true for an app with no units, so also wait for its leader unit
@@ -231,6 +232,7 @@ def test_etcd_metrics_on_cos(juju_vm_model: Juju, juju_k8s_model: Juju, lxd_cont
 
     # integrate the COS charms with grafana-agent on the machine
     # Juju 4 also offers juju-info on consumed apps, so name the endpoints to avoid ambiguity
+    # TODO: go back to bare app names when juju/juju#23744 is fixed
     juju_vm_model.integrate(
         f"{GRAFANA_AGENT_APP_NAME}:grafana-dashboards-provider", GRAFANA_APP_NAME
     )

@@ -171,6 +171,7 @@ def test_set_private_key(juju_vm_model: Juju) -> None:
     logger.info("Configuring the application with the new peer private key")
     juju_vm_model.config(app=APP_NAME, values={TLS_PEER_PRIVATE_KEY_CONFIG: secret_id})
     # Juju 4 can report agents as idle before config-changed runs, so wait for the new certificate
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
         with attempt:
             assert (
@@ -254,6 +255,7 @@ def test_set_private_key(juju_vm_model: Juju) -> None:
     logger.info("Configuring the application with the new client private key")
     juju_vm_model.config(app=APP_NAME, values={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret_id})
     # Juju 4 can report agents as idle before config-changed runs, so wait for the new certificate
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
         with attempt:
             assert (
