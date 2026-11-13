@@ -87,6 +87,8 @@ jobs:
     secrets: inherit
     permissions:
       contents: write # Needed for Allure Report
+      pull-requests: write # the diff and the PR comment, for flake0 classify and summarize
+      actions: read # run history, for flake0 classify
 
   terraform-lint:
     name: Terraform - Lint
