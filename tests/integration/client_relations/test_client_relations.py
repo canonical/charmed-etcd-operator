@@ -14,6 +14,7 @@ from charmlibs.interfaces.tls_certificates import (
     generate_csr,
 )
 from jubilant import Juju, TaskError
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from literals import EXTERNAL_CLIENTS_RELATION, INTERNAL_USER, PEER_RELATION, TLSType
 from statuses import CharmStatuses, ExternalClientsStatuses
@@ -28,7 +29,12 @@ from ..helpers import (
     get_secret_by_label,
     get_user,
 )
-from ..helpers_deployment import ExpectedStatus, are_apps_active_and_agents_idle, does_status_match
+from ..helpers_deployment import (
+    ExpectedStatus,
+    are_apps_active_and_agents_idle,
+    does_status_match,
+    is_relation_gone,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -319,7 +325,10 @@ def test_remove_client_relation(juju_vm_model: Juju) -> None:
 
     # wait for model to settle
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        lambda status: (
+            is_relation_gone(status, REQUIRER_NAME, EXTERNAL_CLIENTS_RELATION)
+            and are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        )
     )
 
     # check that the user and role are removed
@@ -360,7 +369,10 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
     logger.info("Remove TLS relation for requirer.")
     juju_vm_model.remove_relation(f"{REQUIRER_NAME}:certificates", f"{TLS_NAME}:certificates")
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, REQUIRER_NAME, idle_period=10)
+        lambda status: (
+            is_relation_gone(status, REQUIRER_NAME, "certificates")
+            and are_apps_active_and_agents_idle(status, REQUIRER_NAME, idle_period=10)
+        )
     )
 
     logger.info("Integrate requirer with different TLS provider.")
@@ -388,15 +400,20 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
     )
 
     logger.info("Ensure updated mtls-certs are trusted on etcd")
-    mtls_certs = get_requirer_mtls_certificates(juju_vm_model)
-    assert mtls_certs, "failed to get the new mtls certs from requirer TLS provider"
+    # the wait can pass on status from before the new cert reaches etcd
+    for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            mtls_certs = get_requirer_mtls_certificates(juju_vm_model)
+            assert mtls_certs, "failed to get the new mtls certs from requirer TLS provider"
 
-    for unit_name in juju_vm_model.status().get_units(APP_NAME):
-        client_cas = get_certificate_from_unit(
-            juju_vm_model, unit_name, TLSType.CLIENT, is_ca=True
-        )
-        for mtls_cert in mtls_certs:
-            assert mtls_cert in client_cas, f"new mtls cert not in trusted CAs for {unit_name}"
+            for unit_name in juju_vm_model.status().get_units(APP_NAME):
+                client_cas = get_certificate_from_unit(
+                    juju_vm_model, unit_name, TLSType.CLIENT, is_ca=True
+                )
+                for mtls_cert in mtls_certs:
+                    assert mtls_cert in client_cas, (
+                        f"new mtls cert not in trusted CAs for {unit_name}"
+                    )
 
     logger.info("Removing client relation")
     juju_vm_model.remove_relation(
@@ -405,7 +422,10 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
 
     # wait for model to settle
     juju_vm_model.wait(
-        lambda status: are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        lambda status: (
+            is_relation_gone(status, REQUIRER_NAME, EXTERNAL_CLIENTS_RELATION)
+            and are_apps_active_and_agents_idle(status, APP_NAME, REQUIRER_NAME)
+        )
     )
 
 
@@ -428,12 +448,16 @@ def test_certificate_transfer(juju_vm_model: Juju) -> None:
     assert ca_cert, "failed to get ca certificate from requirer tls provider"
 
     # get client ca from every unit and check if it includes the ca_cert
-    for unit_name in juju_vm_model.status().get_units(APP_NAME):
-        client_cas = get_certificate_from_unit(
-            juju_vm_model, unit_name, TLSType.CLIENT, is_ca=True
-        )
-        assert client_cas, f"failed to get client CAs for {unit_name}"
-        assert ca_cert in client_cas, f"CA chain not in trusted CAs for {unit_name}"
+    # the wait can pass on status from before the relation hooks run
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
+    for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            for unit_name in juju_vm_model.status().get_units(APP_NAME):
+                client_cas = get_certificate_from_unit(
+                    juju_vm_model, unit_name, TLSType.CLIENT, is_ca=True
+                )
+                assert client_cas, f"failed to get client CAs for {unit_name}"
+                assert ca_cert in client_cas, f"CA chain not in trusted CAs for {unit_name}"
 
 
 @pytest.mark.v0

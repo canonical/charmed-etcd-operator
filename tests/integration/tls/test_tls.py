@@ -7,6 +7,7 @@ import subprocess
 from time import sleep
 
 from jubilant import Juju
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
 from statuses import CharmStatuses, TLSStatuses
@@ -27,6 +28,7 @@ from ..helpers_deployment import (
     ExpectedStatus,
     are_apps_active_and_agents_idle,
     does_status_match,
+    is_relation_gone,
 )
 
 logger = logging.getLogger(__name__)
@@ -112,7 +114,13 @@ def test_disable_tls(juju_vm_model: Juju) -> None:
     juju_vm_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
     juju_vm_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
-    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_vm_model.wait(
+        lambda status: (
+            is_relation_gone(status, APP_NAME, "peer-certificates")
+            and is_relation_gone(status, APP_NAME, "client-certificates")
+            and are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME)
+        )
+    )
 
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
@@ -164,10 +172,14 @@ def test_enable_tls(juju_vm_model: Juju) -> None:
     juju_vm_model.integrate(f"{APP_NAME}:peer-certificates", TLS_NAME)
     juju_vm_model.integrate(f"{APP_NAME}:client-certificates", TLS_NAME)
 
+    # Juju 4 can report agents as idle before the relation hooks run, so wait for the certificate
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            download_client_certificate_from_unit(juju_vm_model, APP_NAME)
     juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME, tls_enabled=True)
-    download_client_certificate_from_unit(juju_vm_model, APP_NAME)
 
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
@@ -295,7 +307,12 @@ def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     logger.info("Removing peer-certificates relation")
     juju_vm_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
 
-    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_vm_model.wait(
+        lambda status: (
+            is_relation_gone(status, APP_NAME, "peer-certificates")
+            and are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME)
+        )
+    )
 
     endpoints = get_cluster_endpoints(juju_vm_model, APP_NAME, tls_enabled=True)
     leader_unit = get_leader_unit_name(juju_vm_model, APP_NAME)
@@ -419,7 +436,12 @@ def test_disable_and_enable_client_tls(juju_vm_model: Juju) -> None:
     logger.info("Removing client-certificates relation")
     juju_vm_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
-    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_vm_model.wait(
+        lambda status: (
+            is_relation_gone(status, APP_NAME, "client-certificates")
+            and are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME)
+        )
+    )
 
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"
@@ -534,7 +556,13 @@ def test_certificate_expiration(juju_vm_model: Juju) -> None:
     juju_vm_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
     juju_vm_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
-    juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
+    juju_vm_model.wait(
+        lambda status: (
+            is_relation_gone(status, APP_NAME, "peer-certificates")
+            and is_relation_gone(status, APP_NAME, "client-certificates")
+            and are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME)
+        )
+    )
 
     secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
     assert secret, f"Secret is not set for {PEER_RELATION}.{APP_NAME}.app"

@@ -103,6 +103,8 @@ def test_upgrade_single_unit_cluster(charm: str, juju_vm_model: Juju) -> None:
     stop_continuous_writes()
     juju_vm_model.remove_application(APP_NAME)
     juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
+    # Juju 4 keeps the app for a moment after its last unit goes, so wait for the app itself
+    juju_vm_model.wait(lambda status: APP_NAME not in status.apps)
 
 
 def test_scale_up_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
@@ -186,6 +188,8 @@ def test_scale_up_during_upgrade(charm: str, juju_vm_model: Juju) -> None:
     )
     juju_vm_model.remove_application(APP_NAME)
     juju_vm_model.wait(lambda status: not juju_vm_model.status().get_units(APP_NAME))
+    # Juju 4 keeps the app for a moment after its last unit goes, so wait for the app itself
+    juju_vm_model.wait(lambda status: APP_NAME not in status.apps)
 
 
 def test_scale_down_during_upgrade(charm: str, juju_vm_model: Juju) -> None:

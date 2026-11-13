@@ -8,6 +8,7 @@ import logging
 import pytest
 from charmlibs.interfaces.tls_certificates import generate_private_key
 from jubilant import Juju
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from literals import (
     CLIENT_TLS_RELATION_NAME,
@@ -169,6 +170,14 @@ def test_set_private_key(juju_vm_model: Juju) -> None:
 
     logger.info("Configuring the application with the new peer private key")
     juju_vm_model.config(app=APP_NAME, values={TLS_PEER_PRIVATE_KEY_CONFIG: secret_id})
+    # Juju 4 can report agents as idle before config-changed runs, so wait for the new certificate
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            assert (
+                get_certificate_from_unit(juju_vm_model, leader_unit, TLSType.PEER)
+                != leader_current_peer_cert
+            )
     juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     logger.info("Checking if the cluster is still accessible")
@@ -245,6 +254,14 @@ def test_set_private_key(juju_vm_model: Juju) -> None:
 
     logger.info("Configuring the application with the new client private key")
     juju_vm_model.config(app=APP_NAME, values={TLS_CLIENT_PRIVATE_KEY_CONFIG: secret_id})
+    # Juju 4 can report agents as idle before config-changed runs, so wait for the new certificate
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            assert (
+                get_certificate_from_unit(juju_vm_model, leader_unit, TLSType.CLIENT)
+                != leader_current_client_cert
+            )
     juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     logger.info("Checking if the cluster is still accessible")
