@@ -15,7 +15,7 @@ cryptography==50.0.2
     #   requirer-charm
 dpcharmlibs-interfaces==1.2.2
     # via requirer-charm
-opentelemetry-api==1.45.1
+opentelemetry-api==1.45.2
     # via
     #   charmlibs-snap
     #   ops
