@@ -140,6 +140,7 @@ def test_relate_client_charm(juju_vm_model: Juju) -> None:
     )
 
     # Juju 4 can report agents as idle before the relation hooks run, so wait for the credentials
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5), reraise=True):
         with attempt:
             common_names = get_requirer_common_names(juju_vm_model)

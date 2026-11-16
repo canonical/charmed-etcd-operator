@@ -184,6 +184,7 @@ def test_restore_backup_on_different_cluster(charm: str, juju_vm_model: Juju):
 
     # Juju 4 can report agents as idle before the s3 relation hooks run, so wait until
     # the leader has stored the credentials that the restore action checks
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(10), reraise=True):
         with attempt:
             secret = get_secret_by_label(juju_vm_model, label=f"{PEER_RELATION}.{APP_NAME}.app")
