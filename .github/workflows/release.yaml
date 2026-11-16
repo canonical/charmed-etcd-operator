@@ -12,7 +12,7 @@ on:
 jobs:
   tag:
     name: Create charm refresh compatibility version git tag
-    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v42.1.0
+    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v54.0.0
     with:
       track: 3.6
     permissions:
@@ -27,37 +27,16 @@ jobs:
     permissions:
       contents: write # Needed for Allure Report beta
 
-  release-libraries:
-    name: Release libraries
-    needs:
-      - ci-tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - run: |
-          # Workaround for https://github.com/canonical/charmcraft/issues/1389#issuecomment-1880921728
-          touch requirements.txt
-      - name: Release charm libraries
-        uses: canonical/charming-actions/release-libraries@2.6.3
-        with:
-          credentials: ${{ secrets.CHARMHUB_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
   release:
     name: Release charm
     needs:
       - tag
       - ci-tests
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v42.1.0
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v54.0.0
     with:
       track: ${{ needs.tag.outputs.track }}
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
-      charmcraft-snap-revision: "8022"
     secrets:
-      charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
+      charmhub-token: ${{ secrets.CHARMHUB_TOKEN_EDGE }}
     permissions:
       contents: write # Needed to create git tags
