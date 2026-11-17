@@ -244,6 +244,7 @@ def test_restrict_certificate_domain(juju_vm_model: Juju) -> None:
     )
 
     # the wait can pass on status from before config-changed, and Vault issues the cert later
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(5), reraise=True):
         with attempt:
             download_client_certificate_from_unit(juju_vm_model, APP_NAME)

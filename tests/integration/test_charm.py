@@ -233,7 +233,7 @@ def test_etcd_metrics_on_cos(juju_vm_model: Juju, juju_k8s_model: Juju, lxd_cont
 
     # integrate the COS charms with grafana-agent on the machine
     # Juju 4 also offers juju-info on consumed apps, so name the endpoints to avoid ambiguity
-    # TODO: go back to bare app names when juju/juju#23744 is fixed
+    # TODO: go back to bare app names when juju/juju#23744 or juju/juju#23865 is fixed
     juju_vm_model.integrate(
         f"{GRAFANA_AGENT_APP_NAME}:grafana-dashboards-provider", GRAFANA_APP_NAME
     )
