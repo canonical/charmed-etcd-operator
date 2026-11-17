@@ -4,7 +4,7 @@ annotated-types==0.8.0
     # via pydantic
 cffi==2.1.1 ; platform_python_implementation != 'PyPy'
     # via cryptography
-charmlibs-interfaces-tls-certificates==1.12.0
+charmlibs-interfaces-tls-certificates==1.13.0
     # via requirer-charm
 charmlibs-snap==1.0.1.post0
     # via requirer-charm
@@ -15,7 +15,7 @@ cryptography==50.0.2
     #   requirer-charm
 dpcharmlibs-interfaces==1.2.2
     # via requirer-charm
-opentelemetry-api==1.45.1
+opentelemetry-api==1.45.2
     # via
     #   charmlibs-snap
     #   ops
@@ -26,12 +26,12 @@ ops==3.9.0
     #   requirer-charm
 pycparser==3.12 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
     # via cffi
-pydantic==2.14.1
+pydantic==2.14.3
     # via
     #   charmlibs-interfaces-tls-certificates
     #   dpcharmlibs-interfaces
     #   requirer-charm
-pydantic-core==2.50.1
+pydantic-core==2.50.4
     # via pydantic
 pyyaml==6.0.3
     # via ops
@@ -43,7 +43,7 @@ typing-extensions==4.16.0
     #   pydantic
     #   pydantic-core
     #   typing-inspection
-typing-inspection==0.4.4
+typing-inspection==0.4.5
     # via pydantic
 websocket-client==1.9.2
     # via ops
