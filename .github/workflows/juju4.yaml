@@ -1,0 +1,43 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: Juju 4 tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+    paths-ignore:
+      - "docs/**"
+  schedule:
+    - cron: "53 0 * * 0" # Weekly on Sunday at 00:53 UTC
+  workflow_dispatch:
+
+jobs:
+  build:
+    # PRs run Juju 4 only when labelled `juju4`
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'juju4')
+    strategy:
+      fail-fast: true
+      matrix:
+        path:
+          - .
+          - tests/integration/client_relations/requirer-charm
+    name: Build charm
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v42.1.0
+    with:
+      path-to-charm-directory: ${{ matrix.path }}
+
+  integration-test:
+    name: Integration test charm
+    needs:
+      - build
+    uses: ./.github/workflows/integration_test.yaml
+    with:
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+      allure_report: false
+      juju-channel: 4.1/edge
+    secrets: inherit
