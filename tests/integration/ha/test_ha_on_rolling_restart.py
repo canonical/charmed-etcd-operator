@@ -72,6 +72,7 @@ def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     # disable peer TLS and check continuous writes
     logger.info("Removing peer-certificates relations")
     juju_vm_model.remove_relation(f"{app_name}:peer-certificates", f"{TLS_NAME}:certificates")
+    # TODO: drop is_relation_gone once juju/juju#23864 is fixed and juju/juju#23827 backported.
     juju_vm_model.wait(
         lambda status: (
             is_relation_gone(status, app_name, "peer-certificates")

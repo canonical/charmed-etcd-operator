@@ -330,6 +330,7 @@ def test_remove_client_relation(juju_vm_model: Juju) -> None:
     juju_vm_model.remove_relation(APP_NAME, REQUIRER_NAME)
 
     # wait for model to settle
+    # TODO: drop is_relation_gone once juju/juju#23864 is fixed and juju/juju#23827 backported.
     juju_vm_model.wait(
         lambda status: (
             is_relation_gone(status, REQUIRER_NAME, EXTERNAL_CLIENTS_RELATION)
@@ -374,6 +375,7 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
     """Ensure a CA rotation also works when using separate TLS providers."""
     logger.info("Remove TLS relation for requirer.")
     juju_vm_model.remove_relation(f"{REQUIRER_NAME}:certificates", f"{TLS_NAME}:certificates")
+    # TODO: drop is_relation_gone once juju/juju#23864 is fixed and juju/juju#23827 backported.
     juju_vm_model.wait(
         lambda status: (
             is_relation_gone(status, REQUIRER_NAME, "certificates")
@@ -427,6 +429,7 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
     )
 
     # wait for model to settle
+    # TODO: drop is_relation_gone once juju/juju#23864 is fixed and juju/juju#23827 backported.
     juju_vm_model.wait(
         lambda status: (
             is_relation_gone(status, REQUIRER_NAME, EXTERNAL_CLIENTS_RELATION)
