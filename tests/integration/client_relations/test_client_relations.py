@@ -403,6 +403,7 @@ def test_different_tls_providers(juju_vm_model: Juju) -> None:
 
     logger.info("Ensure updated mtls-certs are trusted on etcd")
     # the wait can pass on status from before the new cert reaches etcd
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(5), reraise=True):
         with attempt:
             mtls_certs = get_requirer_mtls_certificates(juju_vm_model)
