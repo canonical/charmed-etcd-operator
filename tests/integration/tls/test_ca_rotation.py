@@ -5,6 +5,7 @@ import logging
 import time
 
 from jubilant import Juju
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from literals import INTERNAL_USER, PEER_RELATION, TLSType
 from statuses import CharmStatuses, TLSStatuses
@@ -128,6 +129,16 @@ def test_ca_rotation_by_config_change(juju_vm_model: Juju) -> None:
     tls_config = {"ca-common-name": "new-etcd-ca"}
     juju_vm_model.config(app=TLS_NAME, values=tls_config)
 
+    # Juju 4 can report agents as idle before config-changed runs, so wait for the new CA
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            assert (
+                get_certificate_from_unit(
+                    juju_vm_model, leader_unit, cert_type=TLSType.PEER, is_ca=True
+                )
+                != current_peer_ca
+            )
     juju_vm_model.wait(lambda status: are_apps_active_and_agents_idle(status, APP_NAME, TLS_NAME))
 
     logger.info("Checking if the CA certificates are rotated")

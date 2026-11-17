@@ -65,6 +65,15 @@ def are_apps_active_and_agents_idle(
     )
 
 
+def is_relation_gone(status: jubilant.Status, app: str, endpoint: str) -> bool:
+    """Check that the app has no relation left on the endpoint.
+
+    Juju 4 can report agents as idle before a removed relation is torn down.
+    It also keeps the relation for 10 s after relation-broken (juju/juju#23864).
+    """
+    return endpoint not in status.apps[app].relations
+
+
 def are_agents_idle(
     status: jubilant.Status,
     *apps: str,
