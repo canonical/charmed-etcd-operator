@@ -164,6 +164,7 @@ def test_etcd_integration_with_grafana_agent(juju_vm_model: Juju):
     juju_vm_model.integrate(f"{APP_NAME}:{COS_RELATION_NAME}", GRAFANA_AGENT_APP_NAME)
     # grafana-agent is a subordinate with no units until the relation is set up, and
     # all_agents_idle is true for an app with no units, so also wait for its leader unit
+    # TODO: drop once juju/juju#23827 backports the watcher backoff fix (juju/juju#23264).
     juju_vm_model.wait(
         lambda status: (
             any(unit.leader for unit in status.get_units(GRAFANA_AGENT_APP_NAME).values())
