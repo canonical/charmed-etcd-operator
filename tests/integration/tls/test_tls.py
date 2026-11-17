@@ -114,6 +114,7 @@ def test_disable_tls(juju_vm_model: Juju) -> None:
     juju_vm_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
     juju_vm_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
+    # TODO: drop is_relation_gone once juju/juju#23864 is fixed and juju/juju#23827 backported.
     juju_vm_model.wait(
         lambda status: (
             is_relation_gone(status, APP_NAME, "peer-certificates")
@@ -307,6 +308,7 @@ def test_disable_and_enable_peer_tls(juju_vm_model: Juju) -> None:
     logger.info("Removing peer-certificates relation")
     juju_vm_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
 
+    # TODO: drop is_relation_gone once juju/juju#23864 is fixed and juju/juju#23827 backported.
     juju_vm_model.wait(
         lambda status: (
             is_relation_gone(status, APP_NAME, "peer-certificates")
@@ -436,6 +438,7 @@ def test_disable_and_enable_client_tls(juju_vm_model: Juju) -> None:
     logger.info("Removing client-certificates relation")
     juju_vm_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
+    # TODO: drop is_relation_gone once juju/juju#23864 is fixed and juju/juju#23827 backported.
     juju_vm_model.wait(
         lambda status: (
             is_relation_gone(status, APP_NAME, "client-certificates")
@@ -556,6 +559,7 @@ def test_certificate_expiration(juju_vm_model: Juju) -> None:
     juju_vm_model.remove_relation(f"{APP_NAME}:peer-certificates", f"{TLS_NAME}:certificates")
     juju_vm_model.remove_relation(f"{APP_NAME}:client-certificates", f"{TLS_NAME}:certificates")
 
+    # TODO: drop is_relation_gone once juju/juju#23864 is fixed and juju/juju#23827 backported.
     juju_vm_model.wait(
         lambda status: (
             is_relation_gone(status, APP_NAME, "peer-certificates")
