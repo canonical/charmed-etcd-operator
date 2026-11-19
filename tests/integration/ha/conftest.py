@@ -1,10 +1,10 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import tomllib
 from platform import machine
 
 import pytest
-import tomllib
 
 from literals import SNAP_NAME
 

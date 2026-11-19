@@ -1,3 +1,4 @@
+(manage-persistent-storage)=
 # How to manage persistent storage
 
 Like many other databases, etcd stores its state on disk. In a default deployment (as described in [](../tutorial/index.md#deploy-etcd)),
@@ -254,7 +255,7 @@ providing credentials. This is also valid for the admin-user charmed etcd uses t
 
 At any time before removing your existing etcd cluster, you can provide a user-defined password for the admin user and configure it to charmed etcd. 
 
-For instructions on how to configure credentials to etcd, refer to the guide [](#manage-passwords). 
+For instructions on how to configure credentials to etcd, refer to {ref}`manage-passwords`. 
 
 With a password now configured, it is safe to remove your existing charmed etcd application:
 

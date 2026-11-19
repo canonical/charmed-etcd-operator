@@ -1,3 +1,4 @@
+(releases)=
 # Charmed etcd releases
 
 Charmed etcd is shipped in the following [tracks](https://documentation.ubuntu.com/juju/3.6/reference/charm/#track): 

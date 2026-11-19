@@ -10,33 +10,19 @@ on:
 
 jobs:
   tiobe-scan:
-    runs-on: [self-hosted, noble, tiobe]
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout the project
-        uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y python3-venv
-
-      - name: Install pipx
-        run: sudo apt install -y pipx && pipx ensurepath
-
-      - name: Add pipx to PATH
-        run: echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
-
-      - name: Install tox and poetry using pipx
-        run: |
-          pipx install tox
-          pipx install poetry
+        uses: actions/checkout@v7
 
       - name: Activate virtual environment and install dependencies
         run: |
           python3 -m venv .venv
           . .venv/bin/activate
+          pip install flake8 poetry pylint pytest tox
           poetry install --all-groups
-          pipx install pylint flake8
-          echo "PATH=$PATH" >> "$GITHUB_PATH"
+          echo PATH="$PATH" >> "$GITHUB_ENV"
 
       - name: Run tox tests to create coverage.xml
         run: tox run -e unit

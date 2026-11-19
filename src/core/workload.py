@@ -9,11 +9,11 @@ import secrets
 import socket
 import string
 import subprocess
+import tomllib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-import tomllib
 import yaml
 from charmlibs.pathops import PathProtocol
 

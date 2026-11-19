@@ -1,3 +1,4 @@
+(migrate-to-charmed-etcd)=
 # How to migrate to charmed etcd
 
 This guide outlines the steps required to migrate an existing etcd cluster to a charmed etcd cluster.

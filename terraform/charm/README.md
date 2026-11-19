@@ -16,7 +16,7 @@ The module offers the following configurable inputs:
 | `channel`     | string      | Channel that the charm is deployed from                   | False    |
 | `base`        | string      | The series to be used for this charm                      | False    |
 | `config`      | map(string) | Map of the charm configuration options                    | False    |
-| `model`       | string      | Name of the model that the charm is deployed on           | **True** |
+| `model_uuid`  | string      | UUID of the model that the charm is deployed on           | **True** |
 | `revision`    | number      | Revision number of the charm name                         | False    |
 | `units`       | number      | Number of units to be deployed                            | False    |
 | `constraints` | string      | Machine constraints for the charm                         | False    |
@@ -42,12 +42,12 @@ Define a `juju_model` resource and pass to the `model` input a reference to the 
 
 ```
 resource "juju_model" "etcd" {
-  name = etcd
+  name = "etcd"
 }
 
 module "etcd-operator" {
   source = "<path-to-this-directory>"
-  model = juju_model.etcd.name
+  model_uuid = juju_model.etcd.uuid
 }
 ```
 

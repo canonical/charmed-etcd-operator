@@ -99,3 +99,4 @@ parts:
     stage:
       - LICENSE
       - refresh_versions.toml
+      - icon.svg

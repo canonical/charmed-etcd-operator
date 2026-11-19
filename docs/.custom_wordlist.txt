@@ -71,3 +71,4 @@ parsable
 MiB
 GiB
 keyspace
+etcdctl

@@ -1,5 +1,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
+import contextlib
 import json
 import logging
 import pathlib
@@ -37,11 +38,9 @@ def charm(arch: str) -> str:
 
 
 @pytest.fixture(scope="module")
-def juju(arch: str):
-    with jubilant.temp_model() as juju:
-        juju.wait_timeout = 1000
-        juju.cli("set-model-constraints", f"arch={arch}")
-        yield juju
+def juju():
+    # no model needed: callers only run controller-level commands (add-model fails on 2+ clouds)
+    yield jubilant.Juju()
 
 
 @pytest.fixture(scope="module")
@@ -147,18 +146,25 @@ def k8s_cloud(arch: str, lxd_controller: str, juju: Juju):
 def juju_vm_model(arch: str, lxd_cloud: str, lxd_controller: str, juju: Juju):
     # if concierge model ("testing") is found, such as on CI, continue with this. Else setup temp model.
     models = json.loads(juju.cli("models", "--format", "json", include_model=False))
-    for model in models["models"]:
-        if CONCIERGE_MODEL_NAME == model["short-name"]:
-            juju_lxd = jubilant.Juju(
-                model=f"{lxd_controller}:{CONCIERGE_MODEL_NAME}", wait_timeout=1000
-            )
-            juju_lxd.cli("set-model-constraints", f"arch={arch}")
-            yield juju_lxd
-            return
-
-    with jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller) as juju_lxd:
+    if CONCIERGE_MODEL_NAME in {m["short-name"] for m in models["models"]}:
+        # nullcontext: reuse the concierge model and keep it after the tests
+        model = contextlib.nullcontext(
+            jubilant.Juju(model=f"{lxd_controller}:{CONCIERGE_MODEL_NAME}")
+        )
+    else:
+        model = jubilant.temp_model(cloud=lxd_cloud, controller=lxd_controller)
+    with model as juju_lxd:
         juju_lxd.wait_timeout = 1000
         juju_lxd.cli("set-model-constraints", f"arch={arch}")
+        # Juju 4 no longer adds the client key to new models, and juju ssh/scp need it
+        if juju_lxd.version().major >= 4:
+            for key_file in (pathlib.Path.home() / ".local/share/juju/ssh").glob("juju_id_*.pub"):
+                key = key_file.read_text().strip()
+                juju_lxd.cli("add-ssh-key", key)
+                # add-ssh-key exits 0 even when it rejects the key
+                assert key.split()[1] in juju_lxd.cli("ssh-keys", "--full"), (
+                    f"{key_file} not added"
+                )
         yield juju_lxd
 
 

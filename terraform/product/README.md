@@ -56,7 +56,7 @@ This module is intended to be a product module, deploying all components for a p
 It may be used as-is and directly as follows:
 ```
 terraform apply \
-  -var 'etcd={"model": "test"}' 
+  -var 'etcd={"model_uuid": "12345678-1234-5678-9012-123456789012"}' 
   -var 'backups-integrator={"config": {"bucket": "test"}}'\
   -out terraform.out
   

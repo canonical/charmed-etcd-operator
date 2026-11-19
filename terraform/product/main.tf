@@ -15,7 +15,7 @@ module "etcd" {
   app_name          = var.etcd.app_name
   units             = var.etcd.units
   config            = var.etcd.config
-  model             = var.etcd.model
+  model_uuid        = var.etcd.model_uuid
   constraints       = var.etcd.constraints
   storage           = var.etcd.storage
   endpoint_bindings = var.etcd.endpoint_bindings
@@ -33,7 +33,7 @@ resource "juju_application" "data-integrator" {
     revision = var.data-integrator.revision
     base     = var.data-integrator.base
   }
-  model  = var.etcd.model
+  model_uuid = var.etcd.model_uuid
   config = var.data-integrator.config
 
   constraints = var.data-integrator.constraints
@@ -46,7 +46,7 @@ resource "juju_application" "grafana-agent" {
     revision = var.grafana-agent.revision
     base     = var.grafana-agent.base
   }
-  model  = var.etcd.model
+  model_uuid = var.etcd.model_uuid
   config = var.grafana-agent.config
 }
 
@@ -58,7 +58,7 @@ resource "juju_application" "backups-integrator" {
     revision = var.backups-integrator.revision
     base     = var.backups-integrator.base
   }
-  model  = var.etcd.model
+  model_uuid = var.etcd.model_uuid
   config = var.backups-integrator.config
 
   constraints = var.backups-integrator.constraints
@@ -71,7 +71,7 @@ resource "juju_application" "backups-integrator" {
 
 # Integrator apps and grafana-agent
 resource "juju_integration" "data_integrator-etcd-integration" {
-  model = var.etcd.model
+  model_uuid = var.etcd.model_uuid
 
   application {
     name = juju_application.data-integrator.name
@@ -89,7 +89,7 @@ resource "juju_integration" "data_integrator-etcd-integration" {
 
 
 resource "juju_integration" "grafana_agent-etcd" {
-  model = var.etcd.model
+  model_uuid = var.etcd.model_uuid
 
   application {
     name = juju_application.grafana-agent.name
@@ -107,7 +107,7 @@ resource "juju_integration" "grafana_agent-etcd" {
 
 
 resource "juju_integration" "backups_integrator-etcd-integration" {
-  model = var.etcd.model
+  model_uuid = var.etcd.model_uuid
 
   application {
     name = juju_application.backups-integrator.name
