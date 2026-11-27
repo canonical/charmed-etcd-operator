@@ -87,6 +87,8 @@ jobs:
     secrets: inherit
     permissions:
       contents: write # Needed for Allure Report
+      pull-requests: write # flake0 error classification adds a PR comment if tests fail
+      actions: read # flake0 error classification needs to read the run history
 
   terraform-lint:
     name: Terraform - Lint
