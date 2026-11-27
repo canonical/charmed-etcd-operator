@@ -25,12 +25,14 @@ juju deploy etcd-benchmark --channel 3.6/edge
 ```
 
 ```{attention}
-The etcd-benchmark charm is designed to run as a **single unit** and benchmarks must be initiated from the leader unit. Scaling the benchmark application to multiple units is not supported. Benchmark actions (`run`, `stop`, `list-tests`, `get-summary`) will only succeed on the leader.
+The etcd-benchmark charm is designed to run as a single unit and **benchmarks must be initiated from the leader unit**.
+ 
+Scaling the benchmark application to multiple units is not supported. Benchmark actions (`run`, `stop`, `list-tests`, `get-summary`) will only succeed on the leader.
 ```
 
 ## Enable TLS on the cluster
 
-As described in the [charmed-etcd docs](https://canonical-charmed-etcd.readthedocs-hosted.com/), TLS certificates are required in order to integrate charmed-etcd with client applications.
+[TLS certificates](/how-to/tls/index.md) are required in order to integrate charmed-etcd with client applications.
 Deploy a TLS provider and integrate it with `charmed-etcd` and `etcd-benchmark`. The [`self-signed-certificates`](https://charmhub.io/self-signed-certificates) charm is suitable for testing:
 
 ```text
@@ -44,7 +46,7 @@ Watch the model settle with `juju status --watch 3s --integrations` and wait unt
 
 ## Integrate the benchmark charm with etcd
 
-Once TLS is in place, relate the benchmark charm to charmed-etcd:
+Once TLS is enabled, relate the benchmark charm to charmed-etcd:
 
 ```text
 juju integrate etcd-benchmark charmed-etcd
