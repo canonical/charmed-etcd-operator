@@ -117,6 +117,7 @@ jobs:
         uses: canonical/flake0/.github/actions/collect@main
         with:
           phase: start
+          markers: true
       - name: Set up environment
         timeout-minutes: 5
         run: sudo snap install charmcraft --classic
