@@ -13,6 +13,7 @@ Essential operations to configure a new charmed etcd deployment:
 
 Scale horizontally <scale-horizontally>
 Tune etcd settings <tune-settings>
+Benchmark performance <benchmark-performance>
 ```
 
 Migrate an existing etcd cluster to a charmed cluster:
