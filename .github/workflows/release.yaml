@@ -26,6 +26,8 @@ jobs:
     secrets: inherit
     permissions:
       contents: write # Needed for Allure Report beta
+      pull-requests: write # flake0 error classification
+      actions: read # flake0 error classification
 
   release:
     name: Release charm
