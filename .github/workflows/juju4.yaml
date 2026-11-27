@@ -41,3 +41,7 @@ jobs:
       allure_report: false
       juju-channel: 4.1/edge
     secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: write # flake0 error classification adds a PR comment if tests fail
+      actions: read # flake0 error classification needs to read the run history

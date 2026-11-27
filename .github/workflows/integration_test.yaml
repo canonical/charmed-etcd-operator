@@ -100,6 +100,10 @@ jobs:
       - collect-integration-tests
     runs-on: ${{ matrix.job.runner }}
     timeout-minutes: 217 # Sum of steps `timeout-minutes` + 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
     steps:
       - name: Disk usage
         timeout-minutes: 1
@@ -107,6 +111,13 @@ jobs:
       - name: Checkout
         timeout-minutes: 3
         uses: actions/checkout@v6
+      - name: Start telemetry for error classification
+        timeout-minutes: 5
+        continue-on-error: true
+        uses: canonical/flake0/.github/actions/collect@main
+        with:
+          phase: start
+          markers: true
       - name: Set up environment
         timeout-minutes: 5
         run: sudo snap install charmcraft --classic
@@ -184,6 +195,54 @@ jobs:
         timeout-minutes: 1
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
         run: df --human-readable
+      - name: Stop telemetry for error classification
+        id: collect
+        if: always()
+        timeout-minutes: 5
+        continue-on-error: true
+        uses: canonical/flake0/.github/actions/collect@main
+        with:
+          phase: stop
+          artifact-name: flake0-collect-${{ matrix.job.name_in_artifact }}-${{ github.run_attempt }}
+      - name: Render metrics dashboard
+        if: always()
+        timeout-minutes: 1
+        continue-on-error: true
+        uses: canonical/flake0/.github/actions/plot@main
+        with:
+          bundle-path: ${{ steps.collect.outputs.bundle-path }}
+          artifact-name: flake0-plot-${{ matrix.job.name_in_artifact }}-${{ github.run_attempt }}
+      - name: Classify failure
+        id: classify
+        if: ${{ github.event_name == 'pull_request' && failure() && steps.spread.outcome == 'failure' && !github.event.pull_request.head.repo.fork }}
+        timeout-minutes: 25
+        continue-on-error: true
+        uses: canonical/flake0/.github/actions/classify@main
+        with:
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          bundle-path: ${{ steps.collect.outputs.bundle-path }}
+          job-name: ${{ matrix.job.name }}
+      - name: Add PR comment for failure classification
+        if: ${{ github.event_name == 'pull_request' && failure() && steps.classify.outcome != 'skipped' && !github.event.pull_request.head.repo.fork }}
+        timeout-minutes: 1
+        continue-on-error: true
+        uses: canonical/flake0/.github/actions/summarize@main
+        with:
+          leg-id: ${{ matrix.job.name_in_artifact }}
+          job-name: ${{ matrix.job.name }}
+          verdict-path: ${{ steps.classify.outputs.verdict-path }}
+          job-id: ${{ job.check_run_id }}
+      - name: Ingest telemetry and classification into OpenSearch
+        if: ${{ github.event_name == 'pull_request' && failure() && steps.classify.outcome != 'skipped' && !github.event.pull_request.head.repo.fork }}
+        timeout-minutes: 15
+        continue-on-error: true
+        uses: canonical/flake0/.github/actions/ingest@main
+        with:
+          bundle-path: ${{ steps.collect.outputs.bundle-path }}
+          verdict-path: ${{ steps.classify.outputs.verdict-path }}
+          url: ${{ secrets.FLAKE0_INGEST_URL }}
+          username: ${{ secrets.FLAKE0_INGEST_USER }}
+          password: ${{ secrets.FLAKE0_INGEST_PASSWORD }}
 
   allure-report:
     # TODO future improvement: use concurrency group for job
